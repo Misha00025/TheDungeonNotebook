@@ -26,8 +26,9 @@ def authorised(func):
     return wrapped
 
 
-@route("authorise", ["POST"])
+@route("auth", ["POST"])
 def _authorise():
+    # print(f"{request};\n{request.headers}\n{request.data}")
     content = request.json
     err, payload = get_payload(content)
     if not err:
@@ -58,7 +59,7 @@ def _get_groups():
     })
 
 
-@route("group=<group_id>/notes", ["GET"])
+@route("groups/<group_id>/notes", ["GET"])
 @authorised
 def _get_notes(group_id: int):
     author = {
@@ -83,7 +84,7 @@ def _get_notes(group_id: int):
     return jsonify(results[int(group_id)])
 
 
-@route("notes=<note_id>", ["GET"])
-def _get_note(note_id: int):
+@route("groups/<group_id>/notes/<note_id>", ["GET"])
+def _get_note(group_id: int, note_id: int):
     pass
 
