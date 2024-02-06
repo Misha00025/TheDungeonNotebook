@@ -65,7 +65,7 @@ def get_account_info(user_id):
 
 
 def access_to_user_token(access_token: str):
-    user_token = hash(access_token)
+    user_token = str(hash(access_token))
     return user_token
 
 
