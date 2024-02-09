@@ -1,0 +1,25 @@
+.listItem {
+    background-color: #323641;
+    color: #d3deff;
+
+    display: flex;
+    padding: 0 4px;
+    border-radius: 8px;
+
+    cursor: pointer;
+
+    transition: 0.1s;
+}
+
+.listItem:hover {
+    filter: brightness(115%);
+}
+
+.listItem__active {
+    filter: brightness(140%) !important;
+}
+
+.listItem-link {
+    width: 100%;
+    height: 100%;
+}

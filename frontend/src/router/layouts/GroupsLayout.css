@@ -1,0 +1,14 @@
+.app-container {
+    height: 100vh;
+    width: 100vw;
+
+    max-height: 100vh;
+    max-width: 100vw;
+
+    display: flex;
+    font-size: calc(10px + 2vmin);
+
+    background-color: #282c34;
+
+    color: white;
+}

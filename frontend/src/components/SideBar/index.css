@@ -1,0 +1,16 @@
+.sidebar {
+    width: 100px;
+    height: 100vh;
+
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    justify-content: end;
+
+    padding: 16px 0;
+
+    gap: 10px;
+
+
+    background-color: #3a3f4b;
+}

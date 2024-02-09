@@ -1,0 +1,15 @@
+.note {
+    display: flex;
+    flex-direction: column;
+
+    padding: 10px;
+    padding-top: 24px;
+}
+
+.note-text {
+
+}
+
+.note-footer{
+    
+}
