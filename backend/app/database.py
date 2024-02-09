@@ -1,10 +1,21 @@
 import time
+from functools import wraps
 
 from config import connection_settings
 from app.databases.MySQLDB import MySQLDB
 
 
 _instance: MySQLDB = None
+
+
+def _instantiated(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if _instance is None:
+            return 1, "No connection to database"
+        return func(*args, **kwargs)
+    return wrapper
+
 
 
 class VkUser:
@@ -38,6 +49,7 @@ def _to_string(fields: list):
     return string
 
 
+@_instantiated
 def find_user_id_from_token(token):
     field = "vk_user_id"
     query = f"SELECT {field} FROM vk_user_token WHERE token = '{token}'"
@@ -47,6 +59,7 @@ def find_user_id_from_token(token):
     return 1, "user not found"
 
 
+@_instantiated
 def get_last_authorise(token):
     field = "last_date"
     query = f"SELECT {field} FROM vk_user_token WHERE token = '{token}'"
@@ -56,6 +69,7 @@ def get_last_authorise(token):
     return 1, "user not found"
 
 
+@_instantiated
 def find_user_from_id(user_id) -> (int, VkUser):
     fields = ["vk_user_id", "first_name", "last_name", "photo_link"]
     string = _to_string(fields)
@@ -67,6 +81,7 @@ def find_user_from_id(user_id) -> (int, VkUser):
     return 0, user
 
 
+@_instantiated
 def save_user(user: VkUser):
     fields = ["vk_user_id", "first_name", "last_name", "photo_link"]
     string = _to_string(fields)
@@ -81,6 +96,7 @@ def save_user(user: VkUser):
     _instance.execute(command)
 
 
+@_instantiated
 def save_user_token(user_id, token):
     err, _ = find_user_id_from_token(token)
     values = ['vk_user_id', 'token', 'last_date']
@@ -90,6 +106,26 @@ def save_user_token(user_id, token):
     else:
         query = f"UPDATE vk_user_token SET last_date = '{date}' WHERE token = '{token}'"
     return _instance.execute(query)
+
+
+@_instantiated
+def get_groups(user_id: str):
+    err, user = find_user_from_id(user_id)
+    if err:
+        return err, "User not found"
+    query = f"SELECT vk_group_id FROM user_group WHERE vk_user_id = '{user_id}'"
+    res = _instance.fetchall(query)
+    return 0, res
+
+
+@_instantiated
+def get_note_ids(user_id, group_id):
+    return
+
+
+@_instantiated
+def get_note(note_id):
+    return
 
 
 if connection_settings is not None:
