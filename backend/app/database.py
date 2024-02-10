@@ -54,7 +54,7 @@ class VkGroup:
 
     def to_dict(self):
         result: dict = {
-            "vk_id": self.vk_id,
+            "id": self.vk_id,
             "name": self.name,
             "privileges": self.privileges
         }
