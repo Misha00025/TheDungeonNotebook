@@ -97,18 +97,8 @@ def get_user_id(token):
 
 
 def get_groups(user_id: str):
-    return 0, {
-        "groups": [
-            {
-                "id": 1,
-                "name": "Group 1"
-            },
-            {
-                "id": 2,
-                "name": "Group 2"
-            }
-        ]
-    }
+    err, groups = database.get_groups(user_id)
+    return err, groups
 
 
 def get_notes(user_id: str, group_id: int):

@@ -17,7 +17,6 @@ def _instantiated(func):
     return wrapper
 
 
-
 class VkUser:
     vk_id: int
     first_name: str
@@ -37,6 +36,27 @@ class VkUser:
             "first_name": self.first_name,
             "last_name": self.last_name,
             "photo": self.photo
+        }
+        return result
+
+
+class VkGroup:
+    vk_id: int
+    name: str
+    privileges: dict
+
+    def __init__(self, vk_id):
+        self.vk_id = vk_id
+        err, res = get_group(vk_id)
+        if not err:
+            self.name = res[1]
+            self.privileges = res[2]
+
+    def to_dict(self):
+        result: dict = {
+            "vk_id": self.vk_id,
+            "name": self.name,
+            "privileges": self.privileges
         }
         return result
 
@@ -114,7 +134,21 @@ def get_groups(user_id: str):
     if err:
         return err, "User not found"
     query = f"SELECT vk_group_id FROM user_group WHERE vk_user_id = '{user_id}'"
-    res = _instance.fetchall(query)
+    ress = _instance.fetchall(query)
+    groups = []
+    for res in ress:
+        vk_id = res[0]
+        group = VkGroup(vk_id)
+        groups.append(group)
+    return 0, groups
+
+
+@_instantiated
+def get_group(group_id):
+    query = f"SELECT vk_group_id, group_name, privileges FROM vk_group WHERE vk_group_id = '{group_id}'"
+    res = _instance.fetchone(query)
+    if res is None:
+        return 1, 'group not found'
     return 0, res
 
 
