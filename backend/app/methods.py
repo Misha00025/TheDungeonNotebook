@@ -102,25 +102,11 @@ def get_groups(user_id: str):
 
 
 def get_notes(user_id: str, group_id: int):
-    author = {
-        "photo": "https://sun1-55.userapi.com/s/v1/ig2/1zpZxO4Vb8Id0Afo4WdJrwjK7-i1mOnZE_stz27PDVXYQf7nuZ1_SnqlXipi8_cbL2Tub38AwybZoa7XNcCTXAc5.jpg?size=100x100&quality=95&crop=20,113,211,211&ava=1",
-        "first_name": "Миша",
-        "last_name": "Николаев"
-    }
-    results = {
-        1: {
-            "notes": [
-                {"id": 1, "header": "Header 1", "body": "body1", "author": author},
-                {"id": 2, "header": "Header 2", "body": "body2", "author": author}
-            ]
-        },
-        2: {
-            "notes": [
-                {"id": 1, "header": "Note 1", "body": "body", "author": author},
-                {"id": 2, "header": "Note 2", "body": "body body", "author": author}
-            ]
-        }
-    }
-    if group_id in results.keys():
-        return 0, results[group_id]
-    return 1, "group not found"
+    err, is_admin = database.check_admin(user_id, group_id)
+    if err:
+        return err, is_admin
+    if is_admin:
+        user_id = None
+    err, notes = database.get_notes(group_id, user_id)
+    return err, notes
+    # return 1, "group not found"

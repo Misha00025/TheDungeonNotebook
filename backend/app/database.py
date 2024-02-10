@@ -133,14 +133,24 @@ def get_groups(user_id: str):
     err, user = find_user_from_id(user_id)
     if err:
         return err, "User not found"
-    query = f"SELECT vk_group_id FROM user_group WHERE vk_user_id = '{user_id}'"
+    query = f"SELECT vk_group_id, is_admin FROM user_group WHERE vk_user_id = '{user_id}'"
     ress = _instance.fetchall(query)
     groups = []
     for res in ress:
         vk_id = res[0]
         group = VkGroup(vk_id).to_dict()
+        group["admin"] = bool(int(res[1]))
         groups.append(group)
     return 0, groups
+
+
+@_instantiated
+def check_admin(user_id, group_id):
+    query = f"SELECT is_admin FROM user_group WHERE vk_user_id = '{user_id}' AND vk_group_id = '{group_id}'"
+    res = _instance.fetchone(query)
+    if res is None:
+        return 1, "link between user and group not found"
+    return 0, res[0]
 
 
 @_instantiated
@@ -153,8 +163,23 @@ def get_group(group_id):
 
 
 @_instantiated
-def get_note_ids(user_id, group_id):
+def get_note_ids(group_id, user_id=None):
     return
+
+
+@_instantiated
+def get_notes(group_id, user_id=None):
+    query = "SELECT note_id, header, description, owner_id FROM note WHERE "
+    query += f"group_id = {group_id}"
+    if user_id is not None:
+        query += f"AND owner_id = {user_id}"
+    ress = _instance.fetchall(query)
+    notes = []
+    for res in ress:
+        _, user = find_user_from_id(res[3])
+        note = {"id": res[0], "header": res[1], "body": res[2], "author": user.to_dict() }
+        notes.append(note)
+    return 0, notes
 
 
 @_instantiated
