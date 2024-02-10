@@ -13,12 +13,17 @@ export const GroupsLayout = () => {
     const haveToken = token !== null && token !== undefined;
     console.log('token' + token);
 
+    useEffect(() => {
+      if (!haveToken) {
+        navigate('/login');
+      }
+    }, [token]);
+
     if (!haveToken) {
       navigate('/login')
       return (
         <>
           token not found login redirect
-          {navigate('/login')}
         </>
       )
     };
