@@ -172,7 +172,7 @@ def get_notes(group_id, user_id=None):
     query = "SELECT note_id, header, description, owner_id FROM note WHERE "
     query += f"group_id = {group_id}"
     if user_id is not None:
-        query += f"AND owner_id = {user_id}"
+        query += f"AND owner_id = '{user_id}'"
     ress = _instance.fetchall(query)
     notes = []
     for res in ress:
