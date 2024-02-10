@@ -52,7 +52,7 @@ def _get_groups():
     err, groups = get_groups(user_id)
     if err:
         return jsonify({"error": "unsupported error"})
-    return jsonify(groups)
+    return jsonify({"groups": groups})
 
 
 @route("groups/<group_id>/notes", ["GET"])

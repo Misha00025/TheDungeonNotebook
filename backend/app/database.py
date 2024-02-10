@@ -138,7 +138,7 @@ def get_groups(user_id: str):
     groups = []
     for res in ress:
         vk_id = res[0]
-        group = VkGroup(vk_id)
+        group = VkGroup(vk_id).to_dict()
         groups.append(group)
     return 0, groups
 
