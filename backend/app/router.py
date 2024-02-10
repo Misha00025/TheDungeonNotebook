@@ -65,7 +65,7 @@ def _get_notes(group_id: int):
     err, notes = get_notes(user_id, int(group_id))
     if err:
         return jsonify({"error": notes})
-    return jsonify(notes)
+    return jsonify({"notes": notes})
 
 
 @route("groups/<group_id>/notes/<note_id>", ["GET"])
