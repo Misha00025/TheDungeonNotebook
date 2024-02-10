@@ -3,6 +3,7 @@ import os
 import requests
 
 import config
+from app import database
 
 vk_api_version = "5.131"
 service_token = config.token
@@ -17,7 +18,6 @@ def _get_response(res):
 
 
 def is_correct_token(token):
-    from app import database
     err, last_date = database.get_last_authorise(token)
     return not err
 
@@ -70,7 +70,6 @@ def access_to_user_token(access_token: str):
 
 
 def update_authorise_date(token):
-    from app import database
     err, user_id = database.find_user_id_from_token(token)
     if not err:
         database.save_user_token(user_id, token)
@@ -90,3 +89,38 @@ def save_client(payload, user_token):
     database.save_user(user)
     database.save_user_token(user_id, user_token)
     return 0
+
+
+def get_user_id(token):
+    err, user_id = database.find_user_id_from_token(token)
+    return err, user_id
+
+
+def get_groups(user_id: str):
+    err, groups = database.get_groups(user_id)
+    return err, groups
+
+
+def get_notes(user_id: str, group_id: int):
+    author = {
+        "photo": "https://sun1-55.userapi.com/s/v1/ig2/1zpZxO4Vb8Id0Afo4WdJrwjK7-i1mOnZE_stz27PDVXYQf7nuZ1_SnqlXipi8_cbL2Tub38AwybZoa7XNcCTXAc5.jpg?size=100x100&quality=95&crop=20,113,211,211&ava=1",
+        "first_name": "Миша",
+        "last_name": "Николаев"
+    }
+    results = {
+        1: {
+            "notes": [
+                {"id": 1, "header": "Header 1", "body": "body1", "author": author},
+                {"id": 2, "header": "Header 2", "body": "body2", "author": author}
+            ]
+        },
+        2: {
+            "notes": [
+                {"id": 1, "header": "Note 1", "body": "body", "author": author},
+                {"id": 2, "header": "Note 2", "body": "body body", "author": author}
+            ]
+        }
+    }
+    if group_id in results.keys():
+        return 0, results[group_id]
+    return 1, "group not found"
