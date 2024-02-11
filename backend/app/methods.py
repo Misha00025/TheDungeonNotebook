@@ -3,6 +3,7 @@ import os
 import requests
 
 import config
+from app import database
 
 vk_api_version = "5.131"
 service_token = config.token
@@ -17,7 +18,6 @@ def _get_response(res):
 
 
 def is_correct_token(token):
-    from app import database
     err, last_date = database.get_last_authorise(token)
     return not err
 
@@ -70,7 +70,6 @@ def access_to_user_token(access_token: str):
 
 
 def update_authorise_date(token):
-    from app import database
     err, user_id = database.find_user_id_from_token(token)
     if not err:
         database.save_user_token(user_id, token)
@@ -90,3 +89,24 @@ def save_client(payload, user_token):
     database.save_user(user)
     database.save_user_token(user_id, user_token)
     return 0
+
+
+def get_user_id(token):
+    err, user_id = database.find_user_id_from_token(token)
+    return err, user_id
+
+
+def get_groups(user_id: str):
+    err, groups = database.get_groups(user_id)
+    return err, groups
+
+
+def get_notes(user_id: str, group_id: int):
+    err, is_admin = database.check_admin(user_id, group_id)
+    if err:
+        return err, is_admin
+    if is_admin:
+        user_id = None
+    err, notes = database.get_notes(group_id, user_id)
+    return err, notes
+    # return 1, "group not found"

@@ -45,43 +45,27 @@ def _authorise():
 @route("groups", ["GET"])
 @authorised
 def _get_groups():
-    return jsonify({
-        "groups": [
-            {
-                "id": 1,
-                "name": "Group 1"
-            },
-            {
-                "id": 2,
-                "name": "Group 2"
-            }
-        ]
-    })
+    token = request.headers.get("token")
+    err, user_id = get_user_id(token)
+    if err:
+        return jsonify({"error": "user not found"})
+    err, groups = get_groups(user_id)
+    if err:
+        return jsonify({"error": "unsupported error"})
+    return jsonify({"groups": groups})
 
 
 @route("groups/<group_id>/notes", ["GET"])
 @authorised
 def _get_notes(group_id: int):
-    author = {
-        "photo": "https://sun1-55.userapi.com/s/v1/ig2/1zpZxO4Vb8Id0Afo4WdJrwjK7-i1mOnZE_stz27PDVXYQf7nuZ1_SnqlXipi8_cbL2Tub38AwybZoa7XNcCTXAc5.jpg?size=100x100&quality=95&crop=20,113,211,211&ava=1",
-        "first_name": "Миша",
-        "last_name": "Николаев"
-    }
-    results = {
-        1: {
-            "notes": [
-                {"id": 1, "header": "Header 1", "body": "body1", "author": author},
-                {"id": 2, "header": "Header 2", "body": "body2", "author": author}
-            ]
-        },
-        2: {
-            "notes": [
-                {"id": 1, "header": "Note 1", "body": "body", "author": author},
-                {"id": 2, "header": "Note 2", "body": "body body", "author": author}
-            ]
-        }
-    }
-    return jsonify(results[int(group_id)])
+    token = request.headers.get("token")
+    err, user_id = get_user_id(token)
+    if err:
+        return jsonify({"error": "user not found"})
+    err, notes = get_notes(user_id, int(group_id))
+    if err:
+        return jsonify({"error": notes})
+    return jsonify({"notes": notes})
 
 
 @route("groups/<group_id>/notes/<note_id>", ["GET"])
