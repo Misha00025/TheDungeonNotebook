@@ -21,7 +21,7 @@ export const AppRouter = () => {
                 element: <NotesLayout />,
                 children: [{
                     path: "notes/:noteId",
-                    element: <Note headerText='Заметка типа' author={"Я"} text='Я рольнул d20'/>
+                    element: <Note />
                 }]
             }]
         },

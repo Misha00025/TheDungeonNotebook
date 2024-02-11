@@ -6,24 +6,24 @@ interface Author {
     last_name: string;
 }
 
-interface Note {
+export interface INote {
     id: number;
     header: string;
     body: string;
     author: Author;
 }
 
-interface Group {
+export interface IGroup {
     id: number;
     name: string;
 }
 
 interface GroupsResponse {
-    groups: Array<Group>
+    groups: Array<IGroup>
 }
 
 interface NotesResponse {
-    notes: Array<Note>
+    notes: Array<INote>
 }
 
 const BACKEND_HOST = "http://158.160.58.174:5000/api/"
@@ -49,7 +49,7 @@ export class Api {
         return result as TokenResponse;
     }
 
-    static fetchGroups = async (token: string | null): Promise<Array<Group>>  => {
+    static fetchGroups = async (token: string | null): Promise<Array<IGroup>>  => {
         console.log("fetchGroups");
         console.log(token)
         if (!token) {
@@ -69,15 +69,15 @@ export class Api {
         return result.groups;
     }
 
-    static fetchNotes = async (token: string | null): Promise<Array<Note>>  => {
-        console.log("fetchNote");
+    static fetchNotes = async (groupId: number, token: string | null): Promise<Array<INote>>  => {
+        console.log("fetchNotes");
         console.log(token)
         if (!token) {
             console.error('token not found');
             throw new Error('token not found');
         }
 
-        const response = await fetch(BACKEND_HOST + 'groups', {
+        const response = await fetch(BACKEND_HOST + `groups/${groupId}/notes`, {
             method: 'GET',
             headers: {
                 "token": token

@@ -16,7 +16,7 @@ export const ListItem = ({
     linkPath,
     onClick
 }: ListItemProps) => {
-    console.log(linkPath)
+
     return (
         <li onClick={onClick} className={`listItem ${isActive ? 'listItem__active' : ''}`}>
             {

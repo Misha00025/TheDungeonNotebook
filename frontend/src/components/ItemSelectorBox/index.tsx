@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { memo, useEffect, useState } from 'react'
 import { ListContainer } from '../ListContainer/Index'
 import { ListItem } from '../ListItem';
 
@@ -6,32 +6,37 @@ import "./index.css"
 
 interface ItemSelectorBoxProps {
     initialItemsCallback: () => Promise<Array<{name: string; id: number}>>;
+    handleActiveItemChanged?: (itemId: number) => void
     headerText: string;
     linkPrefix?: string;
     initialActiveItemId?: number;
+    activeItemId?: number;
+    refetchItemsOnChangeValue?: string;
 }
 
-export const ItemSelectorBox = ({
+export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
     initialItemsCallback,
+    handleActiveItemChanged,
     headerText,
     linkPrefix,
-    initialActiveItemId = -1
-}: ItemSelectorBoxProps) => {
-    const [activeItemId, setActiveItemId] = useState(initialActiveItemId);
+    activeItemId = -1,
+    refetchItemsOnChangeValue
+}) => {
+    console.log('rerender... ItemSelectorBox')
     const [items, setItems] = useState<Array<{name: string; id: number}>>([]);
 
     useEffect(() => {
+        console.log('refetch items...', activeItemId);
         initialItemsCallback().then(value => setItems(value));
-    }, []);
+    }, [refetchItemsOnChangeValue]);
+
 
     useEffect(() => {
-        setActiveItemId(initialActiveItemId)
-    }, [initialActiveItemId]);
-
-
-    const makeActiveGroup = (id: number) => {
-        setActiveItemId(id);
-    }
+        if (handleActiveItemChanged) {
+            console.log('handleActiveItemChanged', activeItemId);
+            handleActiveItemChanged(activeItemId);
+        }
+    }, [activeItemId]);
 
     return (
         <div className='itemSelectorBox-container'>
@@ -43,9 +48,9 @@ export const ItemSelectorBox = ({
                     items.map(item => (
                             <ListItem 
                                 key={item.id}
-                                isActive={item.id === activeItemId}
+                                isActive={Number(item.id) === Number(activeItemId)}
                                 linkPath={linkPrefix && linkPrefix + item.id}
-                                onClick={() => makeActiveGroup(item.id)}
+                                onClick={()=>undefined}
                             >
                                 {item.name}
                             </ListItem>

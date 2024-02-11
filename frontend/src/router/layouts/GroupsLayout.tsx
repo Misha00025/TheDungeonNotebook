@@ -11,7 +11,6 @@ export const GroupsLayout = () => {
     const navigate = useNavigate();
 
     const haveToken = token !== null && token !== undefined;
-    console.log('token' + token);
 
     useEffect(() => {
       if (!haveToken) {
@@ -28,11 +27,11 @@ export const GroupsLayout = () => {
       )
     };
 
+    console.log('rerender... all')
 
     return (
       <>
           <main className='app-container'>
-              {}
               <SideBar />
               <Groups />
               <Outlet />

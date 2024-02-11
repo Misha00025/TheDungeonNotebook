@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ItemSelectorBox } from '../../components/ItemSelectorBox'
 import { Api } from '../../utils/api';
 import { useAuth } from '../../store/AuthContent';
+import { useCallback } from 'react';
 
 const mockListItems = () => {
     const items = [];
@@ -9,7 +10,7 @@ const mockListItems = () => {
         items.push(
             {
                 text: `Тест-ролёвка (недоделкины вперёд!) ${i}`,
-                id: i
+                vkId: i
             }
         )
     }
@@ -20,14 +21,17 @@ const mockListItems = () => {
 export const Groups = () => {
     const { groupId } = useParams();
     const { token } = useAuth();
-    console.log(groupId);
 
+    const fetchGroups = useCallback(() => Api.fetchGroups(token), [])
+
+    console.log(groupId + 'check initial');
+    console.log('rerender... groups')
   return (
     <ItemSelectorBox 
         headerText='Список групп'
-        initialItemsCallback={() => Api.fetchGroups(token)}
+        initialItemsCallback={fetchGroups}
         linkPrefix='groups/'
-        initialActiveItemId={groupId ? Number(groupId) : undefined}
+        activeItemId={groupId ? Number(groupId) : undefined}
     />
   );
 }

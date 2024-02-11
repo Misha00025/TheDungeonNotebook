@@ -1,28 +1,23 @@
 import React from 'react'
 
 import './index.css'
+import { INote } from '../../utils/api';
+import { useNotes } from '../../store/NoteContext';
 
-interface NoteProps {
-    headerText: string;
-    text: string;
-    author: any;
-}
 
-export const Note = ({
-    headerText,
-    text,
-    author
-}: NoteProps) => {
-
+export const Note = () => {
+    const { activeNote } = useNotes();
   return (
     <div className='note'>
         <header className='note-header'>
-            {headerText}
+            {activeNote?.header}
         </header>
         <p className='note-text'>
-            {text}
+            {activeNote?.body}
         </p>
-        <p className='note-footer'>{author}</p>
+        <div className='note-author'>
+            <img src={activeNote?.author.photo}/><p className='note-author-text'>{activeNote?.author.first_name} {activeNote?.author.last_name}</p>
+        </div>
     </div>
   )
 }

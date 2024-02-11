@@ -4,12 +4,20 @@
 
     padding: 10px;
     padding-top: 24px;
+    flex: 1;
 }
 
 .note-text {
 
 }
 
-.note-footer{
-    
+.note-author{
+    height: 4em;
+    display: flex;
+    justify-content: end;
+}
+
+.note-author img{
+    margin-top: auto;
+    border-radius: 50%;
 }
