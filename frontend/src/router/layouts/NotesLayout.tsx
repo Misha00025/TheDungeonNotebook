@@ -4,8 +4,6 @@ import { Notes } from '../../pages/Notes';
 import { NotesProvider } from '../../store/NoteContext';
 
 export const NotesLayout = () => {
-    const { noteId } = useParams();
-    console.log("noteId" + noteId);
     return (
         <>
             <NotesProvider>

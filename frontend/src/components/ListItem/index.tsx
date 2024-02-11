@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 
 interface ListItemProps {
     children: ReactNode;
-    onClick: () => void;
+    onClick?: () => void;
     isActive?: boolean;
     linkPath?: string;
 }

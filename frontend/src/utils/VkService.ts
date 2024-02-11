@@ -49,7 +49,6 @@ export class VkService {
                 case ConnectEvents.OneTapAuthEventsSDK.FULL_AUTH_NEEDED: //  = 'VKSDKOneTapAuthFullAuthNeeded'
                 case ConnectEvents.OneTapAuthEventsSDK.PHONE_VALIDATION_NEEDED: // = 'VKSDKOneTapAuthPhoneValidationNeeded'
                 case ConnectEvents.ButtonOneTapAuthEventsSDK.SHOW_LOGIN: // = 'VKSDKButtonOneTapAuthShowLogin'
-                    console.log('Auth home')
                     handleSuccessLogin(e as VkResponse);
                     return false;
                   // return Connect.redirectAuth({ url: HOME_URL }); // url - строка с url, на который будет произведён редирект после авторизации.
@@ -57,7 +56,6 @@ export class VkService {
                 // Пользователь перешел по кнопке "Войти другим способом"
                 case ConnectEvents.ButtonOneTapAuthEventsSDK.SHOW_LOGIN_OPTIONS: // = 'VKSDKButtonOneTapAuthShowLoginOptions'
                   // Параметр url: ссылка для перехода после авторизации. Должен иметь https схему. Обязательный параметр.
-                  console.log('Auth home 2')
                   console.log(e)
                   return Connect.redirectAuth({ url: HOME_URL });
               }

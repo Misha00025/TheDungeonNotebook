@@ -22,25 +22,22 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
     activeItemId = -1,
     refetchItemsOnChangeValue
 }) => {
-    console.log('rerender... ItemSelectorBox')
     const [items, setItems] = useState<Array<{name: string; id: number}>>([]);
 
     useEffect(() => {
-        console.log('refetch items...', activeItemId);
         initialItemsCallback().then(value => setItems(value));
     }, [refetchItemsOnChangeValue]);
 
 
     useEffect(() => {
         if (handleActiveItemChanged) {
-            console.log('handleActiveItemChanged', activeItemId);
             handleActiveItemChanged(activeItemId);
         }
     }, [activeItemId]);
 
     return (
         <div className='itemSelectorBox-container'>
-            <header>
+            <header className='itemSelectorBox-header'>
                 {headerText}
             </header>
             <ListContainer>
@@ -50,7 +47,6 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
                                 key={item.id}
                                 isActive={Number(item.id) === Number(activeItemId)}
                                 linkPath={linkPrefix && linkPrefix + item.id}
-                                onClick={()=>undefined}
                             >
                                 {item.name}
                             </ListItem>

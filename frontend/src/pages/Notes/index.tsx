@@ -23,14 +23,12 @@ export const Notes: React.FC = () => {
     const { noteId, groupId } = useParams();
     const { setActiveNoteById, setNotes, notes } = useNotes(); 
     const { token } = useAuth();
-    console.log('rerender... Notes')
+
     useEffect(() => {
         setActiveNoteById && setActiveNoteById(Number(noteId));
     }, [noteId, notes]);
 
     const fetchNotes = useCallback(async () => {
-        console.log('recreate fetch func');
-        console.log(groupId, typeof groupId)
         if (groupId && setNotes) {
             return Api.fetchNotes(Number(groupId), token).then((notes) => {
                 setNotes(notes);

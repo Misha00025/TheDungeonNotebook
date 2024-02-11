@@ -15,7 +15,7 @@ export const Login = () => {
   const navigate = useNavigate();
 
   const queryParams = new URLSearchParams(location.search);
-  // При авторизации другими методами, происодит редирект, с параметром payload
+  // При авторизации другими методами, происходит редирект, с параметром payload
   const loginPayload = queryParams.get('payload');
 
   const { login } = useAuth();
@@ -38,7 +38,6 @@ export const Login = () => {
 
   useEffect(()=>{
     if (vkResponse) {
-      console.log(vkResponse);
       login(vkResponse).then(() => {
         navigate("/");
       });

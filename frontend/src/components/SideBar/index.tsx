@@ -20,9 +20,9 @@ export const SideBar = () => {
   return (
     <div className='sidebar'>
         <Link to={PROJECT_GITHUB_URL}>
-          <IconButton icon={githubIcon} tooltip='Страница на github' onClick={()=>console.log('click')}/>
+          <IconButton icon={githubIcon} tooltip='Страница на github' onClick={()=>undefined}/>
         </Link>
-        <IconButton icon={settingIcon} tooltip='Настройки' onClick={()=>console.log('click')}/>
+        <IconButton icon={settingIcon} tooltip='Настройки' onClick={()=>alert('Ха ха, ты думал тут что-то будет?')}/>
         <IconButton icon={exitIcon} tooltip='Перейти на страницу авторизации' onClick={()=>exitAction()}/>
     </div>
   )

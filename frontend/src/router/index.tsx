@@ -30,6 +30,7 @@ export const AppRouter = () => {
             element: <Login />
         }
     ])
+
   return (
     <RouterProvider router={router} />
   )

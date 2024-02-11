@@ -16,3 +16,7 @@
 
     border-right: 1px solid gray;
 }
+
+.itemSelectorBox-header {
+    font-weight: 500;
+}

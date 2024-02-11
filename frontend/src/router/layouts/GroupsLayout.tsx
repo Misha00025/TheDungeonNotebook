@@ -27,8 +27,6 @@ export const GroupsLayout = () => {
       )
     };
 
-    console.log('rerender... all')
-
     return (
       <>
           <main className='app-container'>
