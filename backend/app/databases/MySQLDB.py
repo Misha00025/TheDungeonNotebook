@@ -26,17 +26,20 @@ class MySQLDB:
     def execute(self, query):
         with self.__connection.cursor() as cursor:
             result = cursor.execute(query)
+            cursor.close()
             self.__connection.commit()
         return result
 
     def fetchone(self, query):
         with self.__connection.cursor() as cursor:
             cursor.execute(query)
+            cursor.close()
             result = cursor.fetchone()
         return result
 
     def fetchall(self, query):
         with self.__connection.cursor() as cursor:
             cursor.execute(query)
+            cursor.close()
             result = cursor.fetchall()
         return result
