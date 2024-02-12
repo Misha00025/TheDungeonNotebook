@@ -33,13 +33,13 @@ class MySQLDB:
     def fetchone(self, query):
         with self.__connection.cursor() as cursor:
             cursor.execute(query)
-            cursor.close()
             result = cursor.fetchone()
+            cursor.close()
         return result
 
     def fetchall(self, query):
         with self.__connection.cursor() as cursor:
             cursor.execute(query)
-            cursor.close()
             result = cursor.fetchall()
+            cursor.close()
         return result
