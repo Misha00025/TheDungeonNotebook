@@ -40,6 +40,9 @@ export class VkService {
                 return false;
               }
 
+              console.log(type);
+              console.log(e);
+
               switch (type) {
                 case ConnectEvents.OneTapAuthEventsSDK.LOGIN_SUCCESS: // = 'VKSDKOneTapAuthLoginSuccess'
                   handleSuccessLogin(e as VkResponse);
