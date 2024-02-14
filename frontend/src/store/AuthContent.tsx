@@ -41,6 +41,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
   const [token, setToken] = useState<string | null>(getToken());
 
   const login = async (data: VkResponse) => {
+    console.log('login')
     const token = await Api.exchangeToken(data);
     localStorage.setItem("accessToken", token.access_token);
 

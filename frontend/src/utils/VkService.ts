@@ -1,7 +1,7 @@
 import { Config, Connect, ConnectEvents } from '@vkontakte/superappkit';
 
 const APP_ID = 51847034;
-const HOME_URL = "http://localhost/login";
+const HOME_URL = "https://the-dungeon-notebook.ru/login";
 
 export interface VkResponse {
   uuid: string;

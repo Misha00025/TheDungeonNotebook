@@ -37,6 +37,7 @@ export const Login = () => {
   }, [loginPayload]);
 
   useEffect(()=>{
+    console.log(vkResponse);
     if (vkResponse) {
       login(vkResponse).then(() => {
         navigate("/");
