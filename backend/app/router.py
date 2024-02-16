@@ -21,14 +21,13 @@ def authorised(func):
         if is_correct_token(token):
             update_authorise_date(token)
             return func(*args, **kwargs)
-        return jsonify({"error": "not valid token"})
+        return "not valid token", 401
     wrapped.__name__ = func.__name__
     return wrapped
 
 
 @route("auth", ["POST"])
 def _authorise():
-    # print(f"{request};\n{request.headers}\n{request.data}")
     content = request.json
     err, payload = get_payload(content)
     if not err:
@@ -38,8 +37,8 @@ def _authorise():
             user_token = access_to_user_token(access_token)
             save_client(payload, user_token)
             return jsonify({"access_token": user_token})
-        return jsonify({"error": result})
-    return jsonify({"error": "payload not found"})
+        return result, 406
+    return "payload not found", 415
 
 
 @route("groups", ["GET"])
