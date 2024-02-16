@@ -4,15 +4,17 @@ const APP_ID = 51847034;
 const HOME_URL = "https://the-dungeon-notebook.ru/login";
 
 export interface VkResponse {
-  uuid: string;
-  type: string;
-  auth: number;
-  user: User;
-  token: string;
-  ttl: number;
-  hash: string;
-  loadExternalUsers: boolean;
-  code_verifier: string;
+  payload: {
+    uuid: string;
+    type: string;
+    auth: number;
+    user: User;
+    token: string;
+    ttl: number;
+    hash: string;
+    loadExternalUsers: boolean;
+    code_verifier: string;
+  }
 }
 
 interface User {
