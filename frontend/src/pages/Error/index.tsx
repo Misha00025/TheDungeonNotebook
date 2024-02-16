@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useRouteError } from 'react-router-dom';
+import { Link, useRouteError } from 'react-router-dom';
 
 import './index.css'
 
@@ -45,7 +45,9 @@ export const ErrorPage = () => {
                     <i>{error.statusText || error.message}</i>
                 </h3>
                 <p>{isDragonPage ? "Your page has been burned by a dragon" : "You rolled 1 and get Error Page :("}</p>
-
+                <Link className='errorPage-link' to={'/'}>
+                    Main page
+                </Link>
             </div>
 
         </div>

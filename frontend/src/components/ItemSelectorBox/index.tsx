@@ -3,6 +3,7 @@ import { ListContainer } from '../ListContainer/Index'
 import { ListItem } from '../ListItem';
 
 import "./index.css"
+import { useAuth } from '../../store/AuthContent';
 
 interface ItemSelectorBoxProps {
     initialItemsCallback: () => Promise<Array<{name: string; id: number}>>;
