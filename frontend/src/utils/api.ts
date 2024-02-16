@@ -26,7 +26,7 @@ interface NotesResponse {
     notes: Array<INote>
 }
 
-const BACKEND_HOST = "http://158.160.58.174:5000/api/"
+const BACKEND_HOST = "https://the-dungeon-notebook.ru/api/"
 
 export interface TokenResponse {
     access_token: string;
