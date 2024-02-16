@@ -47,14 +47,14 @@ export class VkService {
 
               switch (type) {
                 case ConnectEvents.OneTapAuthEventsSDK.LOGIN_SUCCESS: // = 'VKSDKOneTapAuthLoginSuccess'
-                  handleSuccessLogin(e as VkResponse);
+                  handleSuccessLogin(e as unknown as VkResponse);
                   return false
                 // Для этих событий нужно открыть полноценный VK ID чтобы
                 // пользователь дорегистрировался или подтвердил телефон
                 case ConnectEvents.OneTapAuthEventsSDK.FULL_AUTH_NEEDED: //  = 'VKSDKOneTapAuthFullAuthNeeded'
                 case ConnectEvents.OneTapAuthEventsSDK.PHONE_VALIDATION_NEEDED: // = 'VKSDKOneTapAuthPhoneValidationNeeded'
                 case ConnectEvents.ButtonOneTapAuthEventsSDK.SHOW_LOGIN: // = 'VKSDKButtonOneTapAuthShowLogin'
-                    handleSuccessLogin(e as VkResponse);
+                    handleSuccessLogin(e as unknown as VkResponse);
                     return false;
                   // return Connect.redirectAuth({ url: HOME_URL }); // url - строка с url, на который будет произведён редирект после авторизации.
                   // state - состояние вашего приложение или любая произвольная строка, которая будет добавлена к url после авторизации.
