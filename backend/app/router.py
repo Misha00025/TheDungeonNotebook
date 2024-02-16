@@ -47,10 +47,10 @@ def _get_groups():
     token = request.headers.get("token")
     err, user_id = get_user_id(token)
     if err:
-        return jsonify({"error": "user not found"})
+        return "user not found", 404
     err, groups = get_groups(user_id)
     if err:
-        return jsonify({"error": "unsupported error"})
+        return "unsupported error", 418
     return jsonify({"groups": groups})
 
 
@@ -60,10 +60,10 @@ def _get_notes(group_id: int):
     token = request.headers.get("token")
     err, user_id = get_user_id(token)
     if err:
-        return jsonify({"error": "user not found"})
+        return "user not found", 404
     err, notes = get_notes(user_id, int(group_id))
     if err:
-        return jsonify({"error": notes})
+        return notes, 418
     return jsonify({"notes": notes})
 
 
