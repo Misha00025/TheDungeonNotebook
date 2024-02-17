@@ -24,22 +24,35 @@ class MySQLDB:
         return self.__connection is not None
 
     def execute(self, query):
-        with self.__connection.cursor() as cursor:
-            result = cursor.execute(query)
-            cursor.close()
-            self.__connection.commit()
-        return result
+        try:
+            with self.__connection.cursor() as cursor:
+                result = cursor.execute(query)
+                cursor.close()
+                self.__connection.commit()
+            return result
+        except:
+            self._connect()
+            return None
 
     def fetchone(self, query):
-        with self.__connection.cursor() as cursor:
-            cursor.execute(query)
-            result = cursor.fetchone()
-            cursor.close()
-        return result
+        try:
+            with self.__connection.cursor() as cursor:
+                cursor.execute(query)
+                result = cursor.fetchone()
+                cursor.close()
+            return result
+        except:
+            self._connect()
+            return None
+
 
     def fetchall(self, query):
-        with self.__connection.cursor() as cursor:
-            cursor.execute(query)
-            result = cursor.fetchall()
-            cursor.close()
-        return result
+        try:
+            with self.__connection.cursor() as cursor:
+                cursor.execute(query)
+                result = cursor.fetchall()
+                cursor.close()
+            return result
+        except:
+            self._connect()
+            return None
