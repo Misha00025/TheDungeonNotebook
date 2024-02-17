@@ -3,7 +3,6 @@ import { ListContainer } from '../ListContainer/Index'
 import { ListItem } from '../ListItem';
 
 import "./index.css"
-import { useAuth } from '../../store/AuthContent';
 
 interface ItemSelectorBoxProps {
     initialItemsCallback: () => Promise<Array<{name: string; id: number}>>;
@@ -13,6 +12,7 @@ interface ItemSelectorBoxProps {
     initialActiveItemId?: number;
     activeItemId?: number;
     refetchItemsOnChangeValue?: string;
+    isHided?: boolean;
 }
 
 export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
@@ -21,7 +21,8 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
     headerText,
     linkPrefix,
     activeItemId = -1,
-    refetchItemsOnChangeValue
+    refetchItemsOnChangeValue,
+    isHided = false
 }) => {
     const [items, setItems] = useState<Array<{name: string; id: number}>>([]);
 
@@ -37,7 +38,7 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
     }, [activeItemId]);
 
     return (
-        <div className='itemSelectorBox-container'>
+        <div className={`itemSelectorBox-container ${isHided ? 'itemSelectorBox-container__hided' : undefined}`}>
             <header className='itemSelectorBox-header'>
                 {headerText}
             </header>

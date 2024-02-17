@@ -20,3 +20,13 @@
 .itemSelectorBox-header {
     font-weight: 500;
 }
+
+.itemSelectorBox-container__hided {
+    display: none;
+}
+
+@media screen and (max-width: 768px) {
+    .itemSelectorBox-container {
+        flex: 1;
+    }
+}

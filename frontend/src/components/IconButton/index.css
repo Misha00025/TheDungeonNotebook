@@ -10,8 +10,8 @@
 }
 
 .icon {
-    width: 64px;
-    height: 64px;
+    height: 100%;
+    width: 100%;
 
     padding: 8px;
 
@@ -41,4 +41,11 @@
 .icon__right{
     justify-content: space-between;
     flex-direction: row-reverse;
+}
+
+
+@media screen and (max-width: 768px) {
+    .icon {
+        padding: 4px;
+    }
 }

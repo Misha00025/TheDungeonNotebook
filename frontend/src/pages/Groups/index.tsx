@@ -3,9 +3,11 @@ import { ItemSelectorBox } from '../../components/ItemSelectorBox'
 import { Api } from '../../utils/api';
 import { useAuth } from '../../store/AuthContent';
 import React, { useCallback } from 'react';
+import { usePlatform } from '../../store/PlatformContext';
 
 export const Groups: React.FC = () => {
-    const { groupId } = useParams();
+    const { platform } = usePlatform();
+    const { groupId, noteId } = useParams();
     const { token } = useAuth();
 
     const fetchGroups = useCallback(() => Api.fetchGroups(token), [token]);
@@ -15,6 +17,7 @@ export const Groups: React.FC = () => {
         initialItemsCallback={fetchGroups}
         linkPrefix='groups/'
         activeItemId={groupId ? Number(groupId) : undefined}
+        isHided={noteId && platform === 'touch' ? true : false}
     />
   );
 }

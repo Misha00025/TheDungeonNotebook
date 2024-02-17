@@ -4,6 +4,7 @@ import { useNotes } from '../../store/NoteContext';
 import { useAuth } from '../../store/AuthContent';
 import { Api } from '../../utils/api';
 import { useCallback, useEffect, useMemo } from 'react';
+import { usePlatform } from '../../store/PlatformContext';
 
 const mockListItems = () => {
     const items = [];
@@ -23,6 +24,7 @@ export const Notes: React.FC = () => {
     const { noteId, groupId } = useParams();
     const { setActiveNoteById, setNotes, notes } = useNotes(); 
     const { token } = useAuth();
+    const { platform } = usePlatform();
 
     useEffect(() => {
         setActiveNoteById && setActiveNoteById(Number(noteId));
@@ -54,6 +56,7 @@ export const Notes: React.FC = () => {
             handleActiveItemChanged={handleActiveItemChanged}
             activeItemId={noteId ? Number(noteId) : undefined }
             refetchItemsOnChangeValue={groupId}
+            isHided={noteId && platform === 'touch' ? true : false}
         />
     );
 }

@@ -5,6 +5,7 @@ import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import reportWebVitals from './reportWebVitals';
 import { AppRouter } from './router';
 import { AuthProvider } from './store/AuthContent';
+import { PlatformProvider } from './store/PlatformContext';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -13,7 +14,9 @@ const root = ReactDOM.createRoot(
 root.render(
   <React.StrictMode>
     <AuthProvider>
-      <AppRouter />
+      <PlatformProvider>
+        <AppRouter />
+      </PlatformProvider>
     </AuthProvider>
   </React.StrictMode>
 );

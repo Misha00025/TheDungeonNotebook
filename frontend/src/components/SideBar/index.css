@@ -5,12 +5,23 @@
     display: flex;
     align-items: center;
     flex-direction: column;
-    justify-content: end;
+    justify-content: space-between;
 
     padding: 16px 0;
 
     gap: 10px;
 
-
     background-color: #3a3f4b;
+}
+
+.sidebar-bottomItems, .sidebar-topItems {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+@media screen and (max-width: 768px) {
+    .sidebar {
+        width: 48px;
+    }
 }
