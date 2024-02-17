@@ -1,9 +1,9 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Dungeon notebook",
+  "name": "The dungeon notebook",
   "icons": [
     {
-      "src": "favicon.ico",
+      "src": "fa-solid_dice-d20.svg",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
     },

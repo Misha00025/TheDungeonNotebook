@@ -18,3 +18,13 @@
 
     border-radius: 16px;
 }
+
+.errorPage-link {
+    text-decoration: underline;
+    color: hsla(230, 30%, 85%, 1);
+    cursor: pointer;
+}
+
+.errorPage-link:hover {
+    opacity: 0.8;
+}
