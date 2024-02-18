@@ -1,7 +1,4 @@
 .itemSelectorBox-container {
-    width: 20vw;
-    min-width: 200px;
-
     max-height: 100vh;
 
     overflow: auto;
@@ -23,6 +20,13 @@
 
 .itemSelectorBox-container__hided {
     display: none;
+}
+
+@media screen and (min-width: 769px) {
+    .itemSelectorBox-container {
+        width: 20vw;
+        min-width: 200px;
+    }
 }
 
 @media screen and (max-width: 768px) {
