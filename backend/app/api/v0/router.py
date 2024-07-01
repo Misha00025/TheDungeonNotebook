@@ -1,18 +1,11 @@
-import requests
-
-from app import application
 from flask.json import jsonify
 from flask import request
 
-from app.methods import *
-from app import database
+from app.api.v0.methods import *
+from app.api_controller import route, version
 
 
-prefix = "/api/"
-
-
-def route(url, methods):
-    return application.route(prefix + url, methods=methods)
+version("")
 
 
 def authorised(func):

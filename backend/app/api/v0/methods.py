@@ -1,9 +1,7 @@
-import os
-
 import requests
 
 import config
-from app import database
+from app.api.v0 import database
 
 vk_api_version = "5.131"
 service_token = config.token
