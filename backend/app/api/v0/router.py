@@ -1,22 +1,13 @@
 from flask.json import jsonify
 from flask import request
 
+from app.access_managment import authorised_user
 from app.api.v0.methods import *
 from app.api_controller import route, version
 
 
 version("")
 
-
-def authorised(func):
-    def wrapped(*args, **kwargs):
-        token = request.headers.get("token")
-        if is_correct_token(token):
-            update_authorise_date(token)
-            return func(*args, **kwargs)
-        return "not valid token", 401
-    wrapped.__name__ = func.__name__
-    return wrapped
 
 
 @route("auth", ["POST"])
@@ -35,7 +26,7 @@ def _authorise():
 
 
 @route("groups", ["GET"])
-@authorised
+@authorised_user
 def _get_groups():
     token = request.headers.get("token")
     err, user_id = get_user_id(token)
@@ -48,7 +39,7 @@ def _get_groups():
 
 
 @route("groups/<group_id>/notes", ["GET"])
-@authorised
+@authorised_user
 def _get_notes(group_id: int):
     token = request.headers.get("token")
     err, user_id = get_user_id(token)

@@ -74,7 +74,7 @@ def update_authorise_date(token):
 
 
 def save_client(payload, user_token):
-    from app import database
+    from app.api.v0 import database
     user_id = payload["user"]["id"]
     user = database.VkUser()
     err, account_info = get_account_info(user_id)
