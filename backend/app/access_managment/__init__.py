@@ -1,13 +1,10 @@
 from app.api.v0.methods import (update_authorise_date)
-
-_at = "token"
-
-_st = "Service-token"
+from variables import _st, _at
 
 
 def is_correct_token(request):
     from app.api.v0.methods import is_correct_token as ict
-    token = request.headers.get("token")
+    token = request.headers.get(_at)
     result = ict(token)
     if result:
         update_authorise_date(token)

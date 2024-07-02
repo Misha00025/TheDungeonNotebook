@@ -24,3 +24,21 @@ def get_account_info(user_id):
             return 0, response[0]
         return 1, response
     return 1, "vk not found"
+
+
+def save_client(user_id):
+    from app.api.v0 import database
+    user = database.VkUser()
+    err, account_info = get_account_info(user_id)
+    if err:
+        return err
+    user.vk_id = account_info["id"]
+    user.first_name = account_info["first_name"]
+    user.last_name = account_info["last_name"]
+    user.photo = account_info["photo_100"]
+    database.save_user(user)
+    return 0
+
+
+def save_user_group(user_id, group_id):
+    pass
