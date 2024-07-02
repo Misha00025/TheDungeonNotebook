@@ -30,7 +30,8 @@ def authorised(func):
 
 def authorised_user(func):
     def wrapped(*args, **kwargs):
-        if is_correct_token():
+        from flask import request
+        if is_correct_token(request):
             return func(*args, **kwargs)
         return "not valid token", 401
     wrapped.__name__ = func.__name__
