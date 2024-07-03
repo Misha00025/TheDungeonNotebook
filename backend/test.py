@@ -12,7 +12,7 @@ user_id = "811066224"
 def get_info():
     url = f"http://127.0.0.1:5000/api/v1/get_user_info/{user_id}"
     res = rq.get(url=url, headers=headers)
-    print(res.json())
+    return res.json()
 
 
 def upd_user():
@@ -24,12 +24,31 @@ def upd_user():
         data=json_data,
         headers=headers
     )
-    print(res.content)
+    return res.content
+
+
+def db_test():
+    from app import database
+    user = database.vk_user.VkUser()
+    account_info = get_info()
+    user.vk_id = account_info["id"]
+    user.first_name = account_info["first_name"]
+    user.last_name = account_info["last_name"]
+    user.photo = account_info["photo_100"]
+    res = database.vk_user.find(user_id)
+    print(res[1])
+    database.vk_user.add(user.vk_id, None, None, None)
+    database.vk_user.update(user.vk_id, user.first_name, user.last_name, user.photo)
+    res = database.vk_user.find(user_id)
+    print(res[1].to_dict())
+    database.vk_user.remove(user_id)
+    return "OK"
 
 
 if __name__ == "__main__":
-    get_info()
-    # upd_user()
+    # print(db_test())
+    print(get_info())
+    print(upd_user())
 
 
 

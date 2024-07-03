@@ -23,10 +23,10 @@ class MySQLDB:
     def is_connected(self):
         return self.__connection is not None
 
-    def execute(self, query):
+    def execute(self, query, data=()):
         try:
             with self.__connection.cursor() as cursor:
-                result = cursor.execute(query)
+                result = cursor.execute(query, data)
                 cursor.close()
                 self.__connection.commit()
             return result
@@ -34,10 +34,10 @@ class MySQLDB:
             self._connect()
             return None
 
-    def fetchone(self, query):
+    def fetchone(self, query, data=()):
         try:
             with self.__connection.cursor() as cursor:
-                cursor.execute(query)
+                cursor.execute(query, data)
                 result = cursor.fetchone()
                 cursor.close()
             return result
@@ -45,11 +45,10 @@ class MySQLDB:
             self._connect()
             return None
 
-
-    def fetchall(self, query):
+    def fetchall(self, query, data=()):
         try:
             with self.__connection.cursor() as cursor:
-                cursor.execute(query)
+                cursor.execute(query, data)
                 result = cursor.fetchall()
                 cursor.close()
             return result
