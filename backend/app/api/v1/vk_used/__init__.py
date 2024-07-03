@@ -8,8 +8,14 @@ from app.access_managment import authorised
 @route("get_user_info/<user_id>", methods=["GET"])
 @authorised
 def _get_user_info(user_id):
-    user_info = get_account_info(user_id)
+    user_info = get_user_info(user_id)
     return jsonify(user_info)
+
+
+@route("group_users", methods=["GET"])
+@authorised
+def _get_group_users():
+    return "Not Implemented", 501
 
 
 @route("update_user", methods=["PUT"])

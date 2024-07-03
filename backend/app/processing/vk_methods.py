@@ -14,8 +14,15 @@ def _get_response(res):
     return 1, json["error"]
 
 
+def get_user_info(user_id):
+    from app.api.v0.database import find_user_from_id
+    err, user = find_user_from_id(user_id)
+    if err:
+        return None
+    return user.to_dict()
 
-def get_account_info(user_id):
+
+def get_vk_account_info(user_id):
     data = f"v={vk_api_version}&user_ids={user_id}&fields=photo_100&access_token={service_token}&lang=0"
     res = requests.post('https://api.vk.com/method/users.get', data=data)
     if res.ok:
@@ -29,7 +36,7 @@ def get_account_info(user_id):
 def save_client(user_id):
     from app.api.v0 import database
     user = database.VkUser()
-    err, account_info = get_account_info(user_id)
+    err, account_info = get_vk_account_info(user_id)
     if err:
         return err
     user.vk_id = account_info["id"]

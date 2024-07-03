@@ -7,16 +7,16 @@ from variables import _st
 
 
 headers = {_st: "1", "Content-Type": "application/json"}
-
+user_id = "811066224"
 
 def get_info():
-    url = "http://127.0.0.1:5000/api/v1/get_user_info/173745999"
+    url = f"http://127.0.0.1:5000/api/v1/get_user_info/{user_id}"
     res = rq.get(url=url, headers=headers)
-    print(res.json()[1])
+    print(res.json())
 
 
 def upd_user():
-    data = {"user_id": "173745999", "group_id": "218984657"}
+    data = {"user_id": user_id, "group_id": "218984657"}
     json_data = json.dumps(data)  # Преобразование данных в формат JSON
     res = rq.request(
         method="PUT",
@@ -29,7 +29,7 @@ def upd_user():
 
 if __name__ == "__main__":
     get_info()
-    upd_user()
+    # upd_user()
 
 
 
