@@ -7,7 +7,7 @@ from variables import _st
 
 
 headers = {_st: "1", "Content-Type": "application/json"}
-user_id = "811066224"
+user_id = "173745999"
 
 def get_info():
     url = f"http://127.0.0.1:5000/api/v1/get_user_info/{user_id}"
@@ -48,7 +48,6 @@ def db_test():
 if __name__ == "__main__":
     # print(db_test())
     print(get_info())
-    print(upd_user())
-
+    # print(upd_user())
 
 
