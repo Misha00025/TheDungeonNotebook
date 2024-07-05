@@ -43,5 +43,4 @@ def save_client(user_id):
     user.first_name = account_info["first_name"]
     user.last_name = account_info["last_name"]
     user.photo = account_info["photo_100"]
-    database.save_user(user)
-    return 0
+    return database.save_user(user)

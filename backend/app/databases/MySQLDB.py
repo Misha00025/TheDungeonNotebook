@@ -18,7 +18,7 @@ class MySQLDB:
                                             host=self._host,
                                             charset='utf8',
                                             cursorclass=pymysql.cursors.SSCursor)
-        print(self.__connection.get_server_info())
+        # print(self.__connection.get_server_info())
         self.__cursor = self.__connection.cursor()
 
     def is_connected(self):

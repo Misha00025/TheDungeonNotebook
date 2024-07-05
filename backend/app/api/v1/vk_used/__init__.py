@@ -33,7 +33,6 @@ def _update_user():
     if not user_is_founded(user_id):
         return "USER NOT FOUND", 404
     save_client(user_id)
-    print(request.get_json())
     return "OK", 200
 
 
@@ -41,12 +40,13 @@ def _update_user():
 @authorised_group
 def _add_user_to_group():
     user_id = get_user_id(request)
+    print(user_id)
     if not user_is_founded(user_id):
-        save_client(user_id)
+        save_client(str(user_id))
     st = get_service_token(request)
     group_id = find_group_id_by(st)
     is_admin = get_admin_status(request)
-    add_user_to_group(user_id, group_id, is_admin)
+    add_user_to_group(group_id, user_id, is_admin)
     return "OK", 200
 
 
