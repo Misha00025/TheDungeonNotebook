@@ -6,8 +6,10 @@ import json
 from variables import _st
 
 
-headers = {_st: "1", "Content-Type": "application/json"}
+st = "1"
+headers = {_st: st, "Content-Type": "application/json"}
 user_id = "173745999"
+
 
 def get_info():
     url = f"http://127.0.0.1:5000/api/v1/get_user_info/{user_id}"
@@ -25,6 +27,13 @@ def upd_user():
         headers=headers
     )
     return res.content
+
+
+def check_user():
+    url = f"http://127.0.0.1:5000/api/v1/user_is_mine"
+    payload = {"user_id": user_id}
+    res = rq.get(url=url, headers=headers, params=payload)
+    return res.text
 
 
 def db_test():
@@ -45,9 +54,10 @@ def db_test():
     return "OK"
 
 
+
+
 if __name__ == "__main__":
     # print(db_test())
-    print(get_info())
+    # print(get_info())
     # print(upd_user())
-
-
+    print(check_user())

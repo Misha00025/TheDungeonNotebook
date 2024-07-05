@@ -1,10 +1,10 @@
 from app.api.v0.methods import (update_authorise_date)
-from variables import _st, _at
+from app.processing.request_parcer import get_service_token, get_access_token
 
 
 def is_correct_token(request):
     from app.api.v0.methods import is_correct_token as ict
-    token = request.headers.get(_at)
+    token = get_access_token(request)
     result = ict(token)
     if result:
         update_authorise_date(token)
@@ -12,16 +12,18 @@ def is_correct_token(request):
 
 
 def is_correct_service_token(request):
-    print(request.headers)
-    if request.headers.get(_st, "") == "":
+    st = get_service_token(request)
+    if st == "":
         return False
-    return True
+    from app.processing.founder import find_group_id_by
+    group_id = find_group_id_by(st)
+    return group_id is not None
 
 
-def authorised(func):
+def authorised_group(func):
     from flask import request
     def wrapped(*args, **kwargs):
-        if is_correct_token(request) or is_correct_service_token(request):
+        if is_correct_service_token(request):
             return func(*args, **kwargs)
         return "not valid token", 401
     wrapped.__name__ = func.__name__

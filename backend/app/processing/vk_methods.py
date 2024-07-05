@@ -45,7 +45,3 @@ def save_client(user_id):
     user.photo = account_info["photo_100"]
     database.save_user(user)
     return 0
-
-
-def save_user_group(user_id, group_id):
-    pass

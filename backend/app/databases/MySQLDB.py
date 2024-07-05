@@ -56,4 +56,4 @@ class MySQLDB:
             return result
         except:
             self._connect()
-            return None
+            return []
