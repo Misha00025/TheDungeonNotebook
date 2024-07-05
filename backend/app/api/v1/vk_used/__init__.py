@@ -37,7 +37,7 @@ def _update_user():
     return "OK", 200
 
 
-@route("add_user_to_me", methods=["PUSH"])
+@route("add_user_to_me", methods=["POST"])
 @authorised_group
 def _add_user_to_group():
     user_id = get_user_id(request)
