@@ -18,12 +18,11 @@ def get_info():
 
 
 def upd_user():
-    data = {"user_id": user_id, "group_id": "218984657"}
-    json_data = json.dumps(data)  # Преобразование данных в формат JSON
+    payload = {"user_id": user_id}
     res = rq.request(
         method="PUT",
         url="http://127.0.0.1:5000/api/v1/update_user",
-        data=json_data,
+        params=payload,
         headers=headers
     )
     return res.content
