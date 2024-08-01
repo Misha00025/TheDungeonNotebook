@@ -70,19 +70,20 @@ def test_notes():
     res = rq.get(url=url, headers=headers)
     print(res.text)
     res = rq.get(url=url, headers=head, params=upayload)
-    # res = rq.post(url=url+"add", headers=headers, params=payload, json=data).json()
-    # note_id = str(res["last_id"])
-    # res = rq.get(url=url+note_id, headers=headers, params=payload)
-    # print(res.text)
-    # sleep(10)
-    # data["header"] = "HEH"
-    # data["body"] = "HEHEH"
-    # rq.put(url=url+note_id, headers=headers, params=payload, json=data)
-    # res = rq.get(url=url+note_id, headers=headers, params=payload)
-    # print(res.text)
-    # sleep(10)
-    # rq.delete(url=url+note_id, headers=headers, params=payload)
-    # res = rq.get(url=url+note_id, headers=headers, params=payload)
+    print(res.text)
+    res = rq.post(url=url+"add", headers=headers, params=payload, json=data).json()
+    note_id = str(res["last_id"])
+    res = rq.get(url=url+note_id, headers=headers, params=payload)
+    print(res.text)
+    sleep(10)
+    data["header"] = "HEH"
+    data["body"] = "HEHEH"
+    rq.put(url=url+note_id, headers=headers, params=payload, json=data)
+    res = rq.get(url=url+note_id, headers=headers, params=payload)
+    print(res.text)
+    sleep(10)
+    rq.delete(url=url+note_id, headers=headers, params=payload)
+    res = rq.get(url=url+note_id, headers=headers, params=payload)
     return res.text
 
 
