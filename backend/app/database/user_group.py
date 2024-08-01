@@ -16,21 +16,21 @@ def _make_result(query, data):
 
 def _find_by_user_id(user_id):
     data = (user_id,)
-    print("by ui")
+    # print("by ui")
     query = f"SELECT {_string_fields} FROM {_table} WHERE {_fields[0]} = %s"
     return _make_result(query, data)
 
 
 def _find_by_group_id(group_id):
     data = (group_id,)
-    print("by gi")
+    # print("by gi")
     query = f"SELECT {_string_fields} FROM {_table} WHERE {_fields[1]} = %s"
     return _make_result(query, data)
 
 
 def _find_by_all(user_id, group_id):
     data = (user_id, group_id,)
-    print("by all")
+    # print("by all")
     query = f"SELECT {_string_fields} FROM {_table} WHERE {_fields[0]} = %s and {_fields[1]} = %s"
     err, result = _make_result(query, data)
     if err:

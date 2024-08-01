@@ -10,3 +10,4 @@ def _ping():
 
 
 from .vk_used import *
+from . import notes

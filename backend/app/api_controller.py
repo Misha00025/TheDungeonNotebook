@@ -28,3 +28,4 @@ def route(url, methods):
         _urls[url] = (methods, f)
         return dec(f)
     return decorator
+

@@ -1,3 +1,4 @@
+from time import sleep
 from typing import Mapping
 
 import requests as rq
@@ -7,7 +8,8 @@ from variables import _st
 
 
 st = "1"
-headers = {_st: st, "Content-Type": "application/json"}
+ut = "4595880663507502266"
+headers = {_st: st, "Content-Type": "application/json; charset=utf-8"}
 user_id = "173745999"
 
 
@@ -53,10 +55,35 @@ def db_test():
     return "OK"
 
 
+def test_notes():
+    # from app.model.Note import Note
+    # note = Note(19)
+    url = f"http://127.0.0.1:5000/api/v1/notes/"
+    payload = {"user_id": user_id}
+    data = {"header": "heh", "body": "heheh"}
+    res = rq.post(url=url+"add", headers=headers, params=payload, json=data).json()
+    note_id = str(res["last_id"])
+    res = rq.get(url=url+note_id, headers=headers, params=payload)
+    print(res.text)
+    sleep(10)
+    data["header"] = "HEH"
+    data["body"] = "HEHEH"
+    rq.put(url=url+note_id, headers=headers, params=payload, json=data)
+    res = rq.get(url=url+note_id, headers=headers, params=payload)
+    print(res.text)
+    sleep(10)
+    rq.delete(url=url+note_id, headers=headers, params=payload)
+    res = rq.get(url=url+note_id, headers=headers, params=payload)
+    return res.text
 
 
 if __name__ == "__main__":
     # print(db_test())
     # print(get_info())
     # print(upd_user())
-    print(check_user())
+    # print(check_user())
+    print(test_notes())
+    # from app.model.VkUser import VkUser
+    # user = VkUser(user_id)
+    # print(user.to_dict())
+    pass

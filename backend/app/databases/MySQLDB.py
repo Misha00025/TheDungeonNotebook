@@ -10,6 +10,7 @@ class MySQLDB:
         self._host = host
         self._port = port
         self._connect()
+        self.last_row_id = 0
 
     def _connect(self):
         self.__connection = pymysql.connect(database=self._dbname,
@@ -28,6 +29,7 @@ class MySQLDB:
         try:
             with self.__connection.cursor() as cursor:
                 result = cursor.execute(query, data)
+                self.last_row_id = cursor.lastrowid
                 cursor.close()
                 self.__connection.commit()
             return result
