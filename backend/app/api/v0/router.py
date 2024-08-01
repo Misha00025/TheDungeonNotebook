@@ -40,7 +40,7 @@ def _get_groups():
 
 @route("groups/<group_id>/notes", ["GET"])
 @authorised_user
-def _get_notes(group_id: int):
+def _get_notes_old(group_id: int):
     token = request.headers.get("token")
     err, user_id = get_user_id(token)
     if err:

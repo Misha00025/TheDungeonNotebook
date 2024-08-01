@@ -69,3 +69,20 @@ def add():
     note = generate_note()
     last_id = note.save()
     return {"last_id": last_id}, 200
+
+
+def get_all():
+    user_id = get_user_id(request)
+    group_id = get_group_id(request)
+    user = VkUser(user_id)
+    if group_id in user.admin_in:
+        user_id = None
+    from app.database import note
+    err, res = note.find(group_id, user_id)
+    notes = []
+    for nt in res:
+        note = Note(nt[2])
+        notes.append(note.to_dict())
+    print(res)
+    return jsonify({"notes": notes}), 200
+

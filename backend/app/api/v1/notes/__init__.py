@@ -11,6 +11,12 @@ def route(url, methods):
     return rt(_prefix+url, methods)
 
 
+@route("", ["GET"])
+@authorised
+def _get_notes():
+    return note.get_all()
+
+
 @route("<note_id>", ["GET", "PUT", "DELETE"])
 @authorised
 def _note(note_id):

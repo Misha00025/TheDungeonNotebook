@@ -51,6 +51,8 @@ def find(group_id=None, owner_id=None, note_id=None):
         return _find_one(note_id)
     if group_id is None and owner_id is None:
         return 2, None
+    if owner_id is None:
+        return _find_by_group(group_id)
     return _find_many(group_id, owner_id)
 
 

@@ -4,7 +4,7 @@ from typing import Mapping
 import requests as rq
 import json
 
-from variables import _st
+from variables import _st, _at
 
 
 st = "1"
@@ -60,20 +60,29 @@ def test_notes():
     # note = Note(19)
     url = f"http://127.0.0.1:5000/api/v1/notes/"
     payload = {"user_id": user_id}
+    upayload = {"group_id": "-101"}
     data = {"header": "heh", "body": "heheh"}
-    res = rq.post(url=url+"add", headers=headers, params=payload, json=data).json()
-    note_id = str(res["last_id"])
-    res = rq.get(url=url+note_id, headers=headers, params=payload)
+    head = headers.copy()
+    head.pop(_st)
+    head[_at] = ut
+    res = rq.get(url=url, headers=headers, params=payload)
     print(res.text)
-    sleep(10)
-    data["header"] = "HEH"
-    data["body"] = "HEHEH"
-    rq.put(url=url+note_id, headers=headers, params=payload, json=data)
-    res = rq.get(url=url+note_id, headers=headers, params=payload)
+    res = rq.get(url=url, headers=headers)
     print(res.text)
-    sleep(10)
-    rq.delete(url=url+note_id, headers=headers, params=payload)
-    res = rq.get(url=url+note_id, headers=headers, params=payload)
+    res = rq.get(url=url, headers=head, params=upayload)
+    # res = rq.post(url=url+"add", headers=headers, params=payload, json=data).json()
+    # note_id = str(res["last_id"])
+    # res = rq.get(url=url+note_id, headers=headers, params=payload)
+    # print(res.text)
+    # sleep(10)
+    # data["header"] = "HEH"
+    # data["body"] = "HEHEH"
+    # rq.put(url=url+note_id, headers=headers, params=payload, json=data)
+    # res = rq.get(url=url+note_id, headers=headers, params=payload)
+    # print(res.text)
+    # sleep(10)
+    # rq.delete(url=url+note_id, headers=headers, params=payload)
+    # res = rq.get(url=url+note_id, headers=headers, params=payload)
     return res.text
 
 
