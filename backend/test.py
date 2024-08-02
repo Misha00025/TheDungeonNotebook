@@ -6,7 +6,9 @@ import json
 
 from variables import _st, _at
 
-
+ethernet = "https://the-dungeon-notebook.ru"
+local = "http://127.0.0.1:5000"
+site = ethernet
 st = "1"
 ut = "4595880663507502266"
 headers = {_st: st, "Content-Type": "application/json; charset=utf-8"}
@@ -14,7 +16,7 @@ user_id = "173745999"
 
 
 def get_info():
-    url = f"http://127.0.0.1:5000/api/v1/get_user_info/{user_id}"
+    url = f"{site}/api/v1/get_user_info/{user_id}"
     res = rq.get(url=url, headers=headers)
     return res.json()
 
@@ -23,7 +25,7 @@ def upd_user():
     payload = {"user_id": user_id}
     res = rq.request(
         method="PUT",
-        url="http://127.0.0.1:5000/api/v1/update_user",
+        url=f"{site}/api/v1/update_user",
         params=payload,
         headers=headers
     )
@@ -31,7 +33,7 @@ def upd_user():
 
 
 def check_user():
-    url = f"http://127.0.0.1:5000/api/v1/user_is_mine"
+    url = f"{site}/api/v1/user_is_mine"
     payload = {"user_id": user_id}
     res = rq.get(url=url, headers=headers, params=payload)
     return res.text
@@ -58,7 +60,7 @@ def db_test():
 def test_notes():
     # from app.model.Note import Note
     # note = Note(19)
-    url = f"http://127.0.0.1:5000/api/v1/notes/"
+    url = f"{site}/api/v1/notes/"
     payload = {"user_id": user_id}
     upayload = {"group_id": "-101"}
     data = {"header": "heh", "body": "heheh"}
