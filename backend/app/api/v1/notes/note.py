@@ -3,7 +3,7 @@ from flask import request
 from flask.json import jsonify
 from app.processing.request_parcer import *
 from app.model.VkUser import VkUser
-from app.errors import forbidden, not_implemented, ok, not_found
+from app.statuss import forbidden, not_found, accepted, ok, created
 
 
 def in_keys(k1, k2):
@@ -38,7 +38,7 @@ def get(note_id):
     if not note.is_exist():
         return not_found()
     if check_access(note):
-        return jsonify(note.to_dict()), 200
+        return ok(jsonify(note.to_dict()))
     return forbidden()
 
 
@@ -51,7 +51,7 @@ def put(note_id):
         new_note = generate_note()
         new_note.note_id = note_id
         new_note.update()
-        return ok()
+        return accepted()
     return forbidden()
 
 
@@ -61,14 +61,14 @@ def delete(note_id):
         return not_found()
     if check_access(note):
         note.delete()
-        return ok()
+        return accepted()
     return forbidden()
 
 
 def add():
     note = generate_note()
     last_id = note.save()
-    return {"last_id": last_id}, 200
+    return created({"last_id": last_id})
 
 
 def get_all():
@@ -84,5 +84,5 @@ def get_all():
         note = Note(nt[2])
         notes.append(note.to_dict())
     print(res)
-    return jsonify({"notes": notes}), 200
+    return ok({"notes": notes})
 
