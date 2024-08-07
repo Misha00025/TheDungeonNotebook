@@ -27,16 +27,19 @@ export const SideBar = () => {
   const handleBackAction = () => {
     if (noteId) {
       return navigate(`/groups/${groupId}`);
+    } else if (groupId) {
+      return navigate(`/groups`);
     } else {
-      return navigate(`/`);
+      return navigate('/')
     }
+
   }
 
   return (
     <div className='sidebar'>
       <div className='sidebar-topItems'>
         <IconButton icon={backIcon} tooltip='Назад' onClick={handleBackAction}/>
-        <Link to={'/'}>
+        <Link to={'/groups'}>
           <IconButton icon={homeIcon} tooltip='Список групп' onClick={()=>undefined}/>
         </Link>
       </div>

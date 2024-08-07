@@ -15,7 +15,7 @@ export const Groups: React.FC = () => {
     <ItemSelectorBox 
         headerText='Список групп'
         initialItemsCallback={fetchGroups}
-        linkPrefix='groups/'
+        linkPrefix='/groups/'
         activeItemId={groupId ? Number(groupId) : undefined}
         isHided={noteId && platform === 'touch' ? true : false}
     />

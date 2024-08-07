@@ -1,39 +1,26 @@
 import React, { useEffect } from 'react'
-import { SideBar } from '../../components/SideBar'
-
-import './GroupsLayout.css'
-import { Outlet, useNavigate } from 'react-router-dom'
 import { Groups } from '../../pages/Groups'
-import { useAuth } from '../../store/AuthContent'
+import { usePlatform } from '../../store/PlatformContext'
+import { Outlet, useParams } from 'react-router-dom'
 
 export const GroupsLayout = () => {
-    const { token } = useAuth();
-    const navigate = useNavigate();
+    const platform = usePlatform()
+    const { groupId, noteId } = useParams();
 
-    const haveToken = token !== null && token !== undefined;
-
-    useEffect(() => {
-      if (!haveToken) {
-        navigate('/login');
-      }
-    }, [token]);
-
-    if (!haveToken) {
-      navigate('/login')
+    if (platform.platform === "touch" && groupId){
+        return (
+          <>
+            <Outlet />
+          </>
+        )
+    }
+    else {
       return (
         <>
-          token not found login redirect
+          <Groups />
+          <Outlet />
         </>
-      )
-    };
-
-    return (
-      <>
-          <main className='app-container'>
-              <SideBar />
-              <Groups />
-              <Outlet />
-          </main>
-      </>
-  )
+    )
+    }
+    
 }

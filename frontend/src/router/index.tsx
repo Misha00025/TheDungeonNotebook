@@ -8,22 +8,33 @@ import { NotesLayout } from './layouts/NotesLayout';
 import { ErrorPage } from '../pages/Error';
 import { Note } from '../components/Note';
 import { Login } from '../pages/Login';
+import { HomeLayout } from './layouts/HomeLayout';
 
 
 export const AppRouter = () => {
     const router = createBrowserRouter([
         {
             path: "/",
-            element: <GroupsLayout />,
+            element: <HomeLayout />,
             errorElement: <ErrorPage />,
-            children: [{
-                path: "groups/:groupId",
-                element: <NotesLayout />,
-                children: [{
-                    path: "notes/:noteId",
-                    element: <Note />
-                }]
-            }]
+            children: [
+                {
+                    path: "/groups",
+                    element: <GroupsLayout />,
+                    children: [
+                        {
+                            path: "/groups/:groupId",
+                            element: <NotesLayout />,
+                            children: [
+                              {
+                                path: "notes/:noteId",
+                                element: <Note />
+                              }
+                            ]
+                        }
+                    ]
+                },
+            ]
         },
         {
             path: "/login",
