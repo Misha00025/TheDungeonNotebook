@@ -21,13 +21,15 @@ class Note:
         return str(self.to_dict())
 
     def to_dict(self):
+        _, user = database.vk_user.find(self.owner_id)
         return {
             "group_id": self.group_id,
             "owner_id": self.owner_id,
-            "note_id": self.note_id,
+            "id": self.note_id,
             "header": self.header,
             "body": self.body,
-            "last_modify": self.modified_date
+            "last_modify": self.modified_date,
+            "author": user.to_dict()
         }
 
     def is_exist(self):

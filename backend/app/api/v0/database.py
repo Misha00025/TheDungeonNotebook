@@ -82,8 +82,9 @@ def find_user_id_from_token(token):
 @_instantiated
 def get_last_authorise(token):
     field = "last_date"
-    query = f"SELECT {field} FROM vk_user_token WHERE token = '{token}'"
-    result = _instance.fetchone(query)
+    query = f"SELECT {field} FROM vk_user_token WHERE token = %s"
+    data = (token,)
+    result = _instance.fetchone(query, data)
     if result is not None:
         return 0, result[0]
     return 1, "user not found"

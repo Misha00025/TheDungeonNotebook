@@ -9,7 +9,7 @@ def get_service_token(request: Request):
 
 def get_access_token(request: Request):
     token = request.headers.get(_at, None)
-    return token
+    return str(token)
 
 
 def from_bot(request: Request):

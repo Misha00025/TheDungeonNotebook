@@ -17,6 +17,7 @@ def _get_response(res):
 
 def is_correct_token(token):
     err, last_date = database.get_last_authorise(token)
+    print(f"code: {err}, error: {last_date}")
     return not err
 
 

@@ -3,9 +3,10 @@ from app.processing.request_parcer import get_service_token, get_access_token
 
 
 def is_correct_token(request):
-    from app.api.v0.methods import is_correct_token as ict
+    from app.database import vk_user_token
     token = get_access_token(request)
-    result = token is not None and ict(token)
+    err, user = vk_user_token.find(token)
+    result = not err
     if result:
         update_authorise_date(token)
     return result
