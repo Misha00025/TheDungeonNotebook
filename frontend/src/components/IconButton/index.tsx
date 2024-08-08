@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tooltip } from 'react-tooltip';
 
-import './index.css';
+// import './index.css';
 
 interface IconButtonProps {
     text?: string;

@@ -26,3 +26,54 @@
         min-width: 48px;
     }
 }
+
+.iconButton {
+    display: flex;
+
+    border: none;
+    outline: none;
+    background-color: transparent;
+
+    padding: 0;
+    cursor: pointer;
+}
+
+.icon {
+    height: 100%;
+
+    padding: 8px;
+
+    transition: background-color 0.1s;
+    
+    border-radius: 10px;
+}
+
+.icon:hover {
+    background-color: #585b63;
+}
+
+.icon:active {
+    opacity: 0.8;
+    background-color: #848996;
+}
+
+
+.icon__center{
+    justify-content: center;
+}
+
+.icon__left{
+    justify-content: space-between;
+}
+
+.icon__right{
+    justify-content: space-between;
+    flex-direction: row-reverse;
+}
+
+
+@media screen and (max-width: 768px) {
+    .icon {
+        padding: 4px;
+    }
+}

@@ -26,10 +26,10 @@ export const AppRouter = () => {
                             path: "/groups/:groupId",
                             element: <NotesLayout />,
                             children: [
-                              {
-                                path: "notes/:noteId",
-                                element: <Note />
-                              }
+                                {
+                                  path: "notes/:noteId",
+                                  element: <Note />
+                                }
                             ]
                         }
                     ]

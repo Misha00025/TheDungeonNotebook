@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react'
 import { SideBar } from '../../components/SideBar'
 
-import './HomeLayout.css'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../store/AuthContent'
+import { usePlatform } from '../../store/PlatformContext'
+import '../../HomeLayout.css'
+
 
 export const HomeLayout = () => {
     const { token } = useAuth();
@@ -25,10 +27,11 @@ export const HomeLayout = () => {
         </>
       )
     };
-
+    const theme = "HomeLayout"
     return (
       <>
           <main className='app-container'>
+              {/* <link ref='stylesheet' href='$HomeLayout.css' /> */}
               <SideBar />
               <Outlet />
           </main>

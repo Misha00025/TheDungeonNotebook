@@ -26,7 +26,11 @@ interface NotesResponse {
     notes: Array<INote>
 }
 
+
+// const BACKEND_HOST = "http://127.0.0.1:5000/api/"
 const BACKEND_HOST = "https://the-dungeon-notebook.ru/api/"
+const API_VERSION = "v1/"
+const BACKEND_VERSION_HOST = BACKEND_HOST + API_VERSION
 
 export interface TokenResponse {
     access_token: string;
@@ -77,7 +81,9 @@ export class Api {
             throw new Error('token not found');
         }
 
-        const response = await fetch(BACKEND_HOST + `groups/${groupId}/notes`, {
+        const params = new URLSearchParams({group_id: groupId.toString()}).toString()
+        const response = await fetch(BACKEND_VERSION_HOST + `notes/?` + params, {
+        // const response = await fetch(BACKEND_HOST + `groups/${groupId}/notes`, {
             method: 'GET',
             headers: {
                 "token": token

@@ -48,15 +48,17 @@ export const Notes: React.FC = () => {
         }
     }
 
+
     return (
         <ItemSelectorBox
             headerText='Заметки'
             linkPrefix='notes/'
             initialItemsCallback={fetchNotes}
             handleActiveItemChanged={handleActiveItemChanged}
-            activeItemId={noteId ? Number(noteId) : undefined }
+            activeItemId={noteId ? Number(noteId) : undefined}
             refetchItemsOnChangeValue={groupId}
             isHided={noteId && platform === 'touch' ? true : false}
+            deletableItems={true}
         />
     );
 }
