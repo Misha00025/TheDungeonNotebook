@@ -12,8 +12,7 @@ interface ItemSelectorBoxProps {
     initialActiveItemId?: number;
     activeItemId?: number;
     refetchItemsOnChangeValue?: string;
-    isHided?: boolean;
-    deletableItems?: boolean;
+    isHided?: boolean;    
 }
 
 export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
@@ -23,8 +22,7 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
     linkPrefix,
     activeItemId = -1,
     refetchItemsOnChangeValue,
-    isHided = false,
-    deletableItems = false
+    isHided = false
 }) => {
     const [items, setItems] = useState<Array<{name: string; id: number}>>([]);
 
@@ -50,8 +48,7 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
                             <ListItem 
                                 key={item.id}
                                 isActive={Number(item.id) === Number(activeItemId)}
-                                linkPath={linkPrefix && linkPrefix + item.id}
-                                deletable={deletableItems}                            >
+                                linkPath={linkPrefix && linkPrefix + item.id}                            >
                                 {item.name}
                             </ListItem>
                     ))

@@ -17,22 +17,14 @@ export const ListItem = ({
     children,
     isActive = false,
     linkPath,
-    onClick,
-    deletable = false
+    onClick
 }: ListItemProps) => {
-    const deleteNote = () => undefined;
-    const buttons = <IconButton icon={del_icon} tooltip='удалить' onClick={deleteNote}/>
     return (
         <li onClick={onClick} className={`listItem ${isActive ? 'listItem__active' : ''}`}>
             {
                 linkPath ?
                     <Link className='listItem-link' to={linkPath}>{children}</Link> :
                     children
-            }
-            {
-                deletable ? 
-                    <div className='buttonsBar'>{buttons}</div>:
-                    <></>
             }
         </li>
     )

@@ -58,7 +58,6 @@ export const Notes: React.FC = () => {
             activeItemId={noteId ? Number(noteId) : undefined}
             refetchItemsOnChangeValue={groupId}
             isHided={noteId && platform === 'touch' ? true : false}
-            deletableItems={true}
         />
     );
 }
