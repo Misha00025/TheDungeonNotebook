@@ -54,3 +54,8 @@
     padding: 0 4px;
     height: 3em;
 }
+
+.buttonsBar.iconButton {
+    max-height: 40px; /* Ограничиваем высоту кнопок до высоты бара */
+    margin-right: 10px; /* Отступ между кнопками */
+}
