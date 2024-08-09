@@ -1,0 +1,8 @@
+services:
+  rpchatbot:
+    container_name: rpbot
+    image: rpchatbot:0.7.9 
+    volumes:
+      - './configs:/root/RPChatBotVK/configs:rw'
+      - './logs:/root/RPChatBotVK/logs:rw'
+      - './saves:/root/RPChatBotVK/saves:rw'
