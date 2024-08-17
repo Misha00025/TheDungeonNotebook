@@ -1,48 +1,48 @@
 .note {
-    display: flex;
-    flex-direction: column;
+  display: flex;
+  flex-direction: column;
 
-    padding: 10px;
-    padding-top: 24px;
-    flex: 1 1;
+  padding: 10px;
+  padding-top: 24px;
+  flex: 1 1;
 
-    overflow: auto;
-    height: 100vh;
+  overflow: auto;
+  height: 100vh;
 }
 
 .note-header {
-    padding-bottom: 24px;
-    text-align: center;
-    font-weight: 500;
+  padding-bottom: 24px;
+  text-align: center;
+  font-weight: 500;
 }
 
 .note-text {
-    font-size: calc(10px + 1.5vmin);
-    margin: 0 0;
-    padding: 4px 4px;
+  font-size: calc(10px + 1.5vmin);
+  margin: 0 0;
+  padding: 4px 4px;
 }
 
-.note-author{
-    margin-top: auto;
-    height: 4em;
-    display: flex;
-    justify-content: flex-end; /* Use flex-end instead of end for better browser compatibility */
-    align-items: center; /* Here is the new line */
-    gap: 7px;
+.note-author {
+  margin-top: auto;
+  height: 4em;
+  display: flex;
+  justify-content: flex-end; /* Use flex-end instead of end for better browser compatibility */
+  align-items: center; /* Here is the new line */
+  gap: 7px;
 }
 
-.note-author img{
-    border-radius: 50%;
+.note-author img {
+  border-radius: 50%;
 
-    max-height: 60px;
+  max-height: 60px;
 }
 
 @media screen and (max-width: 768px) {
-    .note {
-        width: 100%;
-    }
+  .note {
+    width: 100%;
+  }
 
-    .note-author img{
-        height: 48px;
-    }
+  .note-author img {
+    height: 48px;
+  }
 }

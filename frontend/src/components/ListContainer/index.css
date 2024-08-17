@@ -1,15 +1,15 @@
 .listContainer {
-    list-style-type: none;
-    margin: 0;
-    padding: 4px;
+  list-style-type: none;
+  margin: 0;
+  padding: 4px;
 
-    width: 100%;
+  width: 100%;
 
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 
-    font-size: calc(10px + 1.5vmin);
+  font-size: calc(10px + 1.5vmin);
 
-    overflow-x: hidden;
+  overflow-x: hidden;
 }

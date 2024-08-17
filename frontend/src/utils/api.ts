@@ -1,97 +1,101 @@
 import { VkResponse } from "./VkService";
 
 interface Author {
-    photo: string;
-    first_name: string;
-    last_name: string;
+  photo: string;
+  first_name: string;
+  last_name: string;
 }
 
 export interface INote {
-    id: number;
-    header: string;
-    body: string;
-    author: Author;
+  id: number;
+  header: string;
+  body: string;
+  author: Author;
 }
 
 export interface IGroup {
-    id: number;
-    name: string;
+  id: number;
+  name: string;
 }
 
 interface GroupsResponse {
-    groups: Array<IGroup>
+  groups: Array<IGroup>;
 }
 
 interface NotesResponse {
-    notes: Array<INote>
+  notes: Array<INote>;
 }
 
-
 // const BACKEND_HOST = "http://127.0.0.1:5000/api/"
-const BACKEND_HOST = "https://the-dungeon-notebook.ru/api/"
-const API_VERSION = "v1/"
-const BACKEND_VERSION_HOST = BACKEND_HOST + API_VERSION
+const BACKEND_HOST = "https://the-dungeon-notebook.ru/api/";
+const API_VERSION = "v1/";
+const BACKEND_VERSION_HOST = BACKEND_HOST + API_VERSION;
 
 export interface TokenResponse {
-    access_token: string;
+  access_token: string;
 }
 
 export class Api {
-    static exchangeToken = async (authData: VkResponse) => {
-        console.log(JSON.stringify(authData))
-        const response = await fetch(BACKEND_HOST + 'auth', {
-            method: 'POST',
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(authData),
-        });
+  static exchangeToken = async (authData: VkResponse) => {
+    console.log(JSON.stringify(authData));
+    const response = await fetch(BACKEND_HOST + "auth", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(authData),
+    });
 
-        let result = await response.json();
-        console.log(result);
+    let result = await response.json();
+    console.log(result);
 
-        return result as TokenResponse;
+    return result as TokenResponse;
+  };
+
+  static fetchGroups = async (token: string | null): Promise<Array<IGroup>> => {
+    console.log("fetchGroups");
+    console.log(token);
+    if (!token) {
+      console.error("token not found");
+      throw new Error("token not found");
     }
 
-    static fetchGroups = async (token: string | null): Promise<Array<IGroup>>  => {
-        console.log("fetchGroups");
-        console.log(token)
-        if (!token) {
-            console.error('token not found');
-            throw new Error('token not found');
-        }
+    const response = await fetch(BACKEND_HOST + "groups", {
+      method: "GET",
+      headers: {
+        token: token,
+      },
+    });
 
-        const response = await fetch(BACKEND_HOST + 'groups', {
-            method: 'GET',
-            headers: {
-                "token": token
-            }
-        });
+    let result = (await response.json()) as GroupsResponse;
+    console.log(result);
+    return result.groups;
+  };
 
-        let result = await response.json() as GroupsResponse;
-        console.log(result);
-        return result.groups;
+  static fetchNotes = async (
+    groupId: number,
+    token: string | null,
+  ): Promise<Array<INote>> => {
+    console.log("fetchNotes");
+    console.log(token);
+    if (!token) {
+      console.error("token not found");
+      throw new Error("token not found");
     }
 
-    static fetchNotes = async (groupId: number, token: string | null): Promise<Array<INote>>  => {
-        console.log("fetchNotes");
-        console.log(token)
-        if (!token) {
-            console.error('token not found');
-            throw new Error('token not found');
-        }
+    const params = new URLSearchParams({
+      group_id: groupId.toString(),
+    }).toString();
+    const response = await fetch(BACKEND_VERSION_HOST + `notes/?` + params, {
+      // const response = await fetch(BACKEND_HOST + `groups/${groupId}/notes`, {
+      method: "GET",
+      headers: {
+        token: token,
+      },
+    });
 
-        const params = new URLSearchParams({group_id: groupId.toString()}).toString()
-        const response = await fetch(BACKEND_VERSION_HOST + `notes/?` + params, {
-        // const response = await fetch(BACKEND_HOST + `groups/${groupId}/notes`, {
-            method: 'GET',
-            headers: {
-                "token": token
-            }
-        });
-
-        let result = await response.json() as NotesResponse;
-        console.log(result);
-        return result.notes;
-    }
+    let result = (await response.json()) as NotesResponse;
+    console.log(result);
+    return result.notes;
+  };
 }
