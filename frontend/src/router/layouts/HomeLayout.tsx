@@ -1,10 +1,9 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { SideBar } from "../../components/SideBar";
 
-import { Outlet, useNavigate } from "react-router-dom";
+import { useNavigate, useOutlet } from "react-router-dom";
 import { useAuth } from "../../store/AuthContent";
-import { usePlatform } from "../../store/PlatformContext";
-import "../../HomeLayout.css";
+import { HomePage } from "../../pages/Home";
 
 export const HomeLayout = () => {
   const { token } = useAuth();
@@ -22,13 +21,14 @@ export const HomeLayout = () => {
     navigate("/login");
     return <>token not found login redirect</>;
   }
-  const theme = "HomeLayout";
+
+  const outlet = useOutlet();
+
   return (
     <>
       <main className="app-container">
-        {/* <link ref='stylesheet' href='$HomeLayout.css' /> */}
         <SideBar />
-        <Outlet />
+        {outlet || <HomePage />}
       </main>
     </>
   );

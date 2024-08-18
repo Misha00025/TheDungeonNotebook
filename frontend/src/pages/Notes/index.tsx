@@ -3,7 +3,7 @@ import { ItemSelectorBox } from "../../components/ItemSelectorBox";
 import { useNotes } from "../../store/NoteContext";
 import { useAuth } from "../../store/AuthContent";
 import { Api } from "../../utils/api";
-import { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { usePlatform } from "../../store/PlatformContext";
 
 const mockListItems = () => {

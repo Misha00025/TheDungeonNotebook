@@ -1,0 +1,30 @@
+.home-container {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+    text-align: center;
+    font-family: Arial;
+    padding: 2em;
+    transition: opacity .3s;
+    overflow: auto;
+}
+
+.home-container h1 {}
+
+.home-container p {}
+
+.home-container a {
+    margin-right: 1em;
+    text-decoration: none;
+    color: #3388DD;
+}
+
+.home-container a:last-child {
+    margin-left: 1em;
+}
+
+.home-container a:hover {
+    opacity: .5;
+    cursor: pointer;
+}

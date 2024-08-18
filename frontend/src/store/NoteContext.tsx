@@ -1,10 +1,4 @@
-import React, {
-  ReactNode,
-  createContext,
-  useCallback,
-  useContext,
-  useState,
-} from "react";
+import React, { ReactNode, createContext, useContext, useState } from "react";
 
 import { INote } from "../utils/api";
 

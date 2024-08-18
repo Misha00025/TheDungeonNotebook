@@ -23,10 +23,10 @@ const MultiLineText: React.FC<MultiLineTextProps> = ({ text }) => {
   return (
     <div>
       {lines.map((line, index) => (
-        <>
+        <React.Fragment key={index}>
           {line}
           <br />
-        </>
+        </React.Fragment>
       ))}
     </div>
   );
@@ -38,9 +38,9 @@ export const Note = () => {
   return (
     <div className="note">
       <header className="note-header">{activeNote?.header}</header>
-      <p className="note-text">
+      <div className="note-text">
         <MultiLineText text={formattedMessage} />
-      </p>
+      </div>
       <div className="note-author">
         <img src={activeNote?.author.photo} />
         <p className="note-author-text">

@@ -46,7 +46,7 @@ export class Api {
       body: JSON.stringify(authData),
     });
 
-    let result = await response.json();
+    const result = await response.json();
     console.log(result);
 
     return result as TokenResponse;
@@ -67,7 +67,13 @@ export class Api {
       },
     });
 
-    let result = (await response.json()) as GroupsResponse;
+    if (!response.ok) {
+      throw new Error(
+        JSON.stringify({ code: response.status, message: response.statusText }),
+      );
+    }
+
+    const result = (await response.json()) as GroupsResponse;
     console.log(result);
     return result.groups;
   };
@@ -76,8 +82,6 @@ export class Api {
     groupId: number,
     token: string | null,
   ): Promise<Array<INote>> => {
-    console.log("fetchNotes");
-    console.log(token);
     if (!token) {
       console.error("token not found");
       throw new Error("token not found");
@@ -94,7 +98,7 @@ export class Api {
       },
     });
 
-    let result = (await response.json()) as NotesResponse;
+    const result = (await response.json()) as NotesResponse;
     console.log(result);
     return result.notes;
   };

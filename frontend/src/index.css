@@ -22,3 +22,20 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;
 }
+
+.app-container {
+  height: 100dvh;
+  width: 100dvw;
+
+  max-height: 100dvh;
+  max-width: 100dvw;
+
+  display: flex;
+  font-size: calc(10px + 2vmin);
+
+  background-color: #282c34;
+
+  color: white;
+
+  overflow: hidden;
+}
