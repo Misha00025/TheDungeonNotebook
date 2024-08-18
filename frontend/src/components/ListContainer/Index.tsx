@@ -1,17 +1,11 @@
-import React, { Children } from "react"
+import React, { Children } from "react";
 
-import './index.css';
+import "./index.css";
 
 interface ListContainerProps {
-    children: React.ReactNode
+  children: React.ReactNode;
 }
 
-export const ListContainer = ({
-    children
-}: ListContainerProps) => {
-    return (
-        <ul className="listContainer">
-            {children}
-        </ul>
-    )
-}
+export const ListContainer = ({ children }: ListContainerProps) => {
+  return <ul className="listContainer">{children}</ul>;
+};

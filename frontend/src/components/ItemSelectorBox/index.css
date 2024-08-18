@@ -1,62 +1,60 @@
 .itemSelectorBox-container {
-    max-height: 100vh;
+  max-height: 100vh;
 
-    overflow: auto;
+  overflow: auto;
 
-    display: flex;
-    align-items: center;
-    flex-direction: column;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
 
-    padding-top: 24px;
+  padding-top: 24px;
 
-    gap: 24px;
+  gap: 24px;
 
-    border-right: 1px solid gray;
+  border-right: 1px solid gray;
 }
 
 .itemSelectorBox-header {
-    font-weight: 500;
+  font-weight: 500;
 }
 
 .itemSelectorBox-container__hided {
-    display: none;
+  display: none;
 }
 
-
 @media screen and (min-width: 769px) {
-    .itemSelectorBox-container {
-        width: 20vw;
-        min-width: 200px;
-    }
+  .itemSelectorBox-container {
+    width: 20vw;
+    min-width: 200px;
+  }
 }
 
 @media screen and (max-width: 768px) {
-    .itemSelectorBox-container {
-        flex: 1;
-    }
+  .itemSelectorBox-container {
+    flex: 1;
+  }
 }
 
-
 .buttonsBar {
-    position: absolute; /* Делаем позицию абсолютной */
-    bottom: 0;         /* Прикрепляем к нижней части элемента списка */
-    right: 0;         /* Прикрепляем к правой стороне */
-    width: 50%;
-    height: 35px;     /* Устанавливаем фиксированную высоту бара */
-    display: flex;    /* Используем flexbox для кнопок */
-    align-items:last baseline; /* Центрируем кнопки по вертикали */
-    padding: 0 10px;  /* Отступы внутри бара */
-    justify-content: flex-end;
+  position: absolute; /* Делаем позицию абсолютной */
+  bottom: 0; /* Прикрепляем к нижней части элемента списка */
+  right: 0; /* Прикрепляем к правой стороне */
+  width: 50%;
+  height: 35px; /* Устанавливаем фиксированную высоту бара */
+  display: flex; /* Используем flexbox для кнопок */
+  align-items: last baseline; /* Центрируем кнопки по вертикали */
+  padding: 0 10px; /* Отступы внутри бара */
+  justify-content: flex-end;
 }
 
 .buttonsBar .iconButton {
-    display: flex;
-    height: 100%;
-    border: none;
-    outline: none;
-    background-color: transparent;
+  display: flex;
+  height: 100%;
+  border: none;
+  outline: none;
+  background-color: transparent;
 
-    padding: 0;
-    cursor: pointer;
-    margin-left: 5px;
+  padding: 0;
+  cursor: pointer;
+  margin-left: 5px;
 }
