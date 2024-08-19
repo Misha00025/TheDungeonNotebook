@@ -3,7 +3,7 @@ FROM python:3.11
 MAINTAINER Misha00025<misha00025@mail.ru>
 
 ENV TZ=Europe/Moscow
-ENV BOT_VERSION=Arkadia-0-7-9
+ENV BOT_VERSION=Arkadia-0-7-10
 
 RUN apt-get update
 RUN apt install -y wget && apt install -y zip 

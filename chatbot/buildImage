@@ -1,0 +1,1 @@
+docker image build --no-cache -t rpchatbot:0.7.10 - < ./Dockerfile
