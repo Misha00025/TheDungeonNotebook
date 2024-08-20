@@ -30,7 +30,7 @@ export const Notes: React.FC = () => {
 
   const fetchNotes = useCallback(async () => {
     if (groupId && setNotes) {
-      return Api.fetchNotes(Number(groupId), token).then((notes) => {
+      await Api.fetchNotes(Number(groupId), token).then((notes) => {
         setNotes(notes);
         return notes.map((note) => ({ id: note.id, name: note.header }));
       });
@@ -50,6 +50,7 @@ export const Notes: React.FC = () => {
       headerText="Заметки"
       linkPrefix="notes/"
       initialItemsCallback={fetchNotes}
+      items={notes?.map((note) => ({ id: note.id, name: note.header })) || []}
       handleActiveItemChanged={handleActiveItemChanged}
       activeItemId={noteId ? Number(noteId) : undefined}
       refetchItemsOnChangeValue={groupId}

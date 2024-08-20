@@ -5,7 +5,8 @@ import { ListItem } from "../ListItem";
 import "./index.css";
 
 interface ItemSelectorBoxProps {
-  initialItemsCallback: () => Promise<Array<{ name: string; id: number }>>;
+  initialItemsCallback: () => Promise<void>;
+  items?: Array<{ name: string; id: number }>;
   handleActiveItemChanged?: (itemId: number) => void;
   headerText: string;
   linkPrefix?: string;
@@ -15,6 +16,12 @@ interface ItemSelectorBoxProps {
   isHided?: boolean;
 }
 
+/**
+ *
+ * @param initialItemsCallback - Асинхронная функция, возвращающая Promise. В теле функции должен установить состояние items.
+ * @param items - Массив объектов с полями name и id. Должен быть установлен например через initialItemsCallback.
+ * @returns
+ */
 export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
   initialItemsCallback,
   handleActiveItemChanged,
@@ -22,14 +29,14 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
   linkPrefix,
   activeItemId = -1,
   refetchItemsOnChangeValue,
+  items = [],
   isHided = false,
 }) => {
-  const [items, setItems] = useState<Array<{ name: string; id: number }>>([]);
+  // const [items, setItems] = useState<Array<{ name: string; id: number }>>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    initialItemsCallback().then((value) => {
-      setItems(value);
+    initialItemsCallback().then(() => {
       setIsLoading(false);
     });
   }, [refetchItemsOnChangeValue]);

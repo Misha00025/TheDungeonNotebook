@@ -1,6 +1,6 @@
 .sidebar {
   width: 100px;
-  height: 100vh;
+  height: 100dvh;
 
   display: flex;
   align-items: center;

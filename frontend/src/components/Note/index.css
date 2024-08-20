@@ -7,13 +7,29 @@
   flex: 1 1;
 
   overflow: auto;
-  height: 100vh;
+  height: 100dvh;
 }
 
-.note-header {
+.note-headerBox {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-direction: row;
   padding-bottom: 24px;
+}
+
+.note-headerTitle {
   text-align: center;
   font-weight: 500;
+  font-size: 1.5em;
+}
+
+.note-headerActions {
+  display: flex;
+  gap: 6px;
+  height: 36px;
+  margin-top: auto;
 }
 
 .note-text {
@@ -26,8 +42,8 @@
   margin-top: auto;
   height: 4em;
   display: flex;
-  justify-content: flex-end; /* Use flex-end instead of end for better browser compatibility */
-  align-items: center; /* Here is the new line */
+  justify-content: flex-end;
+  align-items: center;
   gap: 7px;
 }
 

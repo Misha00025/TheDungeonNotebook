@@ -31,9 +31,9 @@ export const IconButton = ({
           id={tooltipId}
           style={{ zIndex: 100 }}
           openEvents={{
-            "mouseenter": true,
-            "mousedown": true,
-            "click": true
+            mouseenter: true,
+            mousedown: true,
+            click: true,
           }}
         />
       ) : undefined}

@@ -1,8 +1,12 @@
 import React from "react";
 
 import "./index.css";
-import { INote } from "../../utils/api";
 import { useNotes } from "../../store/NoteContext";
+import deleteIcon from "../../assets/carbon_delete.svg";
+import editIcon from "../../assets/carbon_edit.svg";
+import { IconButton } from "../IconButton";
+import { Api, INote } from "../../utils/api";
+import { useAuth } from "../../store/AuthContent";
 
 // Функция для замены символов и декодирования HTML
 const decodeHtml = (html: string | undefined) => {
@@ -33,11 +37,47 @@ const MultiLineText: React.FC<MultiLineTextProps> = ({ text }) => {
 };
 
 export const Note = () => {
-  const { activeNote } = useNotes();
+  const { activeNote, setNotes, notes } = useNotes();
+  const { token } = useAuth();
   const formattedMessage = decodeHtml(activeNote?.body);
+
+  const handleNoteEdit = (note: INote, token: string) => {
+    Api.updateNote(note, token);
+  };
+
+  const handleNoteDelete = (note: INote, token: string) => {
+    const isConfirmed = confirm("Вы уверены, что хотите удалить эту заметку?");
+    if (isConfirmed && notes && setNotes) {
+      Api.deleteNote(note, token);
+      setNotes(notes.filter((n: INote) => n.id !== note.id));
+    }
+  };
+
   return (
     <div className="note">
-      <header className="note-header">{activeNote?.header}</header>
+      <div className="note-headerBox">
+        <header className="note-headerTitle">{activeNote?.header}</header>
+        <div className="note-headerActions">
+          {activeNote && (
+            <>
+              <IconButton
+                icon={editIcon}
+                tooltip="Редактировать заметку"
+                onClick={() =>
+                  activeNote && token && handleNoteEdit(activeNote, token)
+                }
+              />
+              <IconButton
+                icon={deleteIcon}
+                tooltip="Удалить заметку"
+                onClick={() =>
+                  activeNote && token && handleNoteDelete(activeNote, token)
+                }
+              />
+            </>
+          )}
+        </div>
+      </div>
       <div className="note-text">
         <MultiLineText text={formattedMessage} />
       </div>

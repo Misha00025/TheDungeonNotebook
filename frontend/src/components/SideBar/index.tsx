@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 
 import "./index.css";
 import { IconButton } from "../IconButton";
@@ -14,7 +14,7 @@ import { useAuth } from "../../store/AuthContent";
 
 const PROJECT_GITHUB_URL = "https://github.com/Misha00025/TheDungeonNotebook";
 
-export const SideBar = () => {
+export const SideBar = memo(function SideBar() {
   const { logout } = useAuth();
   const { groupId, noteId } = useParams();
   const navigate = useNavigate();
@@ -72,4 +72,4 @@ export const SideBar = () => {
       </div>
     </div>
   );
-};
+});

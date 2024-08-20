@@ -53,8 +53,6 @@ export class Api {
   };
 
   static fetchGroups = async (token: string | null): Promise<Array<IGroup>> => {
-    console.log("fetchGroups");
-    console.log(token);
     if (!token) {
       console.error("token not found");
       throw new Error("token not found");
@@ -97,6 +95,61 @@ export class Api {
         token: token,
       },
     });
+
+    const result = (await response.json()) as NotesResponse;
+    console.log(result);
+    return result.notes;
+  };
+
+  static updateNote = async (
+    updatedNote: INote,
+    token: string | null,
+  ): Promise<Array<INote>> => {
+    if (!token) {
+      console.error("token not found");
+      throw new Error("token not found");
+    }
+
+    const response = await fetch(
+      BACKEND_VERSION_HOST + `notes/${updatedNote.id}`,
+      {
+        // const response = await fetch(BACKEND_HOST + `groups/${groupId}/notes`, {
+        method: "PUT",
+        headers: {
+          token: token,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedNote),
+      },
+    );
+
+    console.log("update result" + response);
+
+    const result = (await response.json()) as NotesResponse;
+    console.log(result);
+    return result.notes;
+  };
+
+  static deleteNote = async (
+    note: INote,
+    token: string | null,
+  ): Promise<Array<INote>> => {
+    if (!token) {
+      console.error("token not found");
+      throw new Error("token not found");
+    }
+    console.log("delete note" + note.id);
+
+    const response = await fetch(BACKEND_VERSION_HOST + `notes/${note.id}`, {
+      // const response = await fetch(BACKEND_HOST + `groups/${groupId}/notes`, {
+      method: "DELETE",
+      headers: {
+        token: token,
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log("delete result" + response);
 
     const result = (await response.json()) as NotesResponse;
     console.log(result);
