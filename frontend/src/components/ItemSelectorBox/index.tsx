@@ -25,9 +25,13 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
   isHided = false,
 }) => {
   const [items, setItems] = useState<Array<{ name: string; id: number }>>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    initialItemsCallback().then((value) => setItems(value));
+    initialItemsCallback().then((value) => {
+      setItems(value);
+      setIsLoading(false);
+    });
   }, [refetchItemsOnChangeValue]);
 
   useEffect(() => {
@@ -51,6 +55,12 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
             {item.name}
           </ListItem>
         ))}
+        {}
+        {isLoading ? (
+          <span className="itemSelectorBox-loader" />
+        ) : (
+          items.length === 0 && <p>Список пуст</p>
+        )}
       </ListContainer>
     </div>
   );

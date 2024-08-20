@@ -33,6 +33,7 @@ export const Login = () => {
   }, []);
 
   useEffect(() => {
+    console.log("Login payload:", loginPayload);
     if (loginPayload?.length) {
       const oauthData = JSON.parse(loginPayload);
       // При авторизации другим способом vk отправляет ответ без payload

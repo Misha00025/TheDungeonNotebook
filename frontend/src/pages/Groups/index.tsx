@@ -21,13 +21,16 @@ export const Groups: React.FC = React.memo(function Groups() {
     try {
       return await Api.fetchGroups(token);
     } catch (err: any) {
-      const error = JSON.parse(err.message);
-      if (error.code === 401) {
-        navigate("/login");
-        console.log(UNAUTHORIZED_ERROR_MESSAGE);
+      try {
+        const error = JSON.parse(err.message);
+        if (error.code === 401) {
+          navigate("/login");
+          console.log(UNAUTHORIZED_ERROR_MESSAGE);
+        }
+        return [];
+      } catch {
+        throw err;
       }
-
-      return [];
     }
   }, [token]);
 
