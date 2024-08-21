@@ -113,7 +113,6 @@ export class Api {
     const response = await fetch(
       BACKEND_VERSION_HOST + `notes/${updatedNote.id}`,
       {
-        // const response = await fetch(BACKEND_HOST + `groups/${groupId}/notes`, {
         method: "PUT",
         headers: {
           token: token,
@@ -122,8 +121,6 @@ export class Api {
         body: JSON.stringify(updatedNote),
       },
     );
-
-    console.log("update result" + response);
 
     const result = (await response.json()) as NotesResponse;
     console.log(result);
@@ -141,7 +138,6 @@ export class Api {
     console.log("delete note" + note.id);
 
     const response = await fetch(BACKEND_VERSION_HOST + `notes/${note.id}`, {
-      // const response = await fetch(BACKEND_HOST + `groups/${groupId}/notes`, {
       method: "DELETE",
       headers: {
         token: token,

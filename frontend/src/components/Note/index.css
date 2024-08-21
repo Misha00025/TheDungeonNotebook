@@ -11,31 +11,40 @@
 }
 
 .note-headerBox {
-  width: 100%;
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: end;
   flex-direction: row;
-  padding-bottom: 24px;
+
+  gap: 10px;
+
+  overflow: hidden;
 }
 
 .note-headerTitle {
   text-align: center;
   font-weight: 500;
-  font-size: 1.5em;
+  word-break: break-word;
+
+  display: flex;
+  overflow: hidden;
+  flex: 2;
 }
 
 .note-headerActions {
   display: flex;
+  justify-content: end;
   gap: 6px;
-  height: 36px;
-  margin-top: auto;
+
+  flex: 1 72px;
+  overflow: hidden;
 }
 
-.note-text {
-  font-size: calc(10px + 1.5vmin);
-  margin: 0 0;
-  padding: 4px 4px;
+.note-headerActions .iconButton {
+  min-width: 36px;
+  max-width: 64px;
+
+  margin-top: auto;
 }
 
 .note-author {
@@ -51,6 +60,45 @@
   border-radius: 50%;
 
   max-height: 60px;
+}
+
+.note-body {
+  font-size: calc(10px + 1.5vmin);
+  margin: 0 0;
+  flex: 1;
+
+  gap: 10px;
+
+  display: flex;
+  flex-direction: column;
+}
+
+.note-multiLineText {
+  resize: none;
+
+  display: flex;
+  flex: auto;
+}
+
+.note-multiLineText__readOnly {
+  border: none;
+  overflow: auto;
+  outline: none;
+
+  -webkit-box-shadow: none;
+  -moz-box-shadow: none;
+  box-shadow: none;
+  background: transparent;
+
+  color: inherit;
+  font: inherit;
+}
+
+.note-editModeButtons {
+  display: flex;
+  align-items: end;
+  justify-content: end;
+  gap: 1em;
 }
 
 @media screen and (max-width: 768px) {

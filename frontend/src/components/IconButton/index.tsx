@@ -15,7 +15,7 @@ export const IconButton = ({
   text,
   icon,
   iconPosition = "left",
-  tooltip = "Tooltip",
+  tooltip = "",
   onClick,
 }: IconButtonProps) => {
   const tooltipId = tooltip + "/" + icon;
@@ -23,7 +23,7 @@ export const IconButton = ({
     <button
       data-tooltip-id={tooltip + "/" + icon}
       data-tooltip-content={tooltip}
-      className={`iconButton icon__${iconPosition}`}
+      className={`iconButton iconButton-icon__${iconPosition}`}
       onClick={onClick}
     >
       {tooltip ? (
@@ -37,8 +37,8 @@ export const IconButton = ({
           }}
         />
       ) : undefined}
-      <img className="icon" src={icon} />
-      {text && <p>${text}</p>}
+      <img className="iconButton-icon" src={icon} />
+      {text && <p className="iconButton-text">{text}</p>}
     </button>
   );
 };

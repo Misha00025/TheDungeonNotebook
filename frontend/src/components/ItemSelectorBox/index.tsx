@@ -32,7 +32,6 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
   items = [],
   isHided = false,
 }) => {
-  // const [items, setItems] = useState<Array<{ name: string; id: number }>>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

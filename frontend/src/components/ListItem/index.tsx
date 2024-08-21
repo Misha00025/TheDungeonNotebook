@@ -2,8 +2,6 @@ import React, { ReactNode } from "react";
 
 import "./index.css";
 import { Link } from "react-router-dom";
-import { IconButton } from "../../components/IconButton";
-import del_icon from "../../assets/delete-1487-svgrepo-com.svg";
 
 interface ListItemProps {
   children: ReactNode;

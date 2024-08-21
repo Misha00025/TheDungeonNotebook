@@ -1,85 +1,144 @@
-import React from "react";
-
-import "./index.css";
-import { useNotes } from "../../store/NoteContext";
-import deleteIcon from "../../assets/carbon_delete.svg";
-import editIcon from "../../assets/carbon_edit.svg";
+import React, { ChangeEvent, useEffect, useState } from "react";
 import { IconButton } from "../IconButton";
 import { Api, INote } from "../../utils/api";
 import { useAuth } from "../../store/AuthContent";
 
-// Функция для замены символов и декодирования HTML
-const decodeHtml = (html: string | undefined) => {
-  // Заменяем HTML-сущности на соответствующие символы
-  if (html === undefined) return "";
-  const txt = document.createElement("textarea");
-  txt.innerHTML = html;
-  return txt.value;
-};
+import { useNotes } from "../../store/NoteContext";
+
+import deleteIcon from "../../assets/carbon_trash-can.svg";
+import editIcon from "../../assets/carbon_edit.svg";
+
+import unsavedIcon from "../../assets/carbon_unsaved.svg";
+import saveIcon from "../../assets/carbon_save.svg";
+
+import "./index.css";
 
 interface MultiLineTextProps {
-  text: string;
+  text?: string;
+  isEditMode?: boolean;
+  onChange: (value: ChangeEvent<HTMLTextAreaElement>) => void;
 }
 
-const MultiLineText: React.FC<MultiLineTextProps> = ({ text }) => {
-  const lines = text.split("\n");
-
+const MultiLineText: React.FC<MultiLineTextProps> = ({
+  text,
+  isEditMode = false,
+  onChange,
+}) => {
   return (
-    <div>
-      {lines.map((line, index) => (
-        <React.Fragment key={index}>
-          {line}
-          <br />
-        </React.Fragment>
-      ))}
-    </div>
+    <textarea
+      className={`note-multiLineText ${isEditMode ? "note-multiLineText__editing" : "note-multiLineText__readOnly"}`}
+      spellCheck="true"
+      name="noteText"
+      value={text}
+      onChange={onChange}
+      readOnly={!isEditMode}
+    />
   );
 };
 
 export const Note = () => {
-  const { activeNote, setNotes, notes } = useNotes();
   const { token } = useAuth();
-  const formattedMessage = decodeHtml(activeNote?.body);
+  const { activeNote, setNotes, notes } = useNotes();
 
-  const handleNoteEdit = (note: INote, token: string) => {
-    Api.updateNote(note, token);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [activeNoteText, setActiveNoteText] = useState(activeNote?.body);
+  const [activeNoteHeader, setActiveNoteHeader] = useState(activeNote?.header);
+
+  useEffect(() => {
+    setActiveNoteText(activeNote?.body);
+    setActiveNoteHeader(activeNote?.header);
+  }, [activeNote]);
+
+  const handleNoteEdit = () => {
+    setIsEditMode((lastEditMode) => !lastEditMode);
   };
 
-  const handleNoteDelete = (note: INote, token: string) => {
+  const handleNoteDelete = () => {
     const isConfirmed = confirm("Вы уверены, что хотите удалить эту заметку?");
-    if (isConfirmed && notes && setNotes) {
-      Api.deleteNote(note, token);
-      setNotes(notes.filter((n: INote) => n.id !== note.id));
+    if (isConfirmed && notes && setNotes && activeNote) {
+      Api.deleteNote(activeNote, token);
+      setNotes(notes.filter((n: INote) => n.id !== activeNote.id));
     }
+  };
+
+  const handleChangeNoteText = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    setActiveNoteText(event.target.value);
+  };
+
+  const handleChangeNoteTitle = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    setActiveNoteHeader(event.target.value);
+  };
+
+  const handleNoteEditSave = async () => {
+    if (activeNote && setNotes && notes) {
+      const changedNote = {
+        ...activeNote,
+        body: activeNoteText ?? activeNote.body,
+        header: activeNoteHeader ?? activeNote.header,
+      };
+
+      await Api.updateNote(changedNote, token);
+
+      setNotes([
+        ...notes.filter((n: INote) => n.id !== activeNote.id),
+        changedNote,
+      ]);
+    }
+    setIsEditMode(false);
+  };
+
+  const handleNoteEditCancel = () => {
+    setActiveNoteText(activeNote?.body);
+    setIsEditMode(false);
   };
 
   return (
     <div className="note">
       <div className="note-headerBox">
-        <header className="note-headerTitle">{activeNote?.header}</header>
+        <header className="note-headerTitle">
+          <MultiLineText
+            onChange={handleChangeNoteTitle}
+            text={activeNoteHeader}
+            isEditMode={isEditMode}
+          />
+        </header>
         <div className="note-headerActions">
           {activeNote && (
             <>
               <IconButton
                 icon={editIcon}
                 tooltip="Редактировать заметку"
-                onClick={() =>
-                  activeNote && token && handleNoteEdit(activeNote, token)
-                }
+                onClick={() => activeNote && handleNoteEdit()}
               />
               <IconButton
                 icon={deleteIcon}
                 tooltip="Удалить заметку"
-                onClick={() =>
-                  activeNote && token && handleNoteDelete(activeNote, token)
-                }
+                onClick={() => activeNote && handleNoteDelete()}
               />
             </>
           )}
         </div>
       </div>
-      <div className="note-text">
-        <MultiLineText text={formattedMessage} />
+      <div className="note-body">
+        <MultiLineText
+          text={activeNoteText}
+          isEditMode={isEditMode}
+          onChange={handleChangeNoteText}
+        />
+        {isEditMode && (
+          <div className="note-editModeButtons">
+            <IconButton
+              text="Отменить"
+              onClick={handleNoteEditCancel}
+              icon={unsavedIcon}
+            />
+            <IconButton
+              text="Сохранить"
+              onClick={handleNoteEditSave}
+              icon={saveIcon}
+            />
+          </div>
+        )}
       </div>
       <div className="note-author">
         <img src={activeNote?.author.photo} />

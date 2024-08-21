@@ -7,43 +7,47 @@
 
   padding: 0;
   cursor: pointer;
-}
-
-.icon {
-  height: 100%;
-  width: 100%;
-
-  padding: 8px;
-
-  transition: background-color 0.1s;
 
   border-radius: 10px;
+  padding: 8px;
+  transition: background-color 0.1s;
+
+  gap: 0.2em;
 }
 
-.icon:hover {
+.iconButton-text {
+  margin: auto;
+}
+
+.iconButton-icon {
+  height: 100%;
+  width: 100%;
+}
+
+.iconButton:hover {
   background-color: #585b63;
 }
 
-.icon:active {
+.iconButton:active {
   opacity: 0.8;
   background-color: #848996;
 }
 
-.icon__center {
+.iconButton-icon__center {
   justify-content: center;
 }
 
-.icon__left {
+.iconButton-icon__left {
   justify-content: space-between;
 }
 
-.icon__right {
+.iconButton-icon__right {
   justify-content: space-between;
   flex-direction: row-reverse;
 }
 
 @media screen and (max-width: 768px) {
-  .icon {
+  .iconButton {
     padding: 4px;
   }
 }
