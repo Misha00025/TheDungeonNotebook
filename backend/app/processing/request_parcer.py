@@ -36,7 +36,7 @@ def get_user_id(request: Request):
         if err:
             return None
         return res[0]
-
+    raise Exception("Bad request: user_id not founded")
 
 def get_group_id(request: Request):
     if from_bot(request):

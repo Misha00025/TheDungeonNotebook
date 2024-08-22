@@ -9,7 +9,7 @@ class VkUser:
         res: vk_user.VkUser
         err, res = vk_user.find(user_id)
         if err:
-            raise Exception("User not founded")
+            raise Exception(f"User not founded: {res}")
         err, g_res = user_group.find(user_id)
         if err:
             raise Exception("User groups not loaded")

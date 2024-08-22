@@ -29,6 +29,7 @@ def generate_note() -> Note:
 
 def check_access(note: Note):
     user_id = get_user_id(request)
+    print(f"{user_id} -- {type(user_id)}")
     user = VkUser(user_id)
     return str(note.owner_id) == str(user_id) or str(note.group_id) in user.admin_in
 
@@ -38,18 +39,19 @@ def get(note_id):
     if not note.is_exist():
         return not_found()
     if check_access(note):
-        return ok(jsonify(note.to_dict()))
+        return ok(note.to_dict())
     return forbidden()
 
 
 def put(note_id):
     note = Note(note_id)
-    print(note.to_dict())
+    # print(note.to_dict())
     if not note.is_exist():
         return not_found()
     if check_access(note):
         new_note = generate_note()
         new_note.note_id = note_id
+        new_note.owner_id = note.owner_id
         new_note.update()
         return accepted()
     return forbidden()

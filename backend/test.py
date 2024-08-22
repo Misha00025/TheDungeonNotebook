@@ -8,7 +8,7 @@ from variables import _st, _at
 
 ethernet = "https://the-dungeon-notebook.ru"
 local = "http://127.0.0.1:5000"
-site = ethernet
+site = local
 st = "1"
 ut = "4595880663507502266"
 headers = {_st: st, "Content-Type": "application/json; charset=utf-8"}
@@ -62,31 +62,32 @@ def test_notes():
     # note = Note(19)
     url = f"{site}/api/v1/notes/"
     payload = {"user_id": user_id}
-    upayload = {"group_id": "-101"}
+    upayload = {"group_id": "218984657"}
     data = {"header": "heh", "body": "heheh"}
     head = headers.copy()
     head.pop(_st)
-    head[_at] = ut
-    res = rq.get(url=url, headers=headers, params=payload)
-    print(res.text)
-    res = rq.get(url=url, headers=headers)
-    print(res.text)
-    res = rq.get(url=url, headers=head, params=upayload)
-    print(res.text)
-    res = rq.post(url=url+"add", headers=headers, params=payload, json=data).json()
-    note_id = str(res["last_id"])
-    res = rq.get(url=url+note_id, headers=headers, params=payload)
-    print(res.text)
-    sleep(10)
-    data["header"] = "HEH"
-    data["body"] = "HEHEH"
-    rq.put(url=url+note_id, headers=headers, params=payload, json=data)
-    res = rq.get(url=url+note_id, headers=headers, params=payload)
-    print(res.text)
-    sleep(10)
-    rq.delete(url=url+note_id, headers=headers, params=payload)
-    res = rq.get(url=url+note_id, headers=headers, params=payload)
-    return res.text
+    head[_at] = "-1456012282360953399"
+    # res = rq.get(url=url, headers=headers, params=payload)
+    # print(res.text)
+    # res = rq.get(url=url, headers=headers)
+    # print(res.text)
+    # res = rq.get(url=url, headers=head, params=upayload)
+    # print(res.text)
+    # res = rq.post(url=url+"add", headers=headers, params=payload, json=data).json()
+    note_id = "20"
+    res = rq.get(url=url+note_id, headers=head)
+    # print(res.text)
+    serv_data = res.json()
+    data["header"] = serv_data["header"]
+    data["body"] = serv_data["body"] + " ...Test"
+    print(data)
+    rq.put(url=url+note_id, headers=head, params=upayload, json=data)
+    res = rq.get(url=url+note_id, headers=head, params=upayload)
+    print(res.json()["body"])
+    # sleep(10)
+    # rq.delete(url=url+note_id, headers=headers, params=payload)
+    # res = rq.get(url=url+note_id, headers=headers, params=payload)
+    return ""
 
 
 if __name__ == "__main__":
@@ -97,5 +98,14 @@ if __name__ == "__main__":
     print(test_notes())
     # from app.model.VkUser import VkUser
     # user = VkUser(user_id)
-    # print(user.to_dict())
+    # # print(user.to_dict())
+    # from app.model.Note import Note
+    # note = Note(26)
+    # is_mine = str(note.owner_id) == str(user.user_id)
+    # is_admin = str(note.group_id) in user.admin_in
+    # print(f"{note.group_id}:{user.admin_in}")
+    # print(is_mine)
+    # print(is_admin)
+    # access = is_mine or is_admin
+    # print(access)
     pass
