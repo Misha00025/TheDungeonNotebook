@@ -23,7 +23,7 @@ class VkUser:
             self.groups.append(group[1])
             is_admin = group[2]
             if is_admin:
-                self.admin_in.append(group[1])
+                self.admin_in.append(str(group[1]))
 
     def to_dict(self):
         return {

@@ -30,7 +30,7 @@ def generate_note() -> Note:
 def check_access(note: Note):
     user_id = get_user_id(request)
     user = VkUser(user_id)
-    return note.owner_id == str(user_id) or note.group_id in user.admin_in
+    return str(note.owner_id) == str(user_id) or str(note.group_id) in user.admin_in
 
 
 def get(note_id):
