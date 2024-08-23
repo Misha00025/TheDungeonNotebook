@@ -1,23 +1,20 @@
-from app.api_controller import route
+from app.api_controller import route, Access
 from flask.json import jsonify
 from flask import request
 from app import database
 from app.processing.vk_methods import *
 from app.processing.founder import *
-from app.access_managment import authorised_group
 from app.processing.request_parcer import *
 from app.processing.group_controller import *
 
 
-@route("get_user_info/<user_id>", methods=["GET"])
-@authorised_group
+@route("get_user_info/<user_id>", methods=["GET"], access=Access.groups)
 def _get_user_info(user_id):
     user_info = get_user_info(user_id)
     return jsonify(user_info)
 
 
-@route("user_is_mine", methods=["GET"])
-@authorised_group
+@route("user_is_mine", methods=["GET"], access=Access.groups)
 def _get_group_users():
     user_id = get_user_id(request)
     st = get_service_token(request)
@@ -26,8 +23,7 @@ def _get_group_users():
     return {"status": result is not None}, 200
 
 
-@route("update_user_info", methods=["PUT"])
-@authorised_group
+@route("update_user_info", methods=["PUT"], access=Access.groups)
 def _update_user():
     user_id = get_user_id(request)
     if not user_is_founded(user_id):
@@ -36,8 +32,7 @@ def _update_user():
     return "OK", 200
 
 
-@route("add_user_to_me", methods=["POST"])
-@authorised_group
+@route("add_user_to_me", methods=["POST"], access=Access.groups)
 def _add_user_to_group():
     user_id = get_user_id(request)
     print(user_id)

@@ -95,7 +95,7 @@ if __name__ == "__main__":
     # print(get_info())
     # print(upd_user())
     # print(check_user())
-    print(test_notes())
+    # print(test_notes())
     # from app.model.VkUser import VkUser
     # user = VkUser(user_id)
     # # print(user.to_dict())
@@ -108,4 +108,10 @@ if __name__ == "__main__":
     # print(is_admin)
     # access = is_mine or is_admin
     # print(access)
+    res = rq.get(url=f"{site}/api/get_api")
+    if res.ok:
+        apis = res.json()["api_methods"]
+        for v in apis:
+            for api in apis[v]:
+                print(f"{v}:{api}")
     pass

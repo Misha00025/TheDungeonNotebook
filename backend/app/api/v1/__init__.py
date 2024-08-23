@@ -1,7 +1,10 @@
 from app.api_controller import route, version
 
 
-version("v1", clear=True)
+_v = "v1"
+
+
+version(_v, clear=True)
 
 
 @route("ping", methods=["GET"])
@@ -10,4 +13,7 @@ def _ping():
 
 
 from .vk_used import *
+
+version(_v, clear=True)
+
 from . import notes

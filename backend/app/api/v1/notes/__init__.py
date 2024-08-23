@@ -1,4 +1,5 @@
 from app.api_controller import route as rt
+from app.api_controller import Access
 from app.access_managment import authorised_user, authorised_group, authorised
 from flask import request
 from . import note
@@ -7,18 +8,16 @@ from . import note
 _prefix = "notes/"
 
 
-def route(url, methods):
-    return rt(_prefix+url, methods)
+def route(url, methods, access = Access.users_and_groups):
+    return rt(_prefix+url, methods, access)
 
 
 @route("", ["GET"])
-@authorised
 def _get_notes():
     return note.get_all()
 
 
 @route("<note_id>", ["GET", "PUT", "DELETE"])
-@authorised
 def _note(note_id):
     print()
     match request.method:
@@ -31,6 +30,5 @@ def _note(note_id):
 
 
 @route("add", ["POST"])
-@authorised
 def _add_note():
     return note.add()

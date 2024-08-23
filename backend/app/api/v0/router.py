@@ -1,13 +1,18 @@
 from flask.json import jsonify
 from flask import request
 
-from app.access_managment import authorised_user
 from app.api.v0.methods import *
-from app.api_controller import route, version
+from app.api_controller import get_routers_info, route, version, Access
+from app.statuss import ok
+from app.access_managment import get_access_token, get_service_token
 
 
 version("")
 
+
+@route("get_api", ["GET"])
+def _get_api():
+    return ok({"api_methods": get_routers_info()})
 
 
 @route("auth", ["POST"])
@@ -25,8 +30,17 @@ def _authorise():
     return "payload not found", 415
 
 
-@route("groups", ["GET"])
-@authorised_user
+@route("check_access", ["GET"], Access.users_and_groups)
+def _ping_pong():
+    access_type = None
+    if get_access_token(request) is not None:
+        access_type = "user"
+    if get_service_token(request) is not None:
+        access_type = "group"
+    return ok({"authorised": {"type": access_type}})
+
+
+@route("groups", ["GET"], Access.users)
 def _get_groups():
     token = request.headers.get("token")
     err, user_id = get_user_id(token)
@@ -36,22 +50,4 @@ def _get_groups():
     if err:
         return "unsupported error", 418
     return jsonify({"groups": groups})
-
-
-@route("groups/<group_id>/notes", ["GET"])
-@authorised_user
-def _get_notes_old(group_id: int):
-    token = request.headers.get("token")
-    err, user_id = get_user_id(token)
-    if err:
-        return "user not found", 404
-    err, notes = get_notes(user_id, int(group_id))
-    if err:
-        return notes, 418
-    return jsonify({"notes": notes})
-
-
-@route("groups/<group_id>/notes/<note_id>", ["GET"])
-def _get_note(group_id: int, note_id: int):
-    pass
 
