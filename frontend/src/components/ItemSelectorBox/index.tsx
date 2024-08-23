@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ListContainer } from "../ListContainer/Index";
 import { ListItem } from "../ListItem";
 
@@ -38,6 +38,8 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
     initialItemsCallback().then(() => {
       setIsLoading(false);
     });
+
+    return () => setIsLoading(true);
   }, [refetchItemsOnChangeValue]);
 
   useEffect(() => {
@@ -52,21 +54,21 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
     >
       <header className="itemSelectorBox-header">{headerText}</header>
       <ListContainer>
-        {items.map((item) => (
-          <ListItem
-            key={item.id}
-            isActive={Number(item.id) === Number(activeItemId)}
-            linkPath={linkPrefix && linkPrefix + item.id}
-          >
-            {item.name}
-          </ListItem>
-        ))}
-        {}
         {isLoading ? (
           <span className="itemSelectorBox-loader" />
         ) : (
           items.length === 0 && <p>Список пуст</p>
         )}
+        {!isLoading &&
+          items.map((item) => (
+            <ListItem
+              key={item.id}
+              isActive={Number(item.id) === Number(activeItemId)}
+              linkPath={linkPrefix && linkPrefix + item.id}
+            >
+              {item.name}
+            </ListItem>
+          ))}
       </ListContainer>
     </div>
   );
