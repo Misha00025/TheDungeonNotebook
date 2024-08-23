@@ -82,8 +82,7 @@ export const Note = () => {
       await Api.updateNote(changedNote, token);
 
       setNotes([
-        ...notes.filter((n: INote) => n.id !== activeNote.id),
-        changedNote,
+        ...notes.map((n: INote) => (n.id !== activeNote.id ? n : changedNote)),
       ]);
     }
     setIsEditMode(false);
