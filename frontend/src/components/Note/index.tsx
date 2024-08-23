@@ -4,10 +4,10 @@ import { Api, INote } from "../../utils/api";
 import { useAuth } from "../../store/AuthContent";
 
 import { useNotes } from "../../store/NoteContext";
+import { useNavigate } from "react-router-dom";
 
 import deleteIcon from "../../assets/carbon_trash-can.svg";
 import editIcon from "../../assets/carbon_edit.svg";
-
 import unsavedIcon from "../../assets/carbon_unsaved.svg";
 import saveIcon from "../../assets/carbon_save.svg";
 
@@ -39,6 +39,7 @@ const MultiLineText: React.FC<MultiLineTextProps> = ({
 export const Note = () => {
   const { token } = useAuth();
   const { activeNote, setNotes, notes } = useNotes();
+  const navigate = useNavigate();
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [activeNoteText, setActiveNoteText] = useState(activeNote?.body);
@@ -56,8 +57,9 @@ export const Note = () => {
   const handleNoteDelete = () => {
     const isConfirmed = confirm("Вы уверены, что хотите удалить эту заметку?");
     if (isConfirmed && notes && setNotes && activeNote) {
-      Api.deleteNote(activeNote, token);
+      Api.deleteNote(activeNote.id, token);
       setNotes(notes.filter((n: INote) => n.id !== activeNote.id));
+      navigate("..");
     }
   };
 

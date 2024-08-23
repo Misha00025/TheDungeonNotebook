@@ -2,6 +2,7 @@ import React from "react";
 
 import "./index.css";
 import { useAuth } from "../../store/AuthContent";
+import { Link } from "react-router-dom";
 
 export const HomePage = () => {
   const { token } = useAuth();
@@ -22,7 +23,7 @@ export const HomePage = () => {
         </p>
       ) : undefined}
       <p>
-        <a href="/groups">View your Groups</a>
+        <Link to={"/groups/"}>View your Groups</Link>
       </p>
     </div>
   );
