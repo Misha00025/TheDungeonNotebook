@@ -128,16 +128,15 @@ export class Api {
   };
 
   static deleteNote = async (
-    note: INote,
+    noteId: number,
     token: string | null,
   ): Promise<Array<INote>> => {
     if (!token) {
       console.error("token not found");
       throw new Error("token not found");
     }
-    console.log("delete note" + note.id);
 
-    const response = await fetch(BACKEND_VERSION_HOST + `notes/${note.id}`, {
+    const response = await fetch(BACKEND_VERSION_HOST + `notes/${noteId}`, {
       method: "DELETE",
       headers: {
         token: token,
