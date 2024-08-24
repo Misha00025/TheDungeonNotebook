@@ -1,16 +1,11 @@
 .itemSelectorBox-container {
-  max-height: 100dvh;
-
-  overflow: auto;
-
   display: flex;
-  align-items: center;
   flex-direction: column;
-
-  padding-top: 24px;
-
   gap: 24px;
-
+  align-items: center;
+  max-height: 100dvh;
+  padding-top: 24px;
+  overflow: auto;
   border-right: 1px solid gray;
 }
 
@@ -23,21 +18,21 @@
 }
 
 .itemSelectorBox-loader {
+  position: relative;
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  position: relative;
   animation: rotate 1s linear infinite;
 }
 
 .itemSelectorBox-loader::before {
-  content: "";
-  box-sizing: border-box;
   position: absolute;
-  inset: 0px;
-  border-radius: 50%;
+  inset: 0;
+  box-sizing: border-box;
+  content: "";
   border: 5px solid #fff;
-  animation: prixClipFix 2s linear infinite;
+  border-radius: 50%;
+  animation: prix-clip-fix 2s linear infinite;
 }
 
 @keyframes rotate {
@@ -46,32 +41,36 @@
   }
 }
 
-@keyframes prixClipFix {
+@keyframes prix-clip-fix {
   0% {
     clip-path: polygon(50% 50%, 0 0, 0 0, 0 0, 0 0, 0 0);
   }
+
   25% {
     clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 0, 100% 0, 100% 0);
   }
+
   50% {
     clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 100% 100%, 100% 100%);
   }
+
   75% {
     clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 0 100%, 0 100%);
   }
+
   100% {
     clip-path: polygon(50% 50%, 0 0, 100% 0, 100% 100%, 0 100%, 0 0);
   }
 }
 
-@media screen and (min-width: 769px) {
+@media screen and (width >= 769px) {
   .itemSelectorBox-container {
     width: 20vw;
     min-width: 200px;
   }
 }
 
-@media screen and (max-width: 768px) {
+@media screen and (width <= 768px) {
   .itemSelectorBox-container {
     flex: 1;
   }

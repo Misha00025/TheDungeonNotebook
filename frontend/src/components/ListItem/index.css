@@ -1,57 +1,35 @@
-/* .listItem {
-    background-color: #323641;
-    color: #d3deff;
-
-    padding: 0 4px;
-    border-radius: 8px;
-
-    cursor: pointer;
-
-    transition: 0.1s;
-
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.5;
-    max-height: 3em;
-    height: 3em;
-} */
-
-.listItem:hover {
-  filter: brightness(115%);
-}
-
 .listItem__active {
   filter: brightness(140%) !important;
 }
 
 .listItem {
-  background-color: #323641;
-  color: #d3deff;
   display: flex;
   align-items: center;
   justify-content: space-between;
-
-  border-radius: 8px;
-  cursor: pointer;
-  transition: 0.1s;
+  height: 3em;
   overflow: hidden;
   line-height: 1.5;
-  height: 3em;
+  color: #d3deff;
+  cursor: pointer;
+  background-color: #323641;
+  border-radius: 8px;
+  transition: 0.1s;
+}
+
+.listItem:hover {
+  filter: brightness(115%);
 }
 
 .listItem-link {
-  flex-grow: 1;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  flex-grow: 1;
+  height: 3em;
+  padding: 0 4px;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-clamp: 2;
   white-space: normal;
-  padding: 0 4px;
-  height: 3em;
+  -webkit-box-orient: vertical;
 }
 
 .buttonsBar.iconButton {

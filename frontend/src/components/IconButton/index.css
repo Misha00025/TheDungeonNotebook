@@ -1,18 +1,13 @@
 .iconButton {
   display: flex;
-
-  border: none;
-  outline: none;
-  background-color: transparent;
-
-  padding: 0;
-  cursor: pointer;
-
-  border-radius: 10px;
-  padding: 8px;
-  transition: background-color 0.1s;
-
   gap: 0.2em;
+  padding: 8px;
+  cursor: pointer;
+  background-color: transparent;
+  border: none;
+  border-radius: 10px;
+  outline: none;
+  transition: background-color 0.1s;
 }
 
 .iconButton-text {
@@ -20,8 +15,8 @@
 }
 
 .iconButton-icon {
-  height: 100%;
   width: 100%;
+  height: 100%;
 }
 
 .iconButton:hover {
@@ -29,8 +24,8 @@
 }
 
 .iconButton:active {
-  opacity: 0.8;
   background-color: #848996;
+  opacity: 0.8;
 }
 
 .iconButton-icon__center {
@@ -42,11 +37,11 @@
 }
 
 .iconButton-icon__right {
-  justify-content: space-between;
   flex-direction: row-reverse;
+  justify-content: space-between;
 }
 
-@media screen and (max-width: 768px) {
+@media screen and (width <= 768px) {
   .iconButton {
     padding: 4px;
   }

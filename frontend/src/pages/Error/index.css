@@ -1,27 +1,23 @@
 .errorPage-container {
   display: flex;
-  background-color: #282c34;
-  align-items: center;
-
-  justify-content: center;
   gap: 100px;
-
-  height: 100dvh;
+  align-items: center;
+  justify-content: center;
   width: 100dvw;
-
+  height: 100dvh;
   color: white;
+  background-color: #282c34;
 }
 
 .error-picture {
-  height: auto;
   width: 30dvw;
-
+  height: auto;
   border-radius: 16px;
 }
 
 .errorPage-link {
+  color: hsl(230deg 30% 85% / 100%);
   text-decoration: underline;
-  color: hsla(230, 30%, 85%, 1);
   cursor: pointer;
 }
 

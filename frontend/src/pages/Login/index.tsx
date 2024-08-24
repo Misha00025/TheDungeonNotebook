@@ -51,8 +51,8 @@ export const Login = () => {
   }, [vkResponse]);
 
   return (
-    <div className="App">
-      <header className="App-header">
+    <div className="app">
+      <header className="app-header">
         <div ref={containerRef} />
       </header>
     </div>

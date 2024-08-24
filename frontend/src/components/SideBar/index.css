@@ -1,17 +1,13 @@
 .sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
   width: 100px;
   min-width: 100px;
   height: 100dvh;
-
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  justify-content: space-between;
-
   padding: 16px 0;
-
-  gap: 10px;
-
   background-color: #3a3f4b;
 }
 
@@ -22,7 +18,7 @@
   gap: 10px;
 }
 
-@media screen and (max-width: 768px) {
+@media screen and (width <= 768px) {
   .sidebar {
     width: 48px;
     min-width: 48px;
