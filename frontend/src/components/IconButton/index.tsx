@@ -2,6 +2,9 @@ import React from "react";
 import { Tooltip } from "react-tooltip";
 
 import "./index.css";
+import { GREEN_FILTER, RED_FILTER } from "./consts";
+
+type TButtonColor = "default" | "red" | "green";
 
 interface IconButtonProps {
   text?: string;
@@ -10,7 +13,14 @@ interface IconButtonProps {
   iconPosition?: "left" | "right" | "center";
   onClick: () => void;
   className?: string; // Дополнительный CSS класс для кнопки и иконки.
+  color?: TButtonColor;
 }
+
+const colorFilterMap = {
+  default: "", // without any filter
+  red: RED_FILTER,
+  green: GREEN_FILTER,
+};
 
 export const IconButton = ({
   text,
@@ -19,8 +29,14 @@ export const IconButton = ({
   tooltip = "",
   onClick,
   className,
+  color = "default",
 }: IconButtonProps) => {
   const tooltipId = tooltip + "/" + icon;
+
+  const coloredStyle = {
+    filter: colorFilterMap[color],
+  };
+
   return (
     <button
       data-tooltip-id={tooltip + "/" + icon}
@@ -39,8 +55,12 @@ export const IconButton = ({
           }}
         />
       ) : undefined}
-      <img className="iconButton-icon" src={icon} />
-      {text && <p className="iconButton-text">{text}</p>}
+      <img className="iconButton-icon" src={icon} style={coloredStyle} />
+      {text && (
+        <p className="iconButton-text" style={coloredStyle}>
+          {text}
+        </p>
+      )}
     </button>
   );
 };

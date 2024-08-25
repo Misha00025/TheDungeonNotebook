@@ -132,11 +132,13 @@ export const Note = () => {
               text="Отменить"
               onClick={handleNoteEditCancel}
               icon={unsavedIcon}
+              color="red"
             />
             <IconButton
               text="Сохранить"
               onClick={handleNoteEditSave}
               icon={saveIcon}
+              color="green"
             />
           </div>
         )}
