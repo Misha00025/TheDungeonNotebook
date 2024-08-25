@@ -9,6 +9,7 @@ interface IconButtonProps {
   icon: any;
   iconPosition?: "left" | "right" | "center";
   onClick: () => void;
+  className?: string; // Дополнительный CSS класс для кнопки и иконки.
 }
 
 export const IconButton = ({
@@ -17,13 +18,14 @@ export const IconButton = ({
   iconPosition = "left",
   tooltip = "",
   onClick,
+  className,
 }: IconButtonProps) => {
   const tooltipId = tooltip + "/" + icon;
   return (
     <button
       data-tooltip-id={tooltip + "/" + icon}
       data-tooltip-content={tooltip}
-      className={`iconButton iconButton-icon__${iconPosition}`}
+      className={`iconButton iconButton-icon__${iconPosition} ${className}`}
       onClick={onClick}
     >
       {tooltip ? (

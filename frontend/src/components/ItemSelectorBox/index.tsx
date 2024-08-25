@@ -3,6 +3,10 @@ import { ListContainer } from "../ListContainer/Index";
 import { ListItem } from "../ListItem";
 
 import "./index.css";
+import { IconButton } from "../IconButton";
+
+import collapseIcon from "../../assets/mdi_arrow-collapse-left.svg";
+import extendIcon from "../../assets/mdi_arrow-expand-right.svg";
 
 interface ItemSelectorBoxProps {
   initialItemsCallback: () => Promise<void>;
@@ -33,6 +37,7 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
   isHided = false,
 }) => {
   const [isLoading, setIsLoading] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
     initialItemsCallback().then(() => {
@@ -48,11 +53,21 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
     }
   }, [activeItemId]);
 
+  const handleToggleCollapse = () => {
+    setIsCollapsed((lastIsCollapsed) => !lastIsCollapsed);
+  };
+
   return (
     <div
-      className={`itemSelectorBox-container ${isHided ? "itemSelectorBox-container__hided" : undefined}`}
+      className={`itemSelectorBox-container ${isHided ? "itemSelectorBox-container__hided" : undefined} itemSelectorBox-container__${isCollapsed ? "collapsed" : "expanded"}`}
     >
-      <header className="itemSelectorBox-header">{headerText}</header>
+      <div className={`itemSelectorBox-header-container`}>
+        <header className={`itemSelectorBox-header-text`}>{headerText}</header>
+        <IconButton
+          icon={isCollapsed ? extendIcon : collapseIcon}
+          onClick={handleToggleCollapse}
+        />
+      </div>
       <ListContainer>
         {isLoading ? (
           <span className="itemSelectorBox-loader" />
