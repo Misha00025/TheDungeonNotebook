@@ -1,4 +1,4 @@
-from app.api.v0.methods import (update_authorise_date)
+from app.api.v0.methods import (update_authorize_date)
 from app.processing.request_parcer import get_service_token, get_access_token
 
 
@@ -8,7 +8,7 @@ def is_correct_token(request):
     err, user = vk_user_token.find(token)
     result = not err
     if result:
-        update_authorise_date(token)
+        update_authorize_date(token)
     return result
 
 
@@ -21,7 +21,7 @@ def is_correct_service_token(request):
     return group_id is not None
 
 
-def authorised_group(func):
+def authorized_group(func):
     from flask import request
     def wrapped(*args, **kwargs):
         if is_correct_service_token(request):
@@ -31,7 +31,7 @@ def authorised_group(func):
     return wrapped
 
 
-def authorised_user(func):
+def authorized_user(func):
     def wrapped(*args, **kwargs):
         from flask import request
         if is_correct_token(request):
@@ -41,7 +41,7 @@ def authorised_user(func):
     return wrapped
 
 
-def authorised(func):
+def authorized(func):
     def wrapped(*args, **kwargs):
         from flask import request
         if is_correct_token(request) or is_correct_service_token(request):

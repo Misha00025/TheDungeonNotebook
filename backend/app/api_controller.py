@@ -1,6 +1,6 @@
 from enum import Enum
 from app import application
-from app.access_managment import authorised, authorised_group, authorised_user
+from app.access_managment import authorized, authorized_group, authorized_user
 
 
 _prefix = "/api/"
@@ -38,11 +38,11 @@ def version(version, clear = False):
 def _get_access(access: Access):
     method = lambda func: func
     if access == Access.groups:
-        method = authorised_group
+        method = authorized_group
     if access == Access.users:
-        method = authorised_user
+        method = authorized_user
     if access == Access.users_and_groups:
-        method = authorised
+        method = authorized
     return method, access.name
         
 

@@ -36,7 +36,7 @@ def get_authorise_data(payload: dict):
     return "", ""
 
 
-def get_access_token(uuid, silent_token):
+def generate_access_token(uuid, silent_token):
     if uuid == "":
         return 300, f"uuid not found"
     data = f"v={vk_api_version}&token={silent_token}&access_token={service_token}&uuid={uuid}"
@@ -68,7 +68,7 @@ def access_to_user_token(access_token: str):
     return user_token
 
 
-def update_authorise_date(token):
+def update_authorize_date(token):
     err, user_id = database.find_user_id_from_token(token)
     if not err:
         database.save_user_token(user_id, token)

@@ -1,6 +1,6 @@
 from app.api_controller import route as rt
 from app.api_controller import Access
-from app.access_managment import authorised_user, authorised_group, authorised
+from app.access_managment import authorized_user, authorized_group, authorized
 from flask import request
 from . import note
 

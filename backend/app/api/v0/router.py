@@ -4,7 +4,7 @@ from flask import request
 from app.api.v0.methods import *
 from app.api_controller import get_routers_info, route, version, Access
 from app.statuss import ok
-from app.access_managment import get_access_token as gat
+from app.access_managment import get_access_token
 from app.access_managment import get_service_token
 
 
@@ -17,11 +17,11 @@ def _get_api():
 
 
 @route("auth", ["POST"])
-def _authorise():
+def _authorize():
     content = request.json
     err, payload = get_payload(content)
     if not err:
-        err, result = get_access_token(*get_authorise_data(payload))
+        err, result = generate_access_token(*get_authorise_data(payload))
         if not err:
             access_token = result
             user_token = access_to_user_token(access_token)
@@ -34,7 +34,7 @@ def _authorise():
 @route("check_access", ["GET"], Access.users_and_groups)
 def _ping_pong():
     access_type = None
-    if gat(request) is not None:
+    if get_access_token(request) is not None:
         access_type = "user"
     if get_service_token(request) is not None:
         access_type = "group"
