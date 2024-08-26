@@ -1,10 +1,11 @@
+from flask import Request
 from app.api.v0.methods import (update_authorize_date)
 from app.processing.request_parcer import get_service_token, get_access_token
 
 
-def is_correct_token(request):
+def is_correct_token(request: Request):
     from app.database import vk_user_token
-    token = get_access_token(request)
+    token = str(get_access_token(request))
     err, user = vk_user_token.find(token)
     result = not err
     if result:

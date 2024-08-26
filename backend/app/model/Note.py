@@ -21,7 +21,9 @@ class Note:
         return str(self.to_dict())
 
     def to_dict(self):
-        _, user = database.vk_user.find(self.owner_id)
+        err, user = database.vk_user.find(self.owner_id)
+        if err:
+            raise Exception(user)
         return {
             "group_id": self.group_id,
             "owner_id": self.owner_id,
@@ -47,7 +49,7 @@ class Note:
     def _find_from_db(self, note_id):
         err, res = database.note.find(note_id=note_id)
         if err:
-            return
+            raise Exception(res)
         self.group_id = res[0]
         self.owner_id = res[1]
         self.note_id = note_id
