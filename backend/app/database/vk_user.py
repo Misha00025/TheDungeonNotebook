@@ -33,7 +33,7 @@ def find(user_id):
     query = f"SELECT {string_fields} FROM vk_user WHERE vk_user_id = %s"
     result = _instance.fetchone(query, data)
     if result is None:
-        return 1, f"user_id = {user_id} ({type(user_id)}) "
+        return 1, f"user_id = {user_id} ({type(user_id)}) Result {result}"
     user = VkUser(result)
     return 0, user
 

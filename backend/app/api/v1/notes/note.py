@@ -85,6 +85,6 @@ def get_all():
     for nt in res:
         note = Note(nt[2])
         notes.append(note.to_dict())
-    print(res)
+    # print(res)
     return ok({"notes": notes})
 
