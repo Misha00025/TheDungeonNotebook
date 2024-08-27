@@ -1,4 +1,4 @@
-import pymysql
+from pymysql.cursors import Cursor
 import pymysqlpool
 
 class MySQLDB:
@@ -20,7 +20,7 @@ class MySQLDB:
                 'password':f'{self._pwd}', 
                 'database':f'{self._dbname}',
                 'port':int(self._port), 
-                'autocommit':True}
+                'autocommit':False}
         # self.__connection = pymysql.connect(database=self._dbname,
         #                                     user=self._user,
         #                                     password=self._pwd,
@@ -38,8 +38,10 @@ class MySQLDB:
         try:
             con = self._pool.get_connection()
             with con.cursor() as cursor:
+                cursor: Cursor
                 result = cursor.execute(query, data)
                 self.last_row_id = cursor.lastrowid
+                cursor.connection.commit()
                 cursor.close()
             return result
         except Exception as err:

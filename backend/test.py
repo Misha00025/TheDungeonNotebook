@@ -62,33 +62,31 @@ def test_notes():
     # note = Note(19)
     url = f"{site}/api/v1/notes/"
     payload = {"user_id": user_id}
-    upayload = {"group_id": "218984657"}
+    upayload = {"group_id": "-101"}
     data = {"header": "heh", "body": "heheh"}
     head = headers.copy()
     head.pop(_st)
-    head[_at] = "-1456012282360953399"
-    # res = rq.get(url=url, headers=headers, params=payload)
-    # print(res.text)
-    # res = rq.get(url=url, headers=headers)
-    # print(res.text)
-    # res = rq.get(url=url, headers=head, params=upayload)
-    # print(res.text)
-    # res = rq.post(url=url+"add", headers=headers, params=payload, json=data).json()
-    note_id = "20"
-    res = rq.get(url=url+note_id, headers=head)
-    # print(res.text)
-    serv_data = res.json()
-    data["header"] = serv_data["header"]
-    data["body"] = serv_data["body"] + " ...Test"
-    print(data)
-    rq.put(url=url+note_id, headers=head, params=upayload, json=data)
-    res = rq.get(url=url+note_id, headers=head, params=upayload)
-    print(res.json()["body"])
-    # sleep(10)
-    # rq.delete(url=url+note_id, headers=headers, params=payload)
-    # res = rq.get(url=url+note_id, headers=headers, params=payload)
-    return ""
-
+    head[_at] = ut
+    res = rq.get(url=url, headers=headers, params=payload)
+    print(res.text)
+    res = rq.get(url=url, headers=headers)
+    print(res.text)
+    res = rq.get(url=url, headers=head, params=upayload)
+    print(res.text)
+    res = rq.post(url=url+"add", headers=headers, params=payload, json=data).json()
+    note_id = str(res["last_id"])
+    res = rq.get(url=url+note_id, headers=headers, params=payload)
+    print(res.text)
+    sleep(10)
+    data["header"] = "HEH"
+    data["body"] = "HEHEH"
+    rq.put(url=url+note_id, headers=headers, params=payload, json=data)
+    res = rq.get(url=url+note_id, headers=headers, params=payload)
+    print(res.text)
+    sleep(10)
+    rq.delete(url=url+note_id, headers=headers, params=payload)
+    res = rq.get(url=url+note_id, headers=headers, params=payload)
+    return res.text
 
 if __name__ == "__main__":
     # print(db_test())
@@ -108,10 +106,17 @@ if __name__ == "__main__":
     # print(is_admin)
     # access = is_mine or is_admin
     # print(access)
-    res = rq.get(url=f"{site}/api/get_api")
-    if res.ok:
-        apis = res.json()["api_methods"]
-        for v in apis:
-            for api in apis[v]:
-                print(f"{v}:{api}")
+    # res = rq.get(url=f"{site}/api/get_api")
+    # if res.ok:
+    #     apis = res.json()["api_methods"]
+    #     for v in apis:
+    #         for api in apis[v]:
+    #             print(f"{v}:{api}")
+    url = f"{site}/api/v1/notes/"
+    upayload = {"group_id": "-101"}
+    head = headers.copy()
+    head.pop(_st)
+    head[_at] = ut
+    res = rq.get(url=url, headers=head, params=upayload)
+    print(res.text)    
     pass
