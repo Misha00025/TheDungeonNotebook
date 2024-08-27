@@ -9,10 +9,12 @@ class MySQLDB:
         self._pwd = password
         self._host = host
         self._port = port
-        self._connect(max_pool)
+        self._max_pool = max_pool
+        self._connect()
         self.last_row_id = 0
 
-    def _connect(self, max_pool):
+    def _connect(self):
+        max_pool = self._max_pool
         config={'host':f'{self._host}', 
                 'user':f'{self._user}', 
                 'password':f'{self._pwd}', 
@@ -27,7 +29,7 @@ class MySQLDB:
         #                                     charset='utf8',
         #                                     cursorclass=pymysql.cursors.SSCursor)
         # print(self.__connection.get_server_info())
-        self._pool = pymysqlpool.ConnectionPool(size=10, maxsize=max_pool, pre_create_num=2, name='_pool', **config)
+        self._pool = pymysqlpool.ConnectionPool(size=max_pool/2, maxsize=max_pool, pre_create_num=2, name='_pool', **config)
 
     def is_connected(self):
         return self.__connection is not None
