@@ -1,7 +1,7 @@
 services:
   rpchatbot:
     container_name: rpbot
-    image: rpchatbot:0.8.0 
+    image: ghcr.io/misha00025/rpchatbot:0.8.0 
     volumes:
       - './configs:/root/RPChatBotVK/configs:rw'
       - './logs:/root/RPChatBotVK/logs:rw'
