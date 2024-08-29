@@ -1,6 +1,5 @@
 from app.api_controller import route as rt
 from app.api_controller import Access
-from app.access_management import authorized_user, authorized_group, authorized
 from flask import request
 from . import note
 
@@ -19,7 +18,6 @@ def _get_notes():
 
 @route("<note_id>", ["GET", "PUT", "DELETE"])
 def _note(note_id):
-    print()
     match request.method:
         case "GET":
             return note.get(note_id)
