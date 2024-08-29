@@ -1,9 +1,8 @@
 from app.model.Note import Note
 from flask import request
-from flask.json import jsonify
-from app.processing.request_parcer import *
+from app.processing.request_parser import *
 from app.model.VkUser import VkUser
-from app.statuss import forbidden, not_found, accepted, ok, created
+from app.status import forbidden, not_found, accepted, ok, created
 
 
 def in_keys(k1, k2):

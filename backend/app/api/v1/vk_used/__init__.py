@@ -4,7 +4,7 @@ from flask import request
 from app import database
 from app.processing.vk_methods import *
 from app.processing.founder import *
-from app.processing.request_parcer import *
+from app.processing.request_parser import *
 from app.processing.group_controller import *
 
 

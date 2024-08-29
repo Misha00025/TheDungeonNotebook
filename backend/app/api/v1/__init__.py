@@ -9,10 +9,11 @@ version(_v, clear=True)
 
 @route("ping", methods=["GET"])
 def _ping():
-    return "OK", 200
+    from app.status import ok
+    return ok()
 
 
-from .vk_used import *
+from . import vk_used
 
 version(_v, clear=True)
 

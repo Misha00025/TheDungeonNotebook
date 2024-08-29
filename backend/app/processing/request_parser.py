@@ -55,7 +55,7 @@ def get_group_id(request: Request):
 
 
 
-def get_admin_status(request):
+def get_admin_status(request: Request):
     is_admin = request.json.get("is_admin")
     return is_admin
 

@@ -1,6 +1,6 @@
 from flask import Request
 from app.api.v0.methods import (update_authorize_date)
-from app.processing.request_parcer import get_service_token, get_access_token
+from app.processing.request_parser import get_service_token, get_access_token
 
 
 def is_correct_token(request: Request):

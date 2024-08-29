@@ -3,9 +3,9 @@ from flask import request
 
 from app.api.v0.methods import *
 from app.api_controller import get_routers_info, route, version, Access
-from app.statuss import ok
-from app.access_managment import get_access_token
-from app.access_managment import get_service_token
+from app.status import ok
+from app.access_management import get_access_token
+from app.access_management import get_service_token
 
 
 version("")
