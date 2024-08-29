@@ -1,6 +1,6 @@
 from enum import Enum
 from app import application
-from app.access_managment import authorized, authorized_group, authorized_user
+from app.access_management import authorized, authorized_group, authorized_user
 
 
 _prefix = "/api/"
