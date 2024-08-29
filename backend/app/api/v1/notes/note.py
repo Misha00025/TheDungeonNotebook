@@ -1,5 +1,6 @@
 from app.model.Note import Note
 from flask import request
+from app.model.UserGroups import UserGroups
 from app.processing.request_parser import *
 from app.model.VkUser import VkUser
 from app.status import forbidden, not_found, accepted, ok, created
@@ -30,7 +31,8 @@ def check_access(note: Note):
     user_id = get_user_id(request)
     print(f"{user_id} -- {type(user_id)}")
     user = VkUser(user_id)
-    return str(note.owner_id) == str(user_id) or str(note.group_id) in user.admin_in
+    ug = UserGroups(user)
+    return str(note.owner_id) == str(user_id) or ug.is_admin(note.group_id)
 
 
 def get(note_id):
@@ -76,7 +78,8 @@ def get_all():
     user_id = get_user_id(request)
     group_id = get_group_id(request)
     user = VkUser(user_id)
-    if group_id in user.admin_in:
+    ug = UserGroups(user)
+    if ug.is_admin(group_id):
         user_id = None
     from app.database import note
     err, res = note.find(group_id, user_id)

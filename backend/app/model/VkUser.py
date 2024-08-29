@@ -10,29 +10,17 @@ class VkUser:
         err, res = vk_user.find(user_id)
         if err:
             raise Exception(f"User not founded: {res}")
-        err, g_res = user_group.find(user_id)
-        if err:
-            raise Exception("User groups not loaded")
-        self.user_id: str = str(res.vk_id)
+        self.id: str = str(res.vk_id)
         self.first_name: str = res.first_name
         self.last_name: str = res.last_name
         self.photo_link: str = res.photo
-        self.groups = []
-        self.admin_in = []
-        for group in g_res:
-            self.groups.append(group[1])
-            is_admin = group[2]
-            if is_admin:
-                self.admin_in.append(str(group[1]))
 
     def to_dict(self):
         return {
-            "user_id": self.user_id,
+            "id": self.id,
             "first_name": self.first_name,
             "last_name": self.last_name,
-            "photo_link": self.photo_link,
-            "groups": self.groups,
-            "admin_in": self.admin_in
+            "photo_link": self.photo_link
         }
 
 
