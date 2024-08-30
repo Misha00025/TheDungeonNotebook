@@ -74,3 +74,4 @@ if __name__ == "__main__":
     group_get_tests("1", users=["test_user"], compact=compact)
     group_get_tests("1", users=["tester"], compact=compact)
     group_get_tests("1", users=["1"], compact=compact)
+    group_get_tests("2", users=["test_user"], compact=compact)
