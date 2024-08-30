@@ -1,15 +1,18 @@
 
+def _exc(err):
+    raise Exception(f"User not founded: {err}" )
+
 
 class VkUser:
-    def __init__(self, user_id):
-        self._find_from_db(user_id)
+    def __init__(self, user_id, on_err = _exc):
+        self._find_from_db(user_id, on_err)
 
-    def _find_from_db(self, user_id):
+    def _find_from_db(self, user_id, on_err):
         from app.database import vk_user, user_group
         res: vk_user.VkUser
         err, res = vk_user.find(user_id)
         if err:
-            raise Exception(f"User not founded: {res}")
+            on_err(res)
         self.id: str = str(res.vk_id)
         self.first_name: str = res.first_name
         self.last_name: str = res.last_name

@@ -1,7 +1,7 @@
 from flask import Request
 from app.processing.request_parser import *
 from app.model.GroupUsers import GroupUsers
-from app.model.UserGroups import UserGroups, Group
+from app.model.UserGroups import UserGroups
 from app.processing.request_parser import get_group_id, get_user_id, from_bot
 from app.status import ok, forbidden
 
