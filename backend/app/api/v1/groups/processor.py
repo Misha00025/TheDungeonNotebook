@@ -5,7 +5,7 @@ from app.processing.request_parser import *
 from app.model.GroupUsers import GroupUsers
 from app.model.UserGroups import UserGroups
 from app.processing.request_parser import get_group_id, get_user_id, from_bot
-from app.status import ok, forbidden
+from app.status import ok, forbidden, not_found
 
 
 def get(group_id: int, rq: Request):
@@ -19,11 +19,12 @@ def get(group_id: int, rq: Request):
             return forbidden()
         is_admin = user.is_admin(group_id)
     group = GroupUsers(Group(group_id))
+    if not group.is_founded():
+        return not_found()
     d = group.to_dict()
     if not is_admin:
         d.pop("users")
     return ok(d)
-
 
 def get_all(rq: Request):
     if from_bot(rq):

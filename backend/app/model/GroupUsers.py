@@ -10,7 +10,9 @@ class GroupUsers:
         self.info = group
         self.users = {}
         self.admins = []
-        self._find()
+        self._founded = group.is_founded()
+        if self._founded:
+            self._find()
 
     def _find(self):
         err, db_users = user_group.find(group_id=self.info.id)
@@ -25,6 +27,8 @@ class GroupUsers:
             if is_admin:
                 self.admins.append(user_id)
         
+    def is_founded(self):
+        return self._founded
 
     def to_dict(self):
         d = self.info.to_dict()

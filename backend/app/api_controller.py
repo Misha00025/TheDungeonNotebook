@@ -66,4 +66,3 @@ def route(url, methods, access: Access = Access.all):
         _urls[url] = (methods, f)
         return dec(access_dec(f))
     return decorator
-

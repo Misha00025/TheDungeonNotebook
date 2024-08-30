@@ -5,14 +5,11 @@ from app.database import user_group
 
 class UserGroups:
     def __init__(self, user: VkUser) -> None:
-        if user is int: 
-            user = str(user)
-        if user is str:
-            user = VkUser(user)
         self.info = user
         self.groups: dict = {}
         self.admin_in: list = []
-        self._find()
+        if self.info.is_founded():
+            self._find()
 
     def _find(self):
         err, db_groups = user_group.find(user_id=self.info.id)
@@ -25,6 +22,9 @@ class UserGroups:
             self.groups[group_id] = group
             if is_admin:
                 self.admin_in.append(group_id)
+
+    def is_founded(self):
+        return self.info.is_founded()
 
     def to_dict(self):
         d = self.info.to_dict()

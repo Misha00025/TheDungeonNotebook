@@ -31,6 +31,8 @@ def check_access(note: Note):
     user_id = get_user_id(request)
     print(f"{user_id} -- {type(user_id)}")
     user = VkUser(user_id)
+    if not user.is_founded():
+        return False
     ug = UserGroups(user)
     return str(note.owner_id) == str(user_id) or ug.is_admin(note.group_id)
 
@@ -79,6 +81,8 @@ def get_all():
     group_id = get_group_id(request)
     user = VkUser(user_id)
     ug = UserGroups(user)
+    if not ug.is_founded():
+        return forbidden()
     if ug.is_admin(group_id):
         user_id = None
     from app.database import note
