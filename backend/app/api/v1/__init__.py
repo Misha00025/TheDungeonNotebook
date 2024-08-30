@@ -17,4 +17,4 @@ from . import vk_used
 
 version(_v, clear=True)
 
-from . import notes
+from . import notes, groups, users

@@ -10,9 +10,11 @@ class GroupUsers:
         self.info = group
         self.users = {}
         self.admins = []
+        self._find()
 
     def _find(self):
         err, db_users = user_group.find(group_id=self.info.id)
+        print(self.users)
         if err:
             raise Exception("Can't find users")
         for db_user in db_users:
@@ -22,12 +24,13 @@ class GroupUsers:
             self.users[user_id] = user
             if is_admin:
                 self.admins.append(user_id)
+        
 
     def to_dict(self):
         d = self.info.to_dict()
         users = []
         admins = []
-        for user in self.users.items():
+        for key, user in self.users.items():
             user: VkUser
             d_user = user.to_dict()
             if self.is_admin(user.id):

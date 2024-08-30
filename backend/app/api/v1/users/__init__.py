@@ -21,7 +21,7 @@ def _user(user_id):
             return processor.delete(user_id, request)
 
 
-@route("", ["GET"])
+@route("", ["GET"], Access.users_and_groups)
 def _get_users():
     return processor.get_all(request)
 

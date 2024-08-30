@@ -13,12 +13,12 @@ def route(url, methods, access = Access.users_and_groups):
 
 
 @route("<group_id>", ["GET"])
-def _get_group(group_id):
+def v1_get_group(group_id):
     return processor.get(group_id, request)
 
 
 @route("", ["GET"])
-def _get_groups():
+def v1_get_groups():
     return processor.get_all(request)
 
 

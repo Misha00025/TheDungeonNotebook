@@ -4,7 +4,7 @@ from app.database import user_group
 
 
 class UserGroups:
-    def __init__(self, user: VkUser | str | int) -> None:
+    def __init__(self, user: VkUser) -> None:
         if user is int: 
             user = str(user)
         if user is str:
@@ -12,6 +12,7 @@ class UserGroups:
         self.info = user
         self.groups: dict = {}
         self.admin_in: list = []
+        self._find()
 
     def _find(self):
         err, db_groups = user_group.find(user_id=self.info.id)
@@ -28,7 +29,7 @@ class UserGroups:
     def to_dict(self):
         d = self.info.to_dict()
         groups = []
-        for group in self.groups.items():
+        for key, group in self.groups.items():
             group: Group
             d_group = group.to_dict()
             d_group["is_admin"] = self.is_admin(group.id)

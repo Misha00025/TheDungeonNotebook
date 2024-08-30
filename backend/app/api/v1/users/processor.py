@@ -1,7 +1,7 @@
 from flask import Request
 from app.processing.request_parser import *
 from app.model.GroupUsers import GroupUsers, Group, VkUser
-from app.processing.request_parser import get_group_id, get_user_id, get_admin_status
+from app.processing.request_parser import get_group_id, get_user_id, get_admin_status, from_bot, from_user
 from app.status import ok, forbidden, created, not_found, accepted
 
 
@@ -17,14 +17,19 @@ def get(user_id: int, rq: Request):
 
 
 def get_all(rq: Request):
-    group_id = get_group_id(rq)
-    group = GroupUsers(Group(group_id))
-    dg = group.to_dict()
-    d = {
-        "admins": dg["admins"],
-        "users": dg["users"]
-    }
-    return ok(d)
+    if from_bot(rq):
+        group_id = get_group_id(rq)
+        group = GroupUsers(Group(group_id))
+        dg = group.to_dict()
+        d = {
+            "admins": dg["admins"],
+            "users": dg["users"]
+        }
+        return ok(d)
+    if from_user(rq):
+        user_id = get_user_id(rq)
+        user = VkUser(user_id)
+        return ok(user.to_dict())
 
 
 def add(rq: Request):
