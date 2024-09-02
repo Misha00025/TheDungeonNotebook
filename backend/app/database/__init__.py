@@ -26,6 +26,10 @@ def get_instance() -> MySQLDB:
                     host=_host,
                     port=_port
                 )
+                with open("create_tables.sql", 'r') as file:
+                    sql_script = file.read()
+                sql_script = sql_script.replace("\n", " ")
+                _instance.execute(sql_script)
         except:
             _instance = None
             return None        
