@@ -35,12 +35,12 @@ def get_all(rq: Request):
 def add(rq: Request):
     user_id = get_user_id(rq)
     group_id = get_group_id(rq)
-    group = GroupUsers(group_id)
+    group = GroupUsers(Group(group_id))
     is_admin = get_admin_status(rq)
     accept = group.add_new(user_id, is_admin)
     if accept:
         return created()
-    return Exception(f"Can't add user {user_id} to group {group_id}")
+    raise Exception(f"Can't add user {user_id} to group {group_id}")
 
 
 def delete(user_id, rq: Request):
