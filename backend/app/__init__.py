@@ -5,9 +5,6 @@ application = Flask(__name__)
 CORS(application)
 
 
-import app.api.v0
-
-
 from app.database import get_instance
 from time import sleep
 while get_instance() is None:
@@ -16,6 +13,7 @@ while get_instance() is None:
     continue
 
 
+import app.api.v0
 import app.api.v0.router
 import app.api.v1
 
