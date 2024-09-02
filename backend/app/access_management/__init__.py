@@ -1,6 +1,7 @@
 from flask import Request
 from app.api.v0.methods import (update_authorize_date)
-from app.processing.request_parcer import get_service_token, get_access_token
+from app.processing.request_parser import get_service_token, get_access_token
+from app.status import unauthorized, forbidden
 
 
 def is_correct_token(request: Request):
@@ -26,8 +27,10 @@ def authorized_group(func):
     from flask import request
     def wrapped(*args, **kwargs):
         if is_correct_service_token(request):
-            return func(*args, **kwargs)
-        return "not valid token", 401
+            return func(*args, **kwargs)        
+        if is_correct_token(request):
+            return forbidden("Forbidden to users. Use service token, to get access of this address")
+        return unauthorized("not valid token")
     wrapped.__name__ = func.__name__
     return wrapped
 
@@ -37,7 +40,9 @@ def authorized_user(func):
         from flask import request
         if is_correct_token(request):
             return func(*args, **kwargs)
-        return "not valid token", 401
+        if is_correct_service_token(request):
+            return forbidden("Forbidden to groups. Use user token, to get access of this address")
+        return unauthorized("not valid token")
     wrapped.__name__ = func.__name__
     return wrapped
 
@@ -47,6 +52,6 @@ def authorized(func):
         from flask import request
         if is_correct_token(request) or is_correct_service_token(request):
             return func(*args, **kwargs)
-        return "not valid token", 401
+        return unauthorized("not valid token")
     wrapped.__name__ = func.__name__
     return wrapped

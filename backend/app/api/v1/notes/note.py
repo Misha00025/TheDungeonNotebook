@@ -1,9 +1,9 @@
 from app.model.Note import Note
 from flask import request
-from flask.json import jsonify
-from app.processing.request_parcer import *
+from app.model.UserGroups import UserGroups
+from app.processing.request_parser import *
 from app.model.VkUser import VkUser
-from app.statuss import forbidden, not_found, accepted, ok, created
+from app.status import forbidden, not_found, accepted, ok, created
 
 
 def in_keys(k1, k2):
@@ -29,9 +29,15 @@ def generate_note() -> Note:
 
 def check_access(note: Note):
     user_id = get_user_id(request)
+    group_id = get_group_id(request)
     print(f"{user_id} -- {type(user_id)}")
     user = VkUser(user_id)
-    return str(note.owner_id) == str(user_id) or str(note.group_id) in user.admin_in
+    if not user.is_founded():
+        return False
+    ug = UserGroups(user)
+    user_access = str(note.owner_id) == str(user_id) or ug.is_admin(note.group_id)
+    group_access = note.group_id == group_id 
+    return user_access and group_access
 
 
 def get(note_id):
@@ -77,7 +83,10 @@ def get_all():
     user_id = get_user_id(request)
     group_id = get_group_id(request)
     user = VkUser(user_id)
-    if group_id in user.admin_in:
+    ug = UserGroups(user)
+    if not ug.is_founded():
+        return forbidden()
+    if ug.is_admin(group_id):
         user_id = None
     from app.database import note
     err, res = note.find(group_id, user_id)

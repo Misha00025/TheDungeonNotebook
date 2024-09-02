@@ -8,115 +8,70 @@ from variables import _st, _at
 
 ethernet = "https://the-dungeon-notebook.ru"
 local = "http://127.0.0.1:5000"
-site = local
+version = "v1"
+site = local + "/api/" + version + "/"
 st = "1"
-ut = "4595880663507502266"
-headers = {_st: st, "Content-Type": "application/json; charset=utf-8"}
-user_id = "173745999"
+headers_template = {"Content-Type": "application/json; charset=utf-8"}
+user_id = "tester"
+
+urls_get = [
+    "groups", "groups/-100", "groups/-101", "groups/-102",
+    "notes", "notes/31", "notes/32", "notes/33",
+    "users", f"users/{user_id}"
+]
 
 
-def get_info():
-    url = f"{site}/api/v1/get_user_info/{user_id}"
-    res = rq.get(url=url, headers=headers)
-    return res.json()
+def test(f):
+    def wrapper(*args, **kwargs):
+        print(f"START: {f.__name__} with args: {args} and kwargs: {kwargs}\n")
+        f(*args, **kwargs)
+        print(f"\nEND: {f.__name__}\n\n")
+    wrapper.__name__ = f.__name__
+    return wrapper
 
 
-def upd_user():
-    payload = {"user_id": user_id}
-    res = rq.request(
-        method="PUT",
-        url=f"{site}/api/v1/update_user",
-        params=payload,
-        headers=headers
-    )
-    return res.content
+def get_test(headers, params, url, compact):
+    full_url = site + url
+    res = rq.get(url=full_url, headers=headers, params=params)
+    try:
+        response = res.json()
+    except:
+        response = res.text
+    text = f"REQUEST {res.status_code}: {url} "
+    if res.status_code < 400:
+        if not compact:
+            text += f"\n   |- Response: {response}"
+    elif res.status_code >= 500:
+        text += "!!!VERY IMPORTANT ERROR!!!"
+    else:
+        text += f"  Error: {response}"
+    print(text)
 
 
-def check_user():
-    url = f"{site}/api/v1/user_is_mine"
-    payload = {"user_id": user_id}
-    res = rq.get(url=url, headers=headers, params=payload)
-    return res.text
+@test
+def user_get_tests(user_token, groups = ["-100"], compact = False):
+    headers = headers_template.copy()
+    headers[_at] = user_token
+    for url in urls_get:
+        for group_id in groups:
+            payload = {"group_id": group_id}
+            get_test(headers, payload, url, compact)
+    
 
+@test
+def group_get_tests(group_token, users = ["1"], compact = False):
+    headers = headers_template.copy()
+    headers[_st] = group_token
+    for url in urls_get:
+        for user in users:
+            get_test(headers, {"user_id": user}, url, compact)
 
-def db_test():
-    from app import database
-    user = database.vk_user.VkUser()
-    account_info = get_info()
-    user.vk_id = account_info["id"]
-    user.first_name = account_info["first_name"]
-    user.last_name = account_info["last_name"]
-    user.photo = account_info["photo_100"]
-    res = database.vk_user.find(user_id)
-    print(res[1])
-    database.vk_user.add(user.vk_id, None, None, None)
-    database.vk_user.update(user.vk_id, user.first_name, user.last_name, user.photo)
-    res = database.vk_user.find(user_id)
-    print(res[1].to_dict())
-    database.vk_user.remove(user_id)
-    return "OK"
-
-
-def test_notes():
-    # from app.model.Note import Note
-    # note = Note(19)
-    url = f"{site}/api/v1/notes/"
-    payload = {"user_id": user_id}
-    upayload = {"group_id": "-101"}
-    data = {"header": "heh", "body": "heheh"}
-    head = headers.copy()
-    head.pop(_st)
-    head[_at] = ut
-    res = rq.get(url=url, headers=headers, params=payload)
-    print(res.text)
-    res = rq.get(url=url, headers=headers)
-    print(res.text)
-    res = rq.get(url=url, headers=head, params=upayload)
-    print(res.text)
-    res = rq.post(url=url+"add", headers=headers, params=payload, json=data).json()
-    note_id = str(res["last_id"])
-    res = rq.get(url=url+note_id, headers=headers, params=payload)
-    print(res.text)
-    sleep(10)
-    data["header"] = "HEH"
-    data["body"] = "HEHEH"
-    rq.put(url=url+note_id, headers=headers, params=payload, json=data)
-    res = rq.get(url=url+note_id, headers=headers, params=payload)
-    print(res.text)
-    sleep(10)
-    rq.delete(url=url+note_id, headers=headers, params=payload)
-    res = rq.get(url=url+note_id, headers=headers, params=payload)
-    return res.text
 
 if __name__ == "__main__":
-    # print(db_test())
-    # print(get_info())
-    # print(upd_user())
-    # print(check_user())
-    # print(test_notes())
-    # from app.model.VkUser import VkUser
-    # user = VkUser(user_id)
-    # # print(user.to_dict())
-    # from app.model.Note import Note
-    # note = Note(26)
-    # is_mine = str(note.owner_id) == str(user.user_id)
-    # is_admin = str(note.group_id) in user.admin_in
-    # print(f"{note.group_id}:{user.admin_in}")
-    # print(is_mine)
-    # print(is_admin)
-    # access = is_mine or is_admin
-    # print(access)
-    # res = rq.get(url=f"{site}/api/get_api")
-    # if res.ok:
-    #     apis = res.json()["api_methods"]
-    #     for v in apis:
-    #         for api in apis[v]:
-    #             print(f"{v}:{api}")
-    url = f"{site}/api/v1/notes/"
-    upayload = {"group_id": "-101"}
-    head = headers.copy()
-    head.pop(_st)
-    head[_at] = ut
-    res = rq.get(url=url, headers=head, params=upayload)
-    print(res.text)    
-    pass
+    compact = bool(1)
+    user_get_tests("1", compact=compact)
+    user_get_tests("2", compact=compact)
+    group_get_tests("1", users=["test_user"], compact=compact)
+    group_get_tests("1", users=["tester"], compact=compact)
+    group_get_tests("1", users=["1"], compact=compact)
+    group_get_tests("2", users=["test_user"], compact=compact)

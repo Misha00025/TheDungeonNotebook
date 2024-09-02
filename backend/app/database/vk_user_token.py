@@ -9,7 +9,7 @@ _table = "vk_user_token"
 
 
 def find(token):
-    print(f"{token} - {type(token)}")
+    # print(f"{token} - {type(token)}")
     data = (token,)
     query = f"SELECT {_string_fields} FROM {_table} WHERE {_fields[1]} = %s"
     result = _instance.fetchone(query, data)

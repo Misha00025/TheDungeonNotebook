@@ -13,6 +13,8 @@ def _default_status(code):
             return {_status: "Created"}
         case 202:
             return {_status: "Accepted"}
+        case 401:
+            return {_error: "Unauthorized"}
         case 403:
             return {_error: "Forbidden"}
         case 404:
@@ -24,6 +26,8 @@ def _default_status(code):
 
 
 def _answer(code, response=None):
+    if response is not None and code >= 400 and type(response) is not dict:
+        response = {_error: response}
     if response is None:
         response = _default_status(code)
     return jsonify(response), code
@@ -51,4 +55,8 @@ def not_implemented(response=None):
 
 def not_found(response=None):
     return _answer(404, response)
+
+
+def unauthorized(response=None):
+    return _answer(401, response)
 

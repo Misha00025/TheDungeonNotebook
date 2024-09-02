@@ -12,12 +12,10 @@ class VkGroup:
     name: str
     privileges: dict
 
-    def __init__(self, vk_id):
-        self.vk_id = vk_id
-        err, res = find(vk_id)
-        if not err:
-            self.name = res[1]
-            self.privileges = res[2]
+    def __init__(self, data):
+        self.vk_id = data[0]
+        self.name = data[1]
+        self.privileges = data[2]
 
     def to_dict(self):
         result: dict = {

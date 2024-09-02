@@ -11,20 +11,24 @@ _instance: MySQLDB = None
 def get_instance() -> MySQLDB:
     global _instance
     if _instance is None:
-        if connection_settings is not None:
-            _dbname = connection_settings["DataBaseName"]
-            _user = connection_settings["User"]
-            _password = connection_settings["Password"]
-            _host = connection_settings["Host"]
-            _port = connection_settings["Port"]
+        try:
+            if connection_settings is not None:
+                _dbname = connection_settings["DataBaseName"]
+                _user = connection_settings["User"]
+                _password = connection_settings["Password"]
+                _host = connection_settings["Host"]
+                _port = connection_settings["Port"]
 
-            _instance = MySQLDB(
-                dbname=_dbname,
-                user=_user,
-                password=_password,
-                host=_host,
-                port=_port
-            )
+                _instance = MySQLDB(
+                    dbname=_dbname,
+                    user=_user,
+                    password=_password,
+                    host=_host,
+                    port=_port
+                )
+        except:
+            _instance = None
+            return None        
     return _instance
 
 

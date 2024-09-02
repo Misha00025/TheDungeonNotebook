@@ -49,7 +49,8 @@ class Note:
     def _find_from_db(self, note_id):
         err, res = database.note.find(note_id=note_id)
         if err:
-            raise Exception(res)
+            self._exist = False
+            return
         self.group_id = res[0]
         self.owner_id = res[1]
         self.note_id = note_id
