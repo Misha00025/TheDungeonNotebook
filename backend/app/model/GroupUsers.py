@@ -59,11 +59,12 @@ class GroupUsers:
         if user_id in self.users.keys():
             return False
         err, res = user_group.add(user_id, self.info.id, admin)
-        return bool(err)
+        print(res)
+        return not bool(err)
     
     def remove_user(self, user_id):
         if not self.is_mine(user_id):
             return False
         err, _ = user_group.remove(user_id, self.info.id)
-        return bool(err)
+        return not bool(err)
 

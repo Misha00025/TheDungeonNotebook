@@ -52,19 +52,19 @@ def add(user_id, group_id, is_admin=False):
     data = (user_id, group_id, is_admin, )
     query = f"INSERT INTO {_table}({_string_fields}) VALUES (%s, %s, %s);"
     _instance.execute(query, data)
-    return 0,
+    return 0, None
 
 
 def update(user_id, group_id, is_admin=False):
     data = (is_admin, user_id, group_id,)
     query = f"UPDATE {_table} SET {_fields[2]}=%s WHERE {_fields[0]}=%s and {_fields[1]}=%s;"
     _instance.execute(query, data)
-    return 0,
+    return 0, None
 
 
 def remove(user_id, group_id):
     query = f"DELETE FROM {_table} WHERE {_fields[0]}=%s and {_fields[1]}=%s;"
     data = (user_id, group_id,)
     _instance.execute(query, data)
-    return 0,
+    return 0, None
 
