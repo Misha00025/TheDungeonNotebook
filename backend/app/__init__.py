@@ -8,7 +8,7 @@ CORS(application)
 from app.database import get_instance
 from time import sleep
 while get_instance() is None:
-    print("Can't connect to database. Retrying after 10 seconds")
+    application.logger.debug("Can't connect to database. Retrying after 10 seconds")
     sleep(10)
     continue
 
