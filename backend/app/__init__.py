@@ -5,7 +5,7 @@ application = Flask(__name__)
 CORS(application)
 
 
-from database import get_instance
+from app.database import get_instance
 from time import sleep
 while get_instance() is None:
     print("Can't connect to database. Retrying after 10 seconds")
