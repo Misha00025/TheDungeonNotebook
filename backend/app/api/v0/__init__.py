@@ -1,5 +1,8 @@
-from app.api_controller import get_routers_info, route
+from app.api_controller import get_routers_info, route, version
 from app.status import ok
+
+
+version("")
 
 
 @route("get_api", ["GET"])
