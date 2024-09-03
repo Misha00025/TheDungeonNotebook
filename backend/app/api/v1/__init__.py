@@ -13,8 +13,6 @@ def _ping():
     return ok()
 
 
-from . import vk_used
-
 version(_v, clear=True)
 
 from . import notes, groups, users
