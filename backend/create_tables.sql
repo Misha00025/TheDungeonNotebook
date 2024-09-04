@@ -66,11 +66,11 @@ CREATE TABLE IF NOT EXIST `inventory` (
   `owner_id` varchar(20) NOT NULL,
   `group_id` varchar(20) NOT NULL,
   PRIMARY KEY (`inventory_id`),
+  UNIQUE KEY `inventory_unique` (`owner_id`,`group_id`),
   KEY `inventory_vk_group_FK` (`group_id`),
-  KEY `inventory_vk_user_FK` (`owner_id`),
-  CONSTRAINT `inventory_vk_group_FK` FOREIGN KEY (`group_id`) REFERENCES `vk_group` (`vk_group_id`),
-  CONSTRAINT `inventory_vk_user_FK` FOREIGN KEY (`owner_id`) REFERENCES `vk_user` (`vk_user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+  CONSTRAINT `inventory_vk_group_FK` FOREIGN KEY (`group_id`) REFERENCES `vk_group` (`vk_group_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `inventory_vk_user_FK` FOREIGN KEY (`owner_id`) REFERENCES `vk_user` (`vk_user_id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb3;
 
 
 CREATE TABLE IF NOT EXIST `item` (
@@ -80,16 +80,16 @@ CREATE TABLE IF NOT EXIST `item` (
   `description` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`item_id`),
   KEY `item_vk_group_FK` (`group_id`),
-  CONSTRAINT `item_vk_group_FK` FOREIGN KEY (`group_id`) REFERENCES `vk_group` (`vk_group_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
+  CONSTRAINT `item_vk_group_FK` FOREIGN KEY (`group_id`) REFERENCES `vk_group` (`vk_group_id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=60 DEFAULT CHARSET=utf8mb3;
 
 
 CREATE TABLE IF NOT EXIST inventory_item (
   `inventory_id` int NOT NULL,
   `item_id` int NOT NULL,
   `amount` int NOT NULL,
-  KEY `inventory_item_item_FK` (`item_id`),
   KEY `inventory_item_inventory_FK` (`inventory_id`),
-  CONSTRAINT `inventory_item_inventory_FK` FOREIGN KEY (`inventory_id`) REFERENCES `inventory` (`inventory_id`),
-  CONSTRAINT `inventory_item_item_FK` FOREIGN KEY (`item_id`) REFERENCES `item` (`item_id`)
+  KEY `inventory_item_item_FK` (`item_id`),
+  CONSTRAINT `inventory_item_inventory_FK` FOREIGN KEY (`inventory_id`) REFERENCES `inventory` (`inventory_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `inventory_item_item_FK` FOREIGN KEY (`item_id`) REFERENCES `item` (`item_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;

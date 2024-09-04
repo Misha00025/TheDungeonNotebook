@@ -136,10 +136,10 @@ def fields_to_string(fields: list):
     return string
 
 
-def get_res(response, get_item) -> list | object | None:
+def get_res(response, get_item) -> list[object] | object | None:
     # print(response)
     is_list = type(response) is list
-    if response is None or (is_list and len(response) == 0):
+    if response is None:
         return None
     result: list
     if is_list:

@@ -45,7 +45,7 @@ def find_by_name(group_id, name)  -> tuple[int, list[ParsedItem] | ParsedItem | 
     res = get_res(_instance.select(_table, _string_fields, where=where), _get_item)
     return int(res is None), res
 
-def add(group_id, name, description):
+def create(group_id, name, description):
     fields = {_fields[1]: group_id, _fields[2]: name, _fields[3]: description}
     res = _instance.insert(_table, fields)
     return int(res is None), res

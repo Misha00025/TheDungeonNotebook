@@ -3,7 +3,7 @@ from . import get_instance, fields_to_string, get_res
 _instance = get_instance()
 _fields = ["inventory_id", "item_id", "amount"]
 _string_fields = fields_to_string(_fields)
-_table = "inventory"
+_table = "inventory_item"
 
 
 class ParsedItemInventory:

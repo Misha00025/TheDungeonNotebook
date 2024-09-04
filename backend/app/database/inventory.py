@@ -17,6 +17,7 @@ def _get_inventory(raw) -> ParsedInventory:
     inventory.group_id = raw[0]
     inventory.owner_id = raw[1]
     inventory.id = raw[2]
+    return inventory
 
 
 def find(group_id, owner_id=None) -> tuple[int, list[ParsedInventory] | ParsedInventory | None]:
