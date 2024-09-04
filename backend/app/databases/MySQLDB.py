@@ -69,7 +69,7 @@ class MySQLDB:
                 cursor.execute(query, data)
                 result = cursor.fetchall()
                 cursor.close()
-            return result
+            return list(result)
         except:
             self._connect()
             return []

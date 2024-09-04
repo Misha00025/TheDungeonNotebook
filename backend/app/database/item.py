@@ -6,17 +6,59 @@ _string_fields = fields_to_string(_fields)
 _table = "item"
 
 
-def find(group_id, item_id=None):
-    where = {_fields[1]: group_id}
+class ParsedItem:
+    group_id: str = -1
+    id: int = -1
+    name: str = ""
+    description: str = ""
+
+    def __str__(self) -> str:
+        return f"({self.group_id}, {self.id}, {self.name}. {self.description})"
+    
+    def __repr__(self) -> str:
+        return str(self)
+
+
+def _get_item(raw) -> ParsedItem:
+        item = ParsedItem()
+        item.id = raw[0]
+        item.group_id = raw[1]
+        item.name = raw[2]
+        item.description = raw[3]
+        return item
+
+
+def _get_res(response) -> list | ParsedItem | None:
+    # print(response)
+    is_list = type(response) is list
+    if response is None or (is_list and len(response) == 0):
+        return None
+    result: list | ParsedItem
+    if is_list:
+        result = []
+        for raw in response:
+            item = _get_item(raw)
+            result.append(item)
+    else:
+        result = _get_item(response)
+    return result
+
+
+def find(group_id=None, item_id=None):
+    where = {}
+    if group_id is None and item_id is None:
+        return 1, None
+    if group_id is not None:
+        where = {_fields[1]: group_id}
     many = item_id is None
     if not many:
         where[_fields[0]] = item_id
-    res = _instance.select(_table, _string_fields, where=where, many=many)
+    res = _get_res(_instance.select(_table, _string_fields, where=where, many=many))
     return int(res is None), res
 
 def find_by_name(group_id, name):
     where = {_fields[1]: group_id, _fields[2]: name}
-    res = _instance.select(_table, _string_fields, where=where)
+    res = _get_res(_instance.select(_table, _string_fields, where=where))
     return int(res is None), res
 
 def add(group_id, name, description):
@@ -25,7 +67,7 @@ def add(group_id, name, description):
     return int(res is None), res
 
 
-def update(group_id, item_id, name=None, description=None):
+def set(group_id, item_id, name=None, description=None):
     if name is None and description is None:
         return 1, "Wrong input: name and description is None"
     fields = {}
@@ -37,7 +79,7 @@ def update(group_id, item_id, name=None, description=None):
     return 0, res
 
 
-def delete(group_id, item_id):
+def remove(group_id, item_id):
     item_id = int(item_id)
     res = _instance.delete(_table, {_fields[0]: item_id, _fields[1]: group_id})
     return int(res is None), res
