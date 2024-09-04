@@ -1,4 +1,4 @@
-from . import get_instance, fields_to_string
+from . import get_instance, fields_to_string, get_res
 
 _instance = get_instance()
 _fields = ["item_id", "group_id", "name", "description"]
@@ -28,23 +28,7 @@ def _get_item(raw) -> ParsedItem:
         return item
 
 
-def _get_res(response) -> list | ParsedItem | None:
-    # print(response)
-    is_list = type(response) is list
-    if response is None or (is_list and len(response) == 0):
-        return None
-    result: list | ParsedItem
-    if is_list:
-        result = []
-        for raw in response:
-            item = _get_item(raw)
-            result.append(item)
-    else:
-        result = _get_item(response)
-    return result
-
-
-def find(group_id=None, item_id=None):
+def find(group_id=None, item_id=None) -> tuple[int, list[ParsedItem] | ParsedItem | None]:
     where = {}
     if group_id is None and item_id is None:
         return 1, None
@@ -53,12 +37,12 @@ def find(group_id=None, item_id=None):
     many = item_id is None
     if not many:
         where[_fields[0]] = item_id
-    res = _get_res(_instance.select(_table, _string_fields, where=where, many=many))
+    res = get_res(_instance.select(_table, _string_fields, where=where, many=many), _get_item)
     return int(res is None), res
 
-def find_by_name(group_id, name):
+def find_by_name(group_id, name)  -> tuple[int, list[ParsedItem] | ParsedItem | None]:
     where = {_fields[1]: group_id, _fields[2]: name}
-    res = _get_res(_instance.select(_table, _string_fields, where=where))
+    res = get_res(_instance.select(_table, _string_fields, where=where), _get_item)
     return int(res is None), res
 
 def add(group_id, name, description):

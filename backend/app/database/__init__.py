@@ -136,5 +136,21 @@ def fields_to_string(fields: list):
     return string
 
 
+def get_res(response, get_item) -> list | object | None:
+    # print(response)
+    is_list = type(response) is list
+    if response is None or (is_list and len(response) == 0):
+        return None
+    result: list
+    if is_list:
+        result = []
+        for raw in response:
+            item = get_item(raw)
+            result.append(item)
+    else:
+        result = get_item(response)
+    return result
+
+
 from . import vk_user, vk_group, vk_user_token, user_group, group_bot_token, note, item, item_inventory, inventory
 
