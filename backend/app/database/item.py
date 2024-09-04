@@ -10,7 +10,7 @@ def find(group_id, item_id=None):
     where = {_fields[1]: group_id}
     many = item_id is None
     if not many:
-        where.append((_fields[0], item_id))
+        where[_fields[0]] = item_id
     res = _instance.select(_table, _string_fields, where=where, many=many)
     return int(res is None), res
 
