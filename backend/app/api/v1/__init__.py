@@ -12,7 +12,4 @@ def _ping():
     from app.status import ok
     return ok()
 
-
-version(_v, clear=True)
-
-from . import notes, groups, users
+from . import notes, groups, users, items

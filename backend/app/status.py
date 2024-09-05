@@ -13,6 +13,8 @@ def _default_status(code):
             return {_status: "Created"}
         case 202:
             return {_status: "Accepted"}
+        case 400:
+            return {_error: "Bad request"}
         case 401:
             return {_error: "Unauthorized"}
         case 403:
@@ -47,6 +49,10 @@ def accepted(response=None):
 
 def forbidden(response=None):
     return _answer(403, response)
+
+
+def bad_request(response=None):
+    return _answer(400, response)
 
 
 def not_implemented(response=None):
