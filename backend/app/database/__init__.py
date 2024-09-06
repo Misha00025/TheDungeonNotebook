@@ -89,7 +89,6 @@ class SQLparser:
         return self.execute(query, data)
 
 
-
 def get_instance() -> SQLparser:
     global _instance
     if _instance is None:
@@ -109,14 +108,22 @@ def get_instance() -> SQLparser:
                     port=_port
                 )
                 _instance = SQLparser(db)
-                with open("create_tables.sql", 'r') as file:
-                    sql_script = file.read()
-                sql_script = sql_script.replace("\n", " ")
-                _instance.execute(sql_script)
         except:
             _instance = None
             return None        
     return _instance
+
+
+def create_tables():
+    with open("create_tables.sql", 'r') as file:
+        sql_script = file.read()
+    scripts = sql_script.split('\n\n')
+    for script in scripts:
+        script = script.replace("\n", " ")
+        instance = get_instance()
+        if instance is None:
+            raise Exception("Cannot connect to database")
+        instance.execute(script)
 
 
 def instantiated(func):
