@@ -11,10 +11,15 @@ def search_by_name(rq: Request):
 
 
 def get_owner_id(rq: Request):
-    key = "owner_id"
-    if key in rq.args.keys():
-        return None
-    return rq.args.get(key)
+    res = None
+    if from_bot(rq):
+        res = get_user_id(rq)
+    if res is None:
+        key = "owner_id"
+        if key in rq.args.keys():
+            return None
+        res = rq.args.get(key)
+    return res
 
 
 def get_item_data(rq: Request) -> tuple[list[str], str | None, str | None, int | None]:

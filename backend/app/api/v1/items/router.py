@@ -23,45 +23,56 @@ def shared_item(admin, user_id, owner_id, rq):
     return admin and not (find_item_from_bot or has_owner_id)
 
 
+def get_inventory(group_id, owner_id):
+    if not processor.check_user_group(group_id, owner_id):
+        return forbidden("Forbidden: User not in group")
+    items = processor.get_inventory_items(group_id, owner_id)
+    if items is None:
+        return not_found("Inventory not found")
+    return ok(items)
+
+
+def get_slot(group_id, owner_id, item_id):
+    if not processor.check_user_group(group_id, owner_id):
+        return forbidden("Forbidden: User not in group")
+    inv = processor.get_inventory(group_id, owner_id)
+    if inv is None:
+        return not_found("Inventory not found")
+    item = processor.get_inventory_slot(inv, item_id)
+    if item is None:
+        return not_found("Item not found")
+    return ok(item.to_dict())
+
+
 def gets(rq: Request):
     user_id, group_id = get_user_id(rq), get_group_id(rq)
     access, admin = check_group_access(rq)
+    owner_id = parser.get_owner_id(rq)
     if not access:
         return forbidden()
-    if admin:
+    if admin and owner_id is None:
         return ok(processor.get_all_items(group_id))
-    items = processor.get_inventory_items(group_id, user_id)
-    if items is None:
-        return not_found()
-    return ok(items)
+    if owner_id is None:
+        owner_id = user_id
+    return get_inventory(group_id, owner_id)
 
 
 def get(rq: Request, item_id):
     user_id, group_id = get_user_id(rq), get_group_id(rq)
     access, admin = check_group_access(rq)
     owner_id = parser.get_owner_id(rq)
-    by_name = search_by_name(rq)
     if not access:
         return forbidden()
     item = None
-    if shared_item(admin, user_id, owner_id, rq):
-        if by_name:
-            item = processor.get_item_by_name(item_id)
-        else:
-            item = processor.get_item_by_id(item_id)
+    if admin:
+        if owner_id is not None:
+            return get_slot(group_id, owner_id, item_id)
+        item = processor.get_item(group_id, item_id)
+        if item is None:
+            return not_found("Item not found")
+        return ok(item.to_dict())
     else:
-        if owner_id is None:
-            owner_id = user_id 
-        inv = processor.get_inventory(group_id, owner_id)
-        if inv is None:
-            return not_found("Inventory not found")
-        if by_name:
-            item = processor.get_inventory_slot_by_name(inv, item_id)
-        else:
-            item = processor.get_inventory_slot(inv, item_id)
-    if item is None:
-        return not_found("Item not found")
-    return ok(item.to_dict())
+        return get_slot(group_id, user_id, item_id)
     
 
 def put(rq: Request, item_id):

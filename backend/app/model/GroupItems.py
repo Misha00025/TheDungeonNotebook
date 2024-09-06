@@ -22,7 +22,7 @@ class GroupItems:
     
     def to_dict(self):
         res = self.info.to_dict()
-        res["items"] = self.items
+        res["items"] = [item.to_dict() for item in self.items]
         return res
     
     def have(self, item: Item):

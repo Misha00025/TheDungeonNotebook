@@ -44,7 +44,7 @@ class Inventory:
         return is_new, inv
 
     @property
-    def items(self):
+    def items(self) -> list[Slot]:
         err, iis = item_inventory.find(self.id)
         items = []
         for ii in iis:
@@ -62,7 +62,7 @@ class Inventory:
         res = {"id": self.id}
         res["group"] = self._group.to_dict()
         res["user"] = self._user.to_dict()
-        res["items"] = self.items
+        res["items"] = [ item.to_dict() for item in self.items ]
         return res
 
     def have(self, item: Item):

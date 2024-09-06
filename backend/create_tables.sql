@@ -79,9 +79,9 @@ CREATE TABLE IF NOT EXIST `item` (
   `name` varchar(100) DEFAULT NULL,
   `description` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`item_id`),
-  KEY `item_vk_group_FK` (`group_id`),
+  UNIQUE KEY `item_unique` (`group_id`,`name`),
   CONSTRAINT `item_vk_group_FK` FOREIGN KEY (`group_id`) REFERENCES `vk_group` (`vk_group_id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=60 DEFAULT CHARSET=utf8mb3;
+) ENGINE=InnoDB AUTO_INCREMENT=66 DEFAULT CHARSET=utf8mb3;
 
 
 CREATE TABLE IF NOT EXIST inventory_item (
