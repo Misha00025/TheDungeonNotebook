@@ -16,7 +16,7 @@ def get_owner_id(rq: Request):
         res = get_user_id(rq)
     if res is None:
         key = "owner_id"
-        if key in rq.args.keys():
+        if key not in rq.args.keys():
             return None
         res = rq.args.get(key)
     return res
@@ -26,17 +26,19 @@ def get_item_data(rq: Request) -> tuple[list[str], str | None, str | None, int |
     fields = {"name": str, "description": str, "amount": int}
     errs = []
     values = []
-    keys = rq.args.keys()
-    for field in fields:
-        if field in keys:
-            val = rq.args.get(field)
+    data =dict(rq.json)
+    keys = data.keys()
+    for key, value in fields.items():
+        if key in keys:
+            print(f"founded: {key}")
+            val = data.get(key)
             try:
-                val = fields[field](val)
+                val = value(val)
             except:
                 val = None
-                errs.append(field)
+                errs.append(key)
             values.append(val)
-        else: 
+        else:
             values.append(None)
     if len(errs) == 0:
         errs = None

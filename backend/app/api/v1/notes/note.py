@@ -30,7 +30,7 @@ def generate_note() -> Note:
 def check_access(note: Note):
     user_id = get_user_id(request)
     group_id = get_group_id(request)
-    print(f"{user_id} -- {type(user_id)}")
+    # print(f"{user_id} -- {type(user_id)}")
     user = VkUser(user_id)
     if not user.is_founded():
         return False

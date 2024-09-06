@@ -66,6 +66,8 @@ class Inventory:
         return res
 
     def have(self, item: Item):
+        if item is None:
+            return False
         err, res = item_inventory.find(self.id, item.id)
         return not err
 
@@ -89,7 +91,7 @@ class Inventory:
 
     def remove(self, item: Item):
         have = self.have(item)
-        if not have:
+        if have:
             item_inventory.remove(self.id, item.id)
         return have
     

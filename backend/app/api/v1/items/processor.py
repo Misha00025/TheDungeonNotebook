@@ -62,25 +62,35 @@ def get_item(group_id, name_or_id):
     return item
 
 
-def put_item(item_id, name, description):
-    item = Item.get_by_id(item_id)
+def put_item(group_id, item_id, name, description):
+    item = get_item(group_id, item_id)
+    if item is None: 
+        return False
     item.set(name, description)
     name = item.name
     description = item.description
-    item = Item.get_by_id(item_id)
+    item = get_item(group_id, item_id)
+    if item is None:
+        return False
     return item.description == description and item.name == name
 
 
 def put_slot(inventory: Inventory, item_id, amount):
-    return inventory.update_slot(Item.get_by_id(item_id), amount)
+    if inventory is None:
+        return False
+    group_id = inventory._group.id
+    return inventory.update_slot(get_item(group_id, item_id), amount)
 
 
 def remove_slot(inventory: Inventory, item_id):
-    return inventory.remove(Item.get_by_id(item_id))
+    if inventory is None:
+        return False
+    group_id = inventory._group.id
+    return inventory.remove(get_item(group_id, item_id))
 
 
-def delete_item(item_id):
-    item = Item.get_by_id(item_id)
+def delete_item(group_id, item_id):
+    item = get_item(group_id, item_id)
     ok = item is not None
     if ok:
         item.delete()
@@ -92,9 +102,12 @@ def create_item(group_id, name, description):
     return item
 
 
-def add_item(inventory: Inventory, item_id):
-    item = Item.get_by_id(item_id)
-    ok = item is not None
+def add_item(inventory: Inventory, item_id, amount=1):
+    item = get_item(inventory._group.id, item_id)
+    slot = get_inventory_slot(inventory, item_id)
+    exist_item, exist_slot = item is not None, slot is not None
+    ok = exist_item and not exist_slot
     if ok:
         inventory.add(item)
-    return ok
+        inventory.update_slot(item, amount)
+    return exist_item, exist_slot

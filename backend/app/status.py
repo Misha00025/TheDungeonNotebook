@@ -21,6 +21,8 @@ def _default_status(code):
             return {_error: "Forbidden"}
         case 404:
             return {_error: "Not Found"}
+        case 409:
+            return {_error: "Conflict"}
         case 501:
             return {_error: "Not Implemented"}
         case _:
@@ -66,3 +68,6 @@ def not_found(response=None):
 def unauthorized(response=None):
     return _answer(401, response)
 
+
+def conflict(response=None):
+    return _answer(409, response)

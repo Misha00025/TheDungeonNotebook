@@ -17,15 +17,12 @@ def test(f):
     wrapper.__name__ = f.__name__
     return wrapper
 
-
-def get_test(headers, params, url, compact):
-    full_url = site + url
-    res = rq.get(url=full_url, headers=headers, params=params)
+def get_text(res, url, method, compact):
     try:
         response = res.json()
     except:
         response = res.text
-    text = f"REQUEST {res.status_code}: {url} "
+    text = f"{method} REQUEST {res.status_code}: {url} "
     if res.status_code < 400:
         if not compact:
             text += f"\n   |- Response: {response}"
@@ -33,6 +30,34 @@ def get_test(headers, params, url, compact):
         text += "!!!VERY IMPORTANT ERROR!!!"
     else:
         text += f"  Error: {response}"
+    return text
+
+
+def get_test(headers, params, url, compact):
+    full_url = site + url
+    res = rq.get(url=full_url, headers=headers, params=params)
+    text = get_text(res, url, "GET ", compact)
+    print(text)
+
+
+def post_test(headers, params, url, data, compact):
+    full_url = site + url
+    res = rq.post(url=full_url, headers=headers, params=params, json=data)
+    text = get_text(res, url, "POST", compact)
+    print(text)
+
+
+def put_test(headers, params, url, data, compact):
+    full_url = site + url
+    res = rq.put(url=full_url, headers=headers, params=params, json=data)
+    text = get_text(res, url, "PUT ", compact)
+    print(text)
+
+
+def delete_test(headers, params, url, compact):
+    full_url = site + url
+    res = rq.delete(url=full_url, headers=headers, params=params)
+    text = get_text(res, url, "DEL ", compact)
     print(text)
 
 

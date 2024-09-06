@@ -17,9 +17,10 @@ def _get_items():
     return router.gets(request)
 
 
-@route("<item_id>", ["GET", "PUT", "DELETE"])
+@route("<item_id>", ["GET", "PUT", "DELETE", "POST"])
 def _item(item_id):
     method = request.method
+    # print(item_id)
     match method:
         case "GET":
             return router.get(request, item_id)
@@ -27,11 +28,9 @@ def _item(item_id):
             return router.put(request, item_id)
         case "DELETE":
             return router.delete(request, item_id)
-
-
-@route("add", ["POST"])
-def _add_item():
-    return router.post_add(request)
+        case "POST":
+            return router.post_add(request, item_id)
+    
 
 
 @route("create", ["POST"])
