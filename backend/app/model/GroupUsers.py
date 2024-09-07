@@ -16,7 +16,7 @@ class GroupUsers:
 
     def _find(self):
         err, db_users = user_group.find(group_id=self.info.id)
-        print(self.users)
+        # print(self.users)
         if err:
             raise Exception("Can't find users")
         for db_user in db_users:
@@ -59,7 +59,7 @@ class GroupUsers:
         if user_id in self.users.keys():
             return False
         err, res = user_group.add(user_id, self.info.id, admin)
-        print(res)
+        # print(res)
         return not bool(err)
     
     def remove_user(self, user_id):

@@ -24,6 +24,7 @@ def get(group_id: int, rq: Request):
     d = group.to_dict()
     if not is_admin:
         d.pop("users")
+    d["is_admin"] = is_admin
     return ok(d)
 
 def get_all(rq: Request):

@@ -21,13 +21,16 @@ def from_user(request: Request):
     at = get_access_token(request)
     return at is not None
 
+_methods_without_json = ["GET", "DELETE"]
 
 def get_user_id(request: Request):
     if from_bot(request):
         args = request.args
         user_id = args.get("user_id", None)
-        if user_id is None:
+        if user_id is None and request.method not in _methods_without_json:
             user_id = request.json.get("user_id")
+        if user_id is None:
+            return None
         return str(user_id)
     if from_user(request):
         from app.database import vk_user_token
@@ -49,7 +52,7 @@ def get_group_id(request: Request):
     if from_user(request):
         args = request.args
         group_id = args.get("group_id", None)
-        if group_id is None:
+        if group_id is None and request.method not in _methods_without_json:
             group_id = request.json.get("group_id")
         return str(group_id)
 
