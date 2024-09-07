@@ -5,7 +5,7 @@ from config import connection_settings
 from app.databases.MySQLDB import MySQLDB
 
 
-_instance: MySQLDB = None
+_instance: MySQLDB | None = None
 
 
 class SQLparser:
@@ -99,17 +99,23 @@ def get_instance() -> SQLparser:
                 _password = connection_settings["Password"]
                 _host = connection_settings["Host"]
                 _port = connection_settings["Port"]
+                if "MaxPool" in connection_settings.keys():
+                    _pool = int(connection_settings["MaxPool"])
+                else:
+                    _pool = 2000
 
                 db = MySQLDB(
                     dbname=_dbname,
                     user=_user,
                     password=_password,
                     host=_host,
-                    port=_port
+                    port=_port,
+                    max_pool=_pool
                 )
                 _instance = SQLparser(db)
-        except:
+        except Exception as e:
             _instance = None
+            print(f"Failed to connect to database: {e}")
             return None        
     return _instance
 
