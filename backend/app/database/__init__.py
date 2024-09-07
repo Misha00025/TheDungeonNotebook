@@ -30,6 +30,10 @@ class SQLparser:
                     query += " AND"
         return query, data
 
+    @property
+    def last_row_id(self):
+        return self._db.last_row_id
+
     def is_connected(self):
         return self._db.is_connected()
 
