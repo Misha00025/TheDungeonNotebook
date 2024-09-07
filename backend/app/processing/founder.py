@@ -3,7 +3,7 @@ from app import database as _db
 
 def user_is_founded(user_id):
     err, res = _db.vk_user.find(user_id)
-    return res is not None and not err
+    return not bool(err)
 
 
 def find_group_id_by(service_token):

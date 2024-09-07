@@ -30,17 +30,13 @@ def get_vk_account_info(user_id):
         if not err:
             return 0, response[0]
         return 1, response
-    return 1, "vk not found"
+    return 2, "vk not found"
 
 
 def save_client(user_id):
-    from app.api.v0 import database
-    user = database.VkUser()
-    err, account_info = get_vk_account_info(user_id)
-    if err:
-        return err
-    user.vk_id = account_info["id"]
-    user.first_name = account_info["first_name"]
-    user.last_name = account_info["last_name"]
-    user.photo = account_info["photo_100"]
-    return database.save_user(user)
+    from app.database import vk_user
+    err, ai = get_vk_account_info(user_id)
+    if bool(err):
+        ai = {"id": user_id, "first_name": f"Unknown-{user_id}", "last_name":f"", "photo_100":None}
+    err, res = vk_user.add(user_id, ai["first_name"], ai["last_name"], ai["photo_100"])
+    return err

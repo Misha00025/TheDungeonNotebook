@@ -30,7 +30,7 @@ class VkUser:
 
 def find(user_id):
     data = (user_id,)
-    query = f"SELECT {string_fields} FROM vk_user WHERE vk_user_id = %s"
+    query = f"SELECT {string_fields} FROM vk_user WHERE {fields[0]} = %s"
     result = _instance.fetchone(query, data)
     if result is None:
         return 1, f"user_id = {user_id} ({type(user_id)}) Result {result}"
@@ -42,14 +42,14 @@ def add(user_id, first_name, last_name, photo_link):
     data = (user_id, first_name, last_name, photo_link,)
     query = f"INSERT INTO vk_user({string_fields}) VALUES (%s, %s, %s, %s);"
     _instance.execute(query, data)
-    return 0
+    return 0, None
 
 
 def update(user_id, first_name, last_name, photo_link):
     data = (first_name, last_name, photo_link, user_id,)
     query = f"UPDATE vk_user SET first_name=%s, last_name=%s, photo_link=%s WHERE vk_user_id=%s;"
     _instance.execute(query, data)
-    return 0
+    return 0, None
 
 
 def remove(user_id):

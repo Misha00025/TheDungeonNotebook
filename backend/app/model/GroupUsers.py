@@ -18,7 +18,7 @@ class GroupUsers:
         err, db_users = user_group.find(group_id=self.info.id)
         # print(self.users)
         if err:
-            raise Exception("Can't find users")
+            return
         for db_user in db_users:
             user_id = db_user[0]
             user = VkUser(user_id)

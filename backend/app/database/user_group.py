@@ -10,7 +10,7 @@ _table = "user_group"
 def _make_result(query, data):
     result = _instance.fetchall(query, data)
     if len(result) == 0:
-        return 1, None
+        return 1, result
     return 0, result
 
 
