@@ -103,8 +103,8 @@ def put(rq: Request, item_id):
                 result = item is None
             item = processor.get_item(group_id, item_id)
         else:
-            if not processor.check_user_group(group_id, user_id):
-                return forbidden()
+            if not processor.check_user_group(group_id, owner_id):
+                return forbidden("User not in group")
             inv = processor.get_inventory(group_id, owner_id)
             if inv is None:
                 return forbidden()
@@ -125,13 +125,14 @@ def delete(rq: Request, item_id):
     user_id, group_id = get_user_id(rq), get_group_id(rq)
     access, admin = check_group_access(rq)
     owner_id = parser.get_owner_id(rq)
+    if user_id is None:
+        user_id = owner_id
     if not access or not processor.check_user_group(group_id, user_id):
         return forbidden()
     if shared_item(admin, user_id, owner_id, rq):
         result = processor.delete_item(group_id, item_id)
     else:
-        if owner_id is None:
-            owner_id = user_id
+        
         inv = processor.get_inventory(group_id, owner_id)
         if inv is None:
             return forbidden()
@@ -144,7 +145,7 @@ def delete(rq: Request, item_id):
 def post_add(rq: Request, item_id):
     user_id, group_id = get_user_id(rq), get_group_id(rq)
     access, admin = check_group_access(rq)
-    if not access or not processor.check_user_group(group_id, user_id):
+    if not access:
         return forbidden()
     if not admin:
         owner_id = user_id
@@ -153,7 +154,7 @@ def post_add(rq: Request, item_id):
     if owner_id is None:
         return bad_request()
     inv = processor.get_inventory(group_id, owner_id)
-    if inv is None:
+    if inv is None or not processor.check_user_group(group_id, owner_id):
         return forbidden()
     errs, _, _, amount = parser.get_item_data(rq)
     if errs is not None:
