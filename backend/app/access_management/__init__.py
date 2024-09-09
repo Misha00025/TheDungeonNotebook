@@ -26,7 +26,7 @@ def is_correct_service_token(request):
 def access_to_group(user_id, group_id) -> tuple[bool, bool]:
     from app.database import user_group
     err, res = user_group.find(str(user_id), str(group_id))
-    access = res is not None
+    access = not err
     if access:
         admin = bool(res[2])
         return access, admin
