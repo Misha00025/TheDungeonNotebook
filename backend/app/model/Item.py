@@ -7,6 +7,7 @@ class Item:
         self.id: int = parsed_item.id
         self.name: str = parsed_item.name
         self.description = parsed_item.description
+        self.icon = "https://cdn-icons-png.flaticon.com/512/9501/9501918.png"
 
     def __str__(self) -> str:
         return str(self.to_dict())
@@ -18,7 +19,8 @@ class Item:
         return {
             "id": self.id,
             "name": self.name,
-            "description": self.description
+            "description": self.description,
+            "icon": self.icon
         }
 
     @staticmethod
