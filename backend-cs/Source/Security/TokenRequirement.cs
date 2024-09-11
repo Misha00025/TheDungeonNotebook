@@ -1,24 +1,24 @@
-using TdnApi.Models.Db;
+using Microsoft.AspNetCore.Authorization;
 
 
 namespace TdnApi.Security;
 
-public class TokenRequirement
+
+public enum Access 
 {
-	private UserContext _userContext;
-	
-	public TokenRequirement(UserContext userContext)
+	All,
+	User = 1,
+	Group = 2,
+	UserOrGroup = User + Group
+}
+
+
+public class TokenRequirement : IAuthorizationRequirement
+{
+	private readonly Access _access;
+	public TokenRequirement(Access access)
 	{
-		_userContext = userContext;
+		_access = access;
 	}
-	
-	public bool FromGroup(string token)
-	{
-		return token == "group";
-	}
-	
-	public bool FromUser(string token)
-	{
-		return token == "user";
-	}
+	public Access Access => _access;
 }

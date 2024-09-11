@@ -28,7 +28,6 @@ public class UserController : ControllerBase
 	
 	[HttpGet("{id}")]
 	[Authorize]
-	[CheckAccess(Access.Group)]
 	public ActionResult<User> GetUser(string id)
 	{
 		var user = _userContext.Users.First(x => x.Id == id);
