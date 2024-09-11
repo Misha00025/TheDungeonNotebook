@@ -1,12 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using TdnApi.Models.Db;
 using TdnApi.Security;
+using static ConnectionSettings;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddMvc();
 
-builder.Services.AddDbContext<UserContext>(opt => opt.UseMySql("server=localhost;port=3307;user=test_user;password=1234;database=test_vk;", new MySqlServerVersion(new Version(8, 0, 11))));
+builder.Services.AddDbContext<UserContext>(opt => opt.UseMySql(Connection, new MySqlServerVersion(new Version(8, 0, 11))));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApiDocument((config) =>
