@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
 using TdnApi.Models.Db;
 using TdnApi.Security;
 using TdnApi.Configuration;
@@ -16,16 +15,16 @@ builder.Services.AddDbContext<TokensContext>(opt => config.ConfigDbConnections(o
 builder.Services.AddSingleton<IAuthorizationHandler, TokenHandler>();
 
 builder.Services.AddAuthorizationBuilder()
-	.AddPolicy("All", policy => policy.Requirements.Add(new TokenRequirement(Access.All)));
+	.AddPolicy(Policy.All, policy => policy.Requirements.Add(new TokenRequirement(Access.All)));
 
 builder.Services.AddAuthorizationBuilder()
-	.AddPolicy("User", policy => policy.Requirements.Add(new TokenRequirement(Access.User)));
+	.AddPolicy(Policy.User, policy => policy.Requirements.Add(new TokenRequirement(Access.User)));
 
 builder.Services.AddAuthorizationBuilder()
-	.AddPolicy("Group", policy => policy.Requirements.Add(new TokenRequirement(Access.Group)));
+	.AddPolicy(Policy.Group, policy => policy.Requirements.Add(new TokenRequirement(Access.Group)));
 
 builder.Services.AddAuthorizationBuilder()
-	.AddPolicy("UserOrGroup", policy => policy.Requirements.Add(new TokenRequirement(Access.UserOrGroup)));
+	.AddPolicy(Policy.UserOrGroup, policy => policy.Requirements.Add(new TokenRequirement(Access.UserOrGroup)));
 
 builder.Services.AddAuthentication("Token")
 	.AddScheme<AuthenticationSchemeOptions, TokenAuthenticationHandler>("Token", null);

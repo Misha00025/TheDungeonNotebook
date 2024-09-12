@@ -27,24 +27,20 @@ public class UserController : ControllerBase
 	
 	[HttpGet]
 	[Authorize(Policy=Policy.UserOrGroup)]
-	public ActionResult<IEnumerable<User>> GetUsers(string? groupId)
+	public ActionResult<IEnumerable<User>> GetUsers()
 	{
-		 var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+		var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+		var id = User.FindFirst(ClaimTypes.Name)?.Value;
+		if (id == null)
+			return Forbid();
 		if (userRole == "user")
 		{
-			if (string.IsNullOrEmpty(groupId))
-			{
-				return BadRequest("groupId is required for users.");
-			}
+			var routeMessage = new{id = id};
+			return RedirectToRoute("GetUser", routeMessage);
 		}
-		else if (userRole == "group")
-		{
-			groupId = User.FindFirst(ClaimTypes.Name)?.Value;
-		}
-		if (groupId == null)
-			return Forbid();
-		var admins = _provider.FindByGroup(groupId, true);
-		var users = _provider.FindByGroup(groupId);
+			
+		var admins = _provider.FindByGroup(id, true);
+		var users = _provider.FindByGroup(id);
 		Dictionary<string, IEnumerable<User>> groupUsers = new(){
 			{"admins",admins}, 
 			{"users", users}	
@@ -52,11 +48,21 @@ public class UserController : ControllerBase
 		return Ok(groupUsers);
 	}
 	
-	[HttpGet("{id}")]
-	[Authorize(Policy=Policy.Group)]
+	[HttpGet("{id}", Name = "GetUser")]
+	[Authorize(Policy=Policy.UserOrGroup)]
 	public ActionResult<User> GetUser(string id)
 	{
+		var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+		var accessId = User.FindFirst(ClaimTypes.Name)?.Value;
+		if (accessId == null)
+			return Forbid();
+		if (userRole == Role.User)
+		   	if (accessId != id)
+		   		return Forbid();
 		var user = _provider.FindByTd(id);
+		var users = _provider.FindByGroup(accessId);
+		if (!users.Any( e => e.Id == id))
+			return Forbid();
 		if (user == null)
 			return NotFound();
 		return Ok(user);
