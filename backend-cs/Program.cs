@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using TdnApi.Models.Db;
 using TdnApi.Security;
 using TdnApi.Configuration;
+using Microsoft.AspNetCore.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = new ConfigParser("config.ini");
@@ -11,6 +12,7 @@ var config = new ConfigParser("config.ini");
 builder.Services.AddMvc();
 
 builder.Services.AddDbContext<UserContext>(opt => config.ConfigDbConnections(opt));
+builder.Services.AddDbContext<TokensContext>(opt => config.ConfigDbConnections(opt));
 builder.Services.AddSingleton<IAuthorizationHandler, TokenHandler>();
 
 builder.Services.AddAuthorizationBuilder()
@@ -24,6 +26,9 @@ builder.Services.AddAuthorizationBuilder()
 
 builder.Services.AddAuthorizationBuilder()
 	.AddPolicy("UserOrGroup", policy => policy.Requirements.Add(new TokenRequirement(Access.UserOrGroup)));
+
+builder.Services.AddAuthentication("Token")
+	.AddScheme<AuthenticationSchemeOptions, TokenAuthenticationHandler>("Token", null);
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApiDocument((config) =>
