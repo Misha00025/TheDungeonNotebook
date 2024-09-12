@@ -59,7 +59,7 @@ public class TokenAuthenticationHandler : AuthenticationHandler<AuthenticationSc
 		}
 		else
 			return false;
-		return true;
+		return role != Role.None;
 	}
 	
 	private bool TryGet(string field, out string value)
