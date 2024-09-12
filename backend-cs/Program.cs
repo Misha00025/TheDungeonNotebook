@@ -11,7 +11,7 @@ var config = new ConfigParser("config.ini");
 
 builder.Services.AddMvc();
 
-builder.Services.AddDbContext<UserContext>(opt => config.ConfigDbConnections(opt));
+builder.Services.AddDbContext<UserGroupContext>(opt => config.ConfigDbConnections(opt));
 builder.Services.AddDbContext<TokensContext>(opt => config.ConfigDbConnections(opt));
 builder.Services.AddSingleton<IAuthorizationHandler, TokenHandler>();
 
