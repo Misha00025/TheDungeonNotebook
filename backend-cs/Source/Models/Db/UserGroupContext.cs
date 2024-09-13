@@ -10,8 +10,8 @@ public class UserGroupContext : DbContext
 	[Keyless]
 	public class GroupUserData
 	{
-		public string? GroupId;
-		public string? UserId;
+		public string GroupId = "";
+		public string UserId = "";
 		public bool IsAdmin;
 		public Group? Group;
 		public User? User;

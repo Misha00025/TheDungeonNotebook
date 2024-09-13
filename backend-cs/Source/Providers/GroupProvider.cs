@@ -1,9 +1,10 @@
+using Microsoft.EntityFrameworkCore;
 using TdnApi.Models;
 using TdnApi.Models.Db;
 
 namespace TdnApi.Providers;
 
-class GroupProvider : IUsersProvider<Group>
+class GroupProvider
 {
 	private readonly UserGroupContext _context;
 
@@ -20,15 +21,12 @@ class GroupProvider : IUsersProvider<Group>
 		return group.First();
 	}
 
-	public IEnumerable<Group> FindByUser(string userId)
+	public IEnumerable<UserGroupContext.GroupUserData> FindByUser(string userId)
 	{
-		var ugs = _context.UserGroups.Where(t => t.UserId == userId).ToList();
-		List<Group> groups = new();
-		foreach (var ug in ugs)
-		{
-			if (ug.Group != null)
-				groups.Add(ug.Group);
-		}
-		return groups;
+		var ugs = _context.UserGroups
+			.Where(t => t.UserId == userId)
+			.Include(e => e.Group)
+			.ToList();
+		return ugs;
 	}
 }
