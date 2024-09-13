@@ -3,8 +3,8 @@ import requests as rq
 
 
 ethernet = "https://the-dungeon-notebook.ru"
-local = "http://127.0.0.1:5000"
-version = "v1"
+local = "http://127.0.0.1:5077"
+version = "v2"
 site = local + "/api/" + version + "/"
 headers_template = {"Content-Type": "application/json; charset=utf-8"}
 

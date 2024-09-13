@@ -5,7 +5,9 @@ using TdnApi.Models;
 using TdnApi.Models.Db;
 using TdnApi.Providers;
 using TdnApi.Security;
-using static Constants;
+using TdnApi.Security.Filters;
+using TdnApi.Security.Validators;
+using static TdnApi.Constants;
 
 namespace TdnApi.Controllers;
 
@@ -16,13 +18,13 @@ public class UserController : ControllerBase
 {
 	public record PostUserData(string UserId, bool? IsAdmin);
 	
+	private UserGroupContext _context;
 	private UserProvider _provider;
-	
-	public record UserInput( string firstName, string lastName );
 	
 	public UserController(UserGroupContext userContext)
 	{
 		_provider = new UserProvider(userContext);
+		_context = userContext;
 	}
 	
 	[HttpGet]
@@ -33,12 +35,11 @@ public class UserController : ControllerBase
 		var id = User.FindFirst(ClaimTypes.Name)?.Value;
 		if (id == null)
 			return Forbid();
-		if (userRole == "user")
+		if (User.Claims.Any(c => c.Type == ClaimTypes.Role && c.Value == Role.User))
 		{
 			var routeMessage = new{id = id};
 			return RedirectToRoute("GetUser", routeMessage);
 		}
-			
 		var admins = _provider.FindByGroup(id, true);
 		var users = _provider.FindByGroup(id);
 		Dictionary<string, IEnumerable<User>> groupUsers = new(){
@@ -52,17 +53,11 @@ public class UserController : ControllerBase
 	[Authorize(Policy=Policy.UserOrGroup)]
 	public ActionResult<User> GetUser(string id)
 	{
-		var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+		var validator = new UserValidator(User, _context);
 		var accessId = User.FindFirst(ClaimTypes.Name)?.Value;
-		if (accessId == null)
-			return Forbid();
-		if (userRole == Role.User)
-		   	if (accessId != id)
-		   		return Forbid();
-		var user = _provider.FindByTd(id);
-		var users = _provider.FindByGroup(accessId);
-		if (!users.Any( e => e.Id == id))
-			return Forbid();
+		if (!validator.HasAccessToUser(id) || accessId == null)
+		   	return Forbid();
+		var user = _provider.FindById(id);
 		if (user == null)
 			return NotFound();
 		return Ok(user);
@@ -72,9 +67,10 @@ public class UserController : ControllerBase
 	[Authorize(Policy = Policy.Group)]
 	public ActionResult DeleteUser(string id)
 	{
-		var user = _provider.FindByTd(id);
+		var user = _provider.FindById(id);
 		string? groupId = User.FindFirst(ClaimTypes.Name)?.Value;
-		if (groupId == null)
+		var validator = new UserValidator(User, _context);
+		if (groupId == null || !validator.HasAccessToUser(id))
 			return Forbid();
 		if (user == null)
 			return NotFound();
@@ -86,12 +82,15 @@ public class UserController : ControllerBase
 	[Authorize(Policy = Policy.Group)]
 	public ActionResult<User> PostUser(PostUserData data)
 	{
-		var user = _provider.FindByTd(data.UserId);
+		var user = _provider.FindById(data.UserId);
 		string? groupId = User.FindFirst(ClaimTypes.Name)?.Value;
 		if (groupId == null)
 			return Forbid();
 		if (user == null)
 			return NotFound();
+		var users = _provider.FindByGroup(groupId);
+		if (users.Any(e => e.Id == data.UserId))
+			return Conflict();
 		_provider.AddToGroup(user, groupId, data.IsAdmin == null ? false : (bool)data.IsAdmin);		
 		return Created();
 	}

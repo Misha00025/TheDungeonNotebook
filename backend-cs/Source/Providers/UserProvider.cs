@@ -1,18 +1,19 @@
+using Microsoft.EntityFrameworkCore;
 using TdnApi.Models;
 using TdnApi.Models.Db;
 
 namespace TdnApi.Providers;
 
-class UserProvider
+class UserProvider : IGroupedProvider<User>
 {
-	private UserGroupContext _context;
+	private readonly UserGroupContext _context;
 	
 	public UserProvider(UserGroupContext context)
 	{
 		_context = context;
 	}
 	
-	public User? FindByTd(string id)
+	public User? FindById(string id)
 	{
 		var users = _context.Users.Where(u => u.Id == id);
 		if (users.Count() == 0)
@@ -20,13 +21,24 @@ class UserProvider
 		return users.First();
 	}
 	
-	public IEnumerable<User> FindByGroup(string groupId, bool adminsOnly = false)
+	public IEnumerable<User> FindByGroup(string groupId)
 	{
-		var ug = _context.UserGroups.Where(t => t.GroupId == groupId).ToList();
+		return FindByGroup(groupId, false);
+	}
+	
+	public IEnumerable<User> FindByGroup(string groupId, bool adminsOnly)
+	{
+		var ugs = _context.UserGroups.Where(t => t.GroupId == groupId).Include(e => e.User).ToList();
 		if (adminsOnly)
-			ug.RemoveAll(t => !t.IsAdmin);
-		var users = _context.Users.AsEnumerable()
-			.Where(t => ug.Any(e => t.Id == e.UserId)).ToList();
+			ugs.RemoveAll(t => !t.IsAdmin);
+		List<User> users = new();
+		foreach (var ug in ugs)
+		{
+			if (ug.User != null)
+				users.Add(ug.User);
+			else
+				Console.WriteLine("----\nnull\n----");
+		}
 		return users;
 	}
 	
@@ -34,7 +46,7 @@ class UserProvider
 	{
 		UserGroupContext.GroupUserData ug = 
 			new() {UserId = user.Id, GroupId = groupId, IsAdmin = isAdmin};
-		_context.Add(ug);
+		_context.UserGroups.Add(ug);
 		_context.SaveChanges();
 	}
 	
@@ -46,6 +58,7 @@ class UserProvider
 			return;
 		var ug = ugs[0];
 		_context.UserGroups.Remove(ug);
+		_context.SaveChanges();
 	}
 }
 
