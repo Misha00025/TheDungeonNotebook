@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TdnApi.Models;
@@ -6,56 +5,78 @@ using TdnApi.Models.Db;
 using TdnApi.Providers;
 using TdnApi.Security;
 using TdnApi.Security.Validators;
+using static TdnApi.Constants;
 
 namespace TdnApi.Controllers;
 
 [ApiController]
 [Authorize(Policy = Policy.UserOrGroup)]
-public class GroupsController : ControllerBase
+[Route(ApiPrefix+"groups")]
+public class GroupsController : BaseController
 {
+	private UserGroupContext _context;
 	private GroupProvider _provider;
 	private UserValidator _validator;
 	
 	public GroupsController(UserGroupContext context)
 	{
+		_context = context;
 		_provider = new(context);
-		_validator = new UserValidator(User, context);
+		_validator = new UserValidator(context);
 	}
-	
-	private bool FromGroup()
-		=> User.FindAll(c => c.Type == ClaimTypes.Role).Any(e => e.Value == Role.Group);
 	
 	[HttpGet]
 	public ActionResult<IEnumerable<GroupResult>> GetGroups()
 	{
-		var accessId = User.FindFirst(c => c.Type == ClaimTypes.Name)?.Value;
 		if (FromGroup())
-			return RedirectToRoute("GetGroup", new {id = accessId});
-		
-		return Ok();
+			return RedirectToRoute("GetGroup", new {id = AccessId});
+		var userGroups = _provider.FindByUser(AccessId).ToArray();
+		var groups = userGroups
+			.Select(e => e.Group != null  
+				? new GroupResult(e.Group.Id, e.Group.Name, e.IsAdmin)
+				: new GroupResult("", "", false))
+			.ToList();
+		Dictionary<string, List<GroupResult>> result = new(){{"groups", groups}};
+		return Ok(result);
 	}
 	
 	[HttpGet("{id}", Name = "GetGroup")]
-	public ActionResult<GroupResult> GetGroup(string id)
+	public ActionResult<Dictionary<string, object?>> GetGroup(string id)
 	{
-		if (!_validator.HasAccessToGroup(id))
+		if (!_validator.HasAccessToGroup(id, User))
 			return Forbid();
 		if (FromGroup())
-		{
-			var res = _provider.FindById(id);
-			if (res == null)
-				return Forbid();
-			return Ok(new GroupResult(res.Id, res.Name, true));
-		}
-		var accessId = User.FindFirst(c => c.Type == ClaimTypes.Name)?.Value;
-		if (accessId == null)
-			return Forbid();
-		var group = _provider.FindByUser(accessId)
+			return GetGroupFromGroup();
+		var group = _provider.FindByUser(AccessId)
 			.FirstOrDefault(e => e?.GroupId == id, null);
 		if (group == null || group.Group == null)
-			return Forbid();
-		return Ok(new GroupResult(group.GroupId, group.Group.Name, group.IsAdmin));
+			return NotFound();
+		return Ok(GenerateResult(group.Group, group.IsAdmin));
 	}
 	
-	public record GroupResult(string id, string name, bool isAdmin);
+	private ActionResult<Dictionary<string, object?>> GetGroupFromGroup()
+	{
+		var res = _provider.FindById(AccessId);
+		if (res == null)
+			return Forbid();
+		return Ok(GenerateResult(res, true));
+	}
+	
+	private Dictionary<string, object?> GenerateResult(Group group, bool isAdmin)
+	{
+		var provider = new UserProvider(_context);
+		var admins = provider.FindByGroup(group.Id, true);
+		Dictionary<string, object?> result = new()
+		{
+			{"id", group.Id},
+			{"name", group.Name},
+			{"is_admin", true},
+			{"admins", admins}
+		};
+		if (isAdmin)
+			result.Add("users", provider.FindByGroup(group.Id));
+		return result;
+	}
+	
+	public record GroupResult(string id, string name, bool is_admin);
 }
