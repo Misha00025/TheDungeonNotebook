@@ -21,5 +21,8 @@ public abstract class BaseController : ControllerBase
 		=> User.FindAll(c => c.Type == ClaimTypes.Role).Any(e => e.Value == Role.Group);
 		
 	protected bool FromUser()
-		=> User.FindAll(c => c.Type == ClaimTypes.Role).Any(e => e.Value == Role.User);		
+		=> User.FindAll(c => c.Type == ClaimTypes.Role).Any(e => e.Value == Role.User);
+	
+	protected bool FromAdmin()
+		=> User.FindAll(c => c.Type == ClaimTypes.Role).Any(e => e.Value == Role.GroupAdmin);
 }
