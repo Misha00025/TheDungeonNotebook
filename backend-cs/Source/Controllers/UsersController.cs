@@ -16,11 +16,11 @@ public class UserController : BaseController
 {
 	public record PostUserData(string UserId, bool? IsAdmin);
 	
-	private UserGroupContext _context;
+	private TdnDbContext _context;
 	private UserProvider _provider;
 	private UserValidator _validator;
 	
-	public UserController(UserGroupContext userContext)
+	public UserController(TdnDbContext userContext)
 	{
 		_provider = new UserProvider(userContext);
 		_context = userContext;

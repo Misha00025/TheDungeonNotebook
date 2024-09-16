@@ -10,7 +10,7 @@ var config = new ConfigParser("config.ini");
 
 builder.Services.AddMvc();
 
-builder.Services.AddDbContext<UserGroupContext>(opt => config.ConfigDbConnections(opt));
+builder.Services.AddDbContext<TdnDbContext>(opt => config.ConfigDbConnections(opt));
 builder.Services.AddDbContext<TokensContext>(opt => config.ConfigDbConnections(opt));
 builder.Services.AddSingleton<IAuthorizationHandler, TokenHandler>();
 

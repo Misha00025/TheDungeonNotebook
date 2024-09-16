@@ -9,7 +9,7 @@ public class UserValidator
 	private GroupProvider _groupProvider;
 	private UserProvider _userProvider;
 	
-	public UserValidator(UserGroupContext context)
+	public UserValidator(TdnDbContext context)
 	{
 		_groupProvider = new GroupProvider(context);
 		_userProvider = new UserProvider(context);

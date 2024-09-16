@@ -6,9 +6,9 @@ namespace TdnApi.Providers;
 
 class GroupProvider
 {
-	private readonly UserGroupContext _context;
+	private readonly TdnDbContext _context;
 
-	public GroupProvider(UserGroupContext context)
+	public GroupProvider(TdnDbContext context)
 	{
 		_context = context;
 	}
@@ -21,7 +21,7 @@ class GroupProvider
 		return group.First();
 	}
 
-	public IEnumerable<UserGroupContext.GroupUserData> FindByUser(string userId)
+	public IEnumerable<TdnDbContext.GroupUserData> FindByUser(string userId)
 	{
 		var ugs = _context.UserGroups
 			.Where(t => t.UserId == userId)

@@ -6,9 +6,9 @@ namespace TdnApi.Providers;
 
 class UserProvider : IGroupedProvider<User>
 {
-	private readonly UserGroupContext _context;
+	private readonly TdnDbContext _context;
 	
-	public UserProvider(UserGroupContext context)
+	public UserProvider(TdnDbContext context)
 	{
 		_context = context;
 	}
@@ -44,7 +44,7 @@ class UserProvider : IGroupedProvider<User>
 	
 	public void AddToGroup(User user, string groupId, bool isAdmin = false)
 	{
-		UserGroupContext.GroupUserData ug = 
+		TdnDbContext.GroupUserData ug = 
 			new() {UserId = user.Id, GroupId = groupId, IsAdmin = isAdmin};
 		_context.UserGroups.Add(ug);
 		_context.SaveChanges();

@@ -52,7 +52,7 @@ public class AccessToGroupAttribute : ActionFilterAttribute
 	
 	private bool UserAccess(HttpContext context)
 	{
-		var dbContext = context.RequestServices.GetService<UserGroupContext>();
+		var dbContext = context.RequestServices.GetService<TdnDbContext>();
 		var accessId = context.User.FindFirst(e => e.Type == ClaimTypes.Name)?.Value;
 		if (dbContext == null || !context.Request.Query.ContainsKey(GroupId) || accessId == null)
 			return false;
@@ -66,7 +66,7 @@ public class AccessToGroupAttribute : ActionFilterAttribute
 	{
 		if (IsGroup(context))
 			return true;
-		var dbContext = context.RequestServices.GetService<UserGroupContext>();
+		var dbContext = context.RequestServices.GetService<TdnDbContext>();
 		var accessId = context.User.FindFirst(e => e.Type == ClaimTypes.Name)?.Value;
 		if (dbContext == null || !context.Request.Query.ContainsKey(GroupId) || accessId == null)
 			return false;

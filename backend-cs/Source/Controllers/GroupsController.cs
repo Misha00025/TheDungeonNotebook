@@ -14,11 +14,11 @@ namespace TdnApi.Controllers;
 [Route(ApiPrefix+"groups")]
 public class GroupsController : BaseController
 {
-	private UserGroupContext _context;
+	private TdnDbContext _context;
 	private GroupProvider _provider;
 	private UserValidator _validator;
 	
-	public GroupsController(UserGroupContext context)
+	public GroupsController(TdnDbContext context)
 	{
 		_context = context;
 		_provider = new(context);
