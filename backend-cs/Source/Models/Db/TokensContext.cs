@@ -6,9 +6,9 @@ namespace TdnApi.Models.Db;
 public class TokensContext : DbContext
 {
 	[Keyless]
-	private class GroupToken { public string? Token; public string? Id; }
+	private class GroupToken { public string Token = ""; public string Id = ""; }
 	[Keyless]
-	private class UserToken { public string? Token; public string? Id; public DateTime LastDate; }
+	private class UserToken { public string Token = ""; public string Id = ""; public DateTime LastDate = DateTime.Now; }
 	
 	public TokensContext(DbContextOptions<TokensContext> options): base(options)
 	{
@@ -48,5 +48,11 @@ public class TokensContext : DbContext
 			return null;
 			
 		return groups.First().Id;
+	}
+
+	internal void UpdateUserToken(string token, string userId)
+	{
+		
+		Users.Update(new UserToken(){Token = token, Id = userId});
 	}
 }

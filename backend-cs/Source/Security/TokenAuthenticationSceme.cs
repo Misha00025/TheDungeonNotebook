@@ -79,7 +79,10 @@ public class TokenAuthenticationHandler : AuthenticationHandler<AuthenticationSc
 		var tmp = _tokensContext.GetUserId(token);
 		userId = "";
 		if (tmp != null)
+		{
 			userId = tmp;
+			_tokensContext.UpdateUserToken(token, userId);
+		}			
 		return tmp != null;
 	} 
 	
