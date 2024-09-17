@@ -25,11 +25,12 @@ public class NoteProvider : IUserGroupProvider<Note>
 		=> Notes.Where(e => e.Id == id).FirstOrDefault();
 	
 	public IEnumerable<Note> FindByGroup(string groupId)
-		=> Notes.Where(e => e.GroupId == groupId).ToArray();
+		=> Notes.Where(e => e.GroupId == groupId).Include(e => e.Owner).ToArray();
 
 	public IEnumerable<Note> FindByUser(string userId) 
-		=> Notes.Where(e => e.OwnerId == userId).ToArray();
+		=> Notes.Where(e => e.OwnerId == userId).Include(e => e.Group).ToArray();
 
 	public IEnumerable<Note> FindByUserGroup(string userId, string groupId)
-		=> Notes.Where(e => e.GroupId == groupId && e.OwnerId == userId).ToArray();
+		=> Notes.Where(e => e.GroupId == groupId && e.OwnerId == userId)
+		.Include(e => e.Group).Include(e => e.Owner).ToArray();
 }

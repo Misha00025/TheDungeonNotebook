@@ -4,15 +4,16 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Primitives;
+using TdnApi.Models;
 using TdnApi.Models.Db;
 using TdnApi.Providers;
 using static TdnApi.Fields;
 
 namespace TdnApi.Security.Filters;
 
-public class AccessToGroupAttribute : BaseAccessAttribute
+public class AccessToUserAttribute : BaseAccessAttribute
 {
-	public AccessToGroupAttribute(bool adminsOnly = false) : base(adminsOnly)
+	public AccessToUserAttribute(bool adminsOnly = false) : base(adminsOnly)
 	{
 	}
 	
@@ -45,28 +46,43 @@ public class AccessToGroupAttribute : BaseAccessAttribute
 	private bool UserAccess(HttpContext context)
 	{
 		var dbContext = context.RequestServices.GetService<TdnDbContext>();
-		var accessId = context.User.FindFirst(e => e.Type == ClaimTypes.Name)?.Value;
-		if (dbContext == null || !context.Request.Query.ContainsKey(GroupId) || accessId == null)
-			return false;
-		var groupId = context.Request.Query[GroupId];
-		var provider = new GroupProvider(dbContext);
-		var groups = provider.FindByUser(accessId);
-		return groups.Any(e => e.GroupId == groupId);
+		if (IsAdmin(context))
+		{
+			if (dbContext == null || !context.Request.Query.ContainsKey(UserId) 
+				|| !context.Request.Query.ContainsKey(GroupId))
+				return false;
+			var groupId = context.Request.Query[GroupId].ToString();
+			var userId = context.Request.Query[UserId].ToString();
+			var provider = new UserProvider(dbContext);
+			var users = provider.FindByGroup(groupId);
+			return users.Any(e => e.Id == userId);
+		}
+		else
+		{
+			var accessId = context.User.FindFirst(e => e.Type == ClaimTypes.Name)?.Value;
+			if (accessId == null)
+				return false;
+			if (!context.Request.Query.ContainsKey(UserId))
+			{
+				var query = context.Request.Query.ToDictionary();
+				query.Add(UserId, new StringValues(accessId));
+				context.Request.Query = new QueryCollection(query);
+				return true;
+			}
+			else
+				return context.Request.Query[UserId].ToString() == accessId;
+		}
 	}
 	
 	private bool GroupAccess(HttpContext context)
 	{
 		var accessId = context.User.FindFirst(e => e.Type == ClaimTypes.Name)?.Value;
-		if (context.Request.Query.ContainsKey(GroupId))
+		var dbContext = context.RequestServices.GetService<TdnDbContext>();
+		if (context.Request.Query.ContainsKey(UserId) && dbContext != null)
 		{
-			return accessId == context.Request.Query[GroupId];
+			var userId = context.Request.Query[UserId];
+			return dbContext.UserGroups.Where(e => e.GroupId == accessId).Any(e => e.UserId == userId);
 		}
-		else
-		{
-			var query = context.Request.Query.ToDictionary();
-			query.Add(GroupId, new StringValues(accessId));
-			context.Request.Query = new QueryCollection(query);
-			return true;	
-		}
+		return false;
 	}
 }

@@ -30,7 +30,7 @@ public class ConfigParser
 		if (settings.ContainsKey("Port"))
 			port = $"port={settings["Port"]};";
 		
-		string connection = $"server={host};{port}user={user};password={pass};database={dbName};";
+		string connection = $"server={host};{port}user={user};password={pass};database={dbName};ConvertZeroDateTime=True;";
 		return connection;
 	}
 

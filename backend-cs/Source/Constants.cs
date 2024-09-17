@@ -8,6 +8,6 @@ public static class Constants
 
 public static class Fields
 {
-	public const string GroupId = "groupId";
-	public const string UserId = "userId";
+	public const string GroupId = "group_id";
+	public const string UserId = "owner_id";
 }

@@ -20,10 +20,12 @@ public class TokensContext : DbContext
 		ut.Property(e => e.Token).HasColumnName("token");
 		ut.Property(e => e.Id).HasColumnName("vk_user_id");
 		ut.Property(e => e.LastDate).HasColumnName("last_date");
+		ut.HasKey(e => e.Token);
 		
 		var gt = builder.Entity<GroupToken>().ToTable("group_bot_token");
 		gt.Property(e => e.Token).HasColumnName("service_token");
 		gt.Property(e => e.Id).HasColumnName("group_id");
+		gt.HasKey(e => e.Token);
 		
 		base.OnModelCreating(builder);
 	}
@@ -52,7 +54,11 @@ public class TokensContext : DbContext
 
 	internal void UpdateUserToken(string token, string userId)
 	{
-		
-		Users.Update(new UserToken(){Token = token, Id = userId});
+		var ut = Users.Where(e => e.Token == token).FirstOrDefault();
+		if (ut == null)
+			return;
+		ut.LastDate = DateTime.Now;
+		Users.Update(ut);
+		SaveChanges();
 	}
 }
