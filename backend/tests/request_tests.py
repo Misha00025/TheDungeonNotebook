@@ -1,4 +1,5 @@
 from variables import _st, _at
+from . import variables
 import requests as rq
 
 
@@ -24,7 +25,7 @@ def get_text(res, url, method, compact):
         response = res.text
     text = f"{method} REQUEST {res.status_code}: {url} "
     if res.status_code < 400:
-        if not compact:
+        if not variables.compact:
             text += f"\n   |- Response: {response}"
     elif res.status_code >= 500:
         text += "!!!VERY IMPORTANT ERROR!!!"
