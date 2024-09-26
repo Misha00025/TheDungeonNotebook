@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TdnApi.Models;
 using TdnApi.Models.Db;
-using TdnApi.Providers;
 using TdnApi.Security;
 using TdnApi.Security.Filters;
 using static TdnApi.Constants;
