@@ -12,12 +12,12 @@ interface ItemSelectorBoxProps {
   initialItemsCallback: () => Promise<void>;
   items?: Array<{ name: string; id: number }>;
   handleActiveItemChanged?: (itemId: number) => void;
-  headerText: string;
   linkPrefix?: string;
   initialActiveItemId?: number;
   activeItemId?: number;
   refetchItemsOnChangeValue?: string;
   isHided?: boolean;
+  headerComponent: React.ReactElement;
 }
 
 /**
@@ -29,12 +29,12 @@ interface ItemSelectorBoxProps {
 export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
   initialItemsCallback,
   handleActiveItemChanged,
-  headerText,
   linkPrefix,
   activeItemId = -1,
   refetchItemsOnChangeValue,
   items = [],
   isHided = false,
+  headerComponent,
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -62,7 +62,7 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
       className={`itemSelectorBox-container ${isHided ? "itemSelectorBox-container__hided" : undefined} itemSelectorBox-container__${isCollapsed ? "collapsed" : "expanded"}`}
     >
       <div className={`itemSelectorBox-header-container`}>
-        <header className={`itemSelectorBox-header-text`}>{headerText}</header>
+        {headerComponent}
         <IconButton
           icon={isCollapsed ? extendIcon : collapseIcon}
           onClick={handleToggleCollapse}

@@ -105,4 +105,8 @@
   .itemSelectorBox-container {
     flex: 1;
   }
+
+  .itemSelectorBox-container .iconButton {
+    display: none !important;
+  }
 }

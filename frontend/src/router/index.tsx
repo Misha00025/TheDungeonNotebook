@@ -1,11 +1,12 @@
 import React from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { GroupsLayout } from "./layouts/GroupsLayout";
-import { NotesLayout } from "./layouts/NotesLayout";
 import { ErrorPage } from "../pages/Error";
 import { Note } from "../components/Note";
 import { Login } from "../pages/Login";
 import { HomeLayout } from "./layouts/HomeLayout";
+import { GroupContentLayout } from "./layouts/GroupContentLayout";
+import { Item } from "../components/Item";
 
 export const AppRouter = () => {
   const router = createBrowserRouter([
@@ -15,16 +16,30 @@ export const AppRouter = () => {
       errorElement: <ErrorPage />,
       children: [
         {
-          path: "/groups",
+          path: "groups",
           element: <GroupsLayout />,
           children: [
             {
-              path: "/groups/:groupId",
-              element: <NotesLayout />,
+              path: ":groupId",
+              element: <GroupContentLayout />,
               children: [
                 {
-                  path: "notes/:noteId",
-                  element: <Note />,
+                  path: "notes",
+                  children: [
+                    {
+                      path: ":noteId",
+                      element: <Note />,
+                    },
+                  ],
+                },
+                {
+                  path: "items",
+                  children: [
+                    {
+                      path: ":itemId",
+                      element: <Item />,
+                    },
+                  ],
                 },
               ],
             },

@@ -13,6 +13,14 @@ export interface INote {
   author: Author;
 }
 
+export interface IItem {
+  id: number;
+  name: string;
+  amount?: number;
+  description: string;
+  icon: string;
+}
+
 export interface IGroup {
   id: number;
   name: string;
@@ -24,6 +32,10 @@ interface GroupsResponse {
 
 interface NotesResponse {
   notes: Array<INote>;
+}
+
+interface ItemsResponse {
+  items: Array<IItem>;
 }
 
 // const BACKEND_HOST = "http://127.0.0.1:5000/api/"
@@ -76,6 +88,28 @@ export class Api {
     return result.groups;
   };
 
+  static fetchItems = async (
+    groupId: number,
+    token: string,
+  ): Promise<Array<IItem>> => {
+    const params = new URLSearchParams({
+      group_id: groupId.toString(),
+    }).toString();
+
+    const response = await fetch(BACKEND_VERSION_HOST + `items/?` + params, {
+      method: "GET",
+      headers: {
+        token: token,
+      },
+    });
+
+    const result = (await response.json()) as ItemsResponse;
+
+    console.log(result);
+
+    return result.items;
+  };
+
   static fetchNotes = async (
     groupId: number,
     token: string | null,
@@ -89,7 +123,6 @@ export class Api {
       group_id: groupId.toString(),
     }).toString();
     const response = await fetch(BACKEND_VERSION_HOST + `notes/?` + params, {
-      // const response = await fetch(BACKEND_HOST + `groups/${groupId}/notes`, {
       method: "GET",
       headers: {
         token: token,
@@ -127,6 +160,32 @@ export class Api {
     return result.notes;
   };
 
+  static updateItem = async (
+    updatedItem: IItem,
+    token: string | null,
+  ): Promise<Array<IItem>> => {
+    if (!token) {
+      console.error("token not found");
+      throw new Error("token not found");
+    }
+
+    const response = await fetch(
+      BACKEND_VERSION_HOST + `items/${updatedItem.id}`,
+      {
+        method: "PUT",
+        headers: {
+          token: token,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedItem),
+      },
+    );
+
+    const result = (await response.json()) as ItemsResponse;
+    console.log(result);
+    return result.items;
+  };
+
   static deleteNote = async (
     noteId: number,
     token: string | null,
@@ -149,5 +208,29 @@ export class Api {
     const result = (await response.json()) as NotesResponse;
     console.log(result);
     return result.notes;
+  };
+
+  static deleteItem = async (
+    itemId: number,
+    token: string | null,
+  ): Promise<Array<IItem>> => {
+    if (!token) {
+      console.error("token not found");
+      throw new Error("token not found");
+    }
+
+    const response = await fetch(BACKEND_VERSION_HOST + `items/${itemId}`, {
+      method: "DELETE",
+      headers: {
+        token: token,
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log("delete result" + response);
+
+    const result = (await response.json()) as ItemsResponse;
+    console.log(result);
+    return result.items;
   };
 }

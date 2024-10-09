@@ -25,13 +25,21 @@ export const SideBar = memo(function SideBar() {
   };
 
   const handleBackAction = () => {
-    if (noteId) {
-      return navigate(`/groups/${groupId}`);
-    } else if (groupId) {
-      return navigate(`/groups`);
-    } else {
-      return navigate("/");
+    const pathSegments = location.pathname
+      .split("/")
+      .filter((segment) => segment);
+
+    let lastSegment;
+    if (pathSegments.length > 0) {
+      lastSegment = pathSegments.pop();
+      if (lastSegment === "items" || "notes") {
+        pathSegments.pop();
+      }
     }
+
+    const newPath = "/" + pathSegments.join("/");
+
+    navigate(newPath);
   };
 
   return (

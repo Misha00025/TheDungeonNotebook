@@ -32,12 +32,14 @@ export const Groups: React.FC = React.memo(function Groups() {
 
   return (
     <ItemSelectorBox
-      headerText="Список групп"
       initialItemsCallback={getGroups}
       items={groups}
       linkPrefix="/groups/"
       activeItemId={groupId ? Number(groupId) : undefined}
       isHided={noteId && platform === "touch" ? true : false}
+      headerComponent={
+        <header className={`itemSelectorBox-header-text`}>Список групп</header>
+      }
     />
   );
 });

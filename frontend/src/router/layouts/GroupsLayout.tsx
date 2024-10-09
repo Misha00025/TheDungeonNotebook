@@ -5,7 +5,7 @@ import { Outlet, useParams } from "react-router-dom";
 
 export const GroupsLayout = () => {
   const platform = usePlatform();
-  const { groupId, noteId } = useParams();
+  const { groupId } = useParams();
 
   if (platform.platform === "touch" && groupId) {
     return (

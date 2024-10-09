@@ -1,11 +1,34 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
+import CssBaseline from "@mui/material/CssBaseline";
 import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
 import reportWebVitals from "./reportWebVitals";
 import { AppRouter } from "./router";
 import { AuthProvider } from "./store/AuthContent";
 import { PlatformProvider } from "./store/PlatformContext";
+
+const darkTheme = createTheme({
+  palette: {
+    mode: "dark",
+  },
+  typography: {
+    fontFamily: [
+      "-apple-system",
+      "BlinkMacSystemFont",
+      "Segoe UI",
+      "Roboto",
+      "Oxygen",
+      "Ubuntu",
+      "Cantarell",
+      "Fira Sans",
+      "Droid Sans",
+      "Helvetica Neue",
+      "sans-serif",
+    ].join(","),
+  },
+});
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement,
@@ -15,7 +38,10 @@ root.render(
   <React.StrictMode>
     <AuthProvider>
       <PlatformProvider>
-        <AppRouter />
+        <ThemeProvider theme={darkTheme}>
+          <CssBaseline />
+          <AppRouter />
+        </ThemeProvider>
       </PlatformProvider>
     </AuthProvider>
   </React.StrictMode>,

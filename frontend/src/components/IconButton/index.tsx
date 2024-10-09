@@ -1,8 +1,8 @@
 import React from "react";
-import { Tooltip } from "react-tooltip";
 
 import "./index.css";
 import { GREEN_FILTER, RED_FILTER } from "./consts";
+import Tooltip from "@mui/material/Tooltip/Tooltip";
 
 type TButtonColor = "default" | "red" | "green";
 
@@ -31,36 +31,25 @@ export const IconButton = ({
   className,
   color = "default",
 }: IconButtonProps) => {
-  const tooltipId = tooltip + "/" + icon;
-
   const coloredStyle = {
     filter: colorFilterMap[color],
   };
 
   return (
-    <button
-      data-tooltip-id={tooltip + "/" + icon}
-      data-tooltip-content={tooltip}
-      className={`iconButton iconButton-icon__${iconPosition} ${className}`}
-      onClick={onClick}
-    >
-      {tooltip ? (
-        <Tooltip
-          id={tooltipId}
-          style={{ zIndex: 100 }}
-          openEvents={{
-            mouseenter: true,
-            mousedown: true,
-            click: true,
-          }}
-        />
-      ) : undefined}
-      <img className="iconButton-icon" src={icon} style={coloredStyle} />
-      {text && (
-        <p className="iconButton-text" style={coloredStyle}>
-          {text}
-        </p>
-      )}
-    </button>
+    <Tooltip title={tooltip}>
+      <button
+        data-tooltip-id={tooltip + "/" + icon}
+        data-tooltip-content={tooltip}
+        className={`iconButton iconButton-icon__${iconPosition} ${className}`}
+        onClick={onClick}
+      >
+        <img className="iconButton-icon" src={icon} style={coloredStyle} />
+        {text && (
+          <p className="iconButton-text" style={coloredStyle}>
+            {text}
+          </p>
+        )}
+      </button>
+    </Tooltip>
   );
 };
