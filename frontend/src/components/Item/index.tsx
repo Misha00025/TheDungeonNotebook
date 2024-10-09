@@ -3,7 +3,7 @@ import { TGroupContentContext } from "../../router/layouts/GroupContentLayout";
 import { useAuth } from "../../store/AuthContent";
 import { ItemContent } from "../ItemContent";
 import { Api } from "../../utils/api";
-import { Box, Paper, Typography } from "@mui/material";
+import { Box, CircularProgress, Paper, Typography } from "@mui/material";
 import defaultItemPicture from "../../assets/items/default_item.png";
 
 export const Item = () => {
@@ -22,15 +22,27 @@ export const Item = () => {
       },
       token,
     );
+
+    itemsContext.setItems([
+      ...itemsContext.items.map((item) =>
+        item.id === activeItem.id
+          ? { ...item, description, name: title }
+          : item,
+      ),
+    ]);
   };
 
-  const handleItemDelete = () => {
-    Api.deleteItem(activeItem?.id, token);
+  const handleItemDelete = async () => {
+    await Api.deleteItem(activeItem?.id, token);
+
+    itemsContext.items = itemsContext.items.filter(
+      (item) => item.id !== activeItem.id,
+    );
     navigate("../");
   };
 
   if (!activeItem) {
-    return <>Active item is not defined!</>;
+    return <CircularProgress />;
   }
 
   const ItemFooter = (

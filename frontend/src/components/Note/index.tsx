@@ -5,7 +5,7 @@ import { Api } from "../../utils/api";
 import { ItemContent } from "../ItemContent";
 
 import "./index.css";
-import { Avatar } from "@mui/material";
+import { Avatar, CircularProgress } from "@mui/material";
 
 export const Note = () => {
   const { token } = useAuth();
@@ -14,8 +14,8 @@ export const Note = () => {
 
   const activeNote = notesContext.activeNote;
 
-  const handleNoteSave = (body: string, header: string) => {
-    Api.updateNote(
+  const handleNoteSave = async (body: string, header: string) => {
+    await Api.updateNote(
       {
         ...activeNote,
         header: header,
@@ -23,10 +23,20 @@ export const Note = () => {
       },
       token,
     );
+
+    notesContext.setNotes([
+      ...notesContext.notes.map((note) =>
+        note.id === activeNote.id ? { ...note, header, body } : note,
+      ),
+    ]);
   };
 
-  const handleNoteDelete = () => {
-    Api.deleteNote(activeNote?.id, token);
+  const handleNoteDelete = async () => {
+    await Api.deleteNote(activeNote?.id, token);
+
+    notesContext.notes = notesContext.notes.filter(
+      (note) => note.id !== activeNote.id,
+    );
     navigate("../");
   };
 
@@ -43,7 +53,7 @@ export const Note = () => {
   );
 
   if (!activeNote) {
-    return <>Active note is not defined!</>;
+    return <CircularProgress />;
   }
 
   return (

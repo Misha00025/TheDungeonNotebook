@@ -18,7 +18,7 @@ export type TGroupContentContext = {
   itemsContext: {
     items: Array<IItem>;
     setActiveItem: React.Dispatch<React.SetStateAction<IItem>>;
-    setNotes: React.Dispatch<React.SetStateAction<IItem[]>>;
+    setItems: React.Dispatch<React.SetStateAction<IItem[]>>;
     activeItem: IItem;
   };
   notesContext: {
