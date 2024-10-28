@@ -1,4 +1,4 @@
-namespace Tdn.Model.Db.Entities
+namespace TdnApi.Db.Entities
 {
 	internal class ItemInventoryData
 	{
