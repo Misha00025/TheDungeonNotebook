@@ -226,3 +226,4 @@ AppPackages/
 #####
 
 configs/
+db/mysql_data

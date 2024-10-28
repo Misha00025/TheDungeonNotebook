@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   mysql:
-    image: mysql:latest
+    image: mysql
     container_name: mysql_container
     restart: always
     environment:
