@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:latest
+    container_name: mysql_container
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: super_test
+      MYSQL_DATABASE: test_db
+    ports:
+      - "3306:3306"
+      - "33060:33060"
+    volumes:
+      - ./mysql_data:/var/lib/mysql
