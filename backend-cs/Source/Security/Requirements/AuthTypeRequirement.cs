@@ -13,10 +13,10 @@ public enum Access
 }
 
 
-public class TokenRequirement : IAuthorizationRequirement
+public class AuthTypeRequirement : IAuthorizationRequirement
 {
 	private readonly Access _access;
-	public TokenRequirement(Access access)
+	public AuthTypeRequirement(Access access)
 	{
 		_access = access;
 	}

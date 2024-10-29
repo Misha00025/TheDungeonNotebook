@@ -3,9 +3,9 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace TdnApi.Security
 {
-	public class TokenHandler : AuthorizationHandler<TokenRequirement>
+	public class AuthTypeHandler : AuthorizationHandler<AuthTypeRequirement>
 	{
-		protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, TokenRequirement requirement)
+		protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, AuthTypeRequirement requirement)
 		{
 			var roles = context.User.FindAll(ClaimTypes.Role).ToList();
 			if (roles.Count == 0)
@@ -18,16 +18,14 @@ namespace TdnApi.Security
 			switch (access)
 			{
 				case Access.All:
-					confirm = true;
+				case Access.UserOrGroup:	
+					confirm = ConnectFrom(Role.Group, context) || ConnectFrom(Role.User, context);
 					break;
 				case Access.Group:
 					confirm = ConnectFrom(Role.Group, context);
 					break;
 				case Access.User:
 					confirm = ConnectFrom(Role.User, context);
-					break;
-				case Access.UserOrGroup:
-					confirm = ConnectFrom(Role.Group, context) || ConnectFrom(Role.User, context);
 					break;
 			}
 			if (!confirm)

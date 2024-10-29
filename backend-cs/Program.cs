@@ -12,19 +12,13 @@ builder.Services.AddMvc();
 
 builder.Services.AddDbContext<TdnDbContext>(opt => config.ConfigDbConnections(opt));
 builder.Services.AddDbContext<TokensContext>(opt => config.ConfigDbConnections(opt));
-builder.Services.AddSingleton<IAuthorizationHandler, TokenHandler>();
+builder.Services.AddSingleton<IAuthorizationHandler, AuthTypeHandler>();
 
-builder.Services.AddAuthorizationBuilder()
-	.AddPolicy(Policy.All, policy => policy.Requirements.Add(new TokenRequirement(Access.All)));
-
-builder.Services.AddAuthorizationBuilder()
-	.AddPolicy(Policy.User, policy => policy.Requirements.Add(new TokenRequirement(Access.User)));
-
-builder.Services.AddAuthorizationBuilder()
-	.AddPolicy(Policy.Group, policy => policy.Requirements.Add(new TokenRequirement(Access.Group)));
-
-builder.Services.AddAuthorizationBuilder()
-	.AddPolicy(Policy.UserOrGroup, policy => policy.Requirements.Add(new TokenRequirement(Access.UserOrGroup)));
+var aBuilder = builder.Services.AddAuthorizationBuilder();
+aBuilder.AddPolicy(Policy.AuthType.All, policy => policy.Requirements.Add(new AuthTypeRequirement(Access.All)));
+aBuilder.AddPolicy(Policy.AuthType.User, policy => policy.Requirements.Add(new AuthTypeRequirement(Access.User)));
+aBuilder.AddPolicy(Policy.AuthType.Group, policy => policy.Requirements.Add(new AuthTypeRequirement(Access.Group)));
+aBuilder.AddPolicy(Policy.UserOrGroup, policy => policy.Requirements.Add(new AuthTypeRequirement(Access.All)));
 
 builder.Services.AddAuthentication("Token")
 	.AddScheme<AuthenticationSchemeOptions, TokenAuthenticationHandler>("Token", null);
