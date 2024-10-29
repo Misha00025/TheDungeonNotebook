@@ -7,6 +7,9 @@ namespace TdnApi.Configuration;
 
 public class ConfigParser
 {
+	private const string DB = "DATABASE";
+	private const string MySQL = "MySQL";
+	
 	private IniData _mainConfig;
 	private IniData _dbConfig;
 
@@ -21,7 +24,7 @@ public class ConfigParser
 
 	private string GenerateConnection()
 	{
-		var settings = _dbConfig["DATABASE"];
+		var settings = _dbConfig[DB];
 		string host = settings["Host"];
 		string user = settings["User"];
 		string pass = settings["Password"];
@@ -35,7 +38,17 @@ public class ConfigParser
 	}
 
 	public void ConfigDbConnections(DbContextOptionsBuilder opt)
-	{		
-		opt.UseMySql(Connection, new MySqlServerVersion(new Version(8, 0, 11)));
+	{	
+		string type = _dbConfig[DB]["Type"];
+		switch (type)
+		{
+			case MySQL:
+				opt.UseMySql(Connection, new MySqlServerVersion(new Version(8, 0, 11)));
+				break;
+			default:
+				opt.UseInMemoryDatabase("Test");
+				break;
+		}	
+			
 	}
 }

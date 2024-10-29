@@ -1,6 +1,6 @@
 namespace TdnApi.Db.Entities
 {
-	internal class CharacterData
+	public class CharacterData
 	{
 		public int Id;
 		public int GroupId;

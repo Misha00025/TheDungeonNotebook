@@ -4,7 +4,7 @@ namespace TdnApi.Db.Entities
 	{
 		public int UserId;
 		public int GroupId;
-		public int Privileges;
+		public string Privileges = "";
 		
 		public UserData? User;
 		public GroupData? Group;

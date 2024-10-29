@@ -1,6 +1,6 @@
 namespace TdnApi.Db.Entities
 {
-	internal class InventoryData
+	public class InventoryData
 	{
 		public int Id;
 		public int OwnerId;
