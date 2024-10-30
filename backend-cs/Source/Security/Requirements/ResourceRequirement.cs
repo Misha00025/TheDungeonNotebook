@@ -12,6 +12,9 @@ public enum Resource
 
 public class ResourceRequirement : IAuthorizationRequirement
 {	
-	public ResourceRequirement(Resource resource) => this.Resource = resource;
+	public ResourceRequirement(Resource resource)
+	{
+		this.Resource = resource;
+	}
 	public Resource Resource { get; private set; }
 }
