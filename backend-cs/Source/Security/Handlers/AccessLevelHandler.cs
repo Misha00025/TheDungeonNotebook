@@ -3,6 +3,13 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace TdnApi.Security;
 
+public static class AccessLevelAlias
+{
+	public const string Admin = "Admin";
+	public const string Moderator = "Moderator";
+	public const string Follower = "Follower";
+}
+
 public class AccessLevelHandler : AuthorizationHandler<AccessLevelRequirement>
 {
 	protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, AccessLevelRequirement requirement)
@@ -19,13 +26,13 @@ public class AccessLevelHandler : AuthorizationHandler<AccessLevelRequirement>
 	{
 		switch(accessStr)
 		{
-			case "Admin":
+			case AccessLevelAlias.Admin:
 				accessLevel = AccessLevel.Full;
 				break;
-			case "Moderator":
+			case AccessLevelAlias.Moderator:
 				accessLevel = AccessLevel.Write;
 				break;
-			case "Follower":
+			case AccessLevelAlias.Follower:
 				accessLevel = AccessLevel.Read;
 				break;
 			default:

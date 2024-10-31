@@ -1,10 +1,10 @@
 namespace TdnApi.Db.Entities
 {
-	internal class UserGroupData
+	public class UserGroupData
 	{
 		public int UserId;
 		public int GroupId;
-		public string Privileges = "";
+		public int Privileges;
 		
 		public UserData? User;
 		public GroupData? Group;

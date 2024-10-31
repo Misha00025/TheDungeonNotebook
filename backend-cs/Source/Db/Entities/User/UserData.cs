@@ -1,6 +1,6 @@
 namespace TdnApi.Db.Entities
 {
-	internal class UserData
+	public class UserData
 	{
 		public int Id;
 		public string FirstName = "";

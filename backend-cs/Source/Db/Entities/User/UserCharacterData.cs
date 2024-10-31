@@ -1,6 +1,6 @@
 namespace TdnApi.Db.Entities
 {
-	internal class UserCharacterData
+	public class UserCharacterData
 	{
 		public int UserId;
 		public int CharacterId;

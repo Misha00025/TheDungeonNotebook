@@ -5,9 +5,9 @@ namespace TdnApi.Security;
 public enum AccessLevel
 {
 	None,
-	Full,
-	Write,
 	Read,
+	Write,
+	Full,
 }
 
 public class AccessLevelRequirement : IAuthorizationRequirement
@@ -19,5 +19,5 @@ public class AccessLevelRequirement : IAuthorizationRequirement
 		_accessLevel = (int)AccessLevel.Read;
 	}
 	
-	public bool Verify(AccessLevel accessLevel) => (int)accessLevel <= _accessLevel && accessLevel != AccessLevel.None;
+	public bool Verify(AccessLevel accessLevel) => (int)accessLevel >= _accessLevel && accessLevel != AccessLevel.None;
 }

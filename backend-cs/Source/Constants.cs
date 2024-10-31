@@ -12,6 +12,7 @@ public static class Fields
 {
 	public const string GroupId = "group_id";
 	public const string UserId = "owner_id";
+	public const string CharacterID = "character_id";
 }
 
 public static class Platform
