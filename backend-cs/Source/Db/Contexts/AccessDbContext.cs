@@ -16,25 +16,11 @@ public class AccessDbContext : DbContext
 	
 	protected override void OnModelCreating(ModelBuilder builder)
 	{
-		_configurer.ConfigureUserModel(builder.Entity<UserData>());
-		_configurer.ConfigureGroupModel(builder.Entity<GroupData>());
-		_configurer.ConfigureCharacterModel(builder.Entity<CharacterData>());
-		
-		var ug = builder.Entity<UserGroupData>();
-		ug.ToTable("user_group");
-		ug.Property(e => e.GroupId).HasColumnName("group_id");
-		ug.Property(e => e.UserId).HasColumnName("user_id");
-		ug.Property(e => e.Privileges).HasColumnName("privileges");
-		ug.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
-		ug.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId);
-		
-		var uc = builder.Entity<UserCharacterData>();
-		uc.ToTable("user_character");
-		uc.Property(e => e.UserId).HasColumnName("user_id");
-		uc.Property(e => e.CharacterId).HasColumnName("character_id");
-		uc.Property(e => e.Privileges).HasColumnName("privileges");
-		uc.HasOne(e => e.Character).WithMany().HasForeignKey(e => e.CharacterId);
-		uc.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId);
+		_configurer.ConfigureModel(builder.Entity<UserData>());
+		_configurer.ConfigureModel(builder.Entity<GroupData>());
+		_configurer.ConfigureModel(builder.Entity<CharacterData>());
+		_configurer.ConfigureModel(builder.Entity<UserGroupData>());		
+		_configurer.ConfigureModel(builder.Entity<UserCharacterData>());
 				
 		base.OnModelCreating(builder);
 	}

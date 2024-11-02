@@ -6,14 +6,19 @@ namespace TdnApi.Db.Configuers;
 
 public interface IEntityBuildersConfigurer
 {
-	void ConfigureUserModel(EntityTypeBuilder<UserData> builder);
-	void ConfigureGroupModel(EntityTypeBuilder<GroupData> builder);
-	void ConfigureCharacterModel(EntityTypeBuilder<CharacterData> builder);
+	void ConfigureModel(EntityTypeBuilder<UserData> builder);
+	void ConfigureModel(EntityTypeBuilder<UserCharacterData> builder);
+	void ConfigureModel(EntityTypeBuilder<UserGroupData> builder);
+	void ConfigureModel(EntityTypeBuilder<GroupData> builder);
+	void ConfigureModel(EntityTypeBuilder<ItemData> builder);
+	void ConfigureModel(EntityTypeBuilder<CharacterData> builder);
+	void ConfigureModel(EntityTypeBuilder<NoteData> builder);
+	void ConfigureModel(EntityTypeBuilder<InventoryData> builder);
 }
 
 public class EntityBuildersConfigurer : IEntityBuildersConfigurer
 {
-	public void ConfigureCharacterModel(EntityTypeBuilder<CharacterData> builder)
+	public void ConfigureModel(EntityTypeBuilder<CharacterData> builder)
 	{
 		builder.ToTable("character");
 		builder.Property(e => e.GroupId).HasColumnName("group_id");
@@ -23,19 +28,68 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
 		builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
 	}
 
-	public void ConfigureGroupModel(EntityTypeBuilder<GroupData> builder)
+	public void ConfigureModel(EntityTypeBuilder<GroupData> builder)
 	{
 		builder.ToTable("group");
 		builder.Property(e => e.Id).HasColumnName("group_id");
 		builder.Property(e => e.Name).HasColumnName("name");
 	}
 
-	public void ConfigureUserModel(EntityTypeBuilder<UserData> builder)
+	public void ConfigureModel(EntityTypeBuilder<InventoryData> builder)
+	{
+		builder.ToTable("inventory");
+		builder.Property(e => e.Id).HasColumnName("inventory_id");
+		builder.Property(e => e.OwnerId).HasColumnName("owner_id");
+		builder.HasOne(e => e.Owner).WithMany().HasForeignKey(e => e.OwnerId);
+	}
+
+	public void ConfigureModel(EntityTypeBuilder<UserData> builder)
 	{
 		builder.ToTable("user");
 		builder.Property(e => e.Id).HasColumnName("user_id");
 		builder.Property(e => e.FirstName).HasColumnName("first_name");
 		builder.Property(e => e.LastName).HasColumnName("last_name");
 		builder.Property(e => e.PhotoLink).HasColumnName("photo_link");
+	}
+
+	public void ConfigureModel(EntityTypeBuilder<UserCharacterData> builder)
+	{
+		builder.ToTable("user_character");
+		builder.Property(e => e.UserId).HasColumnName("user_id");
+		builder.Property(e => e.CharacterId).HasColumnName("character_id");
+		builder.Property(e => e.Privileges).HasColumnName("privileges");
+		builder.HasOne(e => e.Character).WithMany().HasForeignKey(e => e.CharacterId);
+		builder.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId);
+	}
+
+	public void ConfigureModel(EntityTypeBuilder<UserGroupData> builder)
+	{
+		builder.ToTable("user_group");
+		builder.Property(e => e.GroupId).HasColumnName("group_id");
+		builder.Property(e => e.UserId).HasColumnName("user_id");
+		builder.Property(e => e.Privileges).HasColumnName("privileges");
+		builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
+		builder.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId);
+	}
+
+	public void ConfigureModel(EntityTypeBuilder<NoteData> builder)
+	{
+		builder.ToTable("note");
+		builder.Property(e => e.Id).HasColumnName("note_id");
+		builder.Property(e => e.Header).HasColumnName("header");
+		builder.Property(e => e.Body).HasColumnName("body");
+		builder.Property(e => e.OwnerId).HasColumnName("owner_id");
+		builder.HasOne(e => e.Owner).WithMany().HasForeignKey(e => e.OwnerId);
+	}
+
+	public void ConfigureModel(EntityTypeBuilder<ItemData> builder)
+	{
+		builder.ToTable("item");
+		builder.Property(e => e.Id).HasColumnName("item_id");
+		builder.Property(e => e.GroupId).HasColumnName("group_id");
+		builder.Property(e => e.Name).HasColumnName("name");
+		builder.Property(e => e.Description).HasColumnName("description");
+		builder.Property(e => e.Image).HasColumnName("image_link");
+		builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
 	}
 }
