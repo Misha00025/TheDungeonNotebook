@@ -8,6 +8,20 @@ public static class AccessLevelAlias
 	public const string Admin = "Admin";
 	public const string Moderator = "Moderator";
 	public const string Follower = "Follower";
+	public static string Convert(AccessLevel accessLevel)
+	{
+		switch(accessLevel)
+		{
+			case AccessLevel.Full:
+				return AccessLevelAlias.Admin;
+			case AccessLevel.Write:
+				return AccessLevelAlias.Moderator;
+			case AccessLevel.Read:
+				return AccessLevelAlias.Follower;
+			default:
+				return "";
+		}
+	}
 }
 
 public class AccessLevelHandler : AuthorizationHandler<AccessLevelRequirement>

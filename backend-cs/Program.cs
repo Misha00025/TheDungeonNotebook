@@ -5,6 +5,8 @@ using TdnApi.Configuration;
 using Microsoft.AspNetCore.Authentication;
 using TdnApi.Db.Configuers;
 using TdnApi.Db.Contexts;
+using TdnApi.Parsing.Http;
+using TdnApi.Providers;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = new ConfigParser("config.ini");
@@ -12,10 +14,16 @@ var config = new ConfigParser("config.ini");
 
 builder.Services.AddMvc();
 
+builder.Services.AddHttpContextAccessor();
+
 builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigurer>();
-builder.Services.AddDbContext<TdnDbContext>(opt => config.ConfigDbConnections(opt));
-builder.Services.AddDbContext<TokensContext>(opt => config.ConfigDbConnections(opt));
-builder.Services.AddDbContext<AccessDbContext>(opt => config.ConfigDbConnections(opt));
+builder.Services.AddDbContext<TdnDbContext>(config.ConfigDbConnections);
+builder.Services.AddDbContext<TokensContext>(config.ConfigDbConnections);
+builder.Services.AddDbContext<AccessDbContext>(config.ConfigDbConnections);
+
+builder.Services.AddScoped<IAccessLevelProvider, AccessLevelProvider>();
+builder.Services.AddScoped<IHttpInfoContainer, HttpInfoContainer>();
+
 builder.Services.AddSingleton<IAuthorizationHandler, AuthTypeHandler>();
 builder.Services.AddSingleton<IAuthorizationHandler, AccessLevelHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, ResourceAccessHandler>();
