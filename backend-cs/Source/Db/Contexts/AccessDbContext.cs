@@ -5,22 +5,19 @@ using TdnApi.Db.Entities;
 
 namespace TdnApi.Db.Contexts;
 
-public class AccessDbContext : DbContext
+public class AccessDbContext : BaseDbContext
 {
-	private IEntityBuildersConfigurer _configurer;
-	
-	public AccessDbContext(DbContextOptions options, [FromServices]IEntityBuildersConfigurer configurer) : base(options)
+    public AccessDbContext(DbContextOptions<CharacterContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
+    {
+    }
+
+    protected override void OnModelCreating(ModelBuilder builder)
 	{
-		_configurer = configurer;
-	}
-	
-	protected override void OnModelCreating(ModelBuilder builder)
-	{
-		_configurer.ConfigureModel(builder.Entity<UserData>());
-		_configurer.ConfigureModel(builder.Entity<GroupData>());
-		_configurer.ConfigureModel(builder.Entity<CharacterData>());
-		_configurer.ConfigureModel(builder.Entity<UserGroupData>());		
-		_configurer.ConfigureModel(builder.Entity<UserCharacterData>());
+		Configurer.ConfigureModel(builder.Entity<UserData>());
+		Configurer.ConfigureModel(builder.Entity<GroupData>());
+		Configurer.ConfigureModel(builder.Entity<CharacterData>());
+		Configurer.ConfigureModel(builder.Entity<UserGroupData>());		
+		Configurer.ConfigureModel(builder.Entity<UserCharacterData>());
 				
 		base.OnModelCreating(builder);
 	}

@@ -14,6 +14,7 @@ public interface IEntityBuildersConfigurer
 	void ConfigureModel(EntityTypeBuilder<CharacterData> builder);
 	void ConfigureModel(EntityTypeBuilder<NoteData> builder);
 	void ConfigureModel(EntityTypeBuilder<InventoryData> builder);
+	void ConfigureModel(EntityTypeBuilder<ItemInventoryData> builder);
 }
 
 public class EntityBuildersConfigurer : IEntityBuildersConfigurer
@@ -91,5 +92,15 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
 		builder.Property(e => e.Description).HasColumnName("description");
 		builder.Property(e => e.Image).HasColumnName("image_link");
 		builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
+	}
+
+	public void ConfigureModel(EntityTypeBuilder<ItemInventoryData> builder)
+	{
+		builder.ToTable("inventory_item");
+		builder.Property(e => e.ItemId).HasColumnName("item_id");
+		builder.Property(e => e.InventoryId).HasColumnName("inventory_id");
+		builder.Property(e => e.Amount).HasColumnName("amount");
+		builder.HasOne(e => e.Item).WithMany().HasForeignKey(e => e.ItemId);
+		builder.HasOne(e => e.Inventory).WithMany().HasForeignKey(e => e.InventoryId);
 	}
 }
