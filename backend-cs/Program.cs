@@ -20,6 +20,11 @@ builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigure
 builder.Services.AddDbContext<TdnDbContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<TokensContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<AccessDbContext>(config.ConfigDbConnections);
+builder.Services.AddDbContext<GroupContext>(config.ConfigDbConnections);
+builder.Services.AddDbContext<UserContext>(config.ConfigDbConnections);
+builder.Services.AddDbContext<CharacterContext>(config.ConfigDbConnections);
+builder.Services.AddDbContext<InventoryContext>(config.ConfigDbConnections);
+builder.Services.AddDbContext<NoteContext>(config.ConfigDbConnections);
 
 builder.Services.AddScoped<IAccessLevelProvider, AccessLevelProvider>();
 builder.Services.AddScoped<IHttpInfoContainer, HttpInfoContainer>();
