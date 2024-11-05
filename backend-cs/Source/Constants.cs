@@ -4,7 +4,7 @@ namespace TdnApi;
 
 public static class Constants
 {
-	public const string ApiPrefix = "/api/v2/";
+	public const string ApiPrefix = "";
 }
 
 public static class Fields
