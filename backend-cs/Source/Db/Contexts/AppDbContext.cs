@@ -1,13 +1,13 @@
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TdnApi.Db.Configuers;
 using TdnApi.Db.Entities;
+using TdnApi.Models.Db;
 
 namespace TdnApi.Db.Contexts;
 
-public class AccessDbContext : BaseDbContext<AccessDbContext>
+public class AppDbContext : BaseDbContext<AppDbContext>
 {
-	public AccessDbContext(DbContextOptions<AccessDbContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
+	public AppDbContext(DbContextOptions<AppDbContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
 	{
 	}
 
@@ -18,12 +18,12 @@ public class AccessDbContext : BaseDbContext<AccessDbContext>
 		Configurer.ConfigureModel(builder.Entity<CharacterData>());
 		Configurer.ConfigureModel(builder.Entity<UserGroupData>());		
 		Configurer.ConfigureModel(builder.Entity<UserCharacterData>());
-		Configurer.ConfigureModel(builder.Entity<NoteData>());		
-				
+		Configurer.ConfigureModel(builder.Entity<InventoryData>());
+		Configurer.ConfigureModel(builder.Entity<ItemData>());
+		Configurer.ConfigureModel(builder.Entity<ItemInventoryData>());	
+		Configurer.ConfigureModel(builder.Entity<NoteData>());
+		TokensContext.Configure(builder);
+		
 		base.OnModelCreating(builder);
 	}
-	
-	public DbSet<CharacterData> Characters => Set<CharacterData>();
-	public DbSet<UserGroupData> UserGroups => Set<UserGroupData>();
-	public DbSet<UserCharacterData> UserCharacters => Set<UserCharacterData>();
 }

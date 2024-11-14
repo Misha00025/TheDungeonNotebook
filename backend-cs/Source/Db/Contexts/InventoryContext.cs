@@ -17,6 +17,7 @@ namespace TdnApi.Db.Contexts
 			
 			Configurer.ConfigureModel(builder.Entity<CharacterData>());
 			Configurer.ConfigureModel(builder.Entity<InventoryData>());
+			Configurer.ConfigureModel(builder.Entity<GroupData>());
 			Configurer.ConfigureModel(builder.Entity<ItemData>());
 			Configurer.ConfigureModel(builder.Entity<ItemInventoryData>());
 		}

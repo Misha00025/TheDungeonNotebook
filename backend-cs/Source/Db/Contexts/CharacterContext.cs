@@ -7,16 +7,17 @@ namespace TdnApi.Db.Contexts
 {
 	public class CharacterContext : BaseDbContext<CharacterContext>
 	{
-        public CharacterContext(DbContextOptions<CharacterContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
-        {
-        }
+		public CharacterContext(DbContextOptions<CharacterContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
+		{
+		}
 
-        protected override void OnModelCreating(ModelBuilder builder)
+		protected override void OnModelCreating(ModelBuilder builder)
 		{
 			base.OnModelCreating(builder);
 			
 			Configurer.ConfigureModel(builder.Entity<CharacterData>());
 			Configurer.ConfigureModel(builder.Entity<UserCharacterData>());
+			Configurer.ConfigureModel(builder.Entity<UserData>());
 			Configurer.ConfigureModel(builder.Entity<GroupData>());
 		}
 		

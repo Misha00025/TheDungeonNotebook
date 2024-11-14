@@ -14,6 +14,7 @@ public class NoteContext : BaseDbContext<NoteContext>
 	{
 		Configurer.ConfigureModel(builder.Entity<CharacterData>());		
 		Configurer.ConfigureModel(builder.Entity<NoteData>());		
+		Configurer.ConfigureModel(builder.Entity<GroupData>());		
 		base.OnModelCreating(builder);
 	}
 	

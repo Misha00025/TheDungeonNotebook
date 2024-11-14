@@ -7,6 +7,7 @@ using TdnApi.Db.Configuers;
 using TdnApi.Db.Contexts;
 using TdnApi.Parsing.Http;
 using TdnApi.Providers;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = new ConfigParser("config.ini");
@@ -18,6 +19,7 @@ builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigurer>();
 builder.Services.AddDbContext<TdnDbContext>(config.ConfigDbConnections);
+builder.Services.AddDbContext<AppDbContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<TokensContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<AccessDbContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<GroupContext>(config.ConfigDbConnections);
@@ -79,5 +81,21 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+
+using (var scope = app.Services.CreateScope())
+{
+	var serviceProvider = scope.ServiceProvider;
+
+	try
+	{
+		serviceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
+	}
+	catch (Exception ex)
+	{
+		// Логируем ошибку
+		var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
+		logger.LogInformation(ex, "An error occurred while migrating the database.");
+	}
+}
 
 app.Run();

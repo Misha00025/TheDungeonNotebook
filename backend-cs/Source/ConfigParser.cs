@@ -12,7 +12,7 @@ public class ConfigParser
 	
 	private IniData _mainConfig;
 	private IniData _dbConfig;
-
+	
 	private string? _connection = null;
 	public string Connection { get 
 		{
@@ -41,13 +41,13 @@ public class ConfigParser
 			port = $"port={settings["Port"]};";
 		
 		string connection = $"server={host};{port}user={user};password={pass};database={dbName};ConvertZeroDateTime=True;";
+		Console.WriteLine("Connection string:\n  "+connection);
 		return connection;
 	}
 
 	public void ConfigDbConnections(DbContextOptionsBuilder opt)
-	{	
+	{
 		string type = _dbConfig[DB]["Type"];
-		Console.WriteLine(type);
 		switch (type)
 		{
 			case MySQL:

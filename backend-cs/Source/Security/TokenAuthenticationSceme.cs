@@ -76,7 +76,7 @@ public class TokenAuthenticationHandler : AuthenticationHandler<AuthenticationSc
 	
 	private bool TryGetUser(string token, out string userId) 
 	{
-		var tmp = _tokensContext.GetUserId(token);
+		var tmp = _tokensContext.GetUserId(token).ToString();
 		userId = "";
 		if (tmp != null)
 		{
@@ -88,7 +88,7 @@ public class TokenAuthenticationHandler : AuthenticationHandler<AuthenticationSc
 	
 	private bool TryGetGroup(string token, out string groupId)
 	{
-		var tmp = _tokensContext.GetGroupId(token);
+		var tmp = _tokensContext.GetGroupId(token).ToString();
 		groupId = "";
 		if (tmp != null)
 			groupId = tmp;
