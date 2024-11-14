@@ -4,9 +4,9 @@ using TdnApi.Db.Entities;
 
 namespace TdnApi.Db.Contexts;
 
-public class UserContext : BaseDbContext
+public class UserContext : BaseDbContext<UserContext>
 {
-	public UserContext(DbContextOptions<CharacterContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
+	public UserContext(DbContextOptions<UserContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
 	{
 	}
 

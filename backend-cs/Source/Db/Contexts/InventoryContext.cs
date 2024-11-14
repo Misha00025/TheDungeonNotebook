@@ -5,9 +5,9 @@ using TdnApi.Db.Entities;
 
 namespace TdnApi.Db.Contexts
 {
-	public class InventoryContext : BaseDbContext
+	public class InventoryContext : BaseDbContext<InventoryContext>
 	{
-        public InventoryContext(DbContextOptions<CharacterContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
+        public InventoryContext(DbContextOptions<InventoryContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
         {
         }
 

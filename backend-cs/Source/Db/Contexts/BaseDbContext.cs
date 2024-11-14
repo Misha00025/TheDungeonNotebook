@@ -3,11 +3,11 @@ using TdnApi.Db.Configuers;
 
 namespace TdnApi.Db.Contexts;
 
-public abstract class BaseDbContext : DbContext
+public abstract class BaseDbContext<T> : DbContext where T : BaseDbContext<T>
 {
 	private IEntityBuildersConfigurer _configurer;
 	
-	public BaseDbContext(DbContextOptions<CharacterContext> options, IEntityBuildersConfigurer configurer): base(options)
+	public BaseDbContext(DbContextOptions<T> options, IEntityBuildersConfigurer configurer): base(options)
 	{
 		_configurer = configurer;
 	}

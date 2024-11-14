@@ -5,9 +5,9 @@ using TdnApi.Db.Entities;
 
 namespace TdnApi.Db.Contexts;
 
-public class AccessDbContext : BaseDbContext
+public class AccessDbContext : BaseDbContext<AccessDbContext>
 {
-    public AccessDbContext(DbContextOptions<CharacterContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
+    public AccessDbContext(DbContextOptions<AccessDbContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
     {
     }
 

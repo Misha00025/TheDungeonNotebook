@@ -4,9 +4,9 @@ using TdnApi.Db.Entities;
 
 namespace TdnApi.Db.Contexts;
 
-public class NoteContext : BaseDbContext
+public class NoteContext : BaseDbContext<NoteContext>
 {
-    public NoteContext(DbContextOptions<CharacterContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
+    public NoteContext(DbContextOptions<NoteContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
     {
     }
 

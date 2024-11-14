@@ -5,7 +5,7 @@ using TdnApi.Db.Entities;
 
 namespace TdnApi.Db.Contexts
 {
-	public class CharacterContext : BaseDbContext
+	public class CharacterContext : BaseDbContext<CharacterContext>
 	{
         public CharacterContext(DbContextOptions<CharacterContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
         {

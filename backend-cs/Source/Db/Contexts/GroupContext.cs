@@ -4,9 +4,9 @@ using TdnApi.Db.Entities;
 
 namespace TdnApi.Db.Contexts;
 
-public class GroupContext : BaseDbContext
+public class GroupContext : BaseDbContext<GroupContext>
 {
-	public GroupContext(DbContextOptions<CharacterContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
+	public GroupContext(DbContextOptions<GroupContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
 	{
 	}
 	
