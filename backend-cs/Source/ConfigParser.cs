@@ -13,7 +13,14 @@ public class ConfigParser
 	private IniData _mainConfig;
 	private IniData _dbConfig;
 
-	public string Connection => GenerateConnection();
+	private string? _connection = null;
+	public string Connection { get 
+		{
+			if (_connection == null)
+				_connection = GenerateConnection();
+			return _connection;
+		}
+	}
 
 	public ConfigParser(string filename){
 		var parser = new FileIniDataParser();
@@ -40,6 +47,7 @@ public class ConfigParser
 	public void ConfigDbConnections(DbContextOptionsBuilder opt)
 	{	
 		string type = _dbConfig[DB]["Type"];
+		Console.WriteLine(type);
 		switch (type)
 		{
 			case MySQL:
