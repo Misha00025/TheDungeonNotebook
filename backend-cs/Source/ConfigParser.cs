@@ -43,7 +43,7 @@ public class ConfigParser
 		switch (type)
 		{
 			case MySQL:
-				opt.UseMySql(Connection, new MySqlServerVersion(new Version(8, 0, 11)));
+				opt.UseMySql(Connection, new MySqlServerVersion(new Version(9, 0, 1)));
 				break;
 			default:
 				opt.UseInMemoryDatabase("Test");
