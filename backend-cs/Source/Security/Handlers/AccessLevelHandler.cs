@@ -26,9 +26,24 @@ public static class AccessLevelAlias
 
 public class AccessLevelHandler : AuthorizationHandler<AccessLevelRequirement>
 {
+	private bool Check(Claim e, AccessLevelRequirement requirement)
+	{
+		var isRole = e.Type == "AccessLevel";
+		if (isRole)
+		{
+			// Console.WriteLine(e.Value);
+			if(TryStrToAccess(e.Value, out var accessLevel))
+			{
+				// Console.WriteLine("\n\n-------------------НАЙДЕНО!------------\n\n" + accessLevel +" : "+ requirement.AccessLevel+ "\n\n-------------------НАЙДЕНО!------------\n\n");
+				return requirement.Verify(accessLevel);
+			}
+		}
+		return isRole;
+	}
+	
 	protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, AccessLevelRequirement requirement)
 	{
-		var confirm = context.User.Claims.Any(e => e.Type == ClaimTypes.Role && TryStrToAccess(e.Value, out var accessLevel) && requirement.Verify(accessLevel));
+		var confirm = context.User.Claims.Any(e => Check(e, requirement));
 		if (confirm)
 			context.Succeed(requirement);
 		else

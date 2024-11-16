@@ -16,8 +16,9 @@ public class AccessLevelRequirement : IAuthorizationRequirement
 	
 	public AccessLevelRequirement(AccessLevel accessLevel = AccessLevel.Read)
 	{
-		_accessLevel = (int)AccessLevel.Read;
+		_accessLevel = (int)accessLevel;
 	}
 	
+	public AccessLevel AccessLevel => (AccessLevel)_accessLevel;
 	public bool Verify(AccessLevel accessLevel) => (int)accessLevel >= _accessLevel && accessLevel != AccessLevel.None;
 }

@@ -23,7 +23,8 @@ public class ResourceAccessHandler : AuthorizationHandler<ResourceRequirement>
 			context.Fail();			
 		else
 			context.Succeed(requirement);
-		context.User.Claims.Append(new Claim(ClaimTypes.Role, AccessLevelAlias.Convert(access)));
+		var identity = context.User.Identity as ClaimsIdentity;
+        identity?.AddClaim(new Claim("AccessLevel", AccessLevelAlias.Convert(access)));
 		return Task.CompletedTask;
 	}
 }

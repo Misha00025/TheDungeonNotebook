@@ -1,3 +1,4 @@
 
 
 compact = False
+debug = False

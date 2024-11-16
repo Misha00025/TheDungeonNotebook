@@ -18,7 +18,6 @@ builder.Services.AddMvc();
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigurer>();
-builder.Services.AddDbContext<TdnDbContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<AppDbContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<TokensContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<AccessDbContext>(config.ConfigDbConnections);
@@ -32,8 +31,8 @@ builder.Services.AddScoped<IAccessLevelProvider, AccessLevelProvider>();
 builder.Services.AddScoped<IHttpInfoContainer, HttpInfoContainer>();
 
 builder.Services.AddSingleton<IAuthorizationHandler, AuthTypeHandler>();
-builder.Services.AddSingleton<IAuthorizationHandler, AccessLevelHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, ResourceAccessHandler>();
+builder.Services.AddScoped<IAuthorizationHandler, AccessLevelHandler>();
 
 var aBuilder = builder.Services.AddAuthorizationBuilder();
 
