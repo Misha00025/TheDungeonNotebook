@@ -39,6 +39,15 @@ public class GroupController : ControllerBase
 		return Ok(result);
 	}
 	
+	[HttpDelete]
+	[Authorize(Policy.AccessLevel.Admin)]
+	public ActionResult DeleteGroup(bool debug = false)
+	{
+		if (debug)
+			return Ok();
+		return Ok();
+	}
+	
 	[HttpGet("characters")]
 	public ActionResult GetCharacters()
 	{
@@ -47,7 +56,7 @@ public class GroupController : ControllerBase
 	
 	[HttpPost("characters")]
 	[Authorize(Policy.AccessLevel.Moderator)]
-	public ActionResult AddCharacter(int? owner_id)
+	public ActionResult AddCharacter()
 	{
 		return Created("/group/characters", "OK");
 	}

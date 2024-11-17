@@ -10,7 +10,7 @@ public static class Constants
 public static class Fields
 {
 	public const string GroupId = "group_id";
-	public const string UserId = "owner_id";
+	public const string UserId = "user_id";
 	public const string CharacterID = "character_id";
 	
 	public static string Convert(Resource resource)
