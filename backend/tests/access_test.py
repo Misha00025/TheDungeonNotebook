@@ -1,3 +1,4 @@
+from . import variables
 from .request_tests import get_test, put_test, post_test, delete_test, rq, get_text
 from .tests_data import tests
 
@@ -22,3 +23,6 @@ def start():
 
         if res == None or res.status_code != test.requirement:
             print("ERROR:", get_text(res, test.request, test.method, params=test.params))
+        elif variables.debug:
+            print(get_text(res, test.request, test.method, params=test.params))
+

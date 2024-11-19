@@ -37,35 +37,23 @@ def get_text(res, url, method, params={}, compact = variables.compact):
 def get_test(headers, params, url, compact=variables.compact) -> rq.Response:
     full_url = site + url
     res = rq.get(url=full_url, headers=headers, params=params)
-    text = get_text(res, url, "GET ", compact)
-    if variables.debug:
-        print(text)
     return res
 
 
 def post_test(headers, params, url, data, compact=variables.compact) -> rq.Response:
     full_url = site + url
     res = rq.post(url=full_url, headers=headers, params=params, json=data)
-    text = get_text(res, url, "POST", compact)
-    if variables.debug:
-        print(text)
     return res
 
 
 def put_test(headers, params, url, data, compact=variables.compact) -> rq.Response:
     full_url = site + url
     res = rq.put(url=full_url, headers=headers, params=params, json=data)
-    text = get_text(res, url, "PUT ", compact)
-    if variables.debug:
-        print(text)
     return res
 
 
 def delete_test(headers, params, url, compact=variables.compact) -> rq.Response:
     full_url = site + url
     res = rq.delete(url=full_url, headers=headers, params=params)
-    text = get_text(res, url, "DEL ", compact)
-    if variables.debug:
-        print(text)
     return res
     
