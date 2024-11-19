@@ -26,6 +26,8 @@ public class NoteController : BaseController<NoteContext>
 	[Authorize(Policy.AccessLevel.Moderator)]
 	public ActionResult AddNote()
 	{
+		if (IsDebug())
+			return Created("","");
 		return Created("","");
 	}
 	
@@ -39,6 +41,8 @@ public class NoteController : BaseController<NoteContext>
 	[Authorize(Policy.AccessLevel.Moderator)]
 	public ActionResult UpdateInfo(int character_id, int id)
 	{
+		if (IsDebug())
+			return Ok();
 		return Ok();
 	}
 	
@@ -46,6 +50,8 @@ public class NoteController : BaseController<NoteContext>
 	[Authorize(Policy.AccessLevel.Moderator)]
 	public ActionResult Delete(int character_id, int id)
 	{
+		if (IsDebug())
+			return Ok();
 		return Ok();
 	}
 }

@@ -10,17 +10,12 @@ namespace Tdn.Api.Controllers;
 [ApiController]
 [Authorize(Policy.ResourceAccess.Group)]
 [Route("groups/{group_id}")]
-public class GroupController : ControllerBase
+public class GroupController : BaseController<GroupContext>
 {
-	private GroupContext _dbContext;
-	private IHttpInfoContainer _container;
-	
-	public GroupController(GroupContext dbContext, IHttpInfoContainer container) 
+	public GroupController(GroupContext dbContext, IHttpInfoContainer container) : base(dbContext, container)
 	{
-		_dbContext = dbContext;
-		_container = container;
 	}
-	
+
 	protected HttpResourceInfo Info => _container.ResourceInfo[Resource.Group];
 	protected int SelfId => _container.SelfId;
 	
@@ -43,7 +38,7 @@ public class GroupController : ControllerBase
 	[Authorize(Policy.AccessLevel.Admin)]
 	public ActionResult DeleteGroup(bool debug = false)
 	{
-		if (debug)
+		if (IsDebug())
 			return Ok();
 		return Ok();
 	}
@@ -58,6 +53,8 @@ public class GroupController : ControllerBase
 	[Authorize(Policy.AccessLevel.Moderator)]
 	public ActionResult AddCharacter()
 	{
+		if (IsDebug())
+			return Created("/group/characters", "OK");
 		return Created("/group/characters", "OK");
 	}
 }

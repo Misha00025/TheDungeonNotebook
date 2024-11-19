@@ -24,13 +24,10 @@ public class CharacterController : BaseController<CharacterContext>
 	
 	[HttpDelete]
 	[Authorize(Policy.AccessLevel.Admin)]
-	public ActionResult DeleteCharacter(bool debug = false)
+	public ActionResult DeleteCharacter()
 	{
-		if (debug)
-		{
-			Console.WriteLine("\n\n-------------------------\nDebug!\n-------------------------\n\n");
+		if (IsDebug())
 			return Ok();		
-		}
 		return Ok();
 	}
 	
@@ -44,6 +41,8 @@ public class CharacterController : BaseController<CharacterContext>
 	[Authorize(Policy.AccessLevel.Moderator)]
 	public ActionResult AddInventory()
 	{
+		if (IsDebug())
+			return Created("", "");
 		return Created("", "");
 	}
 	
@@ -65,6 +64,8 @@ public class CharacterController : BaseController<CharacterContext>
 	[Authorize(Policy.AccessLevel.Admin)]
 	public ActionResult DeleteOwner(int owner_id)
 	{
+		if (IsDebug())
+			return Ok();
 		return Ok();
 	}
 }

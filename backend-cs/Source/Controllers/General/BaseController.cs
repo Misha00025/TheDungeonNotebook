@@ -14,4 +14,6 @@ public abstract class BaseController<Tdb> : ControllerBase where Tdb : DbContext
 		_dbContext = dbContext;
 		_container = container;
 	}
+	
+	protected bool IsDebug() => Request.Query.TryGetValue("debug", out var debugStr) && bool.TryParse(debugStr, out var debug) && debug;
 }
