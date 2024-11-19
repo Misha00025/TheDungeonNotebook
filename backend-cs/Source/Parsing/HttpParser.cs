@@ -20,9 +20,9 @@ internal class HttpParser
 
 	public bool TryGetId(string fieldName, HttpContext context, ref int id)
 	{
-		bool success = context.Request.Query.ContainsKey(fieldName);
+		bool success = context.Request.RouteValues.ContainsKey(fieldName);
 		if (success)
-			success = int.TryParse(context.Request.Query[fieldName].ToString(), out id);
+			success = int.TryParse(context.Request.RouteValues[fieldName]?.ToString(), out id);
 		return success;
 	}
 }

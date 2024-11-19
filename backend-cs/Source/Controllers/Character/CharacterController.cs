@@ -9,7 +9,7 @@ namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Authorize(Policy.ResourceAccess.Character)]
-[Route("character")]
+[Route("characters/{character_id}")]
 public class CharacterController : BaseController<CharacterContext>
 {
     public CharacterController(CharacterContext dbContext, IHttpInfoContainer container) : base(dbContext, container)
@@ -34,19 +34,6 @@ public class CharacterController : BaseController<CharacterContext>
 		return Ok();
 	}
 	
-	[HttpGet("notes")]
-	public ActionResult GetNotes()
-	{
-		return Ok();
-	}
-	
-	[HttpPost("notes")]
-	[Authorize(Policy.AccessLevel.Moderator)]
-	public ActionResult AddNote()
-	{
-		return Created("","");
-	}
-	
 	[HttpGet("inventories")]
 	public ActionResult GetInventories()
 	{
@@ -67,16 +54,16 @@ public class CharacterController : BaseController<CharacterContext>
 		return Ok();
 	}
 	
-	[HttpPost("owners")]
+	[HttpPost("owners/{owner_id}")]
 	[Authorize(Policy.AccessLevel.Admin)]
-	public ActionResult AddOwner([Required]int owner_id, int access_level = 0)
+	public ActionResult AddOwner(int owner_id, int access_level = 0)
 	{
 		return Ok();
 	}
 	
-	[HttpDelete("owners")]
+	[HttpDelete("owners/{owner_id}")]
 	[Authorize(Policy.AccessLevel.Admin)]
-	public ActionResult DeleteOwner([Required]int owner_id)
+	public ActionResult DeleteOwner(int owner_id)
 	{
 		return Ok();
 	}

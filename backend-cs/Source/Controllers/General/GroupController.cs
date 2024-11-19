@@ -9,7 +9,7 @@ namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Authorize(Policy.ResourceAccess.Group)]
-[Route("group")]
+[Route("groups/{group_id}")]
 public class GroupController : ControllerBase
 {
 	private GroupContext _dbContext;

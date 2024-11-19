@@ -9,29 +9,42 @@ namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Authorize(Policy.ResourceAccess.Character)]
-[Route("character/note")]
+[Route("characters/{character_id}/notes")]
 public class NoteController : BaseController<NoteContext>
 {
 	public NoteController(NoteContext dbContext, IHttpInfoContainer container) : base(dbContext, container)
 	{
 	}
 	
-	[HttpGet("{id:int}")]
-	public ActionResult GetInfo([Required][FromRoute]int id)
+	[HttpGet]
+	public ActionResult GetNotes(int character_id)
 	{
 		return Ok();
 	}
 	
-	[HttpPut("{id:int}")]
+	[HttpPost]
 	[Authorize(Policy.AccessLevel.Moderator)]
-	public ActionResult UpdateInfo([Required][FromRoute]int id)
+	public ActionResult AddNote()
+	{
+		return Created("","");
+	}
+	
+	[HttpGet("{note_id:int}")]
+	public ActionResult GetInfo(int character_id, int id)
 	{
 		return Ok();
 	}
 	
-	[HttpDelete("{id:int}")]
+	[HttpPut("{note_id:int}")]
 	[Authorize(Policy.AccessLevel.Moderator)]
-	public ActionResult Delete([Required][FromRoute]int id)
+	public ActionResult UpdateInfo(int character_id, int id)
+	{
+		return Ok();
+	}
+	
+	[HttpDelete("{note_id:int}")]
+	[Authorize(Policy.AccessLevel.Moderator)]
+	public ActionResult Delete(int character_id, int id)
 	{
 		return Ok();
 	}
