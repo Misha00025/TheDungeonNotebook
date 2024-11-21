@@ -1,4 +1,4 @@
-from . import variables
+from . import test_variables
 from .request_tests import get_test, put_test, post_test, delete_test, rq, get_text
 from .tests_data import tests
 
@@ -21,8 +21,8 @@ def start():
             case "DELETE":
                 res = delete_test(headers, params, url)
 
-        if res == None or res.status_code != test.requirement:
+        if res == None or not test.check(res):
             print("ERROR:", get_text(res, test.request, test.method, params=test.params))
-        elif variables.debug:
+        elif test_variables.debug:
             print(get_text(res, test.request, test.method, params=test.params))
 

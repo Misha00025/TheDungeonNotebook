@@ -1,5 +1,4 @@
-from variables import _st, _at
-from . import variables
+from . import test_variables
 import requests as rq
 
 
@@ -7,7 +6,6 @@ ethernet = "https://the-dungeon-notebook.ru"
 local = "http://127.0.0.1:5077"
 version = "v2"
 site = local+"/"  # + "/api/" + version + "/"
-headers_template = {"Content-Type": "application/json; charset=utf-8"}
 
 
 def test(f):
@@ -18,14 +16,14 @@ def test(f):
     wrapper.__name__ = f.__name__
     return wrapper
 
-def get_text(res, url, method, params={}, compact = variables.compact):
+def get_text(res, url, method, params={}, compact = test_variables.compact):
     try:
         response = res.json()
     except:
         response = res.text
     text = f"{method} REQUEST {res.status_code}: {url}, {params=} "
     if res.status_code < 400:
-        if not variables.compact:
+        if not test_variables.compact:
             text += f"\n   |- Response: {response}"
     elif res.status_code >= 500:
         text += "!!!VERY IMPORTANT ERROR!!!"
@@ -34,25 +32,25 @@ def get_text(res, url, method, params={}, compact = variables.compact):
     return text
 
 
-def get_test(headers, params, url, compact=variables.compact) -> rq.Response:
+def get_test(headers, params, url, compact=test_variables.compact) -> rq.Response:
     full_url = site + url
     res = rq.get(url=full_url, headers=headers, params=params)
     return res
 
 
-def post_test(headers, params, url, data, compact=variables.compact) -> rq.Response:
+def post_test(headers, params, url, data, compact=test_variables.compact) -> rq.Response:
     full_url = site + url
     res = rq.post(url=full_url, headers=headers, params=params, json=data)
     return res
 
 
-def put_test(headers, params, url, data, compact=variables.compact) -> rq.Response:
+def put_test(headers, params, url, data, compact=test_variables.compact) -> rq.Response:
     full_url = site + url
     res = rq.put(url=full_url, headers=headers, params=params, json=data)
     return res
 
 
-def delete_test(headers, params, url, compact=variables.compact) -> rq.Response:
+def delete_test(headers, params, url, compact=test_variables.compact) -> rq.Response:
     full_url = site + url
     res = rq.delete(url=full_url, headers=headers, params=params)
     return res

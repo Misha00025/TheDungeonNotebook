@@ -1,4 +1,5 @@
-from tests import variables, access_test
+from tests import test_variables
+from tests import main_test
 
 if __name__ == "__main__":
     import argparse
@@ -9,7 +10,7 @@ if __name__ == "__main__":
     p.add_argument("-c", "--compact", nargs='?', const=True, default=False)
     p.add_argument("-d", "--debug", nargs='?', const=True, default=False)
     args = p.parse_args()
-    variables.compact = args.compact
-    variables.debug = args.debug
-    access_test.start()
+    test_variables.compact = args.compact
+    test_variables.debug = args.debug
+    main_test.start()
     pass

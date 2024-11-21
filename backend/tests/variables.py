@@ -1,4 +1,0 @@
-
-
-compact = False
-debug = False
