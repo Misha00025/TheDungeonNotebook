@@ -25,6 +25,7 @@ class Test:
 
 
     def check(self, res: requests.Response):
+        correct_code = self.requirement == res.status_code
         if self._is_valid is None:
-            return self.requirement == res.status_code
-        return self._is_valid(self, res)
+            return correct_code
+        return self._is_valid(self, res) and correct_code

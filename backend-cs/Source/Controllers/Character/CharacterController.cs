@@ -12,14 +12,31 @@ namespace Tdn.Api.Controllers;
 [Route("characters/{character_id}")]
 public class CharacterController : BaseController<CharacterContext>
 {
-    public CharacterController(CharacterContext dbContext, IHttpInfoContainer container) : base(dbContext, container)
-    {
-    }
+	public CharacterController(CharacterContext dbContext, IHttpInfoContainer container) : base(dbContext, container)
+	{
+	}
 
-    [HttpGet]
+	private int CharacterId 
+	{
+		get
+		{
+			return _container.ResourceInfo[Resource.Character].Id;
+		}
+	}
+
+	[HttpGet]
 	public ActionResult GetInfo()
 	{
-		return Ok();
+		var character = _dbContext.Characters.Where(e => e.Id == CharacterId).FirstOrDefault();
+		if (character == null)
+			return NotFound();
+		return Ok(new Dictionary<string, object>()
+		{
+			{"id", character.Id},
+			{"name", character.Name},
+			{"description", character.Description},
+			{"group_id", character.GroupId},
+		});
 	}
 	
 	[HttpDelete]
@@ -29,21 +46,6 @@ public class CharacterController : BaseController<CharacterContext>
 		if (IsDebug())
 			return Ok();		
 		return Ok();
-	}
-	
-	[HttpGet("inventories")]
-	public ActionResult GetInventories()
-	{
-		return Ok();
-	}
-	
-	[HttpPost("inventories")]
-	[Authorize(Policy.AccessLevel.Moderator)]
-	public ActionResult AddInventory()
-	{
-		if (IsDebug())
-			return Created("", "");
-		return Created("", "");
 	}
 	
 	[HttpGet("owners")]
