@@ -32,7 +32,7 @@ public class NoteController : BaseController<NoteContext>
 	}
 	
 	[HttpGet("{note_id:int}")]
-	public ActionResult GetInfo(int character_id, int id)
+	public ActionResult GetInfo(int character_id, int note_id)
 	{
 		return Ok();
 	}
