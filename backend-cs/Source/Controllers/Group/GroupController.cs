@@ -25,7 +25,7 @@ public class GroupController : BaseController<GroupContext>
 	{
 		GroupData data = _dbContext.Groups.Where(e => e.Id == Info.Id).First();
 		var result = DataConverter.ConvertToDict(data);
-		result.Add("access_level", AccessLevelAlias.Convert(Info.AccessLevel));
+		result = DataConverter.AddAccessLevel(result, Info.AccessLevel);
 		return Ok(result);
 	}
 	

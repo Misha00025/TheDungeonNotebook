@@ -1,4 +1,5 @@
 using TdnApi.Db.Entities;
+using TdnApi.Security;
 
 namespace Tdn.Api.Models;
 
@@ -29,5 +30,11 @@ public class DataConverter
 			{"group_id", data.GroupId},	
 		};
 		return result;
+	}
+	
+	public Dictionary<string, object> AddAccessLevel(Dictionary<string, object> source, AccessLevel accessLevel)
+	{
+		source.Add("access_level", AccessLevelAlias.Convert(accessLevel));
+		return source;
 	}
 }
