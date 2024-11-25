@@ -11,7 +11,8 @@ class Test:
                  method: str = "GET",
                  requirement: int = 200,
                  debug: bool = None,
-                 is_valid: callable = None
+                 is_valid: callable = None,
+                 check_access: bool = False
                  ) -> None:
         self.request = request
         self.params = params.copy()
@@ -19,6 +20,7 @@ class Test:
         self.headers = headers.copy()
         self.method = method
         self.data = data
+        self.check_access = check_access
 
         self.requirement = requirement
         self._is_valid = is_valid

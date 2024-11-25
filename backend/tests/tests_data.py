@@ -6,9 +6,9 @@ tests:list[Test]=[]
 
 def user_extend(tests):
     tests.extend([
-        Test(headers=uh, request=f"users/{mu}"),
+        Test(headers=uh, request=f"users/{mu}", is_valid=check_user_data),
         Test(headers=uh, request=f"users/{su}", requirement=FORBID),
-        Test(headers=uh, request=f"users/{mu}/groups"),
+        Test(headers=uh, request=f"users/{mu}/groups", is_valid=check_many_groups, check_access=True),
     ])
 
 def group_extend(tests):
@@ -74,7 +74,7 @@ def inventories_extend(tests):
         Test(headers=uh, request=f"characters/{sc}/inventories/{2}", method="DELETE", requirement=FORBID),
     ])
 
-# user_extend(tests)
+user_extend(tests)
 group_extend(tests)
 # characters_extend(tests)
 # notes_extend(tests)

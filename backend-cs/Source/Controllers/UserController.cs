@@ -1,7 +1,9 @@
 
 
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using TdnApi.Db.Contexts;
 using TdnApi.Parsing.Http;
 using TdnApi.Security;
@@ -11,21 +13,23 @@ namespace Tdn.Api.Controllers;
 [ApiController]
 [Authorize(Policy.ResourceAccess.User)]
 [Route("users/{user_id}")]
-public class UserController : BaseController<CharacterContext>
+public class UserController : BaseController<UserContext>
 {
-    public UserController(CharacterContext dbContext, IHttpInfoContainer container) : base(dbContext, container)
-    {
-    }
+	public UserController(UserContext dbContext, IHttpInfoContainer container) : base(dbContext, container)
+	{
+	}
 
-    [HttpGet]
+	[HttpGet]
 	public ActionResult GetInfo()
 	{
-		return Ok();
+		var user = _dbContext.Users.Where(e => e.Id == SelfId).First();
+		return Ok(DataConverter.ConvertToDict(user));
 	}
 	
 	[HttpGet("groups")]
 	public ActionResult GetGroups()
 	{
-		return Ok();
+		var results = DataConverter.ConvertToListNullable(_dbContext.Groups.Where(e => e.UserId == SelfId).Include(e => e.Group), DataConverter.ConvertToDict);
+		return Ok(results);
 	}
 }
