@@ -1,7 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using TdnApi.Db.Contexts;
+using TdnApi.Db.Entities;
 using TdnApi.Parsing.Http;
 using TdnApi.Security;
 
@@ -16,35 +19,58 @@ public class CharacterController : BaseController<CharacterContext>
 	{
 	}
 
+	private HttpResourceInfo Info => _container.ResourceInfo[Resource.Character];
+
 	private int CharacterId 
 	{
 		get
 		{
-			return _container.ResourceInfo[Resource.Character].Id;
+			return Info.Id;
 		}
 	}
 
-	[HttpGet]
-	public ActionResult GetInfo()
+	private List<Dictionary<string, object>> GenerateOwners()
+	{
+		var tmpOwners = _dbContext.Owners
+				.Where(e => e.CharacterId == CharacterId)
+				.Include(e => e.User);
+		var owners = DataConverter.ConvertToList(tmpOwners, e => {var d = DataConverter.ConvertToDict(e); d.Remove("character"); return d;});
+		if (owners == null)
+			owners = new List<Dictionary<string, object>>();
+		return owners;
+	}
+	
+	public bool TryGetCharacter(out CharacterData characterData)
 	{
 		var character = _dbContext.Characters.Where(e => e.Id == CharacterId).FirstOrDefault();
-		if (character == null)
-			return NotFound();
-		return Ok(new Dictionary<string, object>()
-		{
-			{"id", character.Id},
-			{"name", character.Name},
-			{"description", character.Description},
-			{"group_id", character.GroupId},
-		});
+		characterData = character != null ? character : new CharacterData();
+		return character != null;
 	}
+	
+	[HttpGet]
+	public ActionResult GetInfo(bool with_owners = false)
+	{
+		if (!TryGetCharacter(out var character))
+			return NotFound();
+		var result = DataConverter.ConvertToDict(character);
+		if (with_owners && Info.AccessLevel == AccessLevel.Full)
+		{
+			var owners = GenerateOwners();
+			result.Add("owners", owners);
+		}		
+		return Ok(result);
+	}
+	
 	
 	[HttpDelete]
 	[Authorize(Policy.AccessLevel.Admin)]
 	public ActionResult DeleteCharacter()
 	{
+		if (!TryGetCharacter(out var character))
+			return NotFound();
 		if (IsDebug())
-			return Ok();		
+			return Ok();
+		_dbContext.Characters.Remove(character);	
 		return Ok();
 	}
 	
@@ -52,22 +78,31 @@ public class CharacterController : BaseController<CharacterContext>
 	[Authorize(Policy.AccessLevel.Admin)]
 	public ActionResult GetOwners()
 	{
-		return Ok();
+		Dictionary<string, object> result = new(){
+			{"owners", GenerateOwners()}
+		};
+		return Ok(result);
 	}
 	
 	[HttpPost("owners/{owner_id}")]
 	[Authorize(Policy.AccessLevel.Admin)]
 	public ActionResult AddOwner(int owner_id, int access_level = 0)
 	{
-		return Ok();
+		// TODO: Добавить обработку добавления владельца
+		return StatusCode(501);
+		// if (IsDebug())
+		// 	return Ok();
+		// return Ok();
 	}
 	
 	[HttpDelete("owners/{owner_id}")]
 	[Authorize(Policy.AccessLevel.Admin)]
 	public ActionResult DeleteOwner(int owner_id)
 	{
-		if (IsDebug())
-			return Ok();
-		return Ok();
+		// TODO: Добавить обработку удаления владельца
+		return StatusCode(501);
+		// if (IsDebug())
+		// 	return Ok();
+		// return Ok();
 	}
 }

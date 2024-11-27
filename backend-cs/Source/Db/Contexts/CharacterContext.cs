@@ -22,5 +22,6 @@ namespace TdnApi.Db.Contexts
 		}
 		
 		public DbSet<CharacterData> Characters => Set<CharacterData>();
+		public DbSet<UserCharacterData> Owners => Set<UserCharacterData>();
 	}
 }

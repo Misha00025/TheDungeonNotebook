@@ -4,14 +4,14 @@ from .test_variables import *
 
 tests:list[Test]=[]
 
-def user_extend(tests):
+def user_extend(tests:list):
     tests.extend([
         Test(headers=uh, request=f"users/{mu}", is_valid=check_user_data),
         Test(headers=uh, request=f"users/{su}", requirement=FORBID),
         Test(headers=uh, request=f"users/{mu}/groups", is_valid=check_many_groups, check_access=True),
     ])
 
-def group_extend(tests):
+def group_extend(tests:list):
     tests.extend([
         Test(headers=uh, request=f"groups/{mg}"),
         Test(headers=uh, request=f"groups/{sg}"),
@@ -26,10 +26,12 @@ def group_extend(tests):
         Test(headers=uh, request=f"groups/{sg}", method="DELETE", requirement=FORBID),
     ])
 
-def characters_extend(tests):
+def characters_extend(tests:list):
     tests.extend([
         Test(headers=uh, request=f"characters/{mc}", requirement=OK, is_valid=check_character_data),
         Test(headers=uh, request=f"characters/{sc}", requirement=OK, is_valid=check_character_data),
+        Test(headers=uh, request=f"characters/{mc}", params={WITH_OWNERS:True}, requirement=OK, is_valid=check_character_data),
+        Test(headers=uh, request=f"characters/{sc}", params={WITH_OWNERS:True}, is_valid=check_character_data),
         Test(headers=uh, request=f"characters/{ssc}", requirement=FORBID),
         Test(headers=uh, request=f"characters/{mc}", method="DELETE", requirement=OK), # OK
         Test(headers=uh, request=f"characters/{sc}", method="DELETE", requirement=FORBID),
@@ -42,7 +44,7 @@ def characters_extend(tests):
         Test(headers=uh, request=f"characters/{mc}/owners/{su}", method="DELETE", requirement=OK),
     ])
 
-def notes_extend(tests):
+def notes_extend(tests:list):
     tests.extend([
         Test(headers=uh, request=f"characters/{mc}/notes", requirement=OK),
         Test(headers=uh, request=f"characters/{sc}/notes", requirement=OK),
@@ -58,7 +60,7 @@ def notes_extend(tests):
     ])
 
 
-def inventories_extend(tests):
+def inventories_extend(tests:list):
     tests.extend([
         Test(headers=uh, request=f"characters/{mc}/inventories", requirement=OK),
         Test(headers=uh, request=f"characters/{sc}/inventories", requirement=OK),
@@ -74,8 +76,8 @@ def inventories_extend(tests):
         Test(headers=uh, request=f"characters/{sc}/inventories/{2}", method="DELETE", requirement=FORBID),
     ])
 
-user_extend(tests)
-group_extend(tests)
-# characters_extend(tests)
+# user_extend(tests)
+# group_extend(tests)
+characters_extend(tests)
 # notes_extend(tests)
 # inventories_extend(tests)

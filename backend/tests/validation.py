@@ -19,6 +19,8 @@ def _valid_data(body: dict, t):
             keys = ["id", "group_id", "name", "description"]
         case "group":
             keys = ["id", "name", "photo_link"]
+        case "owner":
+            keys = ["id", ""]
     for key in keys:
         if key not in body.keys():
             return False

@@ -8,6 +8,8 @@ OWNER_ID = "owner_id"
 GROUP_ID = "group_id"
 CHARACTER_ID = "character_id"
 
+WITH_OWNERS = "with_owners"
+
 OK = 200
 FORBID = 403
 CREATED = 201

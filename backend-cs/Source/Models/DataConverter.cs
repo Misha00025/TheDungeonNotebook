@@ -53,6 +53,18 @@ public class DataConverter
 											ParseToAccessLevel(data.Privileges));
 	}
 	
+	public Dictionary<string, object> ConvertToDict(UserCharacterData data)
+	{
+		var dict = new Dictionary<string, object>();
+		if (data.User != null)
+			dict.Add("user", ConvertToDict(data.User));
+		if (data.Character != null)
+			dict.Add("character", ConvertToDict(data.Character));
+		
+		var result = AddAccessLevel(dict, ParseToAccessLevel(data.Privileges));
+		return result;
+	}
+	
 	public AccessLevel ParseToAccessLevel(int level) => level < 3 && level >= 0 ? (AccessLevel)(level+1) : AccessLevel.None;  
 	
 	public Dictionary<string, object> AddAccessLevel(Dictionary<string, object> source, AccessLevel accessLevel)
