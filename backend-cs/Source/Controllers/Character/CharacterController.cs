@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -89,10 +90,17 @@ public class CharacterController : BaseController<CharacterContext>
 	public ActionResult AddOwner(int owner_id, int access_level = 0)
 	{
 		// TODO: Добавить обработку добавления владельца
-		return StatusCode(501);
-		// if (IsDebug())
-		// 	return Ok();
-		// return Ok();
+		// return StatusCode(501);
+		if (IsDebug())
+			return Ok();
+		var owner = new UserCharacterData();
+		owner.UserId = owner_id;
+		owner.CharacterId = CharacterId;
+		owner.Privileges = access_level;
+		_dbContext.Owners.Add(owner);
+		_dbContext.SaveChanges();
+		Console.WriteLine($"---------\nDebug: {IsDebug()}\nOwner Id: {owner_id}\nOwner: {owner}\n----------");
+		return Created($"/characters/{CharacterId}/owners", owner);
 	}
 	
 	[HttpDelete("owners/{owner_id}")]
@@ -100,9 +108,16 @@ public class CharacterController : BaseController<CharacterContext>
 	public ActionResult DeleteOwner(int owner_id)
 	{
 		// TODO: Добавить обработку удаления владельца
-		return StatusCode(501);
-		// if (IsDebug())
-		// 	return Ok();
-		// return Ok();
+		// return StatusCode(501);
+		if (IsDebug())
+			return Ok();
+		
+		var owner = _dbContext.Owners.Where(e => e.UserId == owner_id).FirstOrDefault();
+		Console.WriteLine($"---------\nDebug: {IsDebug()}\nOwner Id: {owner_id}\nOwner: {owner}\n----------");
+		if (owner == null)
+			return NotFound();
+		_dbContext.Owners.Remove(owner);
+		_dbContext.SaveChanges();
+		return Ok();
 	}
 }

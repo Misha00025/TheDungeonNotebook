@@ -24,6 +24,8 @@ def group_extend(tests:list):
         Test(headers=uh, request=f"groups/{mg}", method="DELETE", requirement=OK),
         Test(headers=uh, request=f"groups/{sg}", method="DELETE", requirement=FORBID),
         Test(headers=uh, request=f"groups/{sg}", method="DELETE", requirement=FORBID),
+        Test(headers=uh, request=f"groups/{mg}/users/{su}", method="POST", requirement=CREATED, debug=False),
+        Test(headers=uh, request=f"groups/{mg}/users/{su}", method="DELETE", requirement=OK, debug=False),
     ])
 
 def characters_extend(tests:list):
@@ -40,8 +42,8 @@ def characters_extend(tests:list):
         Test(headers=uh, request=f"characters/{mc}/owners", requirement=OK),
         Test(headers=uh, request=f"characters/{mc}/owners", method="POST", requirement=NOT_ALLOW),
         Test(headers=uh, request=f"characters/{mc}/owners", method="DELETE", requirement=NOT_ALLOW),
-        Test(headers=uh, request=f"characters/{mc}/owners/{su}", method="POST", requirement=OK),
-        Test(headers=uh, request=f"characters/{mc}/owners/{su}", method="DELETE", requirement=OK),
+        Test(headers=uh, request=f"characters/{mc}/owners/{su}", method="POST", requirement=CREATED, debug=False),
+        Test(headers=uh, request=f"characters/{mc}/owners/{su}", method="DELETE", requirement=OK, debug=False),
     ])
 
 def notes_extend(tests:list):
@@ -77,7 +79,7 @@ def inventories_extend(tests:list):
     ])
 
 # user_extend(tests)
-# group_extend(tests)
+group_extend(tests)
 characters_extend(tests)
 # notes_extend(tests)
 # inventories_extend(tests)

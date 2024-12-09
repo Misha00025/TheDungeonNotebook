@@ -16,7 +16,8 @@ class Test:
                  ) -> None:
         self.request = request
         self.params = params.copy()
-        self.params[DEBUG] = default_debug == True if debug is None else debug
+        if debug:
+            self.params[DEBUG] = True 
         self.headers = headers.copy()
         self.method = method
         self.data = data

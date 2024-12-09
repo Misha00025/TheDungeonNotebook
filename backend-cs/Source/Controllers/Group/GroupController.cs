@@ -75,4 +75,45 @@ public class GroupController : BaseController<GroupContext>
 		_dbContext.SaveChanges();
 		return Created(url+data.Id.ToString(), DataConverter.ConvertToDict(data));
 	}
+	
+	[HttpGet("users")]
+	[Authorize(Policy.AccessLevel.Admin)]
+	public ActionResult GetUsers()
+	{
+		var users = _dbContext.Users
+				.Include(e => e.User)
+				.Where(e => e.UserId == SelfId)
+				.Select(e => e.User!);
+		var result = DataConverter.ConvertToListNullable(users, DataConverter.ConvertToDict);
+		return Ok(result);		
+	}
+	
+	[HttpPost("users/{user_id}")]
+	[Authorize(Policy.AccessLevel.Admin)]
+	public ActionResult AddUser(int user_id, int access_level = 0)
+	{
+		if (IsDebug())
+			return Ok();
+		var user = new UserGroupData();
+		user.UserId = user_id;
+		user.GroupId = Info.Id;
+		user.Privileges = access_level;
+		_dbContext.Users.Add(user);
+		_dbContext.SaveChanges();
+		return Created($"/groups/{Info.Id}/users", user);
+	}
+	
+	[HttpDelete("users/{user_id}")]
+	[Authorize(Policy.AccessLevel.Admin)]
+	public ActionResult DeleteUser(int user_id)
+	{
+		if (IsDebug())
+			return Ok();		
+		var user = _dbContext.Users.Where(e => e.UserId == user_id).FirstOrDefault();
+		if (user == null)
+			return NotFound();
+		_dbContext.Users.Remove(user);
+		_dbContext.SaveChanges();
+		return Ok();
+	}
 }
