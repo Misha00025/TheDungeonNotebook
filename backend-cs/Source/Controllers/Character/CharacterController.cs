@@ -30,14 +30,14 @@ public class CharacterController : BaseController<CharacterContext>
 		}
 	}
 
-	private List<Dictionary<string, object>> GenerateOwners()
+	private List<Dictionary<string, object?>> GenerateOwners()
 	{
 		var tmpOwners = _dbContext.Owners
 				.Where(e => e.CharacterId == CharacterId)
 				.Include(e => e.User);
 		var owners = DataConverter.ConvertToList(tmpOwners, e => {var d = DataConverter.ConvertToDict(e); d.Remove("character"); return d;});
 		if (owners == null)
-			owners = new List<Dictionary<string, object>>();
+			owners = new List<Dictionary<string, object?>>();
 		return owners;
 	}
 	

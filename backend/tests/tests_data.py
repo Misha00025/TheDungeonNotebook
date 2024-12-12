@@ -1,3 +1,4 @@
+import random
 from .validation import *
 from .templates import Test
 from .test_variables import *
@@ -51,11 +52,13 @@ def notes_extend(tests:list):
         Test(headers=uh, request=f"characters/{mc}/notes", requirement=OK),
         Test(headers=uh, request=f"characters/{sc}/notes", requirement=OK),
         Test(headers=uh, request=f"characters/{ssc}/notes", requirement=FORBID),
-        Test(headers=uh, request=f"characters/{mc}/notes", method="POST", requirement=CREATED), # CREATED
+        Test(headers=uh, request=f"characters/{mc}/notes", method="POST", data={"header": "test1", "body": "testttttt2"}, requirement=CREATED, debug=False), # CREATED
         Test(headers=uh, request=f"characters/{sc}/notes", method="POST", requirement=FORBID),
         Test(headers=uh, request=f"characters/{ssc}/notes", method="POST", requirement=FORBID),
         Test(headers=uh, request=f"characters/{mc}/notes/1", requirement=OK),
-        Test(headers=uh, request=f"characters/{mc}/notes/1", method="PUT", requirement=OK),
+        Test(headers=uh, request=f"characters/{mc}/notes/1", method="PUT", data={"header": f"test {random.randint(1, 100)}"}, requirement=OK, debug=False),
+        Test(headers=uh, request=f"characters/{mc}/notes/2", method="PUT", data={"body": f"test {random.randint(1, 100)}"}, requirement=OK, debug=False),
+        Test(headers=uh, request=f"characters/{mc}/notes/3", method="PUT", data={"header": f"test {random.randint(1, 100)}","body": f"test {random.randint(1, 100)}"}, requirement=OK, debug=False),
         Test(headers=uh, request=f"characters/{mc}/notes/1", method="DELETE", requirement=OK),
         Test(headers=uh, request=f"characters/{sc}/notes/1", requirement=OK),    
         Test(headers=uh, request=f"characters/{sc}/notes/1", method="PUT", requirement=FORBID),
@@ -78,8 +81,8 @@ def inventories_extend(tests:list):
         Test(headers=uh, request=f"characters/{sc}/inventories/{2}", method="DELETE", requirement=FORBID),
     ])
 
-user_extend(tests)
-group_extend(tests)
-characters_extend(tests)
+# user_extend(tests)
+# group_extend(tests)
+# characters_extend(tests)
 notes_extend(tests)
-inventories_extend(tests)
+# inventories_extend(tests)

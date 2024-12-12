@@ -16,9 +16,9 @@ public static class ConversionExtensions
 		};
 	}
 	
-	public static Dictionary<string, object?> ToDict(this CharacterData data)
+	public static Dictionary<string, object?> ToDict(this CharacterData data, IEnumerable<NoteData>? notes = null)
 	{
-		return new()
+		Dictionary<string, object?> dict = new()
 		{
 			{"type", "character"},
 			{"id", data.Id},
@@ -26,6 +26,9 @@ public static class ConversionExtensions
 			{"description", data.Description},	
 			{"group_id", data.GroupId},	
 		};
+		if (notes != null)
+			dict.Add("notes", notes.ManyConversions(e => e.ToDict()));
+		return dict;
 	}
 	
 	public static Dictionary<string, object?> ToDict(this UserData data)
@@ -98,7 +101,17 @@ public static class ConversionExtensions
 		return dict;
 	}
 	
-	public static Dictionary<string, object?> ToDict(this InventoryData data, IEnumerable<ItemData> items)
+	public static Dictionary<string, object?> ToDict(this ItemInventoryData data)
+	{
+		var dict = new Dictionary<string, object?>()
+		{
+			{"item", data.Item?.ToDict()},
+			{"amount", data.Amount}			
+		};
+		return dict;
+	}
+	
+	public static Dictionary<string, object?> ToDict(this InventoryData data, IEnumerable<ItemInventoryData> items)
 	{
 		Dictionary<string, object?> dict = new()
 		{

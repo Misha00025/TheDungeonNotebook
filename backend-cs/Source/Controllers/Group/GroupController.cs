@@ -62,11 +62,11 @@ public class GroupController : BaseController<GroupContext>
 	{
 		var url = $"/groups/{Info.Id}/characters/";
 		CharacterData data = new CharacterData();
-		Console.WriteLine($"\n\n------------\n{character.Name}, {character.Description}\n-------------\n\n");
-		if (character.Name == null || character.Description == null)
+		Console.WriteLine($"\n\n------------\n{character.name}, {character.description}\n-------------\n\n");
+		if (character.name == null || character.description == null)
 			return BadRequest();
-		data.Name = character.Name;
-		data.Description = character.Description;
+		data.Name = character.name;
+		data.Description = character.description;
 		data.GroupId = Info.Id;
 		if (IsDebug())
 			data.Id = 9;

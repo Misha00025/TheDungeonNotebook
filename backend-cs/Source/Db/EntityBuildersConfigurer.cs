@@ -83,7 +83,7 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
 	{
 		builder.ToTable("note");
 		builder.Property(e => e.Id).HasColumnName("note_id");
-		builder.HasKey(e => e.Id);
+		builder.HasKey(e => new {e.Id, e.OwnerId});
 		builder.Property(e => e.Header).HasColumnName("header");
 		builder.Property(e => e.Body).HasColumnName("body");
 		builder.Property(e => e.OwnerId).HasColumnName("owner_id");
