@@ -78,8 +78,8 @@ def inventories_extend(tests:list):
         Test(headers=uh, request=f"characters/{sc}/inventories/{2}", method="DELETE", requirement=FORBID),
     ])
 
-# user_extend(tests)
+user_extend(tests)
 group_extend(tests)
 characters_extend(tests)
-# notes_extend(tests)
-# inventories_extend(tests)
+notes_extend(tests)
+inventories_extend(tests)
