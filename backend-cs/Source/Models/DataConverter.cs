@@ -24,9 +24,6 @@ public class DataConverter
 	public Dictionary<string, object?> ConvertToDict(UserGroupData data)
 			=> data.ToDict();
 	
-	public Dictionary<string, object?> ConvertToDict(UserCharacterData data)
-			=> data.ToDict();
-	
 	public AccessLevel ParseToAccessLevel(int level) => level < 3 && level >= 0 ? (AccessLevel)(level+1) : AccessLevel.None;  
 	
 	public Dictionary<string, object?> AddAccessLevel(Dictionary<string, object?> source, AccessLevel accessLevel)

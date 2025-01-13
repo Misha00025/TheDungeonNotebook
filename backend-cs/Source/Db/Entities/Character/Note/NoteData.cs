@@ -6,6 +6,4 @@ public class NoteData
 	public int OwnerId;
 	public string Header = "";
 	public string Body = "";
-	
-	public CharacterData? Owner;
 }

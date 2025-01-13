@@ -7,7 +7,6 @@ namespace TdnApi.Db.Entities
 		public string Name = "";
 		public string Description = "";
 		public string? Image;
-		
-		public GroupData? Group;
+		public int? Amount = null;
 	}
 }

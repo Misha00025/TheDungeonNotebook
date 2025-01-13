@@ -43,43 +43,23 @@ public class GroupController : BaseController<GroupContext>
 	[HttpGet("characters")]
 	public ActionResult GetCharacters()
 	{
-		IQueryable<CharacterData> characters;
-		if (Info.AccessLevel == AccessLevel.Full)
-			characters = _dbContext.Characters
-				.Where(e => e.GroupId == Info.Id);
-		else
-			characters = _dbContext.UserCharacters
-				.Include(e => e.Character)
-				.Where(e => e.UserId == SelfId)
-				.Select(e => e.Character!);
-		var result = DataConverter.ConvertToList(characters, DataConverter.ConvertToDict);
-		return Ok(result);
+		// TODO: add implementation
+		return Ok();
 	}
 	
 	[HttpPost("characters")]
 	[Authorize(Policy.AccessLevel.Moderator)]
 	public ActionResult AddCharacter([FromBody]InputCharacter character)
 	{
-		var url = $"/groups/{Info.Id}/characters/";
-		CharacterData data = new CharacterData();
-		Console.WriteLine($"\n\n------------\n{character.name}, {character.description}\n-------------\n\n");
-		if (character.name == null || character.description == null)
-			return BadRequest();
-		data.Name = character.name;
-		data.Description = character.description;
-		data.GroupId = Info.Id;
-		if (IsDebug())
-			data.Id = 9;
-		else
-			_dbContext.Characters.Add(data);
-		_dbContext.SaveChanges();
-		return Created(url+data.Id.ToString(), DataConverter.ConvertToDict(data));
+		// TODO: add implementation
+		return Created();
 	}
 	
 	[HttpGet("users")]
 	[Authorize(Policy.AccessLevel.Admin)]
 	public ActionResult GetUsers()
 	{
+		// FIXME: add MongoDB methods
 		var users = _dbContext.Users
 				.Include(e => e.User)
 				.Where(e => e.UserId == SelfId)

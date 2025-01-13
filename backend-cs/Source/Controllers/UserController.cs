@@ -9,7 +9,7 @@ namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Authorize(Policy.ResourceAccess.User)]
-[Route("users/{user_id}")]
+[Route("user")]
 public class UserController : BaseController<UserContext>
 {
 	public UserController(UserContext dbContext, IHttpInfoContainer container) : base(dbContext, container)

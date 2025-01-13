@@ -6,7 +6,5 @@ namespace TdnApi.Db.Entities
 		public int GroupId;
 		public string Name = "";
 		public string Description = "";
-		
-		public GroupData? Group;
 	}
 }

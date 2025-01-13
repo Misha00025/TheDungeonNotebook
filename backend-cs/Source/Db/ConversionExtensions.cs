@@ -60,18 +60,6 @@ public static class ConversionExtensions
 		return dict;
 	}
 	
-	public static Dictionary<string, object?> ToDict(this UserCharacterData data)
-	{
-		var dict = new Dictionary<string, object?>();
-		if (data.User != null)
-			dict.Add("user", data.User.ToDict());
-		if (data.Character != null)
-			dict.Add("character", data.Character.ToDict());
-		
-		dict.AddAccessLevel(data.Privileges.ToAccessLevel());
-		return dict;
-	}
-	
 	public static Dictionary<string, object?> ToDict(this NoteData data)
 	{
 		Dictionary<string, object?> dict = new()
@@ -81,8 +69,6 @@ public static class ConversionExtensions
 			{"header", data.Header},
 			{"body", data.Body},
 		};
-		if (data.Owner != null)
-			dict.Add("owner", data.Owner.ToDict());
 		return dict;
 	}
 	
@@ -95,30 +81,6 @@ public static class ConversionExtensions
 			{"name", data.Name},
 			{"description", data.Description},
 			{"image_link", data.Image}
-		};
-		if (data.Group != null && addGroup)
-			dict.Add("group", data.Group.ToDict());
-		return dict;
-	}
-	
-	public static Dictionary<string, object?> ToDict(this ItemInventoryData data)
-	{
-		var dict = new Dictionary<string, object?>()
-		{
-			{"item", data.Item?.ToDict()},
-			{"amount", data.Amount}			
-		};
-		return dict;
-	}
-	
-	public static Dictionary<string, object?> ToDict(this InventoryData data, IEnumerable<ItemInventoryData> items)
-	{
-		Dictionary<string, object?> dict = new()
-		{
-			{"type", "inventory"},
-			{"id", data.Id},
-			{"owner", data.Owner?.ToDict()},
-			{"items", items.ManyConversions(e => e.ToDict())}
 		};
 		return dict;
 	}

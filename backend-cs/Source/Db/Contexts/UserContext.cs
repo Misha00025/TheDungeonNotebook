@@ -13,7 +13,6 @@ public class UserContext : BaseDbContext<UserContext>
 	protected override void OnModelCreating(ModelBuilder builder)
 	{
 		Configurer.ConfigureModel(builder.Entity<UserData>());
-		Configurer.ConfigureModel(builder.Entity<UserCharacterData>());
 		Configurer.ConfigureModel(builder.Entity<UserGroupData>());
 		Configurer.ConfigureModel(builder.Entity<CharacterData>());
 		Configurer.ConfigureModel(builder.Entity<GroupData>());
@@ -21,6 +20,5 @@ public class UserContext : BaseDbContext<UserContext>
 	}
 	
 	public DbSet<UserData> Users => Set<UserData>();
-	public DbSet<UserCharacterData> Characters => Set<UserCharacterData>();
 	public DbSet<UserGroupData> Groups => Set<UserGroupData>();
 }
