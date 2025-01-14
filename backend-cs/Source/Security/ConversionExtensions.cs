@@ -1,5 +1,5 @@
-using TdnApi;
-using TdnApi.Security;
+using Tdn;
+using Tdn.Security;
 
 namespace Tdn.Security.Conversions;
 

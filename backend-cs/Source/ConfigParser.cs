@@ -3,7 +3,7 @@ using IniParser;
 using IniParser.Model;
 
 
-namespace TdnApi.Configuration;
+namespace Tdn.Configuration;
 
 public class ConfigParser
 {

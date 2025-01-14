@@ -1,9 +1,9 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Tdn.Security.Conversions;
-using TdnApi.Parsing.Http;
+using Tdn.Parsing.Http;
 
-namespace TdnApi.Security;
+namespace Tdn.Security;
 
 public class ResourceAccessHandler : AuthorizationHandler<ResourceRequirement>
 {

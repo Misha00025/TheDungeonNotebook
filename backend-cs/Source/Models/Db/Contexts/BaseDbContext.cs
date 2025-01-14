@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using TdnApi.Db.Configuers;
+using Tdn.Db.Configuers;
 
-namespace TdnApi.Db.Contexts;
+namespace Tdn.Db.Contexts;
 
 public abstract class BaseDbContext<T> : DbContext where T : BaseDbContext<T>
 {

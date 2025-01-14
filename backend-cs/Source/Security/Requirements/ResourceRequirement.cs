@@ -1,7 +1,7 @@
 
 using Microsoft.AspNetCore.Authorization;
 
-namespace TdnApi.Security;
+namespace Tdn.Security;
 
 public enum Resource 
 {

@@ -1,8 +1,8 @@
 using Tdn.Security.Conversions;
-using TdnApi.Db.Entities;
-using TdnApi.Security;
+using Tdn.Db.Entities;
+using Tdn.Security;
 
-namespace TdnApi.Db.Convertors;
+namespace Tdn.Db.Convertors;
 
 public static class ConversionExtensions
 {

@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using TdnApi.Db.Configuers;
-using TdnApi.Db.Entities;
-using TdnApi.Models.Db;
+using Tdn.Db.Configuers;
+using Tdn.Db.Entities;
+using Tdn.Models.Db;
 
-namespace TdnApi.Db.Contexts;
+namespace Tdn.Db.Contexts;
 
 public class AppDbContext : BaseDbContext<AppDbContext>
 {

@@ -1,4 +1,4 @@
-namespace TdnApi.Security;
+namespace Tdn.Security;
 
 public static class Role
 {

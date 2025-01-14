@@ -3,9 +3,9 @@ using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using TdnApi.Models.Db;
+using Tdn.Models.Db;
 
-namespace TdnApi.Security;
+namespace Tdn.Security;
 
 public class TokenAuthenticationHandler : AuthenticationHandler<AuthenticationSchemeOptions>
 {

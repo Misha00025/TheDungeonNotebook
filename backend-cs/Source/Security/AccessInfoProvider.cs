@@ -1,6 +1,6 @@
-using TdnApi.Db.Contexts;
+using Tdn.Db.Contexts;
 
-namespace TdnApi.Security;
+namespace Tdn.Security;
 
 public interface IAccessLevelProvider
 {

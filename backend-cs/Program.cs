@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
-using TdnApi.Models.Db;
-using TdnApi.Security;
-using TdnApi.Configuration;
+using Tdn.Models.Db;
+using Tdn.Security;
+using Tdn.Configuration;
 using Microsoft.AspNetCore.Authentication;
-using TdnApi.Db.Configuers;
-using TdnApi.Db.Contexts;
-using TdnApi.Parsing.Http;
+using Tdn.Db.Configuers;
+using Tdn.Db.Contexts;
+using Tdn.Parsing.Http;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);

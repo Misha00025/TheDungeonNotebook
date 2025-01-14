@@ -1,6 +1,4 @@
-using TdnApi.Security;
-
-namespace TdnApi;
+namespace Tdn;
 
 public static class Constants
 {

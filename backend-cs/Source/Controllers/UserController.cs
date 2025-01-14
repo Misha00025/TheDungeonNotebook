@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TdnApi.Db.Contexts;
-using TdnApi.Db.Convertors;
-using TdnApi.Parsing.Http;
-using TdnApi.Security;
+using Tdn.Db.Contexts;
+using Tdn.Db.Convertors;
+using Tdn.Parsing.Http;
+using Tdn.Security;
 
 namespace Tdn.Api.Controllers;
 

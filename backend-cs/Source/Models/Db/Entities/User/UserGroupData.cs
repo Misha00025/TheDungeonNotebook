@@ -1,4 +1,4 @@
-namespace TdnApi.Db.Entities
+namespace Tdn.Db.Entities
 {
 	public class UserGroupData
 	{

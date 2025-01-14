@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using TdnApi.Parsing.Http;
+using Tdn.Parsing.Http;
 
 namespace Tdn.Api.Controllers;
 

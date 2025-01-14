@@ -1,8 +1,8 @@
 using System.Security.Claims;
 using Tdn.Security.Conversions;
-using TdnApi.Security;
+using Tdn.Security;
 
-namespace TdnApi.Parsing.Http;
+namespace Tdn.Parsing.Http;
 
 public interface IHttpInfoContainer
 {

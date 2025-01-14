@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using TdnApi.Db.Entities;
+using Tdn.Db.Entities;
 
-namespace TdnApi.Db.Configuers;
+namespace Tdn.Db.Configuers;
 
 public interface IEntityBuildersConfigurer
 {

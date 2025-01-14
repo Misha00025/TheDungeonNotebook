@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
-using TdnApi.Db.Configuers;
-using TdnApi.Db.Contexts;
-using TdnApi.Db.Entities;
+using Tdn.Db.Configuers;
+using Tdn.Db.Contexts;
+using Tdn.Db.Entities;
 
 
-namespace TdnApi.Models.Db;
+namespace Tdn.Models.Db;
 
 public class TokensContext : BaseDbContext<TokensContext>
 {
