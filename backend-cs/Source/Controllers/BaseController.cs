@@ -13,10 +13,11 @@ public abstract class BaseController<Tdb> : ControllerBase where Tdb : DbContext
 	protected int SelfId => _container.SelfId;
 	protected readonly DataConverter DataConverter = new DataConverter();
 	
-	public BaseController(Tdb dbContext, IHttpInfoContainer container) 
+	public BaseController() 
 	{
-		_dbContext = dbContext;
-		_container = container;
+		var services = HttpContext.RequestServices;
+		_dbContext = services.GetRequiredService<Tdb>();
+		_container = services.GetRequiredService<IHttpInfoContainer>();
 	}
 	
 	// TODO: Add method to get value from Request Route as some Type. For example: T GetFromRoute<T>(string name)

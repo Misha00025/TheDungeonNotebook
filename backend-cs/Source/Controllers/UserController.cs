@@ -12,7 +12,7 @@ namespace Tdn.Api.Controllers;
 [Route("user")]
 public class UserController : BaseController<UserContext>
 {
-	public UserController(UserContext dbContext, IHttpInfoContainer container) : base(dbContext, container)
+	public UserController() : base()
 	{
 	}
 
