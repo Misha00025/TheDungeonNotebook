@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TdnApi.Db.Contexts;
+using TdnApi.Db.Convertors;
 using TdnApi.Parsing.Http;
 using TdnApi.Security;
 
@@ -20,13 +21,13 @@ public class UserController : BaseController<UserContext>
 	public ActionResult GetInfo()
 	{
 		var user = _dbContext.Users.Where(e => e.Id == SelfId).First();
-		return Ok(DataConverter.ConvertToDict(user));
+		return Ok(user.ToDict());
 	}
 	
 	[HttpGet("groups")]
 	public ActionResult GetGroups()
 	{
-		var results = DataConverter.ConvertToListNullable(_dbContext.Groups.Where(e => e.UserId == SelfId).Include(e => e.Group), DataConverter.ConvertToDict);
+		var results = _dbContext.Groups.Where(e => e.UserId == SelfId).Include(e => e.Group).ManyConversions(e => e.ToDict());
 		return Ok(results);
 	}
 }

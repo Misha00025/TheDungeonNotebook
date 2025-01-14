@@ -17,21 +17,6 @@ public static class ConversionExtensions
 		};
 	}
 	
-	public static Dictionary<string, object?> ToDict(this CharacterData data, IEnumerable<NoteData>? notes = null)
-	{
-		Dictionary<string, object?> dict = new()
-		{
-			{"type", "character"},
-			{"id", data.Id},
-			{"name", data.Name},	
-			{"description", data.Description},	
-			{"group_id", data.GroupId},	
-		};
-		if (notes != null)
-			dict.Add("notes", notes.ManyConversions(e => e.ToDict()));
-		return dict;
-	}
-	
 	public static Dictionary<string, object?> ToDict(this UserData data)
 	{
 		return new()
@@ -58,31 +43,6 @@ public static class ConversionExtensions
 			dict.Add("group", data.Group.ToDict());
 		
 		dict.AddAccessLevel(data.Privileges.ToAccessLevel());
-		return dict;
-	}
-	
-	public static Dictionary<string, object?> ToDict(this NoteData data)
-	{
-		Dictionary<string, object?> dict = new()
-		{
-			{"type", "note"},
-			{"id", data.Id},
-			{"header", data.Header},
-			{"body", data.Body},
-		};
-		return dict;
-	}
-	
-	public static Dictionary<string, object?> ToDict(this ItemData data, bool addGroup = false)
-	{
-		Dictionary<string, object?> dict = new()
-		{
-			{"type", "item"},
-			{"id", data.Id},
-			{"name", data.Name},
-			{"description", data.Description},
-			{"image_link", data.Image}
-		};
 		return dict;
 	}
 	

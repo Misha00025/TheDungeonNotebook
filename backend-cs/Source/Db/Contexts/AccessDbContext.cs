@@ -16,7 +16,6 @@ public class AccessDbContext : BaseDbContext<AccessDbContext>
 		Configurer.ConfigureModel(builder.Entity<UserData>());
 		Configurer.ConfigureModel(builder.Entity<GroupData>());
 		Configurer.ConfigureModel(builder.Entity<UserGroupData>());		
-		Configurer.ConfigureModel(builder.Entity<NoteData>());		
 				
 		base.OnModelCreating(builder);
 	}

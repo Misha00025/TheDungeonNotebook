@@ -14,7 +14,6 @@ public class UserContext : BaseDbContext<UserContext>
 	{
 		Configurer.ConfigureModel(builder.Entity<UserData>());
 		Configurer.ConfigureModel(builder.Entity<UserGroupData>());
-		Configurer.ConfigureModel(builder.Entity<CharacterData>());
 		Configurer.ConfigureModel(builder.Entity<GroupData>());
 		base.OnModelCreating(builder);
 	}

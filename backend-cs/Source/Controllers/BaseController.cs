@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Tdn.Api.Models;
 using TdnApi.Parsing.Http;
 
 namespace Tdn.Api.Controllers;
@@ -11,7 +10,6 @@ public abstract class BaseController<Tdb> : ControllerBase where Tdb : DbContext
 	// TODO: add field to contain current model
 	protected readonly IHttpInfoContainer _container;
 	protected int SelfId => _container.SelfId;
-	protected readonly DataConverter DataConverter = new DataConverter();
 	
 	public BaseController() 
 	{
