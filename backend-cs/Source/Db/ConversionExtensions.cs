@@ -1,3 +1,4 @@
+using Tdn.Security.Conversions;
 using TdnApi.Db.Entities;
 using TdnApi.Security;
 
@@ -44,7 +45,7 @@ public static class ConversionExtensions
 	}
 	
 	public static void AddAccessLevel(this Dictionary<string, object?> source, AccessLevel accessLevel)
-		=> source.Add("access_level", AccessLevelAlias.Convert(accessLevel));
+		=> source.Add("access_level", accessLevel.ToAlias());
 	
 	public static AccessLevel ToAccessLevel(this int level) => level < 3 && level >= 0 ? (AccessLevel)(level+1) : AccessLevel.None;
 	

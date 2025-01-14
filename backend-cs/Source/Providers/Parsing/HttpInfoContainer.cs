@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Tdn.Security.Conversions;
 using TdnApi.Providers;
 using TdnApi.Security;
 
@@ -45,7 +46,7 @@ public class HttpInfoContainer : IHttpInfoContainer
 	private AccessLevel GetAccessLevel(Resource resource, int id, string name, string role) 
 			=> _provider.AccessTo(resource, name, id.ToString(), role);
 	private string GetFieldName(Resource resource) 
-			=> Fields.Convert(resource);
+			=> resource.GetFieldName();
 
 	private void TryAddInfoFor(Resource resource, HttpContext context)
 	{

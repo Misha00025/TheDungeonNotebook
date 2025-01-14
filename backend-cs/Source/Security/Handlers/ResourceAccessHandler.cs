@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Tdn.Security.Conversions;
 using TdnApi.Parsing.Http;
 
 namespace TdnApi.Security;
@@ -24,7 +25,7 @@ public class ResourceAccessHandler : AuthorizationHandler<ResourceRequirement>
 		else
 			context.Succeed(requirement);
 		var identity = context.User.Identity as ClaimsIdentity;
-        identity?.AddClaim(new Claim("AccessLevel", AccessLevelAlias.Convert(access)));
+        identity?.AddClaim(new Claim("AccessLevel", access.ToAlias()));
 		return Task.CompletedTask;
 	}
 }
