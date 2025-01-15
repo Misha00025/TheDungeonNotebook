@@ -1,7 +1,6 @@
 using System.Security.Claims;
-using Tdn.Security;
 
-namespace Tdn.Parsing.Http;
+namespace Tdn.Security;
 
 internal class HttpParser
 {

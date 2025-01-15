@@ -1,24 +1,30 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Tdn.Parsing.Http;
+using Tdn.Models.Providing;
+using Tdn.Security;
 
 namespace Tdn.Api.Controllers;
 
-public abstract class BaseController<Tdb> : ControllerBase where Tdb : DbContext
+public abstract class BaseController<T> : ControllerBase
 {
-	protected readonly Tdb _dbContext; // TODO: Change to "_modelProvider" of IModelProvider type, where "IModelProvider" is interface with one method: TModel GetModel(int modelId) 
-	// TODO: add field to contain current model
-	protected readonly IHttpInfoContainer _container;
-	protected int SelfId => _container.SelfId;
+	private readonly IModelProvider<T> _modelProvider;
+	protected T model { get; private set; }
+	
+	protected readonly IAccessContext container;
+	protected int SelfId => container.SelfId;
 	
 	public BaseController() 
 	{
 		var services = HttpContext.RequestServices;
-		_dbContext = services.GetRequiredService<Tdb>();
-		_container = services.GetRequiredService<IHttpInfoContainer>();
+		_modelProvider = services.GetRequiredService<IModelProvider<T>>();
+		container = services.GetRequiredService<IAccessContext>();
+		string uuid = GetUUID();
+		model = _modelProvider.GetModel(uuid);
 	}
 	
+	protected abstract string GetUUID();
+	
 	// TODO: Add method to get value from Request Route as some Type. For example: T GetFromRoute<T>(string name)
+	protected bool TrySaveModel(T model) => _modelProvider.TrySaveModel(model);
 	
 	protected bool IsDebug() => Request.Query.TryGetValue("debug", out var debugStr) && bool.TryParse(debugStr, out var debug) && debug;
 }

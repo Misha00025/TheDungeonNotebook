@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using IniParser;
 using IniParser.Model;
+using Tdn.Settings;
 
 
 namespace Tdn.Configuration;
@@ -9,6 +10,7 @@ public class ConfigParser
 {
 	private const string DB = "DATABASE";
 	private const string MySQL = "MySQL";
+	private const string MongoDb = "MongoDB";
 	
 	private IniData _mainConfig;
 	private IniData _dbConfig;
@@ -58,5 +60,15 @@ public class ConfigParser
 				break;
 		}	
 			
+	}
+	
+	public MongoDbSettings GetMongoDbSettings()
+	{
+		var settings = new MongoDbSettings
+		{
+			ConnectionString = _dbConfig[MongoDb]["ConnectionString"],
+			DatabaseName = _dbConfig[MongoDb]["DataBase"]			
+		};
+		return settings;
 	}
 }

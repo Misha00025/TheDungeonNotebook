@@ -7,8 +7,8 @@ namespace Tdn.Security;
 
 public class ResourceAccessHandler : AuthorizationHandler<ResourceRequirement>
 {
-	private readonly IHttpInfoContainer _infoContainer;	
-	public ResourceAccessHandler(IHttpInfoContainer infoContainer) : base()
+	private readonly IAccessContext _infoContainer;	
+	public ResourceAccessHandler(IAccessContext infoContainer) : base()
 	{
 		_infoContainer = infoContainer;
 	}

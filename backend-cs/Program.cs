@@ -5,8 +5,9 @@ using Tdn.Configuration;
 using Microsoft.AspNetCore.Authentication;
 using Tdn.Db.Configuers;
 using Tdn.Db.Contexts;
-using Tdn.Parsing.Http;
 using Microsoft.EntityFrameworkCore;
+using Tdn.Settings;
+using Tdn.Db;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = new ConfigParser("config.ini");
@@ -16,15 +17,17 @@ builder.Services.AddMvc();
 
 builder.Services.AddHttpContextAccessor();
 
+builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
 builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigurer>();
 builder.Services.AddDbContext<AppDbContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<TokensContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<AccessDbContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<GroupContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<UserContext>(config.ConfigDbConnections);
+builder.Services.AddSingleton(_ => new MongoDbContext(config.GetMongoDbSettings()));
 
 builder.Services.AddScoped<IAccessLevelProvider, AccessLevelProvider>();
-builder.Services.AddScoped<IHttpInfoContainer, HttpInfoContainer>();
+builder.Services.AddScoped<IAccessContext, AccessContext>();
 
 builder.Services.AddSingleton<IAuthorizationHandler, AuthTypeHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, ResourceAccessHandler>();

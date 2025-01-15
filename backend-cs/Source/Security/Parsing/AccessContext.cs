@@ -1,31 +1,30 @@
 using System.Security.Claims;
 using Tdn.Security.Conversions;
-using Tdn.Security;
 
-namespace Tdn.Parsing.Http;
+namespace Tdn.Security;
 
-public interface IHttpInfoContainer
+public interface IAccessContext
 {
 	int SelfId { get; }
 	string AccessType { get; }
-	IReadOnlyDictionary<Resource, HttpResourceInfo> ResourceInfo { get; }
+	IReadOnlyDictionary<Resource, ResourceAccessInfo> ResourceInfo { get; }
 	bool Has(Resource resource);
 }
 
-public struct HttpResourceInfo
+public struct ResourceAccessInfo
 {
 	public int Id;
 	public AccessLevel AccessLevel;
 }
 
-public class HttpInfoContainer : IHttpInfoContainer
+public class AccessContext : IAccessContext
 {	
 	
-	private readonly Dictionary<Resource, HttpResourceInfo> _accessCollection = new();
+	private readonly Dictionary<Resource, ResourceAccessInfo> _accessCollection = new();
 	private readonly IAccessLevelProvider _provider;
 	private readonly HttpParser _httpParser;
 	
-	public HttpInfoContainer(IHttpContextAccessor contextAccessor, IAccessLevelProvider accessProvider)
+	public AccessContext(IHttpContextAccessor contextAccessor, IAccessLevelProvider accessProvider)
 	{
 		_provider = accessProvider;
 		_httpParser = new();
@@ -61,7 +60,7 @@ public class HttpInfoContainer : IHttpInfoContainer
 			return;
 		SelfId = selfId;
 		var accessLevel = GetAccessLevel(resource, id, name, AccessType);
-		var info = new HttpResourceInfo(){Id=id, AccessLevel=accessLevel};
+		var info = new ResourceAccessInfo(){Id=id, AccessLevel=accessLevel};
 		_accessCollection.Add(resource, info);
 	}
 
@@ -69,7 +68,7 @@ public class HttpInfoContainer : IHttpInfoContainer
 
 	public string AccessType { get; private set; } = Role.None;
 	
-	public IReadOnlyDictionary<Resource, HttpResourceInfo> ResourceInfo => _accessCollection;
+	public IReadOnlyDictionary<Resource, ResourceAccessInfo> ResourceInfo => _accessCollection;
 	public bool Has(Resource resource) =>
 			ResourceInfo.ContainsKey(resource);
 }
