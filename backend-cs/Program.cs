@@ -8,6 +8,8 @@ using Tdn.Db.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Tdn.Settings;
 using Tdn.Db;
+using Tdn.Models.Providing;
+using Tdn.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = new ConfigParser("config.ini");
@@ -24,7 +26,10 @@ builder.Services.AddDbContext<TokensContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<AccessDbContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<GroupContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<UserContext>(config.ConfigDbConnections);
-builder.Services.AddSingleton(_ => new MongoDbContext(config.GetMongoDbSettings()));
+builder.Services.AddScoped(_ => new MongoDbContext(config.GetMongoDbSettings()));
+
+builder.Services.AddScoped<IModelProvider<User>, UserProvider>();
+
 
 builder.Services.AddScoped<IAccessLevelProvider, AccessLevelProvider>();
 builder.Services.AddScoped<IAccessContext, AccessContext>();
