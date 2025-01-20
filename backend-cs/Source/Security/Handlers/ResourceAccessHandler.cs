@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Tdn.Security.Conversions;
-using Tdn.Parsing.Http;
 
 namespace Tdn.Security;
 
