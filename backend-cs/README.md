@@ -1,32 +1,43 @@
 # Оглавление
 
 - [Оглавление](#оглавление)
-- [Уровни доступа](#уровни-доступа)
-- [Структуры данных](#структуры-данных)
-  - [Общая структура](#общая-структура)
-  - [Пользователь (user)](#пользователь-user)
-  - [Группа (group)](#группа-group)
-  - [Персонаж (character)](#персонаж-character)
-  - [Предмет (item)](#предмет-item)
-  - [Шаблон персонажа (character\_template)](#шаблон-персонажа-character_template)
-- [Методы](#методы)
-  - [GET account](#get-account)
-    - [GET groups](#get-groups)
-  - [GET groups/\<group\_id\>](#get-groupsgroup_id)
-    - [GET users](#get-users)
-    - [PUT users](#put-users)
-    - [DELETE users](#delete-users)
-    - [GET characters](#get-characters)
-      - [GET templates](#get-templates)
-      - [POST templates](#post-templates)
-      - [DELETE templates](#delete-templates)
-    - [POST characters](#post-characters)
-    - [DELETE characters](#delete-characters)
-    - [GET items](#get-items)
-    - [POST items](#post-items)
-    - [DELETE items](#delete-items)
+- [API](#api)
+  - [Уровни доступа](#уровни-доступа)
+  - [Структуры данных](#структуры-данных)
+    - [Общая структура](#общая-структура)
+    - [Пользователь (user)](#пользователь-user)
+    - [Группа (group)](#группа-group)
+    - [Персонаж (character)](#персонаж-character)
+    - [Предмет (item)](#предмет-item)
+    - [Заметка (note)](#заметка-note)
+    - [Шаблон персонажа (character\_template)](#шаблон-персонажа-character_template)
+  - [Методы](#методы)
+    - [GET account](#get-account)
+      - [GET groups](#get-groups)
+    - [GET groups/\<group\_id\>](#get-groupsgroup_id)
+      - [GET users](#get-users)
+      - [PUT users](#put-users)
+      - [DELETE users](#delete-users)
+      - [GET characters](#get-characters)
+        - [GET templates](#get-templates)
+        - [POST templates](#post-templates)
+        - [DELETE templates](#delete-templates)
+      - [POST characters](#post-characters)
+      - [DELETE characters](#delete-characters)
+      - [GET items](#get-items)
+      - [POST items](#post-items)
+      - [DELETE items](#delete-items)
+    - [GET characters/\<character\_id\>](#get-characterscharacter_id)
+      - [GET notes](#get-notes)
+      - [POST notes](#post-notes)
+        - [PUT notes/\<note\_id\>](#put-notesnote_id)
+        - [DELETE notes/\<note\_id\>](#delete-notesnote_id)
+      - [GET items](#get-items-1)
+    - [PATCH characters/\<character\_id\>](#patch-characterscharacter_id)
 
-# Уровни доступа
+# API
+
+## Уровни доступа
 
 Каждый запрос к API проходит две проверки: 
 - Проверка доступа к ресурсу;
@@ -46,11 +57,11 @@
 
 Уровень доступа указывается в графе `"Доступ: <уровень_доступа>"`.Если уровень доступа не указан, то по-умолчанию он считается как "Чтение".
 
-# Структуры данных
+## Структуры данных
 
 В этой главе описаны структуры данных, возвращаемые со стороны API
 
-## Общая структура
+### Общая структура
 
 Каждый GET-запрос возвращает данные в соответсвии со следующей структурой:
 
@@ -66,13 +77,13 @@
 Поле `data` заполняется данными, специфичными для выбранного типа ресурса.
 
 В качестве дополнительных элементов данных могут быть:
-- `access_level`, в котором может быть одно из 4 значений:
+- `access_level` - поле указывающее уровень доступа к ресурсу. Указывается в get-запросах к одному из существующих ресурсов. В поле может быть одно из 4 значений:
   - `None` - нет доступа;
   - `Follower` - Уровень доступа "Чтение";
   - `Moderator` - Уровень доступа "Изменение";
   - `Admin` - Уровень доступа "Полный";
 
-## Пользователь (user)
+### Пользователь (user)
 
 ```json
 {
@@ -86,7 +97,7 @@
 Дополнительные поля:
 - `access_level` - уровень доступа к ресурсу;
 
-## Группа (group)
+### Группа (group)
 
 ```json
 {
@@ -101,7 +112,7 @@
 - `admins` - список пользователей с уровнем доступа `"Admin"` в соответствии со структурой [`user`](#пользователь-user);
 - `characters` - список персонажей, к которым есть доступ, в соответствии со структурой [`character`](#персонаж-character).
 
-## Персонаж (character)
+### Персонаж (character)
 
 ```json
 {
@@ -113,33 +124,52 @@
 ```
 
 Возможные дополнительные поля:
+- `notes` - список всех заметок персонажа, записанных согласно структуре [`note`](#заметка-note)
 - `inventory` - список всех предметов персонажа, записанных согласно структуре [`item`](#предмет-item);
 - `template` - содержит информацию об используемом шаблоне персонажа. Имеет стрктуру согласно [`character_template`](#шаблон-персонажа-character_template)
-- переопределённые поля используемого шаблона. Т.е. поля с изменёнными значениями.
+- `charsheet` - Описывает поля листа персонажа с заданными значениями. Соответствует структуре [`character_template`](#шаблон-персонажа-character_template).
 
-## Предмет (item)
-
-```json
-{
-  // TODO: доделать
-}
-```
-
-## Шаблон персонажа (character_template)
+### Предмет (item)
 
 ```json
 {
-  // TODO: доделать
+  "id": "",
+  "name": "...",
+  "description": "...",
+  // additions
+}
+```
+Дополнительные поля:
+- `amount` - количество предмета.
+
+### Заметка (note)
+
+```json
+{
+  "header": "",
+  "body": ""
 }
 ```
 
-# Методы
+### Шаблон персонажа (character_template)
+
+```json
+{
+  "id": "",
+  "name": "...",
+  "description": "...",
+}
+```
+Дополнительные поля:
+- `fields` - список пунктов листа персонажа
+
+## Методы
 
 API на данный момент находится в разработке, всвязи с чем некоторые методы могут перестать работать/существовать/поддерживаться.
 
 Ниже описаны уже реализованные методы или методы планируемые к реализации.
 
-## GET account
+### GET account
 
 URI: \<host\>/account<br>
 Ресурс: User<br>
@@ -147,13 +177,13 @@ URI: \<host\>/account<br>
 
 Возвращает информацию об аккаунте авторизовавшегося пользователя согласно структуре [`user`](#пользователь-user)
 
-### GET groups
+#### GET groups
 
 URI: \<parrent\>/groups<br>
 
 Возвращает список групп ([`group`](#группа-group)) пользователя. Список возвращается в поле `groups` секции `data` 
 
-## GET groups/<group_id>
+### GET groups/<group_id>
 
 URI: \<host\>/groups/\<group_id\><br>
 Ресурс: Group <br>
@@ -161,14 +191,14 @@ URI: \<host\>/groups/\<group_id\><br>
 
 Возвращает информацию о группе, согласно структуре [`group`](#группа-group). Всегда использует дополнительные поля: `characters`, `admins`.
 
-### GET users
+#### GET users
 
 URI: \<parrent\>/users<br>
 Доступ: Full
 
 Возвращает список пользователей ([`user`](#пользователь-user)) в поле `users` секции `data`. Использует поле `access_level`.
 
-### PUT users
+#### PUT users
 
 URI: \<parrent\>/users<br>
 Доступ: Full
@@ -182,14 +212,14 @@ URI: \<parrent\>/users<br>
 ``` 
 Добавляет пользователя к группе или изменяет его уровень доступа.
 
-### DELETE users
+#### DELETE users
 
 URI: \<parrent\>/users<br>
 Доступ: Full
 
 Требует указать параметр запроса: `id`, указывающий идентификатор удаляемого пользователя. Удаляет пользователя из группы.
 
-### GET characters
+#### GET characters
 
 URI: \<parrent\>/characters<br>
 
@@ -199,7 +229,7 @@ URI: \<parrent\>/characters<br>
 - `start` - позиция, с которой отсчитываются персонажи (default = 0);
 - `count` - количество передаваемых персонажей (default = 0). При значении 0, возвращает полный список персонажей.
 
-#### GET templates
+##### GET templates
 
 URI: \<parrent\>/templates<br>
 Доступ: Full
@@ -210,7 +240,7 @@ URI: \<parrent\>/templates<br>
 - `start` - позиция, с которой отсчитываются шаблоны (default = 0);
 - `count` - количество передаваемых шаблонов (default = 0). При значении 0, возвращает полный список шаблонов.
 
-#### POST templates
+##### POST templates
 
 URI: \<parrent\>/templates<br>
 Доступ: Full
@@ -219,12 +249,12 @@ URI: \<parrent\>/templates<br>
 
 // TODO: add PUT to temlates
 
-#### DELETE templates
+##### DELETE templates
 
 URI: \<parrent\>/templates<br>
 Доступ: Full
 
-### POST characters
+#### POST characters
 
 URI: \<parrent\>/caracters<br>
 Доступ: Full
@@ -233,14 +263,14 @@ URI: \<parrent\>/caracters<br>
 - `template_id` - идентификатор шаблона, из которого формируется персонаж;
 - (опционально) `owner_id` - идентификатор пользователя, которому будет назначен персонаж.
 
-### DELETE characters
+#### DELETE characters
 
 URI: \<parrent\>/characters<br>
 Доступ: Full
 
 Принимает параметр `id`, который означает идентификатор удаляемого персонажа.
 
-### GET items
+#### GET items
 
 URI: \<parrent\>/items<br>
 Доступ: Full
@@ -249,9 +279,10 @@ URI: \<parrent\>/items<br>
 
 Доступны параметры поиска:
 - `start` - позиция, с которой отсчитываются предметы (default = 0);
-- `count` - количество передаваемых предметов (default = 0). При значении 0, возвращает полный список предметов.
+- `count` - количество передаваемых предметов (default = 0). При значении 0, возвращает полный список предметов;
+- `name` - принимает подстроку для фильтрации предметов по имени;
 
-### POST items
+#### POST items
 
 URI: \<parrent\>/items<br>
 Доступ: Full
@@ -260,9 +291,63 @@ URI: \<parrent\>/items<br>
 
 // TODO: add PATCH or PUT to items
 
-### DELETE items
+#### DELETE items
 
 URI: \<parrent\>/items<br>
 Доступ: Full
 
 Принимает параметр `id`, который означает идентификатор удаляемого предмета.
+
+### GET characters/<character_id>
+
+URI: \<host\>/characters/\<character_id\><br>
+Ресурс: Character <br>
+Доступ: Read
+
+Возвращает информацию о персонаже, согласно структуре [`character`](#персонаж-character) с дополнительным полем `charlist`.
+
+#### GET notes
+
+URI: \<parrent\>/notes<br>
+Доступ: Read
+
+Возвращает список заметок по персонажу в поле `notes` секции `data`, согласно структуре [`note`](#заметка-note)
+
+Параметры поиска:
+- `start` - позиция, с которой отсчитываются предметы (default = 0);
+- `count` - количество передаваемых предметов (default = 0). При значении 0, возвращает полный список предметов;
+- `order_by` - определяет способ сортировки заметок (пока бесполезно).
+
+#### POST notes
+
+URI: \<parrent\>/notes<br>
+Доступ: Write
+
+Принимает в теле запроса структуру типа [`note`](#заметка-note) и создаёт заметку по полученным данным.
+
+##### PUT notes/<note_id>
+
+URI: \<parrent\>/<note_id>
+
+Принимает в теле запроса структуру типа [`note`](#заметка-note) и заменяет содержимое существующей заметки на новое.
+
+##### DELETE notes/<note_id>
+
+URI: \<parrent\>/<note_id>
+
+Удаляет заметку с заданным `note_id`
+
+#### GET items
+
+URI: \<parrent\>/items<br>
+Доступ: Read
+
+Аналогичен методу [`groups/<group_id>/items`](#get-items), но возвращает список предметов персонажа. Для каждого предмета добавляется поле `amount`
+
+### PATCH characters/<character_id>
+
+URI: \<host\>/characters/\<character_id\><br>
+Ресурс: Character <br>
+Доступ: Write
+
+Принимает в теле запроса одно или несколько полей из базовой структуры [`character`](#персонаж-character). Игнорирует дополнительные поля. Заменяет поля существующего персонажа полями из переданных данных.
