@@ -10,11 +10,12 @@ check_port_occupied() {
     return $?
 }
 
+sleep 13
 # Ждем готовности первого приложения
-while ! check_port_occupied; do
-    echo "Ожидание доступности порта 5077..."
-    sleep 1
-done
+# while ! check_port_occupied; do
+#     echo "Ожидание доступности порта 5077..."
+#     sleep 1
+# done
 
 # Собираем все аргументы, переданные скрипту, кроме имени самого скрипта ($0)
 PARAMS="${@:1}"

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Tdn.Models;
+using Tdn.Models.Conversions;
 using Tdn.Security;
 
 namespace Tdn.Api.Controllers;
@@ -11,12 +12,18 @@ namespace Tdn.Api.Controllers;
 [Route("account")]
 public class UserController : BaseController<User>
 {
-	public UserController(ILogger logger)
+	ILogger<UserController> _logger;
+	public UserController(ILogger<UserController> logger)
 	{
-		logger.LogDebug("User Controller Created");
+		_logger = logger;
 	}
 	
-	protected override string GetUUID() => container.ResourceInfo[Resource.User].Id.ToString();
+	protected override string GetUUID() => Container.ResourceInfo[Resource.User].Id.ToString();
 	
-	
+	[HttpGet]
+	public ActionResult GetInfo()
+	{
+		var model = Model;
+		return Ok(model.ToDict(addGroups:true));
+	}
 }

@@ -6,25 +6,42 @@ namespace Tdn.Api.Controllers;
 
 public abstract class BaseController<T> : ControllerBase
 {
-	private readonly IModelProvider<T> _modelProvider;
-	protected T model { get; private set; }
+
+	private IModelProvider<T>? _modelProvider;	
+	private T? _model;
+	private IAccessContext? _container;
 	
-	protected readonly IAccessContext container;
-	protected int SelfId => container.SelfId;
+	protected IModelProvider<T> ModelProvider => GetProvider();
+	protected T Model => GetModel();
+	protected IAccessContext Container => GetAccessContext();
 	
-	public BaseController() 
+	protected int SelfId => Container.SelfId;
+
+	private T GetModel()
 	{
-		var services = HttpContext.RequestServices;
-		_modelProvider = services.GetRequiredService<IModelProvider<T>>();
-		container = services.GetRequiredService<IAccessContext>();
-		string uuid = GetUUID();
-		model = _modelProvider.GetModel(uuid);
+		if (_model == null)
+			_model = ModelProvider.GetModel(GetUUID());
+		return _model;		
+	}
+
+	private IModelProvider<T> GetProvider()
+	{
+		if (_modelProvider == null)
+			_modelProvider = HttpContext.RequestServices.GetRequiredService<IModelProvider<T>>();
+		return _modelProvider;
+	}
+
+	private IAccessContext GetAccessContext()
+	{
+		if (_container == null)
+			_container = HttpContext.RequestServices.GetRequiredService<IAccessContext>();
+		return _container;
 	}
 	
 	protected abstract string GetUUID();
 	
 	// TODO: Add method to get value from Request Route as some Type. For example: T GetFromRoute<T>(string name)
-	protected bool TrySaveModel(T model) => _modelProvider.TrySaveModel(model);
+	protected bool TrySaveModel(T model) => ModelProvider.TrySaveModel(model);
 	
 	protected bool IsDebug() => Request.Query.TryGetValue("debug", out var debugStr) && bool.TryParse(debugStr, out var debug) && debug;
 }

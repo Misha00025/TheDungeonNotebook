@@ -19,6 +19,8 @@ builder.Services.AddMvc();
 
 builder.Services.AddHttpContextAccessor();
 
+builder.Services.AddLogging(e => e.AddConsole());
+
 builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
 builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigurer>();
 builder.Services.AddDbContext<AppDbContext>(config.ConfigDbConnections);
