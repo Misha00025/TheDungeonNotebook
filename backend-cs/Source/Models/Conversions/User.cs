@@ -13,13 +13,13 @@ internal static class UserConvertExtensions
 		};
 		if (addGroups)
 		{
-			var groups = model.PrepareGroups();
+			var groups = model.PrepareGroupDicts();
 			result.Add("groups", groups);
 		}
 		return result;
 	}
 	
-	private static List<Dictionary<string, object>> PrepareGroups(this User model)
+	private static List<Dictionary<string, object>> PrepareGroupDicts(this User model)
 	{
 		return new();
 	}
