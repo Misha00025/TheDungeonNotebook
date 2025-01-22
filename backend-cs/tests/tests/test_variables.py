@@ -11,16 +11,19 @@ CHARACTER_ID = "character_id"
 WITH_OWNERS = "with_owners"
 
 OK = 200
-FORBID = 403
 CREATED = 201
-NOT_ALLOW = 405
-NOT_FOUND = 404
 BAD = 400
+NOT_AUTH = 401
+FORBID = 403
+NOT_FOUND = 404
+NOT_ALLOW = 405
 
 
 default_debug = True
 compact = False
 debug = False
+
+nah = headers_template.copy()
 
 uh = headers_template.copy()
 uh[_at] = "1"

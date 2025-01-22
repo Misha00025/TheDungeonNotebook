@@ -1,13 +1,18 @@
 from requests import Response
+import tests.test_variables as tv
 from .templates import Test
 
 
 def trying(func):
     def wrapper(*args, **kwarg):
         try:
-            return func(args, kwarg)
-        except Exception:
+            return func(*args, **kwarg)
+        except Exception as e:
+            if tv.debug:
+                print(f"Exception: {e}")
             return False
+    # wrapper.__name__ = func.__name__
+    return wrapper
 
 
 def _valid_data(body: dict, t):
@@ -22,12 +27,16 @@ def _valid_data(body: dict, t):
         case "owner":
             keys = ["id", ""]
     for key in keys:
+        if tv.debug:
+            print(f"DEBUG: Check {key} in {body.keys()}")
         if key not in body.keys():
             return False
     return True
 
 @trying
 def check_user_data(t: Test, r: Response):
+    if tv.debug:
+        print(f"DEBUG: Type of result: {type(r)} - {r}")
     body:dict = r.json()
     return _valid_data(body, "user")
 

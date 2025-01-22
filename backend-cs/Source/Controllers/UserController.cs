@@ -26,4 +26,11 @@ public class UserController : BaseController<User>
 		var model = Model;
 		return Ok(model.ToDict(addGroups:true));
 	}
+	
+	[HttpGet("groups")]
+	public ActionResult GetGroups()
+	{
+		
+		return Ok();
+	}
 }

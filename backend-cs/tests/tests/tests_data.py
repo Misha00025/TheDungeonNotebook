@@ -7,9 +7,10 @@ tests:list[Test]=[]
 
 def user_extend(tests:list):
     tests.extend([
+        Test(headers=nah, request=f"account", requirement=NOT_AUTH),
+        Test(headers=nah, request=f"account/groups", requirement=NOT_AUTH),
         Test(headers=uh, request=f"account", is_valid=check_user_data),
-        # Test(headers=uh, request=f"users/{su}", requirement=FORBID),
-        # Test(headers=uh, request=f"users/{mu}/groups", is_valid=check_many_groups, check_access=True),
+        Test(headers=uh, request=f"account/groups"),
     ])
 
 def group_extend(tests:list):

@@ -1,5 +1,6 @@
 import requests
 from .test_variables import DEBUG, default_debug
+import tests.test_variables as tv
 
 
 class Test:
@@ -24,6 +25,7 @@ class Test:
         self.check_access = check_access
 
         self.requirement = requirement
+        # print(is_valid)
         self._is_valid = is_valid
 
 
@@ -31,4 +33,7 @@ class Test:
         correct_code = self.requirement == res.status_code
         if self._is_valid is None:
             return correct_code
+        if tv.debug:
+            print(f"DEBUG: Type of result: {type(res)} - {res.text}")
+            print(f"DEBUG: Validation method name: {self._is_valid.__name__}")
         return self._is_valid(self, res) and correct_code

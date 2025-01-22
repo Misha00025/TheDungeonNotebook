@@ -9,7 +9,7 @@ internal static class UserConvertExtensions
 			{"id", model.Id},
 			{"first_name", model.FirstName},
 			{"last_name", model.LastName},
-			{"icon", model.Icon}
+			{"photo_link", model.Icon}
 		};
 		if (addGroups)
 		{
