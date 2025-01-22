@@ -1,8 +1,7 @@
 namespace Tdn.Db.Entities;
 
-public class GroupData
+public class GroupData : IndexedData
 {
-	public int Id;
 	public string Name = "";
 	public string? Icon;
 }

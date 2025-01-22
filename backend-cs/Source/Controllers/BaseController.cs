@@ -43,7 +43,7 @@ public abstract class BaseController<T> : ControllerBase
 	protected abstract string GetUUID();
 	
 	// TODO: Add method to get value from Request Route as some Type. For example: T GetFromRoute<T>(string name)
-	protected bool TrySaveModel(T model) => ModelProvider.TrySaveModel(model);
+	protected bool TrySaveModel(T model) => throw new NotImplementedException();
 	
 	protected bool IsDebug() => Request.Query.TryGetValue("debug", out var debugStr) && bool.TryParse(debugStr, out var debug) && debug;
 

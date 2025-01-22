@@ -6,28 +6,12 @@ using Tdn.Security;
 
 namespace Tdn.Models.Providing;
 
-public class UserProvider : IModelProvider<User>
+public class UserProvider : SQLModelProvider<User, UserContext, UserData>
 {
-	private int _lastId;
-	private UserData? _lastData;
-	
-	private UserContext _dbContext;
-	
-	public UserProvider(UserContext dbContext)
+	public UserProvider(UserContext dbContext) : base(dbContext)
 	{
-		_dbContext = dbContext;
 	}
-	
-	private UserData? Find(int id)
-	{
-		if (id != _lastId)
-		{
-			_lastId = id;
-			_lastData = _dbContext.Users.FirstOrDefault(e => e.Id == id);	
-		}
-		return _lastData;
-	}
-	
+
 	private UserInfo Convert(UserData? data)
 	{		
 		if (data == null)
@@ -63,36 +47,12 @@ public class UserProvider : IModelProvider<User>
 				
 		return groups;
 	}
-	
-	public User GetModel(string uuid)
+
+	protected override User BuildModel(UserData? data)
 	{
-		if (!int.TryParse(uuid, out int id))
-			throw new Exception("Can't parse uuid to int to find User");
-		var info = Convert(Find(id));
-		var groups = GetGroups(id);
+		var info = Convert(data);
+		var groups = GetGroups(info.Id);
 		var user = new User(info, groups);
 		return user;
-	}
-
-	public bool TrySaveModel(User model)
-	{
-		var data = Find(model.Id);
-		bool isNew = data == null;
-		if (data == null)
-			data = new UserData();
-		data.FirstName = model.FirstName;
-		data.LastName = model.LastName;
-		data.PhotoLink = model.Icon;
-		try
-		{		
-			if (isNew)
-				_dbContext.Users.Add(data);
-			_dbContext.SaveChanges();
-			return true;
-		}
-		catch
-		{
-			return false;
-		}
 	}
 }

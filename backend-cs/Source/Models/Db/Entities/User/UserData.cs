@@ -1,8 +1,7 @@
 namespace Tdn.Db.Entities
 {
-	public class UserData
+	public class UserData : IndexedData
 	{
-		public int Id;
 		public string FirstName = "";
 		public string LastName = "";
 		public string? PhotoLink;
