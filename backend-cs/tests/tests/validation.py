@@ -10,71 +10,94 @@ def trying(func):
         except Exception as e:
             if tv.debug:
                 print(f"Exception: {e}")
-            return False
-    # wrapper.__name__ = func.__name__
+            return False, "Error"
+    wrapper.__name__ = func.__name__
     return wrapper
 
+def parsed(t, access_level = False, amount = False):
+    def decor(func):
+        @trying
+        def wrapper(test: Test, r: Response):
+            body:dict = get_data(r)
+            keys = _get_req(t, access_level, amount)
+            return func(body, keys), f"\n   |- Requirement fields: {keys}"
+        wrapper.__name__ = func.__name__
+        return wrapper
+    return decor
 
-def _valid_data(body: dict, t, access_level = False):
+
+def _get_req(t, access_level = False, amount = False):
     keys = []
     match(t):
         case "user":
             keys = ["id", "first_name", "last_name", "photo_link"]
-        case "character":
-            keys = ["id", "group_id", "name", "description"]
+        case "entity":
+            keys = ["id", "name", "description"]
         case "group":
             keys = ["id", "name", "photo_link"]
         case "owner":
             keys = ["id", ""]
+    if access_level:
+        keys.append("access_level")
+    if amount:
+        keys.append("amount")
+    return keys
+    
+
+
+def _valid_data(body: dict, keys):
     for key in keys:
         if tv.debug:
             print(f"DEBUG: Check {key} in {body.keys()}")
         if key not in body.keys():
-            return False
-    if access_level:
-        if "access_level" not in body.keys():
             return False
     return True
 
 def get_data(r: Response):
     return r.json()["data"]
 
-@trying
-def check_user_data(t: Test, r: Response):
-    if tv.debug:
-        print(f"DEBUG: Type of result: {type(r)} - {r}")
-    body:dict = get_data(r)
-    return _valid_data(body, "user")
+# prepared validators
 
-@trying
-def check_character_data(t: Test, r: Response):
-    body:dict = get_data(r)
-    return _valid_data(body, "character")
+@parsed("user")
+def check_user_data(body: dict, keys):
+    return _valid_data(body, keys)
 
-@trying 
-def check_many_characters(t: Test, r: Response):
-    body:dict = get_data(r)
+@parsed("user", access_level=True)
+def check_many_users(body: dict, keys):
+    body = body["users"]
+    for user in body:
+        if not _valid_data(user, keys):
+            return False
+    return True
+
+@parsed("entity")
+def check_character_data(body: dict, keys):
+    return _valid_data(body, keys)
+
+@parsed("entity", access_level=True)
+def check_many_characters(body: dict, keys):
     characters = body["characters"]
     for c in characters:
-        if not _valid_data(c, "character"):
+        if not _valid_data(c, keys):
             return False
-    return "characters" in body.keys()
+    return True
 
-@trying
-def check_group_data(t: Test, r: Response):
-    body:dict = get_data(r)
-    access_level = t.check_access
-    if access_level:
-        if "group" not in body.keys() or "access_level" not in body.keys():
-            return False
-        body = body["group"]        
-    return _valid_data(body, "group")
+@parsed("group")
+def check_group_data(body: dict, keys):
+    return _valid_data(body, keys)
 
-@trying
-def check_many_groups(t: Test, r: Response):
-    body:dict = get_data(r)
+@parsed("group", access_level=True)
+def check_many_groups(body: dict, keys):
     groups = body["groups"]
     for g in groups:
-        if not _valid_data(g, "group", access_level=True):
+        if not _valid_data(g, keys):
             return False
-    return "groups" in body.keys()
+    return True
+
+@parsed("entity")
+def check_many_items(body: dict, keys):
+    items = body["items"]
+    for i in items:
+        if not _valid_data(i, keys):
+            return False
+    return True

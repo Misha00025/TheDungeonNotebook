@@ -22,7 +22,7 @@ def start():
                 res = delete_test(headers, params, url)
 
         if res == None or not test.check(res):
-            print("ERROR:", get_text(res, test.request, test.method, params=test.params))
+            print("ERROR:", get_text(res, test.request, test.method, params=test.params) + test.message)
         elif test_variables.debug:
             print(get_text(res, test.request, test.method, params=test.params))
 
