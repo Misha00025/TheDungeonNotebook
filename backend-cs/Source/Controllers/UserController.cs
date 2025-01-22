@@ -24,13 +24,12 @@ public class UserController : BaseController<User>
 	public ActionResult GetInfo()
 	{
 		var model = Model;
-		return Ok(model.ToDict(addGroups:true));
+		return Ok(model.ToDict());
 	}
 	
 	[HttpGet("groups")]
 	public ActionResult GetGroups()
 	{
-		
-		return Ok();
+		return Ok(Model.ToDict(addGroups:true));
 	}
 }

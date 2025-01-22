@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Tdn.Models.Providing;
 using Tdn.Security;
+using Tdn.Security.Conversions;
 
 namespace Tdn.Api.Controllers;
 
@@ -44,4 +46,17 @@ public abstract class BaseController<T> : ControllerBase
 	protected bool TrySaveModel(T model) => ModelProvider.TrySaveModel(model);
 	
 	protected bool IsDebug() => Request.Query.TryGetValue("debug", out var debugStr) && bool.TryParse(debugStr, out var debug) && debug;
+
+	public override OkObjectResult Ok([ActionResultObjectValue] object? value)
+	{
+		var resource = Container.ResourceInfo.First();
+		var result = new Dictionary<string, object?>()
+		{
+			{"type", Container.AccessType},
+			{"data", value},
+			{"access_level", resource.Value.AccessLevel.ToAlias()}	
+		};
+		return base.Ok(result);
+	}
+
 }

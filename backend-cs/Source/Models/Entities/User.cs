@@ -17,14 +17,21 @@ public class User : Entity<UserInfo>
 		public GroupInfo info;
 		public AccessLevel accessLevel;
 	}
-	public User(UserInfo info, List<GroupAccess> groups) : base(info)
+	
+	private List<GroupAccess> _groups;
+	
+	public User(UserInfo info, List<GroupAccess>? groups = null) : base(info)
 	{
+		if (groups == null)
+			groups = new();
+		_groups = groups;
 	}
 	
 	public int Id => _info.Id;
 	public string FirstName => _info.FirstName;
 	public string LastName => _info.LastName;
 	public string? Icon => _info.Icon;
+	public IReadOnlyList<GroupAccess> Groups => _groups;
 
 	public override void SetNewInfo(UserInfo info)
 	{

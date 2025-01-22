@@ -1,3 +1,5 @@
+using Tdn.Security.Conversions;
+
 namespace Tdn.Models.Conversions;
 
 internal static class UserConvertExtensions
@@ -13,14 +15,28 @@ internal static class UserConvertExtensions
 		};
 		if (addGroups)
 		{
-			var groups = model.PrepareGroupDicts();
+			var groups = model.PrepareGroupsDicts();
 			result.Add("groups", groups);
 		}
 		return result;
 	}
 	
-	private static List<Dictionary<string, object>> PrepareGroupDicts(this User model)
+	public static Dictionary<string, object?> ToDict(this User.GroupAccess group)
 	{
-		return new();
+		return new()
+		{
+			{"id", group.info.Id},
+			{"name", group.info.Name},	
+			{"photo_link", group.info.Icon},	
+			{"access_level", group.accessLevel.ToAlias()},	
+		};
+	}
+	
+	private static List<Dictionary<string, object?>> PrepareGroupsDicts(this User model)
+	{
+		var list = new List<Dictionary<string, object?>>(model.Groups.Count);
+		foreach (var group in model.Groups)
+			list.Add(group.ToDict());
+		return list;
 	}
 }

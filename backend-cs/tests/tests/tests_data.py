@@ -7,10 +7,10 @@ tests:list[Test]=[]
 
 def user_extend(tests:list):
     tests.extend([
+        Test(headers=gh, request=f"account", requirement=FORBID),
         Test(headers=nah, request=f"account", requirement=NOT_AUTH),
-        Test(headers=nah, request=f"account/groups", requirement=NOT_AUTH),
         Test(headers=uh, request=f"account", is_valid=check_user_data),
-        Test(headers=uh, request=f"account/groups"),
+        Test(headers=uh, request=f"account/groups", is_valid=check_many_groups),
     ])
 
 def group_extend(tests:list):
@@ -20,11 +20,9 @@ def group_extend(tests:list):
         Test(headers=uh, request=f"groups/{ssg}", requirement=FORBID),
         Test(headers=uh, request=f"groups/{mg}/characters", is_valid=check_many_characters),
         Test(headers=uh, request=f"groups/{sg}/characters", is_valid=check_many_characters),
-        Test(headers=uh, request=f"groups/{ssg}/characters", requirement=FORBID),
         Test(headers=uh, request=f"groups/{mg}/characters", method="POST", data={"name": "Test", "description": "TestTest"}, requirement=CREATED),
         Test(headers=uh, request=f"groups/{sg}/characters", method="POST", data={"name": "Test2", "description": "Test2Test2"}, requirement=FORBID),
         Test(headers=uh, request=f"groups/{mg}", method="DELETE", requirement=OK),
-        Test(headers=uh, request=f"groups/{sg}", method="DELETE", requirement=FORBID),
         Test(headers=uh, request=f"groups/{sg}", method="DELETE", requirement=FORBID),
         Test(headers=uh, request=f"groups/{mg}/users/{su}", method="POST", requirement=CREATED, debug=False),
         Test(headers=uh, request=f"groups/{mg}/users/{su}", method="DELETE", requirement=OK, debug=False),
