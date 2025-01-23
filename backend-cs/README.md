@@ -103,7 +103,7 @@
 {
   "id": "...",
   "name": "...",
-  "description": "...",
+  "photo_link": "...",
   // additions
 }
 ```

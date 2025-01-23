@@ -10,14 +10,13 @@ public abstract class SQLModelProvider<TModel, TData> : IModelProvider<TModel>
 	private TData? _lastData;
 
 	protected DbContext _dbContext;
-	
+
 	public SQLModelProvider(DbContext dbContext)
 	{
 		_dbContext = dbContext;
 	}
 	
-	public delegate void OnModelBuilded(TModel model, TData? data);
-	public event OnModelBuilded? ModelBuilded;
+	public event IModelProvider<TModel>.OnModelBuilded? ModelBuilded;
 	
 	protected abstract TModel BuildModel(TData? data);
 	
@@ -37,7 +36,7 @@ public abstract class SQLModelProvider<TModel, TData> : IModelProvider<TModel>
 			throw new Exception("Can't parse uuid to int to find User");
 		var data = Find(id);
 		var model = BuildModel(data);
-		ModelBuilded?.Invoke(model, data);
+		ModelBuilded?.Invoke(model);
 		return model;
 	}
 }

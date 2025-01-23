@@ -23,6 +23,7 @@ public class Group : Entity<GroupInfo>
 		_users = users;
 	}
 	
+	public GroupInfo Info => _info;
 	public int Id => _info.Id;
 	public string Name => _info.Name;
 	public string? Icon => _info.Icon;

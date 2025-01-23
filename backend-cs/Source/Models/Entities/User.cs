@@ -27,6 +27,7 @@ public class User : Entity<UserInfo>
 		_groups = groups;
 	}
 	
+	public UserInfo Info => _info;
 	public int Id => _info.Id;
 	public string FirstName => _info.FirstName;
 	public string LastName => _info.LastName;
