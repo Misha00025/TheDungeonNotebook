@@ -31,6 +31,7 @@ builder.Services.AddDbContext<UserContext>(config.ConfigDbConnections);
 builder.Services.AddScoped(_ => new MongoDbContext(config.GetMongoDbSettings()));
 
 builder.Services.AddScoped<IModelProvider<User>, UserProvider>();
+builder.Services.AddScoped<IModelProvider<Group>, GroupProvider>();
 
 
 builder.Services.AddScoped<IAccessLevelProvider, AccessLevelProvider>();

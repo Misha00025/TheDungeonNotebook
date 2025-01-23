@@ -12,12 +12,6 @@ namespace Tdn.Api.Controllers;
 [Route("account")]
 public class UserController : BaseController<User>
 {
-	ILogger<UserController> _logger;
-	public UserController(ILogger<UserController> logger)
-	{
-		_logger = logger;
-	}
-	
 	protected override string GetUUID() => Container.ResourceInfo[Resource.User].Id.ToString();
 	
 	[HttpGet]

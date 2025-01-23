@@ -1,7 +1,12 @@
 #!/bin/bash
 
+dotnet build > test.log 2>&1 &
+BUILD_PID=$!
+
+wait $BUILD_PID
+
 # Запускаем первое приложение, перенаправляя stdout и stderr в файл test.log
-dotnet run > test.log 2>&1 &
+dotnet run >> test.log 2>&1 &
 APP1_PID=$!
 
 # Функция для проверки доступности порта 5077
@@ -10,7 +15,7 @@ check_port_occupied() {
     return $?
 }
 
-sleep 13
+sleep 11
 # Ждем готовности первого приложения
 # while ! check_port_occupied; do
 #     echo "Ожидание доступности порта 5077..."

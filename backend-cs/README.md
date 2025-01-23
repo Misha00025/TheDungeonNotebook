@@ -16,8 +16,6 @@
       - [GET groups](#get-groups)
     - [GET groups/\<group\_id\>](#get-groupsgroup_id)
       - [GET users](#get-users)
-      - [PUT users](#put-users)
-      - [DELETE users](#delete-users)
       - [GET characters](#get-characters)
         - [GET templates](#get-templates)
         - [POST templates](#post-templates)
@@ -197,27 +195,6 @@ URI: \<parrent\>/users<br>
 Доступ: Full
 
 Возвращает список пользователей ([`user`](#пользователь-user)) в поле `users` секции `data`. Использует поле `access_level`.
-
-#### PUT users
-
-URI: \<parrent\>/users<br>
-Доступ: Full
-
-Принимает данные в формате: 
-```json
-{
-  "id": 0,
-  "access_level": ""
-}
-``` 
-Добавляет пользователя к группе или изменяет его уровень доступа.
-
-#### DELETE users
-
-URI: \<parrent\>/users<br>
-Доступ: Full
-
-Требует указать параметр запроса: `id`, указывающий идентификатор удаляемого пользователя. Удаляет пользователя из группы.
 
 #### GET characters
 

@@ -8,9 +8,7 @@ def trying(func):
         try:
             return func(*args, **kwarg)
         except Exception as e:
-            if tv.debug:
-                print(f"Exception: {e}")
-            return False, "Error"
+            return False, f"Exception: {e}"
     wrapper.__name__ = func.__name__
     return wrapper
 
@@ -35,8 +33,6 @@ def _get_req(t, access_level = False, amount = False):
             keys = ["id", "name", "description"]
         case "group":
             keys = ["id", "name", "photo_link"]
-        case "owner":
-            keys = ["id", ""]
     if access_level:
         keys.append("access_level")
     if amount:
@@ -62,7 +58,7 @@ def get_data(r: Response):
 def check_user_data(body: dict, keys):
     return _valid_data(body, keys)
 
-@parsed("user", access_level=True)
+@parsed("user")
 def check_many_users(body: dict, keys):
     body = body["users"]
     for user in body:
@@ -97,6 +93,14 @@ def check_many_groups(body: dict, keys):
 @parsed("entity")
 def check_many_items(body: dict, keys):
     items = body["items"]
+    for i in items:
+        if not _valid_data(i, keys):
+            return False
+    return True
+
+@parsed("entity")
+def check_many_templates(body: dict, keys):
+    items = body["templates"]
     for i in items:
         if not _valid_data(i, keys):
             return False
