@@ -3,18 +3,21 @@ using Tdn.Db.Entities;
 
 namespace Tdn.Models.Providing;
 
-public abstract class SQLModelProvider<TModel, TContext, TData> : IModelProvider<TModel> 
-			where TContext: DbContext where TData : IndexedData
+public abstract class SQLModelProvider<TModel, TData> : IModelProvider<TModel> 
+			where TData : IndexedData
 {
 	private int _lastId;
 	private TData? _lastData;
 
-	protected TContext _dbContext;
+	protected DbContext _dbContext;
 	
-	public SQLModelProvider(TContext dbContext)
+	public SQLModelProvider(DbContext dbContext)
 	{
 		_dbContext = dbContext;
 	}
+	
+	public delegate void OnModelBuilded(TModel model, TData? data);
+	public event OnModelBuilded? ModelBuilded;
 	
 	protected abstract TModel BuildModel(TData? data);
 	
@@ -32,7 +35,9 @@ public abstract class SQLModelProvider<TModel, TContext, TData> : IModelProvider
 	{
 		if (!int.TryParse(uuid, out int id))
 			throw new Exception("Can't parse uuid to int to find User");
-		var model = BuildModel(Find(id));
+		var data = Find(id);
+		var model = BuildModel(data);
+		ModelBuilded?.Invoke(model, data);
 		return model;
 	}
 }

@@ -6,7 +6,7 @@ using Tdn.Security;
 
 namespace Tdn.Models.Providing;
 
-public class UserProvider : SQLModelProvider<User, UserContext, UserData>
+public class UserProvider : SQLModelProvider<User, UserData>
 {
 	public UserProvider(UserContext dbContext) : base(dbContext)
 	{
@@ -16,18 +16,13 @@ public class UserProvider : SQLModelProvider<User, UserContext, UserData>
 	{		
 		if (data == null)
 			throw new Exception("User not found");
-		var info = new UserInfo(){
-			Id = data.Id, 
-			FirstName = data.FirstName, 
-			LastName = data.LastName,
-			Icon = data.PhotoLink			
-		};
+		var info = data.ToInfo();
 		return info;
 	}
 	
 	private List<User.GroupAccess> GetGroups(int userId)
 	{
-		var data = _dbContext.Groups.Where(e => e.UserId == userId).Include(e => e.Group).ToArray();
+		var data = _dbContext.Set<UserGroupData>().Where(e => e.UserId == userId).Include(e => e.Group).ToArray();
 		List<User.GroupAccess> groups = data.Select(e => 
 		{
 			if (e.Group == null)
