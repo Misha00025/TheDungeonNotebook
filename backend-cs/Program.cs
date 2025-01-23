@@ -23,7 +23,6 @@ builder.Services.AddLogging(e => e.AddConsole());
 
 builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
 builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigurer>();
-builder.Services.AddDbContext<AppDbContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<TokensContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<AccessDbContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<GroupContext>(config.ConfigDbConnections);
@@ -63,45 +62,8 @@ builder.Services.AddAuthentication("Token")
 	.AddScheme<AuthenticationSchemeOptions, TokenAuthenticationHandler>("Token", null);
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddOpenApiDocument((config) =>
-{
-	config.DocumentName = "TdnApi";
-	config.Title = "TdnApi v2";
-	config.Version = "v2";
-});
-
 builder.Services.AddControllers();
 
 var app = builder.Build();
-
-if (app.Environment.IsDevelopment())
-{
-	app.UseOpenApi();
-	app.UseSwaggerUi(config =>
-	{
-		config.DocumentTitle = "TodoAPI";
-		config.Path = "/swagger";
-		config.DocumentPath = "/swagger/{documentName}/swagger.json";
-		config.DocExpansion = "list";
-	});
-}
-
 app.MapControllers();
-
-using (var scope = app.Services.CreateScope())
-{
-	var serviceProvider = scope.ServiceProvider;
-
-	try
-	{
-		serviceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
-	}
-	catch (Exception ex)
-	{
-		// Логируем ошибку
-		var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
-		logger.LogInformation(ex, "An error occurred while migrating the database.");
-	}
-}
-
 app.Run();
