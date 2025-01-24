@@ -16,7 +16,7 @@ def migrate():
     )
     
     # Получение старых данных
-    users, groups, user_groups, notes, items = get_old_data(old_db_connection)
+    users, groups, user_groups, notes, items, user_items = get_old_data(old_db_connection)
     
     # Закрытие соединения со старой базой данных
     old_db_connection.close()
@@ -53,7 +53,7 @@ def migrate():
         for user in users:
             character_id += 1
             if any(user['vk_user_id'] == ug['vk_user_id'] and group['vk_group_id'] == ug['vk_group_id'] for ug in user_groups):
-                character_uuid = insert_character_to_mongo(MONGODB_URI, user, group, notes)
+                character_uuid = insert_character_to_mongo(MONGODB_URI, user, group, notes, user_items)
                 with new_db_connection.cursor() as cursor:
                     cursor.execute("REPLACE INTO `character` (`character_id`, `group_id`, `template_id`, `owner_id`, `uuid`) VALUES (%s, %s, %s, %s, %s)", (
                         character_id, int(group['vk_group_id']), template_id, user['vk_user_id'], character_uuid))

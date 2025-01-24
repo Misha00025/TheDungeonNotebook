@@ -22,10 +22,24 @@ def get_old_data(connection):
     # Получаем предметы
     cursor.execute("SELECT * FROM item")
     items = cursor.fetchall()
-    
+
+    query = """
+    SELECT i.owner_id,
+       it.group_id,
+       it.name,
+       it.description,
+       it.image_link,
+       ii.amount
+    FROM inventory i
+    JOIN inventory_item ii ON i.inventory_id = ii.inventory_id
+    JOIN item it ON ii.item_id = it.item_id;
+    """
+    cursor.execute(query)
+    user_items = cursor.fetchall()
+
     cursor.close()
     
-    return users, groups, user_groups, notes, items
+    return users, groups, user_groups, notes, items, user_items
 
 def update_new_tables(connection, users, groups, user_groups):
     cursor = connection.cursor()
