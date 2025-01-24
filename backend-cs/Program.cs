@@ -1,15 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
-using Tdn.Models.Db;
 using Tdn.Security;
 using Tdn.Configuration;
 using Microsoft.AspNetCore.Authentication;
 using Tdn.Db.Configuers;
 using Tdn.Db.Contexts;
-using Microsoft.EntityFrameworkCore;
 using Tdn.Settings;
 using Tdn.Db;
 using Tdn.Models.Providing;
 using Tdn.Models;
+using Tdn.Security.Db;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = new ConfigParser("config.ini");

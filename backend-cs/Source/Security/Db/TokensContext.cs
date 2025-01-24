@@ -4,7 +4,7 @@ using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 
 
-namespace Tdn.Models.Db;
+namespace Tdn.Security.Db;
 
 public class TokensContext : BaseDbContext<TokensContext>
 {

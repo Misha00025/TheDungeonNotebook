@@ -1,9 +1,9 @@
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Tdn.Db.Configuers;
+using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 
-namespace Tdn.Db.Contexts;
+namespace Tdn.Security.Db;
 
 public class AccessDbContext : BaseDbContext<AccessDbContext>
 {
