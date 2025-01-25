@@ -35,17 +35,10 @@ builder.Services.AddScoped<IModelProvider<Group>, GroupProvider>();
 builder.Services.AddScoped<IAccessLevelProvider, AccessLevelProvider>();
 builder.Services.AddScoped<IAccessContext, AccessContext>();
 
-builder.Services.AddSingleton<IAuthorizationHandler, AuthTypeHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, ResourceAccessHandler>();
 builder.Services.AddScoped<IAuthorizationHandler, AccessLevelHandler>();
 
 var aBuilder = builder.Services.AddAuthorizationBuilder();
-
-// Auth Type
-aBuilder.AddPolicy(Policy.AuthType.All, policy => policy.Requirements.Add(new AuthTypeRequirement(Access.All)));
-aBuilder.AddPolicy(Policy.AuthType.User, policy => policy.Requirements.Add(new AuthTypeRequirement(Access.User)));
-aBuilder.AddPolicy(Policy.AuthType.Group, policy => policy.Requirements.Add(new AuthTypeRequirement(Access.Group)));
-aBuilder.AddPolicy(Policy.UserOrGroup, policy => policy.Requirements.Add(new AuthTypeRequirement(Access.All)));
 
 // Resource Access
 aBuilder.AddPolicy(Policy.ResourceAccess.User, policy => policy.Requirements.Add(new ResourceRequirement(Resource.User)));

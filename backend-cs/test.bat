@@ -2,10 +2,6 @@
 
 :: Строим проект и сохраняем логи в test.log
 start /b dotnet build > test.log 2>&1
-set BUILD_PID=%ERRORLEVEL%
-
-:: Ожидаем завершения процесса сборки
-call :WaitForProcess %BUILD_PID%
 
 :: Запускаем первое приложение, перенаправляем вывод в test.log
 start /b dotnet run >> test.log 2>&1

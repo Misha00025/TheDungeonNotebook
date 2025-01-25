@@ -3,7 +3,7 @@ using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using Tdn.Models.Db;
+using Tdn.Security.Db;
 
 namespace Tdn.Security;
 
