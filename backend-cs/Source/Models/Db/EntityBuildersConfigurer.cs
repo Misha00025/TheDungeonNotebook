@@ -9,6 +9,9 @@ public interface IEntityBuildersConfigurer
 	void ConfigureModel(EntityTypeBuilder<UserData> builder);
 	void ConfigureModel(EntityTypeBuilder<UserGroupData> builder);
 	void ConfigureModel(EntityTypeBuilder<GroupData> builder);
+	void ConfigureModel(EntityTypeBuilder<ItemData> builder);
+	void ConfigureModel(EntityTypeBuilder<CharlistTemplateData> builder);
+	void ConfigureModel(EntityTypeBuilder<CharacterData> builder);
 }
 
 public class EntityBuildersConfigurer : IEntityBuildersConfigurer
@@ -40,5 +43,39 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
 		builder.Property(e => e.Privileges).HasColumnName("privileges");
 		builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
 		builder.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId);
+	}
+
+	public void ConfigureModel(EntityTypeBuilder<ItemData> builder)
+	{
+		builder.ToTable("item");
+		builder.Property(e => e.Id).HasColumnName("item_id");
+		builder.Property(e => e.GroupId).HasColumnName("group_id");
+		builder.Property(e => e.UUID).HasColumnName("uuid");
+		builder.HasKey(e => e.Id);
+		builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
+	}
+
+	public void ConfigureModel(EntityTypeBuilder<CharlistTemplateData> builder)
+	{
+		builder.ToTable("charlist_template");
+		builder.Property(e => e.Id).HasColumnName("template_id");
+		builder.Property(e => e.GroupId).HasColumnName("group_id");
+		builder.Property(e => e.UUID).HasColumnName("uuid");
+		builder.HasKey(e => e.Id);
+		builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
+	}
+
+	public void ConfigureModel(EntityTypeBuilder<CharacterData> builder)
+	{
+		builder.ToTable("character");
+		builder.Property(e => e.Id).HasColumnName("character_id");
+		builder.Property(e => e.GroupId).HasColumnName("group_id");
+		builder.Property(e => e.UUID).HasColumnName("uuid");
+		builder.HasKey(e => e.Id);
+		builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
+		
+		builder.Property(e => e.OwnerId).HasColumnName("owner_id");
+		builder.Property(e => e.TemplateId).HasColumnName("template_id");
+		builder.HasOne(e => e.Template).WithMany().HasForeignKey(e => e.TemplateId);
 	}
 }
