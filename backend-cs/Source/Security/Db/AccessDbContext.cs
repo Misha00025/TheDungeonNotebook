@@ -15,10 +15,12 @@ public class AccessDbContext : BaseDbContext<AccessDbContext>
 	{
 		Configurer.ConfigureModel(builder.Entity<UserData>());
 		Configurer.ConfigureModel(builder.Entity<GroupData>());
-		Configurer.ConfigureModel(builder.Entity<UserGroupData>());		
+		Configurer.ConfigureModel(builder.Entity<UserGroupData>());
+		Configurer.ConfigureModel(builder.Entity<CharacterData>());		
 				
 		base.OnModelCreating(builder);
 	}
 	
 	public DbSet<UserGroupData> UserGroups => Set<UserGroupData>();
+	public DbSet<CharacterData> Characters => Set<CharacterData>();
 }

@@ -56,20 +56,14 @@ public class AccessLevelProvider : IAccessLevelProvider
 	public AccessLevel AccessToCharacter(string selfId, string characterId, string role)
 	{
 		var access = AccessLevel.None;
-		// var character = _accessDb.Characters.FirstOrDefault(e => e.Id.ToString() == characterId);
-		// if (character == null)
-		// 	return access;
-		// var accessToGroup = AccessToGroup(selfId, character.GroupId.ToString(), role);
-		// if (accessToGroup == AccessLevel.Full || accessToGroup == AccessLevel.None)
-		// 	return accessToGroup;
-		// var uc = _accessDb.UserCharacters.FirstOrDefault(e => 
-		// 		e.CharacterId.ToString() == characterId &&
-		// 		e.UserId.ToString() == selfId
-		// 	);
-		// if (uc != null)
-		// 	access = (AccessLevel)(uc.Privileges+1);
-		
-		// TODO: Add implementation
+		var character = _accessDb.Characters.FirstOrDefault(e => e.Id.ToString() == characterId);
+		if (character == null)
+			return access;
+		var accessToGroup = AccessToGroup(selfId, character.GroupId.ToString(), role);
+		if (accessToGroup == AccessLevel.Full || accessToGroup == AccessLevel.None)
+			return accessToGroup;
+		if (selfId == character.OwnerId.ToString())
+			return AccessLevel.Full;
 		return access;
 	}
 }
