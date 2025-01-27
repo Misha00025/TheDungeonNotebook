@@ -9,5 +9,7 @@ public abstract class Entity<TInfo> where TInfo : struct
 		_info = info;
 	}
 	
+	public TInfo Info => _info;
+	
 	public abstract void SetNewInfo(TInfo info);
 }

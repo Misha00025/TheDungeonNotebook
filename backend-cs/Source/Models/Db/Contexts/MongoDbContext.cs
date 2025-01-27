@@ -1,6 +1,5 @@
 using MongoDB.Bson;
 using MongoDB.Driver;
-using Tdn.Db.Entities;
 using Tdn.Settings;
 
 namespace Tdn.Db;
@@ -31,5 +30,17 @@ public class MongoDbContext
 		var collection = GetCollection<T>(collectionName);
 		var filter = Builders<T>.Filter.Eq(e => e.Id, objectId);
 		return collection.Find(filter).FirstOrDefault();
+	}
+	
+	public IEnumerable<T> GetMany<T>(string collectionName, IEnumerable<string> uuids) where T : MongoEntity
+	{
+		List<T> result = new();
+		foreach (var uuid in uuids)
+		{
+			var entity = GetEntity<T>(collectionName, uuid);
+			if (entity != null)
+				result.Add(entity);
+		}
+		return result.ToArray();
 	}
 }
