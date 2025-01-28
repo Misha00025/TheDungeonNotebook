@@ -57,7 +57,7 @@ def update_new_tables(connection, users, groups, user_groups):
     # Обновляем таблицу user_group
     for user_group in user_groups:
         cursor.execute("REPLACE INTO user_group (user_id, group_id, privileges) VALUES (%s, %s, %s)",
-                       (user_group['vk_user_id'], user_group['vk_group_id'], user_group['is_admin']))  # is_admin теперь privileges
+                       (user_group['vk_user_id'], user_group['vk_group_id'], 2 if user_group['is_admin'] == 1 else 0))  # is_admin теперь privileges
     
     connection.commit()
     cursor.close()
