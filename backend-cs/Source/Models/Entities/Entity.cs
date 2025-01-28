@@ -10,6 +10,14 @@ public abstract class Entity<TInfo> where TInfo : struct
 	}
 	
 	public TInfo Info => _info;
+	public delegate void OnUpdate(Entity<TInfo> entity);
+	public event OnUpdate? Updated = null;
 	
-	public abstract void SetNewInfo(TInfo info);
+	protected abstract void SetNewInfo(TInfo info);
+	
+	public void UpdateInfo(TInfo info)
+	{
+		SetNewInfo(info);
+		Updated?.Invoke(this);
+	}
 }

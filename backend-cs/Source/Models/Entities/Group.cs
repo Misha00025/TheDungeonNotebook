@@ -39,7 +39,7 @@ public class Group : Entity<GroupInfo>
 			.ToList();
 	}
 
-	public override void SetNewInfo(GroupInfo info)
+	protected override void SetNewInfo(GroupInfo info)
 	{
 		
 	}

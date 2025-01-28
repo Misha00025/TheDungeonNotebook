@@ -17,7 +17,7 @@ public class Charlist : Entity<CharlistInfo>
 		_fields = fields;
 	}
 
-	public override void SetNewInfo(CharlistInfo info)
+	protected override void SetNewInfo(CharlistInfo info)
 	{
 		if (Info.Id != info.Id && info.Id != 0)
 			return;

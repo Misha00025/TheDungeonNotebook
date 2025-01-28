@@ -33,7 +33,7 @@ public class User : Entity<UserInfo>
 	public string? Icon => _info.Icon;
 	public IReadOnlyList<GroupAccess> Groups => _groups;
 
-	public override void SetNewInfo(UserInfo info)
+	protected override void SetNewInfo(UserInfo info)
 	{
 		_info.FirstName = info.FirstName;
 		_info.LastName = info.LastName;
