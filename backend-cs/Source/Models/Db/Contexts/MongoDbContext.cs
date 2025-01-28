@@ -19,7 +19,7 @@ public class MongoDbContext
 		_database = client.GetDatabase(mongoDbSettings.DatabaseName);
 	}
 
-	private IMongoCollection<T> GetCollection<T>(string collectionName)
+	public IMongoCollection<T> GetCollection<T>(string collectionName)
 	{
 		return _database.GetCollection<T>(collectionName);
 	}

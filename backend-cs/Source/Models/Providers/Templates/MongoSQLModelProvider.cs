@@ -6,7 +6,7 @@ namespace Tdn.Models.Providing;
 
 public abstract class MongoSQLModelProvider<TModel, TData, TMongoData> : SQLModelProvider<TModel, TData> where TData : IndexedData where TMongoData : MongoDbContext.MongoEntity
 {
-	private readonly MongoDbContext _mongoContext;
+	protected readonly MongoDbContext _mongoContext;
 
 	public MongoSQLModelProvider(DbContext dbContext, MongoDbContext mongoContext) : base(dbContext)
 	{
@@ -16,7 +16,7 @@ public abstract class MongoSQLModelProvider<TModel, TData, TMongoData> : SQLMode
 	
 	protected abstract string CollectionName { get; }
 	
-	protected TMongoData? GetData(string uuid)
+	protected TMongoData? GetMongoData(string uuid)
 	{
 		return MongoContext.GetEntity<TMongoData>(CollectionName, uuid);
 	} 
