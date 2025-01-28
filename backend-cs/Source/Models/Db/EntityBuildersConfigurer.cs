@@ -10,7 +10,7 @@ public interface IEntityBuildersConfigurer
 	void ConfigureModel(EntityTypeBuilder<UserGroupData> builder);
 	void ConfigureModel(EntityTypeBuilder<GroupData> builder);
 	void ConfigureModel(EntityTypeBuilder<ItemData> builder);
-	void ConfigureModel(EntityTypeBuilder<CharlistTemplateData> builder);
+	void ConfigureModel(EntityTypeBuilder<CharlistData> builder);
 	void ConfigureModel(EntityTypeBuilder<CharacterData> builder);
 }
 
@@ -55,23 +55,23 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
 		builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
 	}
 
-	public void ConfigureModel(EntityTypeBuilder<CharlistTemplateData> builder)
+	public void ConfigureModel(EntityTypeBuilder<CharlistData> builder)
 	{
 		builder.ToTable("charlist_template");
+		builder.HasKey(e => e.Id);
 		builder.Property(e => e.Id).HasColumnName("template_id");
 		builder.Property(e => e.GroupId).HasColumnName("group_id");
 		builder.Property(e => e.UUID).HasColumnName("uuid");
-		builder.HasKey(e => e.Id);
 		builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
 	}
 
 	public void ConfigureModel(EntityTypeBuilder<CharacterData> builder)
 	{
 		builder.ToTable("character");
+		builder.HasKey(e => e.Id);
 		builder.Property(e => e.Id).HasColumnName("character_id");
 		builder.Property(e => e.GroupId).HasColumnName("group_id");
 		builder.Property(e => e.UUID).HasColumnName("uuid");
-		builder.HasKey(e => e.Id);
 		builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
 		
 		builder.Property(e => e.OwnerId).HasColumnName("owner_id");

@@ -14,7 +14,7 @@ public class EntityContext : BaseDbContext<EntityContext>
 	{
 		Configurer.ConfigureModel(builder.Entity<GroupData>());
 		Configurer.ConfigureModel(builder.Entity<ItemData>());
-		Configurer.ConfigureModel(builder.Entity<CharlistTemplateData>());
+		Configurer.ConfigureModel(builder.Entity<CharlistData>());
 		Configurer.ConfigureModel(builder.Entity<CharacterData>());
 		base.OnModelCreating(builder);
 	}

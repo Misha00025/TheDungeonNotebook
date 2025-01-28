@@ -8,11 +8,11 @@ public class GroupEntityData : IndexedData
 }
 
 public class ItemData : GroupEntityData {}
-public class CharlistTemplateData : GroupEntityData {}
+public class CharlistData : GroupEntityData {}
 public class CharacterData : GroupEntityData 
 {
 	public int TemplateId;
 	public int? OwnerId;
 	
-	public CharlistTemplateData Template = null!;
+	public CharlistData Template = null!;
 }
