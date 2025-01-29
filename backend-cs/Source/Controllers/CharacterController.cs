@@ -16,8 +16,13 @@ public class CharacterController : BaseController<Character>
 	protected override string GetUUID() => CharacterId.ToString();
 		
 	[HttpGet]
-	public ActionResult GetInfo(bool withNotes = false, bool withItems = false)
+	public ActionResult GetInfo(bool with_notes = true, bool with_items = true)
 	{
-		return Ok(Model.ToDict());
+		var builder = Model.GetDictBuilder();
+		if (with_items)
+			builder.WithItems(Model.Items);
+		if (with_notes)
+			builder.WithNotes(Model.Notes);
+		return Ok(builder.Build());
 	}	
 }
