@@ -5,12 +5,9 @@ using Tdn.Db.Entities;
 namespace Tdn.Models.Providing;
 
 public class ItemProvider : MongoSQLModelProvider<Item, ItemData, ItemMongoData>
-{
-	private ILogger _logger;
-	
-	public ItemProvider(EntityContext dbContext, MongoDbContext mongoContext, ILogger<ItemProvider> logger) : base(dbContext, mongoContext)
+{	
+	public ItemProvider(EntityContext dbContext, MongoDbContext mongoContext, ILogger<ItemProvider> logger) : base(dbContext, mongoContext, logger)
 	{
-		_logger = logger;
 	}
 
 	protected override string CollectionName => "items";
@@ -19,23 +16,16 @@ public class ItemProvider : MongoSQLModelProvider<Item, ItemData, ItemMongoData>
 	{
 		if (data == null)
 			return new Item(new ItemInfo());
-		var mongoItem = GetMongoData(data.UUID);
-		if (mongoItem == null)
-		{
-			_logger.LogWarning($"Inconsistent data between SQL and NoSQL: Item with UUID {data.UUID} does not exist in NoSQL. Creating new...");
-			mongoItem = new();
-			var collection = _mongoContext.GetCollection<ItemMongoData>(CollectionName);
-			collection.InsertOne(mongoItem);
-			data.UUID = mongoItem.Id.ToString();
+		var mongoItem = GetMongoData(data.UUID, uuid => {
+			data.UUID = uuid;
 			_dbContext.SaveChanges();
-			_logger.LogInformation($"Item with UUID {data.UUID} created");
-		}
-		_logger.LogDebug($"Value of mongoItem: {mongoItem} (name: {mongoItem.name}, description: {mongoItem.description})");
+		});
+		_logger.LogDebug($"Value of mongoItem: {mongoItem} (name: {mongoItem.Name}, description: {mongoItem.Description})");
 		return new Item(new ItemInfo()
 		{
 			Id = data.Id,
-			Name = mongoItem.name,
-			Description = mongoItem.description
+			Name = mongoItem.Name,
+			Description = mongoItem.Description
 		});
 	}
 	

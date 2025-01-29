@@ -18,14 +18,14 @@ def group_extend(tests:list):
         Test(headers=uh, request=f"groups/{ssg}", requirement=FORBID),
         Test(headers=gh, request=f"groups/{sg}", requirement=FORBID),
         Test(headers=uh, request=f"groups/{sg}/users", requirement=FORBID),
-        Test(headers=uh, request=f"groups/{sg}/character/templates", requirement=FORBID),
         Test(headers=uh, request=f"groups/{sg}/items", requirement=FORBID),
 
         Test(headers=gh, request=f"groups/{mg}", is_valid=check_group_data),
         Test(headers=uh, request=f"groups/{mg}", is_valid=check_group_data),
         Test(headers=uh, request=f"groups/{mg}/users", is_valid=check_many_users),
         Test(headers=uh, request=f"groups/{mg}/characters", is_valid=check_many_characters),
-        Test(headers=uh, request=f"groups/{mg}/character/templates", is_valid=check_many_templates),
+        Test(headers=uh, request=f"groups/{mg}/characters/templates", is_valid=check_many_templates),
+        Test(headers=uh, request=f"groups/{sg}/characters/templates", is_valid=check_many_templates),
         Test(headers=uh, request=f"groups/{mg}/items", is_valid=check_many_items),
     ])
 

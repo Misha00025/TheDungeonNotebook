@@ -37,9 +37,9 @@ internal static class GroupConvertExtensions
 				result.Add("users", users);
 			}
 			if (_items != null)
-			{
 				result.Add("items", _items.Select(e => e.ToDict()));
-			}
+			if (_charlists != null)
+				result.Add("templates", _charlists.Select(e => e.ToDict()));
 			return result;
 		}
 	}
