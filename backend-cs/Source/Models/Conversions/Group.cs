@@ -4,21 +4,56 @@ namespace Tdn.Models.Conversions;
 
 internal static class GroupConvertExtensions
 {
+	public class DictBuilder
+	{
+		private Group _group;
+		private IEnumerable<Item>? _items = null;
+		private IEnumerable<Charlist>? _charlists = null;
+		private IEnumerable<Character>? _characters = null;
+		private bool _addAdmins = false;
+		private bool _addUsers = false;
+		public DictBuilder(Group group)
+		{
+			_group = group;
+		}
+		
+		public DictBuilder WithAdmins() { _addAdmins = true; return this; }
+		public DictBuilder WithUsers() { _addUsers = true; return this; }
+		public DictBuilder WithItems(IEnumerable<Item> items) { _items = items; return this; }
+		public DictBuilder WithCharlists(IEnumerable<Charlist> charlists) { _charlists = charlists; return this; }
+		public DictBuilder WithCharacters(IEnumerable<Character> characters) { _characters = characters; return this; }
+		
+		public Dictionary<string, object?> Build()
+		{
+			var result = _group.Info.ToDict();
+			if (_addAdmins)
+			{
+				var users = _group.PrepareUsersDicts(AccessLevel.Full);
+				result.Add("admins", users);
+			}
+			if (_addUsers)
+			{
+				var users = _group.PrepareUsersDicts(AccessLevel.Read);
+				result.Add("users", users);
+			}
+			if (_items != null)
+			{
+				result.Add("items", _items.Select(e => e.ToDict()));
+			}
+			return result;
+		}
+	}
 	public static Dictionary<string, object?> ToDict(this Group model, bool addAdmins = false, bool addUsers = false)
 	{
-		var result = model.Info.ToDict();
+		var builder = model.GetDictBuilder();
 		if (addAdmins)
-		{
-			var users = model.PrepareUsersDicts(AccessLevel.Full);
-			result.Add("admins", users);
-		}
+			builder.WithAdmins();
 		if (addUsers)
-		{
-			var users = model.PrepareUsersDicts(AccessLevel.Read);
-			result.Add("users", users);
-		}
-		return result;
+			builder.WithUsers();
+		return builder.Build();
 	}
+	
+	public static DictBuilder GetDictBuilder(this Group model) => new DictBuilder(model);
 	
 	public static Dictionary<string, object?> ToDict(this GroupInfo model)
 	{

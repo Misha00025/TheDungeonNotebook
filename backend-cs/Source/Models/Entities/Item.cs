@@ -26,18 +26,11 @@ public class Item : Entity<ItemInfo>
 
 public class AmountedItem : Item
 {
-	private FlexibleField _amount = new FlexibleField();
-	
 	public AmountedItem(ItemInfo info, int amount) : base(info)
 	{
-		_amount.SetIntValue(amount);
+		Amount = amount;
 	}
 	
-	public AmountedItem(ItemInfo info, float amount) : base(info)
-	{
-		_amount.SetFloatValue(amount);
-	}
-	
-	public dynamic Amount => _amount.GetValue();
+	public int Amount;
 }
 

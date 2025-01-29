@@ -8,7 +8,7 @@ public class ItemProvider : MongoSQLModelProvider<Item, ItemData, ItemMongoData>
 {
 	private ILogger _logger;
 	
-	public ItemProvider(EntityContext dbContext, MongoDbContext mongoContext, ILogger logger) : base(dbContext, mongoContext)
+	public ItemProvider(EntityContext dbContext, MongoDbContext mongoContext, ILogger<ItemProvider> logger) : base(dbContext, mongoContext)
 	{
 		_logger = logger;
 	}
@@ -30,11 +30,20 @@ public class ItemProvider : MongoSQLModelProvider<Item, ItemData, ItemMongoData>
 			_dbContext.SaveChanges();
 			_logger.LogInformation($"Item with UUID {data.UUID} created");
 		}
+		_logger.LogDebug($"Value of mongoItem: {mongoItem} (name: {mongoItem.name}, description: {mongoItem.description})");
 		return new Item(new ItemInfo()
 		{
 			Id = data.Id,
-			Name = mongoItem.Name,
-			Description = mongoItem.Description
+			Name = mongoItem.name,
+			Description = mongoItem.description
 		});
+	}
+	
+	public IEnumerable<Item> GetItems(int groupId)
+	{
+		var itemsData = _dbContext.Set<ItemData>()
+			.Where(e => e.GroupId == groupId).ToList();
+		var items = itemsData.Select(BuildModel);
+		return items;
 	}
 }

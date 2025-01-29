@@ -2,8 +2,8 @@ namespace Tdn.Db.Entities;
 
 public class GroupEntityMongoData : MongoDbContext.MongoEntity
 {
-	public string Name = "";
-	public string Description = "";
+	public string name = "";
+	public string description = "";
 }
 
 public class ItemMongoData : GroupEntityMongoData {}

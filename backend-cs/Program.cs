@@ -26,11 +26,12 @@ builder.Services.AddDbContext<TokensContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<AccessDbContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<GroupContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<UserContext>(config.ConfigDbConnections);
+builder.Services.AddDbContext<EntityContext>(config.ConfigDbConnections);
 builder.Services.AddScoped(_ => new MongoDbContext(config.GetMongoDbSettings()));
 
 builder.Services.AddScoped<IModelProvider<User>, UserProvider>();
 builder.Services.AddScoped<IModelProvider<Group>, GroupProvider>();
-
+builder.Services.AddScoped<ItemProvider, ItemProvider>();
 
 builder.Services.AddScoped<IAccessLevelProvider, AccessLevelProvider>();
 builder.Services.AddScoped<IAccessContext, AccessContext>();
