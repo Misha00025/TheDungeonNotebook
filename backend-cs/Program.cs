@@ -33,6 +33,7 @@ builder.Services.AddScoped<IModelProvider<User>, UserProvider>();
 builder.Services.AddScoped<IModelProvider<Group>, GroupProvider>();
 builder.Services.AddScoped<ItemProvider, ItemProvider>();
 builder.Services.AddScoped<CharlistProvider, CharlistProvider>();
+builder.Services.AddScoped<IModelProvider<Character>, CharacterProvider>();
 builder.Services.AddScoped<CharacterProvider, CharacterProvider>();
 
 builder.Services.AddScoped<IAccessLevelProvider, AccessLevelProvider>();

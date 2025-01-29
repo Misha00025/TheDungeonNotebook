@@ -37,4 +37,4 @@ def characters_extend(tests:list):
 
 user_extend(tests)
 group_extend(tests)
-# characters_extend(tests)
+characters_extend(tests)
