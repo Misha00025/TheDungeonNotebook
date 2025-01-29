@@ -70,7 +70,7 @@ def check_many_users(body: dict, keys):
 def check_character_data(body: dict, keys):
     return _valid_data(body, keys)
 
-@parsed("entity", access_level=True)
+@parsed("entity", access_level=False)
 def check_many_characters(body: dict, keys):
     characters = body["characters"]
     for c in characters:

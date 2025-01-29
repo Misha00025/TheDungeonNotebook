@@ -40,6 +40,8 @@ internal static class GroupConvertExtensions
 				result.Add("items", _items.Select(e => e.ToDict()));
 			if (_charlists != null)
 				result.Add("templates", _charlists.Select(e => e.ToDict()));
+			if (_characters != null)
+				result.Add("characters", _characters.Select(e => e.ToDict()));
 			return result;
 		}
 	}

@@ -4,7 +4,7 @@ using Tdn.Db.Entities;
 
 namespace Tdn.Models.Providing;
 
-public abstract class MongoSQLModelProvider<TModel, TData, TMongoData> : SQLModelProvider<TModel, TData> where TData : IndexedData where TMongoData : MongoDbContext.MongoEntity, new()
+public abstract class MongoSQLModelProvider<TModel, TData, TMongoData> : SQLModelProvider<TModel, TData> where TData : IndexedData where TMongoData : MongoDbContext.MongoEntity, new() where TModel : class
 {
 	protected readonly MongoDbContext _mongoContext;
 	protected ILogger _logger;

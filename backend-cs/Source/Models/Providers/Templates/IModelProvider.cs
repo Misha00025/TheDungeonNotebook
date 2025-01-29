@@ -4,5 +4,5 @@ public interface IModelProvider<T>
 {
 	delegate void OnModelBuilded(T model);
 	event OnModelBuilded? ModelBuilded;
-	T GetModel(string uuid);
+	T? GetModel(string uuid);
 }
