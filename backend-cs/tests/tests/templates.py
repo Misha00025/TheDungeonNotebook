@@ -76,23 +76,24 @@ def replace_placeholders(text, data):
             if test_variables.debug:
                 print("DEBUG: Part:", part)
             try:
-                if part[0] == "-":
-                    index = -int(part[1:])
-                else:
-                    index = int(part)  # Проверяем, является ли часть ключа индексом списка
-                
+                index = int(part)  # Проверяем, является ли часть ключа индексом списка
                 if index < 0:  # Обрабатываем отрицательные индексы
                     index += len(value)  # Приводим отрицательный индекс к положительному
                 value = value[index]
             except ValueError:
-                value = value[part]  # Если не индекс, продолжаем искать как обычный ключ
+                try:
+                    value = value[part]  # Если не индекс, продолжаем искать как обычный ключ
+                except:
+                    return match.group()
             except (KeyError, IndexError):
                 return match.group()  # Если ключ или индекс отсутствуют, возвращаем исходный текст
             
         return str(value)
     
     # Найдем все вхождения вида {key}, где key может содержать точки для вложенных значений
-    pattern = r'\{([a-zA-Z0-9_.]+)\}'
+    if test_variables.debug:
+        print("DEBUG: Parse:", text)
+    pattern = r'\{([-]?[a-zA-Z0-9-_.]+)\}'
     result = re.sub(pattern, replace_match, text)
     return result
 
@@ -151,8 +152,8 @@ class Scenario:
             res = None
             try:
                 res = step.execute(data)
-            except:
-                pass
+            except Exception as e:
+                print("ERROR:", e)
             try:
                 data["steps"].append(res.json())
             except:
