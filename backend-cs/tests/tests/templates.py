@@ -75,7 +75,11 @@ def replace_placeholders(text, data):
         for part in key.split('.'):
             if test_variables.debug:
                 print("DEBUG: Part:", part)
+                
             try:
+                if part == "last":
+                    value = len(value)-1
+                    break
                 index = int(part)  # Проверяем, является ли часть ключа индексом списка
                 if index < 0:  # Обрабатываем отрицательные индексы
                     index += len(value)  # Приводим отрицательный индекс к положительному
