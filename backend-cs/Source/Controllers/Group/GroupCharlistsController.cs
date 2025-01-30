@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Tdn.Api.Paths;
 using Tdn.Models;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
@@ -10,24 +11,19 @@ namespace Tdn.Api.Controllers;
 [ApiController]
 [Authorize(Policy.ResourceAccess.Group)]
 [Authorize(Policy.AccessLevel.Follower)]
-[Route("groups/{"+Fields.GroupId+"}/characters")]
-public class GroupCharactersController : BaseController<Group>
+[Route(TdnUriPath.GroupCharlists)]
+public class GroupCharlistsController : BaseController<Group>
 {
 	private int GroupId => Container.ResourceInfo[Resource.Group].Id;
 	protected override string GetUUID() => GroupId.ToString();
 	
-	private CharacterProvider _characterProvider;
+	private CharlistProvider _charlistProvider;
 	
-	public GroupCharactersController(CharacterProvider characterProvider)
+	public GroupCharlistsController(CharlistProvider charlistProvider)
 	{
-		_characterProvider = characterProvider;
+		_charlistProvider = charlistProvider;
 	}
-
-	private bool IsAdmin()
-	{
-		return Container.ResourceInfo[Resource.Group].AccessLevel == AccessLevel.Full;
-	}
-	
+		
 	[HttpGet]
 	public ActionResult GetCharlists()
 	{
@@ -35,7 +31,7 @@ public class GroupCharactersController : BaseController<Group>
 		builder.WithAdmins();
 		if (Container.ResourceInfo[Resource.Group].AccessLevel == AccessLevel.Full)
 			builder.WithUsers();
-		builder.WithCharacters(_characterProvider.GetCharacters(GroupId).Where(e => e.OwnerId == SelfId || IsAdmin()));
+		builder.WithCharlists(_charlistProvider.GetCharlists(GroupId));
 		return Ok(builder.Build());
 	}
 	

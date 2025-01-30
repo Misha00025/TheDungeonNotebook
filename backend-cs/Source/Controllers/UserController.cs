@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Tdn.Api.Paths;
 using Tdn.Models;
 using Tdn.Models.Conversions;
 using Tdn.Security;
@@ -9,7 +10,7 @@ namespace Tdn.Api.Controllers;
 [ApiController]
 [Authorize(Policy.ResourceAccess.User)]
 [Authorize(Policy.AccessLevel.Admin)]
-[Route("account")]
+[Route(TdnUriPath.Account)]
 public class UserController : BaseController<User>
 {
 	protected override string GetUUID() => Container.ResourceInfo[Resource.User].Id.ToString();
