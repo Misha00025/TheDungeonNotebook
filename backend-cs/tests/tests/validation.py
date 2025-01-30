@@ -33,6 +33,10 @@ def _get_req(t, access_level = False, amount = False):
             keys = ["id", "name", "description"]
         case "group":
             keys = ["id", "name", "photo_link"]
+        case "item":
+            keys = ["name", "description", "amount"]
+        case "note":
+            keys = ["header", "body", "addition_date", "modified_date"]
     if access_level:
         keys.append("access_level")
     if amount:
@@ -64,7 +68,7 @@ def check_many_users(body: dict, keys):
     for user in body:
         if not _valid_data(user, keys):
             return False
-    return True
+    return len(body) != 0
 
 @parsed("entity")
 def check_character_data(body: dict, keys):
@@ -76,7 +80,7 @@ def check_many_characters(body: dict, keys):
     for c in characters:
         if not _valid_data(c, keys):
             return False
-    return True
+    return len(characters) != 0
 
 @parsed("group")
 def check_group_data(body: dict, keys):
@@ -88,7 +92,7 @@ def check_many_groups(body: dict, keys):
     for g in groups:
         if not _valid_data(g, keys):
             return False
-    return True
+    return len(groups) != 0
 
 @parsed("entity")
 def check_many_items(body: dict, keys):
@@ -96,7 +100,23 @@ def check_many_items(body: dict, keys):
     for i in items:
         if not _valid_data(i, keys):
             return False
-    return True
+    return len(items) != 0
+
+@parsed("item")
+def check_many_amounted_items(body: dict, keys):
+    items = body["items"]
+    for i in items:
+        if not _valid_data(i, keys):
+            return False
+    return len(items) != 0
+
+@parsed("note")
+def check_many_notes(body: dict, keys):
+    notes = body["notes"]
+    for i in notes:
+        if not _valid_data(i, keys):
+            return False
+    return len(notes) != 0
 
 @parsed("entity")
 def check_many_templates(body: dict, keys):

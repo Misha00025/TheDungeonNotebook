@@ -1,28 +1,13 @@
-from . import test_variables
-from .request_tests import get_test, put_test, post_test, delete_test, rq, get_text
-from .tests_data import tests
-
+from .scenarios import *
 
 
 def start():
-    for test in tests:
-        res: rq.Response = None
-        headers = test.headers
-        params = test.params
-        url = test.request
-        data = test.data
-        match test.method:
-            case "GET":
-                res = get_test(headers, params, url)
-            case "PUT":
-                res = put_test(headers, params, url, data)
-            case "POST":
-                res = post_test(headers, params, url, data)
-            case "DELETE":
-                res = delete_test(headers, params, url)
+    # with_user_scenario()
+    # with_group_scenario()
+    # with_character_scenario()
+    with_notes_edit_scenario()
 
-        if res == None or not test.check(res):
-            print("ERROR:", test.headers, get_text(res, test.request, test.method, params=test.params), test.message)
-        elif test_variables.debug:
-            print(get_text(res, test.request, test.method, params=test.params))
+    for scenario in scenarios:
+        scenario.start()
+        print()
 

@@ -3,7 +3,6 @@ from .validation import *
 from .templates import Test
 from .test_variables import *
 
-tests:list[Test]=[]
 
 def user_extend(tests:list):
     tests.extend([
@@ -33,8 +32,6 @@ def characters_extend(tests:list):
     tests.extend([
         Test(headers=uh, request=f"characters/{mc}", requirement=OK, is_valid=check_character_data),
         Test(headers=uh, request=f"characters/{sc}", requirement=OK, is_valid=check_character_data),
+        Test(headers=uh, request=f"characters/{mc}/items", requirement=OK, is_valid=check_many_amounted_items),
+        Test(headers=uh, request=f"characters/{mc}/notes", requirement=OK, is_valid=check_many_notes),
     ])
-
-user_extend(tests)
-group_extend(tests)
-characters_extend(tests)
