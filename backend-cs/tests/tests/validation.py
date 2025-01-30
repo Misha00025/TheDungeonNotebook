@@ -56,6 +56,26 @@ def _valid_data(body: dict, keys):
 def get_data(r: Response):
     return r.json()["data"]
 
+# 
+
+def is_subset_of_dict(subset_dict, superset_dict):
+    """
+    Проверяет, является ли subset_dict подмножеством superset_dict.
+    
+    :param subset_dict: Словарь, который может быть подмножеством другого словаря.
+    :param superset_dict: Словарь, который может содержать все ключи и значения из subset_dict.
+    :return: True, если subset_dict является подмножеством superset_dict, иначе False.
+    """
+    for key, value in subset_dict.items():
+        if key not in superset_dict or value != superset_dict[key]:
+            return False
+    return True
+
+@trying
+def eq(required: dict, test: Test, r: Response):
+    data = r.json()["data"]
+    return is_subset_of_dict(required, data), f"The following result was expected: {required}"
+
 # prepared validators
 
 @parsed("user")
@@ -125,3 +145,7 @@ def check_many_templates(body: dict, keys):
         if not _valid_data(i, keys):
             return False
     return True
+
+@parsed("note")
+def check_note(body: dict, keys):
+    return _valid_data(body, keys)

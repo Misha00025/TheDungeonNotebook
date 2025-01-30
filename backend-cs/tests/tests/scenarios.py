@@ -45,10 +45,11 @@ def with_notes_edit_scenario():
     old_data = {"header":"{steps.-3.data.header}", "body":"{steps.-3.data.header}"}
     tests = [
         Test(headers=uh, request="groups/{group}/characters", is_valid=check_many_characters),
-        Test(headers=uh, request=f"characters/{character_id}/notes/0"),
-        Test(headers=uh, request=f"characters/{character_id}/notes/0", method="PUT", data=new_data),
-        Test(headers=uh, request=f"characters/{character_id}/notes/0"),
-        Test(headers=uh, request=f"characters/{character_id}/notes/0", method="PUT", data=old_data),
+        Test(headers=uh, request=f"characters/{character_id}/notes/0", is_valid=check_note),
+        Test(headers=uh, request=f"characters/{character_id}/notes/0", requirement=CREATED, method="PUT", data=new_data, is_valid=lambda a, b: eq(new_data, a, b)),
+        Test(headers=uh, request=f"characters/{character_id}/notes/0", is_valid=lambda a, b: eq(new_data, a, b)),
+        Test(headers=uh, request=f"characters/{character_id}/notes/0", requirement=CREATED, method="PUT", data=old_data, is_valid=check_note),
+        Test(headers=uh, request=f"characters/{character_id}/notes/0", requirement=CREATED, method="POST", data=old_data, is_valid=check_note),
     ]
     create_scenario("Note Edit", tests, {"group": mg})
 

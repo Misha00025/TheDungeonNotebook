@@ -143,9 +143,10 @@ class Scenario:
             self.data = {}
 
     def start(self):
-        print("".join(["#" for _ in range(35)]))
-        print("#  Starting {0:20}  #".format(self.name))
-        print("".join(["#" for _ in range(35)]))
+        s = f"'{self.name}' Test Scenario"
+        print("".join(["#" for _ in range(15 + len(s))]))
+        print("#  Starting {}  #".format(s))
+        print("".join(["#" for _ in range(15 + len(s))]))
         data = self.data.copy()
         data["steps"] = []
         for step in self.steps:
@@ -163,6 +164,6 @@ class Scenario:
                     data["steps"].append(res.text)
             test = step.test
             if not step.ok:
-                print("ERROR:", step.message, test.message, "\n   |- Headers:", test.headers, "\n   |- Data:", test.data)
+                print("ERROR:", step.message, "\n   |- Headers:", test.headers, "\n   |- Data:", test.data, "\n   |- Message:", test.message)
             elif test_variables.debug:
                 print(step.message)

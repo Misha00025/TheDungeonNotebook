@@ -47,16 +47,20 @@ public abstract class BaseController<T> : ControllerBase
 	
 	protected bool IsDebug() => Request.Query.TryGetValue("debug", out var debugStr) && bool.TryParse(debugStr, out var debug) && debug;
 
-	public override OkObjectResult Ok([ActionResultObjectValue] object? value)
-	{
-		var resource = Container.ResourceInfo.First();
-		var result = new Dictionary<string, object?>()
+	protected Dictionary<string, object?> PrepareResponse(object? value) => new Dictionary<string, object?>()
 		{
 			{"type", Container.AccessType},
 			{"data", value},
-			{"access_level", resource.Value.AccessLevel.ToAlias()}	
+			{"access_level", Container.ResourceInfo.First().Value.AccessLevel.ToAlias()}	
 		};
-		return base.Ok(result);
+
+	public override OkObjectResult Ok([ActionResultObjectValue] object? value)
+	{
+		return base.Ok(PrepareResponse(value));
 	}
 
+	public override CreatedResult Created(string? uri, [ActionResultObjectValue] object? value)
+	{
+		return base.Created(uri, PrepareResponse(value));
+	}
 }
