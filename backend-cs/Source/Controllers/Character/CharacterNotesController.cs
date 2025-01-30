@@ -9,17 +9,16 @@ namespace Tdn.Api.Controllers;
 [ApiController]
 [Authorize(Policy.ResourceAccess.Character)]
 [Authorize(Policy.AccessLevel.Follower)]
-[Route(TdnUriPath.Character)]
-public class CharacterController : CharacterBaseController
+[Route(TdnUriPath.CharacterNotes)]
+public class CharacterNotesController : CharacterBaseController
 {		
 	[HttpGet]
-	public ActionResult GetInfo(bool with_notes = false, bool with_items = false)
+	public ActionResult GetNotes()
 	{
 		var builder = Model.GetDictBuilder();
-		if (with_items)
-			builder.WithItems(Model.Items);
-		if (with_notes)
-			builder.WithNotes(Model.Notes);
+		builder.WithNotes(Model.Notes);
 		return Ok(builder.Build());
 	}	
 }
+
+
