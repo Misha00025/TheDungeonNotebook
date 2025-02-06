@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Tdn.Models.Providing;
@@ -14,12 +15,17 @@ public abstract class BaseController<T> : ControllerBase
 	private IAccessContext? _container;
 	
 	protected IModelProvider<T> ModelProvider => GetProvider();
-	protected T Model => GetModel();
+	protected T Model => GetModel()!;
 	protected IAccessContext Container => GetAccessContext();
 	
 	protected int SelfId => Container.SelfId;
+	
+	protected virtual bool IsNotModelExist()
+	{
+		return GetModel() != null;
+	}
 
-	private T GetModel()
+	private T? GetModel()
 	{
 		if (_model == null)
 			_model = ModelProvider.GetModel(GetUUID());
@@ -43,7 +49,7 @@ public abstract class BaseController<T> : ControllerBase
 	protected abstract string GetUUID();
 	
 	// TODO: Add method to get value from Request Route as some Type. For example: T GetFromRoute<T>(string name)
-	protected bool TrySaveModel(T model) => throw new NotImplementedException();
+	protected void SaveModel(T model){}
 	
 	protected bool IsDebug() => Request.Query.TryGetValue("debug", out var debugStr) && bool.TryParse(debugStr, out var debug) && debug;
 

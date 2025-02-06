@@ -1,8 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Namotion.Reflection;
 using Tdn.Api.Paths;
-using Tdn.Db.Entities;
 using Tdn.Models;
 using Tdn.Models.Conversions;
 using Tdn.Security;
@@ -17,8 +17,19 @@ public class CharacterNotesController : CharacterBaseController
 {
 	public struct NoteData
 	{
-		public string header;
-		public string body;
+		public string header { get; set; }
+		public string body { get; set; }
+	}
+	
+	protected override bool IsNotModelExist()
+	{
+		var ok = base.IsNotModelExist();
+		if (ok && HttpContext.GetRouteValue("noteId") != null)
+		{
+			var str = HttpContext.GetRouteValue("noteId")?.ToString();
+			ok = !(int.TryParse(str, out var noteId) && Model.Notes.Count < noteId);
+		}
+		return !ok;
 	}
 	
 	[HttpGet]
@@ -29,27 +40,58 @@ public class CharacterNotesController : CharacterBaseController
 		return Ok(builder.Build());
 	}
 	
-	private ActionResult IfNoteExist(int noteId, Func<Note, ActionResult> action)
-	{
-		if (Model.Notes.Count < noteId)
-			return NotFound();
-		return action(Model.Notes[noteId]);
-	}
-	
 	[HttpGet("{noteId}")]
-	public ActionResult GetNote(int noteId) => IfNoteExist(noteId, (Note note) => 
+	public ActionResult GetNote(int noteId)
 	{
+		if (IsNotModelExist())
+			return NotFound();
+		var note = Model.Notes[noteId];
 		return Ok(note.ToDict());
-	});
+	}
 	
 	[Authorize(Policy.AccessLevel.Moderator)]
 	[HttpPut("{noteId}")]
-	public ActionResult PutNote(int noteId, [FromBody, Required] NoteData newData) => IfNoteExist(noteId, (Note note) =>
+	public ActionResult PutNote(int noteId, [FromBody, Required] NoteData newData)
 	{
+		if (IsNotModelExist())
+			return NotFound();
+		var note = Model.Notes[noteId];
 		note.Header = newData.header;
 		note.Body = newData.body;
+		note.ModifyDate = DateTime.Now;
+		SaveModel(Model);
 		return Created(TdnUriPath.CharacterNotes + $"/{noteId}", note.ToDict());
-	});	
+	}	
+	
+	[Authorize(Policy.AccessLevel.Moderator)]
+	[HttpPost]
+	public ActionResult PostNote([FromBody, Required] NoteData newData)
+	{
+		if (IsNotModelExist())
+			return NotFound();
+		var noteId = Model.Notes.Count;
+		var note = new Note()
+		{
+			Header = newData.header,
+			Body = newData.body,
+			AdditionDate = DateTime.Now,
+			ModifyDate = DateTime.Now
+		};
+		Model.Notes.Add(note);
+		SaveModel(Model);
+		return Created(TdnUriPath.CharacterNotes + $"/{noteId}", note.ToDict());
+	}
+	
+	[Authorize(Policy.AccessLevel.Moderator)]
+	[HttpDelete("{noteId}")]
+	public ActionResult DeleteNote(int noteId)
+	{
+		if (IsNotModelExist())
+			return NotFound();
+		Model.Notes.RemoveAt(noteId);
+		SaveModel(Model);
+		return Ok(null);
+	}
 }
 
 

@@ -25,8 +25,8 @@ public class Character : Charlist
 	public string Description => Info.Description;
 	public Charlist Template => _template;
 	
-	public IReadOnlyList<Note> Notes => _notes;
-	public IReadOnlyList<AmountedItem> Items => _items;
+	public List<Note> Notes => _notes;
+	public List<AmountedItem> Items => _items;
 	
 	public void ExtendNotes(IEnumerable<Note> notes)
 	{
