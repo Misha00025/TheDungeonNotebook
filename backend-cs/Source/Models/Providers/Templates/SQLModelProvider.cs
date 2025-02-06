@@ -15,11 +15,13 @@ public abstract class SQLModelProvider<TModel, TData> : IModelProvider<TModel> w
 		_dbContext = dbContext;
 	}
 	
+	public DbContext Context => _dbContext;
+	
 	public event IModelProvider<TModel>.OnModelBuilded? ModelBuilded;
 	
 	protected abstract TModel BuildModel(TData data);
 	
-	protected TData? Find(int id)
+	public TData? Find(int id)
 	{
 		if (id != _lastId)
 		{

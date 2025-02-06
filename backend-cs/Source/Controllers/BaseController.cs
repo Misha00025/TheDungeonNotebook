@@ -52,7 +52,7 @@ public abstract class BaseController<T> : ControllerBase
 	
 	protected virtual bool IsNotModelExist()
 	{
-		return GetModel() != null;
+		return GetModel() == null;
 	}
 	
 	protected abstract string GetUUID();

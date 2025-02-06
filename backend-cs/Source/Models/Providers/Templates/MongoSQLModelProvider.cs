@@ -8,15 +8,14 @@ public abstract class MongoSQLModelProvider<TModel, TData, TMongoData> : SQLMode
 {
 	protected readonly MongoDbContext _mongoContext;
 	protected ILogger _logger;
-	
+	public MongoDbContext MongoContext => _mongoContext;
 
 	public MongoSQLModelProvider(DbContext dbContext, MongoDbContext mongoContext, ILogger<MongoSQLModelProvider<TModel, TData, TMongoData>> logger) : base(dbContext)
 	{
 		_mongoContext = mongoContext;
 		_logger = logger;
 	}
-	protected MongoDbContext MongoContext => _mongoContext;
-	
+		
 	protected abstract string CollectionName { get; }
 	
 	protected TMongoData GetMongoData(string uuid, Action<string>? onError = null)
