@@ -80,7 +80,10 @@ def replace_placeholders(text, data):
 				if part == "last":
 					value = len(value)-1
 					break
-				index = int(part)  # Проверяем, является ли часть ключа индексом списка
+				elif part == "last-v":
+					index = len(value)-1
+				else:
+					index = int(part)  # Проверяем, является ли часть ключа индексом списка
 				if index < 0:  # Обрабатываем отрицательные индексы
 					index += len(value)  # Приводим отрицательный индекс к положительному
 				value = value[index]

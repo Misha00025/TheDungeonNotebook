@@ -91,3 +91,22 @@ def with_items_edit_scenario(headers = uh.copy(), character_number = 1):
 	create_scenario("Items Edit", tests, data)
 
 
+def with_group_items_edit_scenario(headers = uh.copy()):
+	data = {"group": -101}
+	old_data = {"name": "test_item", "description": "test description"}
+	new_data = {"name": "test_item_new", "description": "test description new"}
+	last_id="{steps.2.data.items.last-v.id}"
+	tests = [
+		Test(headers=headers, request="groups/{group}/items", is_valid=check_many_items),
+		Test(headers=headers, request="groups/{group}/items", method="POST", data=old_data, requirement=CREATED, is_valid=lambda a,b: eq(old_data, a,b)),
+		Test(headers=headers, request="groups/{group}/items", is_valid=check_many_items),
+		Test(headers=headers, request="groups/{group}/items/"+last_id, is_valid=lambda a,b: eq(old_data, a,b)),
+		Test(headers=headers, request="groups/{group}/items/"+last_id, method="PUT", data=new_data, requirement=CREATED , is_valid=lambda a,b: eq(new_data, a,b)),
+		Test(headers=headers, request="groups/{group}/items/"+last_id, is_valid=lambda a,b: eq(new_data, a,b)),
+		Test(headers=headers, request="groups/{group}/items/"+last_id, method="DELETE"),
+		Test(headers=headers, request="groups/{group}/items/"+last_id, requirement=NOT_FOUND),
+		
+	]
+	create_scenario("Group Items Edit", tests, data)
+
+

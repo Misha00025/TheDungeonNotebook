@@ -25,7 +25,8 @@ public class ItemProvider : MongoSQLModelProvider<Item, ItemData, ItemMongoData>
 		{
 			Id = data.Id,
 			Name = mongoItem.Name,
-			Description = mongoItem.Description
+			Description = mongoItem.Description,
+			GroupId = data.GroupId
 		});
 	}
 	

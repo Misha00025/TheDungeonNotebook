@@ -5,6 +5,7 @@ public struct ItemInfo
 	public int Id;
 	public string Name;
 	public string Description;
+	public int GroupId;
 }
 
 public class Item : Entity<ItemInfo>
@@ -17,8 +18,8 @@ public class Item : Entity<ItemInfo>
 
 	protected override void SetNewInfo(ItemInfo info)
 	{
-		if (info.Id != Id)
-			throw new Exception($"Incorrect info.Id: \"{info.Id}\". Expected: \"{Id}\"");
+		if (info.Id != Id && info.Id != 0)
+			throw new Exception($"Incorrect info.Id: \"{info.Id}\". Expected: \"{Id}\" or \"0\"");
 		_info.Name = info.Name;
 		_info.Description = info.Description;
 	}

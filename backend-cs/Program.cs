@@ -39,6 +39,7 @@ builder.Services.AddScoped<CharacterProvider, CharacterProvider>();
 
 // Savers
 builder.Services.AddScoped<IModelSaver<Character>, CharacterSaver>();
+builder.Services.AddScoped<ItemSaver, ItemSaver>();
 
 // Access checking elements
 builder.Services.AddScoped<IAccessLevelProvider, AccessLevelProvider>();

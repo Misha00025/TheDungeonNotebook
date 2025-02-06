@@ -41,6 +41,6 @@ public class Group : Entity<GroupInfo>
 
 	protected override void SetNewInfo(GroupInfo info)
 	{
-		
+		// TODO: to do
 	}
 }
