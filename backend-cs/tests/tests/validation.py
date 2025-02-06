@@ -67,7 +67,7 @@ def is_subset_of_dict(subset_dict, superset_dict):
     :return: True, если subset_dict является подмножеством superset_dict, иначе False.
     """
     for key, value in subset_dict.items():
-        if key not in superset_dict or value != superset_dict[key]:
+        if key not in superset_dict or str(value) != str(superset_dict[key]):
             return False
     return True
 
@@ -80,6 +80,10 @@ def eq(required: dict, test: Test, r: Response):
 
 @parsed("user")
 def check_user_data(body: dict, keys):
+    return _valid_data(body, keys)
+
+@parsed("entity")
+def check_item(body: dict, keys):
     return _valid_data(body, keys)
 
 @parsed("user")

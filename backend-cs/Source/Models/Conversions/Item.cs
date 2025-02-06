@@ -16,6 +16,7 @@ internal static class ItemConvertExtensions
 	{
 		var result = ((Item)item).ToDict();
 		result.Add("amount", item.Amount);
+		result.Remove("id");
 		return result;
 	}
 	
