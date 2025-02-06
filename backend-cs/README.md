@@ -18,20 +18,24 @@
       - [GET users](#get-users)
       - [GET characters](#get-characters)
         - [GET templates](#get-templates)
-        - [POST templates](#post-templates)
-        - [DELETE templates](#delete-templates)
-      - [POST characters](#post-characters)
-      - [DELETE characters](#delete-characters)
+        - [POST templates (В разработке)](#post-templates-в-разработке)
+        - [DELETE templates (В разработке)](#delete-templates-в-разработке)
+      - [POST characters (В разработке)](#post-characters-в-разработке)
+      - [DELETE characters (В разработке)](#delete-characters-в-разработке)
       - [GET items](#get-items)
-      - [POST items](#post-items)
-      - [DELETE items](#delete-items)
+      - [POST items (В разработке)](#post-items-в-разработке)
+        - [PUT items/\<item\_id\> (В разработке)](#put-itemsitem_id-в-разработке)
+        - [DELETE items/\<item\_id\> (В разработке)](#delete-itemsitem_id-в-разработке)
     - [GET characters/\<character\_id\>](#get-characterscharacter_id)
       - [GET notes](#get-notes)
       - [POST notes](#post-notes)
         - [PUT notes/\<note\_id\>](#put-notesnote_id)
         - [DELETE notes/\<note\_id\>](#delete-notesnote_id)
       - [GET items](#get-items-1)
-    - [PATCH characters/\<character\_id\>](#patch-characterscharacter_id)
+      - [POST items](#post-items)
+        - [PUT items/\<item\_id\>](#put-itemsitem_id)
+        - [DELETE items/\<item\_id\>](#delete-itemsitem_id)
+    - [PATCH characters/\<character\_id\> (В разработке)](#patch-characterscharacter_id-в-разработке)
 
 # API
 
@@ -217,7 +221,7 @@ URI: \<parrent\>/templates<br>
 - `start` - позиция, с которой отсчитываются шаблоны (default = 0);
 - `count` - количество передаваемых шаблонов (default = 0). При значении 0, возвращает полный список шаблонов.
 
-##### POST templates
+##### POST templates (В разработке)
 
 URI: \<parrent\>/templates<br>
 Доступ: Full
@@ -226,12 +230,12 @@ URI: \<parrent\>/templates<br>
 
 // TODO: add PUT to temlates
 
-##### DELETE templates
+##### DELETE templates (В разработке)
 
 URI: \<parrent\>/templates<br>
 Доступ: Full
 
-#### POST characters
+#### POST characters (В разработке)
 
 URI: \<parrent\>/caracters<br>
 Доступ: Full
@@ -240,7 +244,7 @@ URI: \<parrent\>/caracters<br>
 - `template_id` - идентификатор шаблона, из которого формируется персонаж;
 - (опционально) `owner_id` - идентификатор пользователя, которому будет назначен персонаж.
 
-#### DELETE characters
+#### DELETE characters (В разработке)
 
 URI: \<parrent\>/characters<br>
 Доступ: Full
@@ -259,7 +263,7 @@ URI: \<parrent\>/items<br>
 - `count` - количество передаваемых предметов (default = 0). При значении 0, возвращает полный список предметов;
 - `name` - принимает подстроку для фильтрации предметов по имени;
 
-#### POST items
+#### POST items (В разработке)
 
 URI: \<parrent\>/items<br>
 Доступ: Full
@@ -268,12 +272,19 @@ URI: \<parrent\>/items<br>
 
 // TODO: add PATCH or PUT to items
 
-#### DELETE items
+##### PUT items/<item_id> (В разработке)
 
-URI: \<parrent\>/items<br>
+URI: \<parrent\>/<item_id><br>
 Доступ: Full
 
-Принимает параметр `id`, который означает идентификатор удаляемого предмета.
+Принимает данные в формате ([`item`](#предмет-item)) поле `id` игнорируется. Заменяет содержимое нынешнего предмета на новое.
+
+##### DELETE items/<item_id> (В разработке)
+
+URI: \<parrent\>/<item_id><br>
+Доступ: Full
+
+Удаляет предмет с заданным id.
 
 ### GET characters/<character_id>
 
@@ -321,7 +332,26 @@ URI: \<parrent\>/items<br>
 
 Аналогичен методу [`groups/<group_id>/items`](#get-items), но возвращает список предметов персонажа. Для каждого предмета добавляется поле `amount`
 
-### PATCH characters/<character_id>
+#### POST items
+
+URI: \<parrent\>/items<br>
+Доступ: Write
+
+Принимает в теле запроса структуру типа [`item`](#предмет-item) без `id`, но с `amount` и добавлет пользователю предмет.
+
+##### PUT items/<item_id>
+
+URI: \<parrent\>/<item_id>
+
+Принимает в теле запроса структуру типа [`item`](#предмет-item) без `id`, но с `amount` и заменяет предмет пользователя на новый с новым количеством.
+
+##### DELETE items/<item_id>
+
+URI: \<parrent\>/<item_id>
+
+Удаляет предмет с заданным `item_id`
+
+### PATCH characters/<character_id> (В разработке)
 
 URI: \<host\>/characters/\<character_id\><br>
 Ресурс: Character <br>
