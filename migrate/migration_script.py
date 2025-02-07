@@ -1,8 +1,7 @@
 import pymysql
 import paramiko
-from ssh_helper import create_ssh_tunnel
-from mongodb_helper import insert_character_to_mongo, insert_item_to_mongo, insert_template_to_mongo
-from mysql_helper import get_old_data, update_new_tables
+from mongodb_helper import insert_character_to_mongo, insert_item_to_mongo, insert_template_to_mongo, delete_db
+from mysql_helper import get_old_data, update_new_tables, create_tables, post_sql
 from secret_config import *
 
 def migrate():
@@ -30,9 +29,12 @@ def migrate():
         port=NEW_MYSQL_PORT
     )
     
+    create_tables(new_db_connection)
+
     # Обновление новых таблиц
     update_new_tables(new_db_connection, users, groups, user_groups)
-    
+    delete_db(MONGODB_URI)
+
     # Перенос данных в MongoDB
     template_id = 0
     character_id = 0
@@ -58,19 +60,12 @@ def migrate():
                     cursor.execute("REPLACE INTO `character` (`character_id`, `group_id`, `template_id`, `owner_id`, `uuid`) VALUES (%s, %s, %s, %s, %s)", (
                         character_id, int(group['vk_group_id']), template_id, user['vk_user_id'], character_uuid))
                     new_db_connection.commit()
+
+    post_sql(new_db_connection)
     new_db_connection.close()
 
 if __name__ == "__main__":
-    # client_old = create_ssh_tunnel(OLD_MYSQL_HOST, SSH_OLD_LOGIN, SSH_FILE, OLD_MYSQL_HOST, OLD_MYSQL_PORT)
-    # client_new = create_ssh_tunnel(NEW_MYSQL_HOST, SSH_NEW_LOGIN, SSH_FILE, NEW_MYSQL_HOST, NEW_MYSQL_PORT)
-    # client_mongo = create_ssh_tunnel(MONGO_HOST, SSH_MONGO_LOGIN, SSH_FILE, MONGO_HOST, MONGO_PORT)
     try:
         migrate()
     finally:
-        # if client_old is not None:
-        #     client_old[0].close()
-        # if client_old is not None:
-        #     client_new[0].close()
-        # if client_old is not None:
-        #     client_mongo[0].close()
         pass

@@ -3,6 +3,11 @@ from bson.objectid import ObjectId
 
 from secret_config import MONGO_DB_NAME
 
+def delete_db(mongodb_uri):
+    client = pymongo.MongoClient(mongodb_uri)
+    db = client[MONGO_DB_NAME]
+    client.drop_database(db)
+
 def insert_character_to_mongo(mongodb_uri, user, group, notes, user_items):
     client = pymongo.MongoClient(mongodb_uri)
     db = client[MONGO_DB_NAME]

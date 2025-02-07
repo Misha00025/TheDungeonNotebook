@@ -163,3 +163,4 @@ cython_debug/
 /docker-compose.yaml
 
 secret_config.py
+post_sql.sql

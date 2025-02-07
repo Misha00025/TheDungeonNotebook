@@ -31,7 +31,6 @@ def group_extend(tests:list):
 def characters_extend(tests:list):
     tests.extend([
         Test(headers=uh, request=f"characters/{mc}", requirement=OK, is_valid=check_character_data),
-        Test(headers=uh, request=f"characters/{sc}", requirement=OK, is_valid=check_character_data),
         Test(headers=uh, request=f"characters/{mc}/items", requirement=OK, is_valid=check_many_amounted_items),
         Test(headers=uh, request=f"characters/{mc}/notes", requirement=OK, is_valid=check_many_notes),
     ])

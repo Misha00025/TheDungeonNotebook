@@ -7,67 +7,50 @@ using Tdn.Settings;
 namespace Tdn.Configuration;
 
 public class ConfigParser
-{
-	private const string DB = "DATABASE";
-	private const string MySQL = "MySQL";
-	private const string MongoDb = "MongoDB";
-	
-	private IniData _mainConfig;
-	private IniData _dbConfig;
+{	
+	private string? _mongoConnectionString;
+	private string? _databaseName;
+	private string? _mysqlConnectionString;
 	
 	private string? _connection = null;
 	public string Connection { get 
 		{
 			if (_connection == null)
-				_connection = GenerateConnection();
+				_connection = _mysqlConnectionString!;
 			return _connection;
 		}
 	}
 
-	public ConfigParser(string filename){
-		var parser = new FileIniDataParser();
-		_mainConfig = parser.ReadFile(filename);
-		string dbFile = "configs/"+_mainConfig["DEFAULT"]["DbConnectionSettingsFile"];
-		_dbConfig = parser.ReadFile(dbFile);
-	}
-
-	private string GenerateConnection()
-	{
-		var settings = _dbConfig[DB];
-		string host = settings["Host"];
-		string user = settings["User"];
-		string pass = settings["Password"];
-		string dbName = settings["DataBaseName"];
-		string port = "";
-		if (settings.ContainsKey("Port"))
-			port = $"port={settings["Port"]};";
-		
-		string connection = $"server={host};{port}user={user};password={pass};database={dbName};ConvertZeroDateTime=True;";
-		Console.WriteLine("Connection string:\n  "+connection);
-		return connection;
+	public ConfigParser(){
+		_mongoConnectionString = Environment.GetEnvironmentVariable("MONGO_CONNECTION_STRING");
+		_mysqlConnectionString = Environment.GetEnvironmentVariable("MYSQL_CONNECTION_STRING");
+		_databaseName = Environment.GetEnvironmentVariable("MYSQL_DATABASE");
+		if (_mongoConnectionString == null || _mysqlConnectionString == null || _databaseName == null)
+		{
+			
+			throw new Exception($"Can't find information to connect to databases:\n"+
+									$" |-mongo:{_mongoConnectionString}\n"+
+									$" |-mysql:{_mysqlConnectionString}\n"+
+									$" |-dbname: {_databaseName}"
+								);
+		}
 	}
 
 	public void ConfigDbConnections(DbContextOptionsBuilder opt)
 	{
-		string type = _dbConfig[DB]["Type"];
-		switch (type)
-		{
-			case MySQL:
-				opt.UseMySql(Connection, new MySqlServerVersion(new Version(9, 0, 1)));
-				break;
-			default:
-				opt.UseInMemoryDatabase("Test");
-				break;
-		}	
-			
+		opt.UseMySql(Connection, new MySqlServerVersion(new Version(9, 0, 1)));
 	}
 	
 	public MongoDbSettings GetMongoDbSettings()
-	{
+	{	
+		string dbName;
+		string connection;
+		connection = _mongoConnectionString!;
+		dbName = _databaseName!;
 		var settings = new MongoDbSettings
 		{
-			ConnectionString = _dbConfig[MongoDb]["ConnectionString"],
-			DatabaseName = _dbConfig[MongoDb]["DataBase"]			
+			ConnectionString = connection,
+			DatabaseName = dbName
 		};
 		return settings;
 	}

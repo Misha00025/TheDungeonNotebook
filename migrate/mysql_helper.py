@@ -41,6 +41,26 @@ def get_old_data(connection):
     
     return users, groups, user_groups, notes, items, user_items
 
+def create_tables(connection):
+    cursor = connection.cursor(pymysql.cursors.DictCursor)
+    with open('sql_script.sql', 'r') as file:
+        sql = file.read()
+    for statement in sql.split(';'):
+        if statement.strip():
+            cursor.execute(statement)
+        connection.commit()
+    cursor.close()
+
+def post_sql(connection):
+    cursor = connection.cursor(pymysql.cursors.DictCursor)
+    with open('post_sql.sql', 'r') as file:
+        sql = file.read()
+    for statement in sql.split(';'):
+        if statement.strip():
+            cursor.execute(statement)
+        connection.commit()
+    cursor.close()
+
 def update_new_tables(connection, users, groups, user_groups):
     cursor = connection.cursor()
     

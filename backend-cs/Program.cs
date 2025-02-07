@@ -12,7 +12,7 @@ using Tdn.Security.Db;
 using Tdn.Models.Saving;
 
 var builder = WebApplication.CreateBuilder(args);
-var config = new ConfigParser("config.ini");
+var config = new ConfigParser();
 
 // General
 builder.Services.AddMvc();
