@@ -13,4 +13,3 @@ if __name__ == "__main__":
     test_variables.compact = args.compact
     test_variables.debug = args.debug
     main_test.start()
-    pass
