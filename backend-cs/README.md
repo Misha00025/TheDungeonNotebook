@@ -23,18 +23,18 @@
       - [POST characters (В разработке)](#post-characters-в-разработке)
       - [DELETE characters (В разработке)](#delete-characters-в-разработке)
       - [GET items](#get-items)
-      - [POST items (В разработке)](#post-items-в-разработке)
-        - [PUT items/\<item\_id\> (В разработке)](#put-itemsitem_id-в-разработке)
-        - [DELETE items/\<item\_id\> (В разработке)](#delete-itemsitem_id-в-разработке)
+      - [POST items](#post-items)
+        - [PUT items/\<item\_id\>](#put-itemsitem_id)
+        - [DELETE items/\<item\_id\>](#delete-itemsitem_id)
     - [GET characters/\<character\_id\>](#get-characterscharacter_id)
       - [GET notes](#get-notes)
       - [POST notes](#post-notes)
         - [PUT notes/\<note\_id\>](#put-notesnote_id)
         - [DELETE notes/\<note\_id\>](#delete-notesnote_id)
       - [GET items](#get-items-1)
-      - [POST items](#post-items)
-        - [PUT items/\<item\_id\>](#put-itemsitem_id)
-        - [DELETE items/\<item\_id\>](#delete-itemsitem_id)
+      - [POST items](#post-items-1)
+        - [PUT items/\<item\_id\>](#put-itemsitem_id-1)
+        - [DELETE items/\<item\_id\>](#delete-itemsitem_id-1)
     - [PATCH characters/\<character\_id\> (В разработке)](#patch-characterscharacter_id-в-разработке)
 
 # API
@@ -263,7 +263,7 @@ URI: \<parrent\>/items<br>
 - `count` - количество передаваемых предметов (default = 0). При значении 0, возвращает полный список предметов;
 - `name` - принимает подстроку для фильтрации предметов по имени;
 
-#### POST items (В разработке)
+#### POST items
 
 URI: \<parrent\>/items<br>
 Доступ: Full
@@ -272,14 +272,14 @@ URI: \<parrent\>/items<br>
 
 // TODO: add PATCH or PUT to items
 
-##### PUT items/<item_id> (В разработке)
+##### PUT items/<item_id>
 
 URI: \<parrent\>/<item_id><br>
 Доступ: Full
 
 Принимает данные в формате ([`item`](#предмет-item)) поле `id` игнорируется. Заменяет содержимое нынешнего предмета на новое.
 
-##### DELETE items/<item_id> (В разработке)
+##### DELETE items/<item_id>
 
 URI: \<parrent\>/<item_id><br>
 Доступ: Full
