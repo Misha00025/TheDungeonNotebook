@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+  frontend:
+    build:
+      context: . # Path to the Dockerfile
+      dockerfile: Dockerfile # Name of the Dockerfile
+    ports:
+      - "3000:3000" # Map host port 3000 to container port 3000
+    container_name: frontend # Name the container "frontend"
