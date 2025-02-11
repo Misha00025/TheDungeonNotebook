@@ -48,7 +48,7 @@ services:
       start_period: 60s
 
   backend-cs:
-    build: ./backend-cs
+    build: ./api-v2
     container_name: backend-cs
     depends_on:
       mongo:
