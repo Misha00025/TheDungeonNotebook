@@ -1,17 +1,20 @@
-FROM python:3.11
+FROM python:3.11-slim-buster
 
-MAINTAINER Misha00025<misha00025@mail.ru>
+LABEL maintainer="Misha00025<misha00025@mail.ru>"
 
 ENV TZ=Europe/Moscow
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-WORKDIR /root
-RUN apt-get update
-RUN apt install -y git
+WORKDIR /app
 
-RUN git clone https://github.com/Misha00025/TheDungeonNotebook/ ./tdn
-WORKDIR /root/tdn/backend
-RUN python3 -m venv venv
-RUN ./venv/bin/pip install -r req.txt
-RUN ./venv/bin/pip install gunicorn
+# Копируем все файлы из текущей директории в контейнер
+COPY . .
 
-CMD ./venv/bin/gunicorn --bind 0.0.0.0:5000 --pythonpath /root/tdn/backend/venv wsgi:application
+# Создаем виртуальное окружение и устанавливаем зависимости
+RUN python3 -m venv venv \
+    && source venv/bin/activate \
+    && pip install -r req.txt
+
+EXPOSE 5000
+
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "-w", "4", "wsgi:application"]
