@@ -1,7 +1,6 @@
 import requests
-
 import config
-from app.api.v0 import database
+
 
 vk_api_version = "5.131"
 service_token = config.token
@@ -15,12 +14,6 @@ def _get_response(res):
 	return 1, json["error"]
 
 
-def is_correct_token(token):
-	err, last_date = database.get_last_authorise(token)
-	# print(f"code: {err}, error: {last_date}")
-	return not err
-
-
 def get_payload(content: dict):
 	if "payload" in content.keys():
 		payload = content["payload"]
@@ -28,7 +21,7 @@ def get_payload(content: dict):
 	return 1, "payload not found"
 
 
-def get_authorise_data(payload: dict):
+def get_authorize_data(payload: dict):
 	if "uuid" in payload.keys() and "token" in payload.keys():
 		uuid = payload["uuid"]
 		silent_token = payload["token"]
@@ -61,55 +54,8 @@ def get_account_info(user_id):
 			return 0, response[0]
 		return 1, response
 	return 1, "vk not found"
-
+	
 
 def access_to_user_token(access_token: str):
 	user_token = str(hash(access_token))
 	return user_token
-
-
-def update_authorize_date(token):
-	err, user_id = database.find_user_id_from_token(token)
-	if not err:
-		database.save_user_token(user_id, token)
-
-
-def save_client(payload, user_token):
-	from app.api.v0 import database
-	user_id = payload["user"]["id"]
-	user = database.VkUser()
-	err, account_info = get_account_info(user_id)
-	if err:
-		return err
-	user.vk_id = account_info["id"]
-	user.first_name = account_info["first_name"]
-	user.last_name = account_info["last_name"]
-	user.photo = account_info["photo_100"]
-	database.save_user(user)
-	database.save_user_token(user_id, user_token)
-	return 0
-
-
-def get_user_id(token):
-	err, user_id = database.find_user_id_from_token(token)
-	return err, user_id
-	
-def get_group_id(token):
-    err, group_id = database.find_group_id_from_token(token)
-    return err, group_id
-
-
-def get_groups(user_id: str):
-	err, groups = database.get_groups(user_id)
-	return err, groups
-
-
-def get_notes(user_id: str, group_id: int):
-	err, is_admin = database.check_admin(user_id, group_id)
-	if err:
-		return err, is_admin
-	if is_admin:
-		user_id = None
-	err, notes = database.get_notes(group_id, user_id)
-	return err, notes
-	# return 1, "group not found"
