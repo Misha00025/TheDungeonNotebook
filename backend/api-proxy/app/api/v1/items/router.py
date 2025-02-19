@@ -58,7 +58,7 @@ def get(rq: Request, item_id):
 	response, items = get_items(rq)
 	if items is not None:
 		for item in items:
-			if str(item["id"]) == str(item_id):
+			if str(item["id"]) == str(item_id) or str(item["name"] == str(item_id)):
 				return jsonify({item}), 200
 		response = requests.Response()
 		response.status_code = 404
