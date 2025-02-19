@@ -1,6 +1,6 @@
 from flask import request
 import requests
-from app import AUTH_SERVICE_URL
+from app import AUTH_SERVICE_URL, BACKEND_SERVICE_URL
 
 
 def get_current_time():
@@ -32,3 +32,14 @@ def get_request_meta_data():
 	# Копируем IP-адрес клиента
 	request_meta_data["remote_addr"] = request.remote_addr
 	return request_meta_data
+	
+def get_character_id(group_id, meta_data):
+	url = f"{BACKEND_SERVICE_URL}/groups/{group_id}/characters"
+	response = requests.get(url, **meta_data)
+	if response.status_code == 200:
+		characters = response.json()["data"]["characters"]
+		if len(characters) == 0:
+				return None
+		character_id = characters[0]["id"]
+		return character_id
+	return None

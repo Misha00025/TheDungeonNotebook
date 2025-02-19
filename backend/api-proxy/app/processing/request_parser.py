@@ -1,3 +1,4 @@
+from app.processing.common_methods import check_token
 from variables import _st, _at
 from flask import Request
 
@@ -43,10 +44,16 @@ def get_group_id(request: Request):
 		return str(group_id)
 	raise Exception("Bad request: group_id not founded")
 
-
-
 def get_admin_status(request: Request):
 	is_admin = request.json.get("is_admin")
 	return is_admin
 
+def get_whoami(request: Request):
+	token = request.headers.get("token")
+	if not token:
+		token = request.headers.get("serviceToken")
+		if not token:
+			return "Missing token", 401
+	whoami = check_token(token)
+	return whoami
 
