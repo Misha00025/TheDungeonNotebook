@@ -1,4 +1,4 @@
-from flask import request
+from flask import jsonify, request
 import requests
 from app import BACKEND_SERVICE_URL
 from app.processing.common_methods import get_character_id, get_request_meta_data
@@ -38,16 +38,16 @@ def parse_note_id(str_id: str):
 	return character_id, note_id
 
 def get_character_notes(character_id, group_id, owner):
-	try:
+	# try:
 		meta_data = get_request_meta_data()
 		url = f"{BACKEND_SERVICE_URL}/characters/{character_id}/notes"
-		character = requests.get(url, **meta_data)["data"]
+		character = requests.get(url, **meta_data).json()["data"]
 		notes = character["notes"]
 		i = 0
 		result = []
 		for note in notes:
 			res = {
-				"id": character["id"] + "." + str(i),
+				"id": str(character["id"]) + "." + str(i),
 				"header": note["header"],
 				"body": note["body"],
 				"last_modify": note["modified_date"],
@@ -59,17 +59,17 @@ def get_character_notes(character_id, group_id, owner):
 			result.append(res)
 		return result
 		
-	except Exception as e:
-		print(e)
-		return None
+	# except Exception as e:
+	# 	print(e)
+	# 	return None
 
 
 def get_notes():
-	try:
+	# try:
 		meta_data = get_request_meta_data()
 		group_id = get_group_id(rq)
 		url = f"{BACKEND_SERVICE_URL}/groups/{group_id}/characters"
-		res = requests.get(url, **meta_data)
+		res = requests.get(url, **meta_data).json()
 		notes = None
 		if res["access_level"] == "Admin":
 			characters = res["data"]["characters"]
@@ -83,12 +83,12 @@ def get_notes():
 			if character_id is None:
 				return None
 			url = f"{BACKEND_SERVICE_URL}/account"
-			owner = as_owner(requests.get(url, **meta_data)["data"])
+			owner = as_owner(requests.get(url, **meta_data).json()["data"])
 			notes = get_character_notes(character_id, group_id, owner)
 		return notes
-	except Exception as e:
-		print()
-		return None
+	# except Exception as e:
+	# 	print(e)
+	# 	return None
 
 
 def generate_note():
@@ -141,7 +141,7 @@ def add():
 	user_id = get_user_id(rq)
 	meta_data = get_request_meta_data(without_data=True)
 	url = f"{BACKEND_SERVICE_URL}/groups/{group_id}/characters"
-	res = requests.get(url, **meta_data)
+	res = requests.get(url, **meta_data).json()
 	group = res["data"]
 	if res["access_level"] == "Admin":
 		characters = group["characters"]
@@ -169,6 +169,6 @@ def get_all():
 	notes = get_notes()
 	if notes is None:
 		return not_found()
-	return ok({"notes": notes})
+	return ok({"notes": jsonify(notes)})
 	
 

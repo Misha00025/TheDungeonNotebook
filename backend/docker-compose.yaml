@@ -89,6 +89,9 @@ services:
       - "5000:5000"  # Пример отображения порта, измените на нужный вам порт
     env_file:
       - ./.env
+    environment:
+      - AUTH_SERVICE_URL=http://api-auth:5000
+      - BACKEND_URL=http://api-v2:8080
 
 networks:
   backend-network:

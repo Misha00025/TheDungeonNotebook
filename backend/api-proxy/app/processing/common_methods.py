@@ -18,6 +18,7 @@ def check_token(token):
 		else:
 			return None
 	except requests.RequestException as e:
+		print(e)
 		return None
 
 # Метод для копирования всех данных из запроса
@@ -30,8 +31,6 @@ def get_request_meta_data(without_data=False):
 	# Копируем данные из тела запроса
 	if not without_data:
 		request_meta_data["data"] = request.get_data()
-	# Копируем IP-адрес клиента
-	request_meta_data["remote_addr"] = request.remote_addr
 	return request_meta_data
 	
 def get_character_id(group_id, meta_data):

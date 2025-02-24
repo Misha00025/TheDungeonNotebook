@@ -35,11 +35,11 @@ def login():
 
 @login_routes.route('/whoami', methods=['GET'])
 def whoami():
-	token = request.args.get('token')
+	token = request.headers.get('token')
 	if not token:
 		return jsonify({"message": "Token not provided"}), 401
 	try:
 		data = verify_and_return_token_data(token)
 	except:
 		return jsonify({"message": "Invalid token"}), 403
-	return jsonify(data), 200 if "message" not in data else 403
+	return jsonify(data), 200
