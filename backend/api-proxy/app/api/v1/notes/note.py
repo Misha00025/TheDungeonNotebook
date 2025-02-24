@@ -167,8 +167,9 @@ def get_all():
 	if not whoami:
 		return forbidden()
 	notes = get_notes()
+	print(notes)
 	if notes is None:
 		return not_found()
-	return ok({"notes": jsonify(notes)})
+	return ok({"notes": notes})
 	
 
