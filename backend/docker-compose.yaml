@@ -39,21 +39,21 @@ services:
       retries: 5
       start_period: 60s
       
-  # api-auth:
-    # build: ./api-auth
-    # container_name: api-auth
-    # depends_on:
-    #   mysql:
-    #     condition: service_healthy
-    # networks:
-    #   - backend-network
-    # ports:
-    #   - "5001:5000"  # Пример отображения порта, измените на нужный вам порт
-    # env_file:
-    #   - ./.env
-    # environment:
-    #   - DB_HOST=mysql
-    #   - DB_PORT=3306
+  api-auth:
+    build: ./api-auth
+    container_name: api-auth
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - backend-network
+    ports:
+      - "5001:5000"  # Пример отображения порта, измените на нужный вам порт
+    env_file:
+      - ./.env
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
 
   api-v2:
     build: ./api-v2
@@ -63,8 +63,8 @@ services:
         condition: service_healthy
       mysql:
         condition: service_healthy
-      # api-auth:
-      #   condition: service_started
+      api-auth:
+        condition: service_started
     networks:
       - backend-network
     ports:
@@ -75,18 +75,20 @@ services:
       - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
       - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
-  # api-proxy:
-  #   build: ./api-proxy
-  #   container_name: api-proxy
-  #   depends_on:
-  #     api-v2:
-  #       condition: service_started
-  #   networks:
-  #     - backend-network
-  #   ports:
-  #     - "5000:5000"  # Пример отображения порта, измените на нужный вам порт
-  #   env_file:
-  #     - ./.env
+  api-proxy:
+    build: ./api-proxy
+    container_name: api-proxy
+    depends_on:
+      api-v2:
+        condition: service_started
+      api-auth:
+        condition: service_started
+    networks:
+      - backend-network
+    ports:
+      - "5000:5000"  # Пример отображения порта, измените на нужный вам порт
+    env_file:
+      - ./.env
 
 networks:
   backend-network:
