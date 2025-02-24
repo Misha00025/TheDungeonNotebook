@@ -1,99 +1,121 @@
-from app.model.Note import Note
 from flask import request
-from app.model.UserGroups import UserGroups
+import requests
+from app import BACKEND_SERVICE_URL
+from app.processing.common_methods import get_character_id, get_request_meta_data
 from app.processing.request_parser import *
-from app.model.VkUser import VkUser
-from app.status import forbidden, not_found, accepted, ok, created
+from app.status import forbidden, not_found, accepted, not_implemented, ok, created
 
+rq = request
 
 def in_keys(k1, k2):
-    for k in k1:
-        if k not in k2:
-            return False
-    return True
+	for k in k1:
+		if k not in k2:
+			return False
+	return True
 
 
-def generate_note() -> Note:
-    note = Note()
-    js: dict = request.json
-    hard_keys = ["header", "body"]
-    if in_keys(hard_keys, js.keys()):
-        note.header = js[hard_keys[0]]
-        note.body = js[hard_keys[1]]
-    else:
-        raise Exception("Bad request")
-    note.owner_id = get_user_id(request)
-    note.group_id = get_group_id(request)
-    return note
+def get_character_notes(character_id, group_id):
+	try:
+		meta_data = get_request_meta_data()
+		url = f"{BACKEND_SERVICE_URL}/characters/{character_id}/notes"
+		character = requests.get(url, **meta_data)["data"]
+		notes = character["notes"]
+		i = 0
+		result = []
+		for note in notes:
+			res = {
+				"id": character["id"] + "." + str(i),
+				"header": note["header"],
+				"body": note["body"],
+				"last_modify": note["modified_date"],
+				"group_id":  group_id,
+				"owner_id": character_id,
+				"author":{
+					"vk_id": character["id"],
+					"first_name": character["name"],
+					"last_name": "",
+					"photo": None
+				}
+			}
+			i+=1
+			result.append(res)
+		return result
+		
+	except Exception as e:
+		print(e)
+		return None
 
 
-def check_access(note: Note):
-    user_id = get_user_id(request)
-    group_id = get_group_id(request)
-    # print(f"{user_id} -- {type(user_id)}")
-    user = VkUser(user_id)
-    if not user.is_founded():
-        return False
-    ug = UserGroups(user)
-    user_access = str(note.owner_id) == str(user_id) or ug.is_admin(note.group_id)
-    group_access = note.group_id == group_id 
-    return user_access and group_access
+def get_notes():
+	meta_data = get_request_meta_data()
+	group_id = get_group_id(rq)
+	url = f"{BACKEND_SERVICE_URL}/groups/{group_id}/characters"
+	res = requests.get(url, **meta_data)
+	notes = None
+	if res["access_level"] == "Admin":
+		characters = res["data"]["characters"]
+		notes = []
+		for character in characters:
+			c_notes = get_character_notes(character["id"], group_id)
+			notes.extend(c_notes if c_notes is not None else [])
+			# TODO: Add check of owner_id parameter
+	else:
+		character_id = get_character_id(group_id, meta_data)
+		if character_id is None:
+			return None
+		notes = get_character_notes(character_id, group_id)
+	return notes
+
+
+def generate_note():
+	note = {}
+	js: dict = request.json
+	hard_keys = ["header", "body"]
+	if in_keys(hard_keys, js.keys()):
+		note["header"] = js[hard_keys[0]]
+		note["body"] = js[hard_keys[1]]
+	else:
+		return None
+	return note
 
 
 def get(note_id):
-    note = Note(note_id)
-    if not note.is_exist():
-        return not_found()
-    if check_access(note):
-        return ok(note.to_dict())
-    return forbidden()
-
+	whoami = get_whoami(rq)
+	if not whoami:
+		return forbidden()
+	notes = get_notes()
+	for note in notes:
+		if str(note["id"]) == str(note_id):
+			return ok(note)
+	return not_found()
+	
 
 def put(note_id):
-    note = Note(note_id)
-    # print(note.to_dict())
-    if not note.is_exist():
-        return not_found()
-    if check_access(note):
-        new_note = generate_note()
-        new_note.note_id = note_id
-        new_note.owner_id = note.owner_id
-        new_note.update()
-        return accepted()
-    return forbidden()
+	whoami = get_whoami(rq)
+	if not whoami:
+		return forbidden()
+	return not_implemented()
 
 
 def delete(note_id):
-    note = Note(note_id)
-    if not note.is_exist():
-        return not_found()
-    if check_access(note):
-        note.delete()
-        return accepted()
-    return forbidden()
+	whoami = get_whoami(rq)
+	if not whoami:
+		return forbidden()
+	return not_implemented()
 
 
 def add():
-    note = generate_note()
-    last_id = note.save()
-    return created({"last_id": last_id})
+	last_id = len([])
+	return created({"last_id": last_id})
 
 
 def get_all():
-    user_id = get_user_id(request)
-    group_id = get_group_id(request)
-    user = VkUser(user_id)
-    ug = UserGroups(user)
-    if not ug.is_founded():
-        return forbidden()
-    if ug.is_admin(group_id):
-        user_id = None
-    from app.database import note
-    err, res = note.find(group_id, user_id)
-    notes = []
-    for nt in res:
-        note = Note(nt[2])
-        notes.append(note.to_dict())
-    # print(res)
-    return ok({"notes": notes})
+	whoami = get_whoami(rq)
+	if not whoami:
+		return forbidden()
+	notes = get_notes()
+	if notes is None:
+		return not_found()
+	return ok({"notes": notes})
+	
 

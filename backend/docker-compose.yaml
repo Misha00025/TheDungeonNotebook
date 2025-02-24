@@ -1,93 +1,93 @@
 version: '3'
 
 services:
-	mongo:
-		image: mongo:latest
-		container_name: mongo_db
-		restart: always
-		networks:
-			- backend-network
-		volumes:
-			- ./mongo_data:/data/db
-		env_file:
-			- ./.env
-		ports:
-			- "27019:27017"
-		healthcheck:
-			test: ["CMD", "echo", "db.runCommand(\"ping\").ok", "|", "mongosh", "mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@localhost:27017/?authSource=${MYSQL_DATABASE}", "--quiet"]
-			interval: 10s
-			timeout: 10s
-			retries: 5
-			start_period: 30s
+  mongo:
+    image: mongo:latest
+    container_name: mongo_db
+    restart: always
+    networks:
+      - backend-network
+    volumes:
+      - ./mongo_data:/data/db
+    env_file:
+      - ./.env
+    ports:
+      - "27019:27017"
+    healthcheck:
+      test: ["CMD", "echo", "db.runCommand(\"ping\").ok", "|", "mongosh", "mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@localhost:27017/?authSource=${MYSQL_DATABASE}", "--quiet"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
-	mysql:
-		image: mysql:8.0
-		container_name: mysql_db
-		restart: always
-		networks:
-			- backend-network
-		env_file:
-			- ./.env
-		ports:
-			- "3309:3306"
-		volumes:
-			- ./mysql_data:/var/lib/mysql
-		healthcheck:
-			test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
-			interval: 20s
-			timeout: 10s
-			retries: 5
-			start_period: 60s
-			
-	api-auth:
-		build: ./api-auth
-		container_name: api-auth
-		depends_on:
-			mysql:
-				condition: service_healthy
-		networks:
-			- backend-network
-		ports:
-			- "5001:5000"  # Пример отображения порта, измените на нужный вам порт
-		env_file:
-			- ./.env
-		environment:
-			- DB_HOST=mysql
-			- DB_PORT=3306
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_db
+    restart: always
+    networks:
+      - backend-network
+    env_file:
+      - ./.env
+    ports:
+      - "3309:3306"
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+      
+  # api-auth:
+    # build: ./api-auth
+    # container_name: api-auth
+    # depends_on:
+    #   mysql:
+    #     condition: service_healthy
+    # networks:
+    #   - backend-network
+    # ports:
+    #   - "5001:5000"  # Пример отображения порта, измените на нужный вам порт
+    # env_file:
+    #   - ./.env
+    # environment:
+    #   - DB_HOST=mysql
+    #   - DB_PORT=3306
 
-	api-v2:
-		build: ./api-v2
-		container_name: api-v2
-		depends_on:
-			mongo:
-				condition: service_healthy
-			mysql:
-				condition: service_healthy
-			api-auth:
-				condition: service_started
-		networks:
-			- backend-network
-		ports:
-			- "5077:8080"
-		env_file:
-			- ./.env
-		environment:
-			- MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
-			- MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+  api-v2:
+    build: ./api-v2
+    container_name: api-v2
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      # api-auth:
+      #   condition: service_started
+    networks:
+      - backend-network
+    ports:
+      - "5077:8080"
+    env_file:
+      - ./.env
+    environment:
+      - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
+      - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
-	api-proxy:
-		build: ./api-proxy
-		container_name: api-proxy
-		depends_on:
-			api-v2:
-				condition: service_started
-		networks:
-			- backend-network
-		ports:
-			- "5000:5000"  # Пример отображения порта, измените на нужный вам порт
-		env_file:
-			- ./.env
+  # api-proxy:
+  #   build: ./api-proxy
+  #   container_name: api-proxy
+  #   depends_on:
+  #     api-v2:
+  #       condition: service_started
+  #   networks:
+  #     - backend-network
+  #   ports:
+  #     - "5000:5000"  # Пример отображения порта, измените на нужный вам порт
+  #   env_file:
+  #     - ./.env
 
 networks:
-	backend-network:
-		driver: bridge
+  backend-network:
+    driver: bridge

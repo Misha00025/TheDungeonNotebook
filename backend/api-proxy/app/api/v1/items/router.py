@@ -4,7 +4,7 @@ from app import BACKEND_SERVICE_URL
 from app.processing.common_methods import get_character_id, get_request_meta_data
 from app.processing.request_parser import from_user, get_whoami
 from .parser import get_group_id, get_user_id, from_bot, search_by_name
-from app.status import accepted, created, ok, forbidden, not_found, bad_request, conflict
+from app.status import accepted, created, ok, forbidden, not_found, bad_request, conflict, not_implemented
 
 
 def br(method):
@@ -20,7 +20,10 @@ def errs_response(errs):
 def get_items(rq: Request):
 	whoami = get_whoami(rq)
 	if not whoami:
-		return forbidden()
+		response = requests.Response()
+		response.status_code = 403
+		response.content = "Forbidden"
+		return response, None
 	meta_data = get_request_meta_data()
 	if from_user(rq):
 		group_id = get_group_id(rq)
@@ -29,7 +32,7 @@ def get_items(rq: Request):
 			response = requests.Response()
 			response.status_code = 404
 			response.content = "Can't find character"
-			return response, []
+			return response, None
 		url = f"{BACKEND_SERVICE_URL}/characters/{character_id}/items"			
 	else:
 		group_id = whoami["access"]["id"]
@@ -67,16 +70,16 @@ def get(rq: Request, item_id):
 	
 
 def put(rq: Request, item_id):
-	pass
+	return not_implemented()
 
 
 def delete(rq: Request, item_id):
-	pass
+	return not_implemented()
 
 
 def post_add(rq: Request, item_id):
-	pass
+	return not_implemented()
 	
 
 def post_new(rq: Request):
-	pass
+	return not_implemented()

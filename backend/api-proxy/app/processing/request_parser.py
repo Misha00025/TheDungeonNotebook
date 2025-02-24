@@ -24,6 +24,12 @@ def from_user(request: Request):
 
 _methods_without_json = ["GET", "DELETE"]
 
+def get_my_id():
+	whoami = get_whoami()
+	if not whoami:
+		return None
+	return str(whoami["access"]["id"])
+
 def get_user_id(request: Request):
 	if from_bot(request):
 		args = request.args
@@ -33,7 +39,8 @@ def get_user_id(request: Request):
 		if user_id is None:
 			return None
 		return str(user_id)
-	raise Exception("Bad request: user_id not founded")
+	else:
+		return get_my_id()
 
 def get_group_id(request: Request):
 	if from_user(request):
@@ -42,7 +49,8 @@ def get_group_id(request: Request):
 		if group_id is None and request.method not in _methods_without_json:
 			group_id = request.json.get("group_id")
 		return str(group_id)
-	raise Exception("Bad request: group_id not founded")
+	else:
+		return get_my_id()
 
 def get_admin_status(request: Request):
 	is_admin = request.json.get("is_admin")
@@ -53,7 +61,7 @@ def get_whoami(request: Request):
 	if not token:
 		token = request.headers.get("serviceToken")
 		if not token:
-			return "Missing token", 401
+			return None
 	whoami = check_token(token)
 	return whoami
 
