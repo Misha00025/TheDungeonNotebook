@@ -11,8 +11,6 @@ services:
       - ./mongo_data:/data/db
     env_file:
       - ./.env
-    ports:
-      - "27019:27017"
     healthcheck:
       test: ["CMD", "echo", "db.runCommand(\"ping\").ok", "|", "mongosh", "mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@localhost:27017/?authSource=${MYSQL_DATABASE}", "--quiet"]
       interval: 10s
@@ -28,8 +26,6 @@ services:
       - backend-network
     env_file:
       - ./.env
-    ports:
-      - "3309:3306"
     volumes:
       - ./mysql_data:/var/lib/mysql
     healthcheck:
