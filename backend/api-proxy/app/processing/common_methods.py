@@ -21,14 +21,15 @@ def check_token(token):
 		return None
 
 # Метод для копирования всех данных из запроса
-def get_request_meta_data():
+def get_request_meta_data(without_data=False):
 	request_meta_data = {}
 	# Копируем все заголовки
 	request_meta_data["headers"] = {key: value for (key, value) in request.headers if key != 'Host'}
 	# Копируем все cookies
 	request_meta_data["cookies"] = request.cookies
 	# Копируем данные из тела запроса
-	request_meta_data["data"] = request.get_data()
+	if not without_data:
+		request_meta_data["data"] = request.get_data()
 	# Копируем IP-адрес клиента
 	request_meta_data["remote_addr"] = request.remote_addr
 	return request_meta_data
