@@ -103,7 +103,7 @@ def generate_note():
 		note["body"] = js[hard_keys[1]]
 	else:
 		return None
-	return js
+	return note
 
 
 def get(note_id):
@@ -124,7 +124,7 @@ def put(note_id):
 	character_id, note_id = parse_note_id(note_id)
 	meta_data = get_request_meta_data(without_data=True)
 	url = f"{BACKEND_SERVICE_URL}/characters/{character_id}/notes/{note_id}"
-	res = requests.put(url, data=generate_note(), **meta_data)
+	res = requests.put(url, json=generate_note(), **meta_data)
 	return res.content, res.status_code
 
 
@@ -159,7 +159,7 @@ def add():
 	else:
 		character_id = get_character_id(group_id, meta_data)
 	url = f"{BACKEND_SERVICE_URL}/characters/{character_id}/notes"
-	res = requests.post(url, data=generate_note(), **meta_data)
+	res = requests.post(url, json=generate_note(), **meta_data)
 	notes = get_character_notes(character_id, group_id, None)
 	last_id = notes[len(notes)-1]["id"]
 	if res.ok:
