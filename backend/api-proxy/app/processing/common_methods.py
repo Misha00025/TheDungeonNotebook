@@ -25,15 +25,16 @@ def check_token(token):
 # Метод для копирования всех данных из запроса
 def get_request_meta_data(without_data=False):
 	request_meta_data = {}
+	headers = {key: value for (key, value) in request.headers if key != 'Host'}
+	if _st in headers.keys():
+		headers[_at] = headers[_st]
 	# Копируем все заголовки
-	request_meta_data["headers"] = {key: value for (key, value) in request.headers if key != 'Host'}
+	request_meta_data["headers"] = headers
 	# Копируем все cookies
 	request_meta_data["cookies"] = request.cookies
 	# Копируем данные из тела запроса
 	if not without_data:
 		request_meta_data["data"] = request.get_data()
-	if _st in request_meta_data["headers"].keys():
-		request_meta_data["headers"][_at] = request_meta_data["headers"][_st]
 	return request_meta_data
 	
 def get_character_id(group_id, meta_data):
