@@ -103,7 +103,7 @@ def generate_note():
 		note["body"] = js[hard_keys[1]]
 	else:
 		return None
-	return note
+	return js
 
 
 def get(note_id):
