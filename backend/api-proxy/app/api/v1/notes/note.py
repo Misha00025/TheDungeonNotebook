@@ -143,8 +143,9 @@ def add():
 	user_id = get_user_id(rq)
 	meta_data = get_request_meta_data(without_data=True)
 	url = f"{BACKEND_SERVICE_URL}/groups/{group_id}/characters"
-	res = requests.get(url, **meta_data).json()
-	group = res["data"]
+	res = requests.get(url, **meta_data)
+	print(res, res.content)
+	group = res.json()["data"]
 	if res["access_level"] == "Admin":
 		characters = group["characters"]
 		users = group["users"] + group["admins"]
