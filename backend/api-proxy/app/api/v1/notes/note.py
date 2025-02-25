@@ -123,7 +123,6 @@ def put(note_id):
 		return forbidden()
 	character_id, note_id = parse_note_id(note_id)
 	meta_data = get_request_meta_data(without_data=True)
-	meta_data["headers"]["Content-Type"] = "application/json"
 	url = f"{BACKEND_SERVICE_URL}/characters/{character_id}/notes/{note_id}"
 	res = requests.put(url, data=generate_note(), **meta_data)
 	return res.content, res.status_code
@@ -144,7 +143,6 @@ def add():
 	group_id = get_group_id(rq)
 	user_id = get_user_id(rq)
 	meta_data = get_request_meta_data(without_data=True)
-	meta_data["headers"]["Content-Type"] = "application/json"
 	url = f"{BACKEND_SERVICE_URL}/groups/{group_id}/characters"
 	res = requests.get(url, **meta_data).json()
 	group = res["data"]

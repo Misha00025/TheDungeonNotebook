@@ -25,6 +25,7 @@ def check_token(token):
 def get_request_meta_data(without_data=False):
 	request_meta_data = {}
 	headers = {key: value for (key, value) in request.headers if key != 'Host'}
+	headers["Content-Type"] = "application/json; charset=utf-8"
 	# Копируем все заголовки
 	request_meta_data["headers"] = headers
 	# Копируем все cookies
@@ -32,7 +33,7 @@ def get_request_meta_data(without_data=False):
 	# Копируем данные из тела запроса
 	if not without_data:
 		request_meta_data["data"] = request.get_data()
-	# print(request_meta_data)
+	print(request_meta_data)
 	return request_meta_data
 	
 def get_character_id(group_id, meta_data):
