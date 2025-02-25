@@ -95,8 +95,9 @@ def get_notes():
 
 def generate_note():
 	note = {}
-	js: dict = request.json
+	js: dict = request.get_json()
 	hard_keys = ["header", "body"]
+	print(js)
 	if in_keys(hard_keys, js.keys()):
 		note["header"] = js[hard_keys[0]]
 		note["body"] = js[hard_keys[1]]
