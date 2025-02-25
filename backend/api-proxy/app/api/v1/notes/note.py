@@ -144,7 +144,6 @@ def add():
 	meta_data = get_request_meta_data(without_data=True)
 	url = f"{BACKEND_SERVICE_URL}/groups/{group_id}/characters"
 	res = requests.get(url, **meta_data).json()
-	print(res, res.content)
 	group = res["data"]
 	if res["access_level"] == "Admin":
 		characters = group["characters"]
