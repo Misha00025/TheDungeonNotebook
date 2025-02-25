@@ -1,6 +1,7 @@
 **/.vscode/
 **/.env
 **/venv/
+**/*.log
 
-mongo_data/
-mysql_data/
+**/mongo_data/
+**/mysql_data/
