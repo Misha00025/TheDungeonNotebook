@@ -33,8 +33,10 @@ def get_owner(character, group):
 		print(e)
 		return None
 
+INDEX_MOD = 100000
+
 def parse_note_id(str_id: str):
-	character_id, note_id = str_id.split(".")
+	character_id, note_id = int(str_id)//INDEX_MOD, int(str_id)%INDEX_MOD
 	return character_id, note_id
 
 def get_character_notes(character_id, group_id, owner):
@@ -47,7 +49,7 @@ def get_character_notes(character_id, group_id, owner):
 		result = []
 		for note in notes:
 			res = {
-				"id": str(character["id"]) + "." + str(i),
+				"id": int(character["id"])*INDEX_MOD+int(i),
 				"header": note["header"],
 				"body": note["body"],
 				"last_modify": note["modified_date"],
