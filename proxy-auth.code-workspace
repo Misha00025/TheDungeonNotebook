@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "backend/api-proxy"
+		},
+		{
+			"path": "backend/api-auth"
+		}
+	],
+	"settings": {}
+}
