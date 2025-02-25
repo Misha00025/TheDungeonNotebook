@@ -102,7 +102,7 @@ def generate_note():
 		note["body"] = js[hard_keys[1]]
 	else:
 		return None
-	return note
+	return {"newData":note}
 
 
 def get(note_id):
@@ -121,9 +121,9 @@ def put(note_id):
 	if not whoami:
 		return forbidden()
 	character_id, note_id = parse_note_id(note_id)
-	meta_data = get_request_meta_data()
+	meta_data = get_request_meta_data(without_data=True)
 	url = f"{BACKEND_SERVICE_URL}/characters/{character_id}/notes/{note_id}"
-	res = requests.put(url, **meta_data)
+	res = requests.put(url, data=generate_note(), **meta_data)
 	return res.content, res.status_code
 
 
