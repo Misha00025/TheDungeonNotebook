@@ -8,3 +8,5 @@ version("")
 @route("get_api", ["GET"])
 def _get_api():
     return ok({"api_methods": get_routers_info()})
+
+from . import router
