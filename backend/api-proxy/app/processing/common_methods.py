@@ -35,6 +35,7 @@ def get_request_meta_data(without_data=False):
 	# Копируем данные из тела запроса
 	if not without_data:
 		request_meta_data["data"] = request.get_data()
+	print(request_meta_data)
 	return request_meta_data
 	
 def get_character_id(group_id, meta_data):
