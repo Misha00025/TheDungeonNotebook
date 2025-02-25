@@ -162,7 +162,10 @@ def add():
 	res = requests.post(url, data=generate_note() **meta_data)
 	notes = get_character_notes(character_id, group_id, None)
 	last_id = notes[len(notes)-1]["id"]
-	return created({"last_id": last_id})
+	if res.ok:
+		return created({"last_id": last_id})
+	print(res, res.content)
+	return res.content, res.status_code
 
 
 def get_all():

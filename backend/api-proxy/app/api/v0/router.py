@@ -6,6 +6,7 @@ from app import BACKEND_SERVICE_URL, AUTH_SERVICE_URL
 from app.api_controller import route, version, Access
 from app.status import ok
 from app.processing.common_methods import get_request_meta_data
+from variables import _at, _st
 
 
 version("")
@@ -14,6 +15,8 @@ version("")
 @route("auth", ["POST"])
 def _authorize():
 	meta_data = get_request_meta_data()
+	if _st in meta_data["headers"].keys():
+		meta_data["headers"][_at] = meta_data["headers"][_st]
 	url = f"{AUTH_SERVICE_URL}/login"
 	response = requests.post(url, **meta_data)
 	return response.content, response.status_code
@@ -22,6 +25,8 @@ def _authorize():
 @route("check_access", ["GET"])
 def _ping_pong():
 	meta_data = get_request_meta_data()
+	if _st in meta_data["headers"].keys():
+		meta_data["headers"][_at] = meta_data["headers"][_st]
 	url = f"{AUTH_SERVICE_URL}/whoami"
 	response = requests.get(url, **meta_data)
 	return response.content, response.status_code
