@@ -57,9 +57,9 @@ def get_admin_status(request: Request):
 	return is_admin
 
 def get_whoami(request: Request):
-	token = request.headers.get("token")
+	token = request.headers.get(_at)
 	if not token:
-		token = request.headers.get("serviceToken")
+		token = request.headers.get(_st)
 		if not token:
 			return None
 	whoami = check_token(token)
