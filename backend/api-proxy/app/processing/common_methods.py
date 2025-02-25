@@ -1,6 +1,7 @@
 from flask import request
 import requests
 from app import AUTH_SERVICE_URL, BACKEND_SERVICE_URL
+from variables import _at, _st
 
 
 def get_current_time():
@@ -31,6 +32,8 @@ def get_request_meta_data(without_data=False):
 	# Копируем данные из тела запроса
 	if not without_data:
 		request_meta_data["data"] = request.get_data()
+	if _st in request_meta_data["headers"].keys():
+		request_meta_data["headers"][_at] = request_meta_data["headers"][_st]
 	return request_meta_data
 	
 def get_character_id(group_id, meta_data):
