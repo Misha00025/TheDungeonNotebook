@@ -15,7 +15,7 @@ version("")
 def _authorize():
 	meta_data = get_request_meta_data()
 	url = f"{AUTH_SERVICE_URL}/login"
-	response = requests.get(url, **meta_data)
+	response = requests.post(url, **meta_data)
 	return response.content, response.status_code
 
 
