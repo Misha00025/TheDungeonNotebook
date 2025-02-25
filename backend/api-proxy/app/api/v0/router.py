@@ -6,6 +6,7 @@ from app import BACKEND_SERVICE_URL, AUTH_SERVICE_URL
 from app.api_controller import route, version, Access
 from app.status import ok
 from app.processing.common_methods import get_request_meta_data
+from variables import _at, _st
 
 
 version("")
@@ -15,6 +16,8 @@ version("")
 def _authorize():
 	meta_data = get_request_meta_data()
 	url = f"{AUTH_SERVICE_URL}/login"
+	if _st in meta_data["headers"].keys():
+		meta_data["headers"][_at] = meta_data["headers"][_st]
 	response = requests.post(url, **meta_data)
 	return response.content, response.status_code
 
