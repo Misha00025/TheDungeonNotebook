@@ -1,31 +1,28 @@
 package ru.thedun.notebook
 
+import android.annotation.SuppressLint
 import android.os.Bundle
-import android.widget.LinearLayout
-import android.widget.TextView
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import ru.thedun.notebook.databinding.ActivityNotesBinding
 
 class MainActivity : AppCompatActivity() {
+
+    private var _binding: ActivityNotesBinding? = null
+    private val binding
+        get() = _binding?:throw IllegalStateException("Binding for ActivityNotesBinding must not be null")
+
+    @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContentView(R.layout.activity_notes)
-        val myDataset = MutableList<String>(200, { i -> "Item $i"})
-
-        val viewManager = LinearLayoutManager(this)
-        val viewAdapter = NotesAdapter(myDataset)
-
-        val tvCharacterName: TextView = findViewById(R.id.tvCharacterName)
-        val llNotes: RecyclerView = findViewById(R.id.rvNotes)
-        llNotes.apply {
-            setHasFixedSize(true)
-            layoutManager = viewManager
-            adapter = viewAdapter
+        _binding = ActivityNotesBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        var i = 0
+        with(binding){
+            val text = tvCharacterName.text
+            tvCharacterName.setOnClickListener {
+                tvCharacterName.text = "$text $i"
+                i += 1
+            }
         }
     }
 }
