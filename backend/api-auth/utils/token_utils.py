@@ -5,11 +5,13 @@ from config import secret_key as sk
 
 secret_key = jwt.jwk.OctetJWK(bytes(str(sk), encoding="utf-8"))
 
-def generate_jwt_token(access_id, auth_type="user"):
+def generate_jwt_token(access_id, auth_type="user", delta_time = None):
+	if delta_time is None:
+		delta_time = {"days": 7}
 	payload = {
 		'access_id': access_id,
 		'auth_type': auth_type,
-		'exp': int(datetime.timestamp(datetime.now(tz=timezone.utc) + timedelta(days=7)))
+		'exp': int(datetime.timestamp(datetime.now(tz=timezone.utc) + timedelta(**delta_time)))
 	}
 	token: jwt.JWT = jwt.JWT().encode(payload, secret_key)
 	return token
