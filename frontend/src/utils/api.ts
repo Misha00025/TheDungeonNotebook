@@ -39,7 +39,7 @@ interface ItemsResponse {
 }
 
 // const BACKEND_HOST = "http://127.0.0.1:5000/api/"
-const BACKEND_HOST = "https://the-dungeon-notebook.ru/api/";
+const BACKEND_HOST = "https://thedun.ru/api/";
 const API_VERSION = "v1/";
 const BACKEND_VERSION_HOST = BACKEND_HOST + API_VERSION;
 
