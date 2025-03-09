@@ -1,5 +1,7 @@
 .listItem__active {
-  filter: brightness(140%) !important;
+  font-weight: 500;
+  color: var(--text-primary) !important;
+  background-color: var(--active-bg) !important;
 }
 
 .listItem {
@@ -9,15 +11,15 @@
   height: 3em;
   overflow: hidden;
   line-height: 1.5;
-  color: #d3deff;
+  color: var(--text-secondary);
   cursor: pointer;
-  background-color: #323641;
+  background-color: var(--bg-secondary);
   border-radius: 8px;
-  transition: 0.1s;
+  transition: all 0.2s ease;
 }
 
 .listItem:hover {
-  filter: brightness(115%);
+  background-color: var(--hover-bg);
 }
 
 .listItem-link {

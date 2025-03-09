@@ -1,11 +1,14 @@
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { TGroupContentContext } from "../../router/layouts/GroupContentLayout";
 import { useAuth } from "../../store/AuthContent";
-import { ItemContent } from "../ItemContent";
-import { Api } from "../../utils/api";
+import { DetailContent } from "../DetailContent";
+import { ItemService } from "../../utils/api/itemService";
 import { Box, CircularProgress, Paper, Typography } from "@mui/material";
 import defaultItemPicture from "../../assets/items/default_item.png";
 
+/**
+ * Component for displaying and editing an item
+ */
 export const Item = () => {
   const { token } = useAuth();
   const { itemsContext } = useOutletContext<TGroupContentContext>();
@@ -13,32 +16,43 @@ export const Item = () => {
 
   const activeItem = itemsContext.activeItem;
 
-  const handleItemSave = (description: string, title: string) => {
-    Api.updateItem(
-      {
-        ...activeItem,
-        description: description,
-        name: title,
-      },
-      token,
-    );
+  const handleItemSave = async (description: string, title: string) => {
+    try {
+      if (!activeItem) return;
 
-    itemsContext.setItems([
-      ...itemsContext.items.map((item) =>
-        item.id === activeItem.id
-          ? { ...item, description, name: title }
-          : item,
-      ),
-    ]);
+      const updatedItem = await ItemService.updateItem({
+        ...activeItem,
+        description,
+        name: title,
+      });
+
+      // Update local state
+      itemsContext.setItems([
+        ...itemsContext.items.map((item) =>
+          item.id === activeItem.id ? updatedItem : item,
+        ),
+      ]);
+    } catch (error) {
+      console.error("Failed to save item:", error);
+    }
   };
 
   const handleItemDelete = async () => {
-    await Api.deleteItem(activeItem?.id, token);
+    try {
+      if (!activeItem) return;
 
-    itemsContext.items = itemsContext.items.filter(
-      (item) => item.id !== activeItem.id,
-    );
-    navigate("../");
+      await ItemService.deleteItem(activeItem.id);
+
+      // Update local state
+      itemsContext.setItems(
+        itemsContext.items.filter((item) => item.id !== activeItem.id),
+      );
+
+      // Navigate back
+      navigate("../");
+    } catch (error) {
+      console.error("Failed to delete item:", error);
+    }
   };
 
   if (!activeItem) {
@@ -68,12 +82,13 @@ export const Item = () => {
   );
 
   return (
-    <ItemContent
-      itemBodyText={activeItem?.description}
-      itemHeaderText={activeItem?.name}
-      itemFooter={ItemFooter}
-      handleItemSave={handleItemSave}
-      handleItemDelete={handleItemDelete}
+    <DetailContent
+      title={activeItem.name}
+      content={activeItem.description}
+      footer={ItemFooter}
+      onSave={handleItemSave}
+      onDelete={handleItemDelete}
+      isLoading={false}
     />
   );
 };

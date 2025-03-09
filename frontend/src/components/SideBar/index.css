@@ -8,7 +8,8 @@
   min-width: 64px;
   height: 100dvh;
   padding: 16px 0;
-  background-color: #3a3f4b;
+  background-color: var(--bg-tertiary);
+  transition: background-color 0.3s ease;
 }
 
 .sidebar-bottomItems,
@@ -16,6 +17,15 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* Theme toggle icon animation */
+.sidebar .iconButton img {
+  transition: transform 0.3s ease;
+}
+
+[data-theme="light"] .sidebar .iconButton img[src*="theme-toggle"] {
+  filter: none;
 }
 
 @media screen and (width <= 768px) {

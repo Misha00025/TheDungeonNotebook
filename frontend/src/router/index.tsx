@@ -7,6 +7,8 @@ import { Login } from "../pages/Login";
 import { HomeLayout } from "./layouts/HomeLayout";
 import { GroupContentLayout } from "./layouts/GroupContentLayout";
 import { Item } from "../components/Item";
+import { NotesListView } from "../components/NotesListView";
+import { ItemsListView } from "../components/ItemsListView";
 
 export const AppRouter = () => {
   const router = createBrowserRouter([
@@ -25,6 +27,7 @@ export const AppRouter = () => {
               children: [
                 {
                   path: "notes",
+                  element: <NotesListView />,
                   children: [
                     {
                       path: ":noteId",
@@ -34,6 +37,7 @@ export const AppRouter = () => {
                 },
                 {
                   path: "items",
+                  element: <ItemsListView />,
                   children: [
                     {
                       path: ":itemId",

@@ -1,30 +1,70 @@
 import React, { useEffect, useState } from "react";
 import { ListContainer } from "../ListContainer/Index";
 import { ListItem } from "../ListItem";
-
-import "./index.css";
 import { IconButton } from "../IconButton";
+import "./index.css";
 
 import collapseIcon from "../../assets/mdi_arrow-collapse-left.svg";
 import extendIcon from "../../assets/mdi_arrow-expand-right.svg";
 
+/**
+ * Interface for items displayed in the selector box
+ */
+export interface SelectorItem {
+  id: number;
+  name: string;
+}
+
 interface ItemSelectorBoxProps {
-  initialItemsCallback: () => Promise<void>;
-  items?: Array<{ name: string; id: number }>;
+  /**
+   * Callback to fetch items. Should set the items state internally.
+   * Can optionally return the items for convenience.
+   */
+  initialItemsCallback: () => Promise<any>;
+
+  /**
+   * Array of items to display in the selector
+   */
+  items?: Array<SelectorItem>;
+
+  /**
+   * Callback when an item is selected
+   */
   handleActiveItemChanged?: (itemId: number) => void;
+
+  /**
+   * Prefix for item links (e.g., "notes/" or "items/")
+   */
   linkPrefix?: string;
+
+  /**
+   * ID of the initially active item
+   */
   initialActiveItemId?: number;
+
+  /**
+   * ID of the currently active item
+   */
   activeItemId?: number;
+
+  /**
+   * Value that triggers a refetch when changed
+   */
   refetchItemsOnChangeValue?: string;
+
+  /**
+   * Whether the selector box should be hidden
+   */
   isHided?: boolean;
+
+  /**
+   * Component to display in the header
+   */
   headerComponent: React.ReactElement;
 }
 
 /**
- *
- * @param initialItemsCallback - Асинхронная функция, возвращающая Promise. В теле функции должен установить состояние items.
- * @param items - Массив объектов с полями name и id. Должен быть установлен например через initialItemsCallback.
- * @returns
+ * A reusable component for selecting items from a list
  */
 export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
   initialItemsCallback,
@@ -39,29 +79,47 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
+  // Fetch items when the component mounts or refetchItemsOnChangeValue changes
   useEffect(() => {
-    initialItemsCallback().then(() => {
-      setIsLoading(false);
-    });
+    const fetchItems = async () => {
+      try {
+        setIsLoading(true);
+        await initialItemsCallback();
+      } catch (error) {
+        console.error("Error fetching items:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchItems();
 
     return () => setIsLoading(true);
-  }, [refetchItemsOnChangeValue]);
+  }, [refetchItemsOnChangeValue, initialItemsCallback]);
 
+  // Notify parent when active item changes
   useEffect(() => {
-    if (handleActiveItemChanged) {
+    if (handleActiveItemChanged && activeItemId !== -1) {
       handleActiveItemChanged(activeItemId);
     }
-  }, [activeItemId]);
+  }, [activeItemId, handleActiveItemChanged]);
 
   const handleToggleCollapse = () => {
-    setIsCollapsed((lastIsCollapsed) => !lastIsCollapsed);
+    setIsCollapsed((prevIsCollapsed) => !prevIsCollapsed);
   };
 
+  // Determine container class names
+  const containerClassNames = [
+    "itemSelectorBox-container",
+    isHided ? "itemSelectorBox-container__hided" : "",
+    `itemSelectorBox-container__${isCollapsed ? "collapsed" : "expanded"}`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div
-      className={`itemSelectorBox-container ${isHided ? "itemSelectorBox-container__hided" : undefined} itemSelectorBox-container__${isCollapsed ? "collapsed" : "expanded"}`}
-    >
-      <div className={`itemSelectorBox-header-container`}>
+    <div className={containerClassNames}>
+      <div className="itemSelectorBox-header-container">
         {headerComponent}
         <IconButton
           icon={isCollapsed ? extendIcon : collapseIcon}
@@ -71,19 +129,19 @@ export const ItemSelectorBox: React.FC<ItemSelectorBoxProps> = ({
       <ListContainer>
         {isLoading ? (
           <span className="itemSelectorBox-loader" />
+        ) : items.length === 0 ? (
+          <p>Список пуст</p>
         ) : (
-          items.length === 0 && <p>Список пуст</p>
-        )}
-        {!isLoading &&
           items.map((item) => (
             <ListItem
               key={item.id}
               isActive={Number(item.id) === Number(activeItemId)}
-              linkPath={linkPrefix && linkPrefix + item.id}
+              linkPath={linkPrefix ? `${linkPrefix}${item.id}` : undefined}
             >
               {item.name}
             </ListItem>
-          ))}
+          ))
+        )}
       </ListContainer>
     </div>
   );

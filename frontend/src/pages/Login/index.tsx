@@ -1,54 +1,61 @@
 import React, { useEffect, useRef, useState } from "react";
-
 import { VkResponse, VkService } from "../../utils/VkService";
 import { useAuth } from "../../store/AuthContent";
-
-import "./index.css";
 import { useLocation, useNavigate } from "react-router-dom";
+import "./index.css";
 
 export const Login = () => {
-  const [isVkOauth, setToggleVkOauth] = useState(true);
   const [vkResponse, setVkResponse] = useState<VkResponse>();
-
   const containerRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
+  const { login, isAuthenticated } = useAuth();
 
+  // Get payload from URL if redirected from external auth
   const queryParams = new URLSearchParams(location.search);
-  // При авторизации другими методами, происходит редирект, с параметром payload
   const loginPayload = queryParams.get("payload");
 
-  const { login } = useAuth();
-
+  // Initialize VK auth frame
   useEffect(() => {
-    if (
-      isVkOauth &&
-      containerRef.current &&
-      !containerRef.current.hasChildNodes()
-    ) {
+    if (containerRef.current && !containerRef.current.hasChildNodes()) {
       const vkFrame = VkService.oneTapAuth(setVkResponse)?.getFrame();
-
-      containerRef.current.appendChild(vkFrame as Node);
+      if (vkFrame) {
+        containerRef.current.appendChild(vkFrame as Node);
+      }
     }
   }, []);
 
+  // Handle external auth payload
   useEffect(() => {
-    console.log("Login payload:", loginPayload);
     if (loginPayload?.length) {
-      const oauthData = JSON.parse(loginPayload);
-      // При авторизации другим способом vk отправляет ответ без payload
-      setVkResponse({ payload: oauthData });
+      try {
+        const oauthData = JSON.parse(loginPayload);
+        setVkResponse({ payload: oauthData });
+      } catch (error) {
+        console.error("Failed to parse login payload:", error);
+      }
     }
   }, [loginPayload]);
 
+  // Process authentication
   useEffect(() => {
-    console.log(vkResponse);
     if (vkResponse) {
-      login(vkResponse).then(() => {
-        navigate("/");
-      });
+      login(vkResponse)
+        .then(() => {
+          navigate("/");
+        })
+        .catch((error) => {
+          console.error("Login failed:", error);
+        });
     }
-  }, [vkResponse]);
+  }, [vkResponse, login, navigate]);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/");
+    }
+  }, [isAuthenticated, navigate]);
 
   return (
     <div className="app">

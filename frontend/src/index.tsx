@@ -1,34 +1,40 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
+import {
+  ThemeProvider as MuiThemeProvider,
+  createTheme,
+} from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
 import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
 import reportWebVitals from "./reportWebVitals";
 import { AppRouter } from "./router";
 import { AuthProvider } from "./store/AuthContent";
 import { PlatformProvider } from "./store/PlatformContext";
+import { ThemeProvider, useTheme } from "./store/ThemeContext";
 
-const darkTheme = createTheme({
-  palette: {
-    mode: "dark",
-  },
-  typography: {
-    fontFamily: [
-      "-apple-system",
-      "BlinkMacSystemFont",
-      "Segoe UI",
-      "Roboto",
-      "Oxygen",
-      "Ubuntu",
-      "Cantarell",
-      "Fira Sans",
-      "Droid Sans",
-      "Helvetica Neue",
-      "sans-serif",
-    ].join(","),
-  },
-});
+// Create MUI themes for dark and light modes
+const createAppTheme = (mode: "light" | "dark") =>
+  createTheme({
+    palette: {
+      mode,
+    },
+    typography: {
+      fontFamily: [
+        "-apple-system",
+        "BlinkMacSystemFont",
+        "Segoe UI",
+        "Roboto",
+        "Oxygen",
+        "Ubuntu",
+        "Cantarell",
+        "Fira Sans",
+        "Droid Sans",
+        "Helvetica Neue",
+        "sans-serif",
+      ].join(","),
+    },
+  });
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement,
@@ -38,14 +44,27 @@ root.render(
   <React.StrictMode>
     <AuthProvider>
       <PlatformProvider>
-        <ThemeProvider theme={darkTheme}>
-          <CssBaseline />
-          <AppRouter />
+        <ThemeProvider>
+          <AppThemeWrapper />
         </ThemeProvider>
       </PlatformProvider>
     </AuthProvider>
   </React.StrictMode>,
 );
+
+// Wrapper component to use the theme context
+function AppThemeWrapper() {
+  const { theme } = useTheme();
+
+  return (
+    <MuiThemeProvider theme={createAppTheme(theme)}>
+      <CssBaseline />
+      <div className="app-container">
+        <AppRouter />
+      </div>
+    </MuiThemeProvider>
+  );
+}
 
 // If you want your app to work offline and load faster, you can change
 // unregister() to register() below. Note this comes with some pitfalls.

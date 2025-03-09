@@ -9,16 +9,16 @@ export const GroupsLayout = () => {
 
   if (platform.platform === "touch" && groupId) {
     return (
-      <>
+      <div style={{ display: "flex", flex: 1, width: "100%", height: "100%" }}>
         <Outlet />
-      </>
+      </div>
     );
   } else {
     return (
-      <>
+      <div style={{ display: "flex", flex: 1, width: "100%", height: "100%" }}>
         <Groups />
         <Outlet />
-      </>
+      </div>
     );
   }
 };
