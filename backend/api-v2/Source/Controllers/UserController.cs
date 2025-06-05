@@ -1,30 +1,28 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Tdn.Api.Paths;
 using Tdn.Models;
-using Tdn.Models.Conversions;
-using Tdn.Security;
 
 namespace Tdn.Api.Controllers;
 
 [ApiController]
-[Authorize(Policy.ResourceAccess.User)]
-[Authorize(Policy.AccessLevel.Admin)]
-[Route(TdnUriPath.Account)]
+[Route("users")]
 public class UserController : BaseController<User>
 {
-	protected override string GetUUID() => Container.ResourceInfo[Resource.User].Id.ToString();
 	
 	[HttpGet]
-	public ActionResult GetInfo()
+	public ActionResult GetAll(string? groupId = null, bool isAdmin = false)
 	{
-		var model = Model;
-		return Ok(model.ToDict());
+		return NotImplemented();
 	}
 	
-	[HttpGet("groups")]
-	public ActionResult GetGroups()
+	[HttpGet("{userId}")]
+	public ActionResult GetUser(string userId)
 	{
-		return Ok(Model.ToDict(addGroups:true));
+		return NotImplemented();
+	}
+
+	[HttpPatch("{userId}")]
+	public ActionResult PatchUser(string userId)
+	{
+		return NotImplemented();
 	}
 }
