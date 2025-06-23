@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authorization;
-using Tdn.Security;
 using Tdn.Configuration;
 using Microsoft.AspNetCore.Authentication;
 using Tdn.Db.Configuers;
@@ -8,7 +7,6 @@ using Tdn.Settings;
 using Tdn.Db;
 using Tdn.Models.Providing;
 using Tdn.Models;
-using Tdn.Security.Db;
 using Tdn.Models.Saving;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,8 +20,6 @@ builder.Services.AddLogging(e => e.AddConsole());
 // DataBase Contexts
 builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
 builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigurer>();
-builder.Services.AddDbContext<TokensContext>(config.ConfigDbConnections);
-builder.Services.AddDbContext<AccessDbContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<GroupContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<UserContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<EntityContext>(config.ConfigDbConnections);

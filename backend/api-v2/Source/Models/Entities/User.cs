@@ -1,5 +1,3 @@
-using Tdn.Security;
-
 namespace Tdn.Models;
 
 public struct UserInfo
@@ -8,6 +6,14 @@ public struct UserInfo
 	public string FirstName;
 	public string LastName;
 	public string? Icon;
+}
+
+public enum AccessLevel
+{
+    None = -1,
+    Read,
+    Write,
+    Full
 }
 
 public class User : Entity<UserInfo>

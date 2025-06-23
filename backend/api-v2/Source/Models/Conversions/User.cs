@@ -1,5 +1,3 @@
-using Tdn.Security.Conversions;
-
 namespace Tdn.Models.Conversions;
 
 internal static class UserConvertExtensions
@@ -18,7 +16,7 @@ internal static class UserConvertExtensions
 	public static Dictionary<string, object?> ToDict(this User.GroupAccess group)
 	{
 		var result = group.info.ToDict();
-		result.Add("access_level", group.accessLevel.ToAlias());
+		result.Add("access_level", group.accessLevel);
 		return result;
 	}
 	

@@ -5,31 +5,28 @@ using Tdn.Models.Saving;
 
 namespace Tdn.Api.Controllers;
 
-public abstract class BaseController<T> : ControllerBase
+public abstract class BaseController : ControllerBase
 {
-	private IModelProvider<T>? _modelProvider;
-	private IModelSaver<T>? _modelSaver;
 
-	private IModelProvider<T> GetProvider()
+	protected IModelProvider<T> GetProvider<T>()
 	{
-		if (_modelProvider == null)
-			_modelProvider = HttpContext.RequestServices.GetRequiredService<IModelProvider<T>>();
-		return _modelProvider;
+		var provider = HttpContext.RequestServices.GetService<IModelProvider<T>>();
+		if (provider == null)
+			throw new System.Exception("Model provider is null");
+		return provider;
 	}
 	
-	private IModelSaver<T> GetSaver()
+	protected IModelSaver<T> GetSaver<T>()
 	{
-		if (_modelSaver == null)
-			_modelSaver = HttpContext.RequestServices.GetRequiredService<IModelSaver<T>>();
-		return _modelSaver;
+		var saver = HttpContext.RequestServices.GetService<IModelSaver<T>>();
+		if (saver == null)
+			throw new System.Exception("Model saver is null");
+		return saver;
 	}
 	
-	protected IModelProvider<T> ModelProvider => GetProvider();
-	protected IModelSaver<T> ModelSaver => GetSaver();
-	
-	protected void SaveModel(T model)
+	protected void SaveModel<T>(T model)
 	{
-		var ok = ModelSaver.TrySaveModel(model);
+		var ok = GetSaver<T>().TrySaveModel(model);
 		if (!ok)
 			throw new Exception($"Can't save model: {model}");
 	}
@@ -55,4 +52,10 @@ public abstract class BaseController<T> : ControllerBase
 			StatusCode = StatusCodes.Status501NotImplemented
 		};
 	}
+}
+
+public abstract class BaseController<T> : BaseController
+{
+	public IModelProvider<T> ModelProvider => GetProvider<T>();
+	public IModelSaver<T> ModelSaver => GetSaver<T>();
 }
