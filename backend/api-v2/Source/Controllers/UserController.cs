@@ -16,23 +16,29 @@ public class UserController : BaseController
 		_dbContext = context;
 	}
 	
-	
 	[HttpGet]
 	public ActionResult GetAll(int? groupId = null, bool isAdmin = false)
 	{
-		List<UserData> users;
+		IQueryable<UserData> users;
 		if (groupId != null)
 		{
 			var tmp = _dbContext.Groups.Where(e => e.GroupId == groupId);
 			if (isAdmin)
 				tmp = tmp.Where(e => e.Privileges >= (int)AccessLevel.Full);
-			users = tmp.Include(e => e.User).Select(e => e.User!).ToList();
+			users = tmp.Include(e => e.User).Select(e => e.User!);
 		}
 		else
 		{
-			users = _dbContext.Users.ToList();
+			users = _dbContext.Users;
 		}
-		return Ok(new Dictionary<string, object>(){{"users", users}});
+		return Ok(new Dictionary<string, object>(){{"users", users.ToList()}});
+	}
+	
+	[HttpPost]
+	public ActionResult AddUser(UserData data)
+	{
+		_dbContext.Users.Add(data); 
+		return NotImplemented();
 	}
 	
 	[HttpGet("{userId}")]
@@ -51,8 +57,10 @@ public class UserController : BaseController
 		return NotImplemented();
 	}
 	
-	public ActionResult AddUser()
+	
+	[HttpGet("{userId}/groups")]
+	public ActionResult GetUserGroups(int userId)
 	{
-		return NotImplemented();
+		return Ok();
 	}
 }

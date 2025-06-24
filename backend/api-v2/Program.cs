@@ -1,6 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
 using Tdn.Configuration;
-using Microsoft.AspNetCore.Authentication;
 using Tdn.Db.Configuers;
 using Tdn.Db.Contexts;
 using Tdn.Settings;
@@ -36,24 +34,6 @@ builder.Services.AddScoped<CharacterProvider, CharacterProvider>();
 // Savers
 builder.Services.AddScoped<IModelSaver<Character>, CharacterSaver>();
 builder.Services.AddScoped<ItemSaver, ItemSaver>();
-
-// // Access checking elements
-// builder.Services.AddScoped<IAccessLevelProvider, AccessLevelProvider>();
-// builder.Services.AddScoped<IAccessContext, AccessContext>();
-// builder.Services.AddScoped<IAuthorizationHandler, ResourceAccessHandler>();
-// builder.Services.AddScoped<IAuthorizationHandler, AccessLevelHandler>();
-// // Authorization
-// var aBuilder = builder.Services.AddAuthorizationBuilder();
-// // Resource Access
-// aBuilder.AddPolicy(Policy.ResourceAccess.User, policy => policy.Requirements.Add(new ResourceRequirement(Resource.User)));
-// aBuilder.AddPolicy(Policy.ResourceAccess.Group, policy => policy.Requirements.Add(new ResourceRequirement(Resource.Group)));
-// aBuilder.AddPolicy(Policy.ResourceAccess.Character, policy => policy.Requirements.Add(new ResourceRequirement(Resource.Character)));
-// // Access Level
-// aBuilder.AddPolicy(Policy.AccessLevel.Admin, policy => policy.Requirements.Add(new AccessLevelRequirement(AccessLevel.Full)));
-// aBuilder.AddPolicy(Policy.AccessLevel.Moderator, policy => policy.Requirements.Add(new AccessLevelRequirement(AccessLevel.Write)));
-// aBuilder.AddPolicy(Policy.AccessLevel.Follower, policy => policy.Requirements.Add(new AccessLevelRequirement(AccessLevel.Read)));
-// builder.Services.AddAuthentication("Token")
-// 	.AddScheme<AuthenticationSchemeOptions, TokenAuthenticationHandler>("Token", null);
 
 // General
 builder.Services.AddEndpointsApiExplorer();
