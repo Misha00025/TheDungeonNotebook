@@ -7,8 +7,6 @@ services:
     restart: always
     networks:
       - backend-network
-    volumes:
-      - ./mongo_data:/data/db
     env_file:
       - ./.env
     healthcheck:
@@ -26,8 +24,6 @@ services:
       - backend-network
     env_file:
       - ./.env
-    volumes:
-      - ./mysql_data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
       interval: 20s

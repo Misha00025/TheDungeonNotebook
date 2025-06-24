@@ -12,7 +12,7 @@ until [[ "$(docker inspect -f "{{.State.Running}}" ${MAIN_SERVICE})" = "true" ]]
     echo "Ожидаем старт контейнера $MAIN_SERVICE..."
 done
 
-sleep 30
+sleep 1
 
 # После того, как все контейнеры готовы, запускаем тесты
 python test.py $@ > test.log
