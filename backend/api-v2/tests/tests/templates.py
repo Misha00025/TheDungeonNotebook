@@ -3,7 +3,7 @@ from . import test_variables
 from .test_variables import DEBUG, default_debug
 import re
 import tests.test_variables as tv
-from .request_tests import get_test, put_test, post_test, delete_test, rq, get_text
+from .request_tests import get_test, patch_test, put_test, post_test, delete_test, rq, get_text
 
 
 def get_http_status_message(status_code):
@@ -134,6 +134,8 @@ class Step:
 				res = put_test(headers, params, url, data)
 			case "POST":
 				res = post_test(headers, params, url, data)
+			case "PATCH":
+				res = patch_test(headers, params, url, data)
 			case "DELETE":
 				res = delete_test(headers, params, url)
 		self.ok = test.check(res)

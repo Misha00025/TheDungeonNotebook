@@ -49,6 +49,10 @@ def put_test(headers, params, url, data, compact=test_variables.compact) -> rq.R
     res = rq.put(url=full_url, headers=headers, params=params, json=data)
     return res
 
+def patch_test(headers, params, url, data, compact=test_variables.compact) -> rq.Response:
+    full_url = site + url
+    res = rq.patch(url=full_url, headers=headers, params=params, json=data)
+    return res
 
 def delete_test(headers, params, url, compact=test_variables.compact) -> rq.Response:
     full_url = site + url

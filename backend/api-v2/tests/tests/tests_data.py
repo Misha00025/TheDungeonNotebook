@@ -3,15 +3,6 @@ from .validation import *
 from .templates import Test
 from .test_variables import *
 
-
-def user_extend(tests:list):
-    tests.extend([
-        Test(headers=gh, request=f"account", requirement=FORBID),
-        Test(headers=nah, request=f"account", requirement=NOT_AUTH),
-        Test(headers=uh, request=f"account", is_valid=check_user_data),
-        Test(headers=uh, request=f"account/groups", is_valid=check_many_groups),
-    ])
-
 def group_extend(tests:list):
     tests.extend([
         Test(headers=uh, request=f"groups/{ssg}", requirement=FORBID),

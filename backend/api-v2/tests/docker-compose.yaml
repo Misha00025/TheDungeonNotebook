@@ -24,6 +24,8 @@ services:
       - backend-network
     env_file:
       - ./.env
+    volumes:
+      - ../../migrate/sql_script.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
       interval: 20s
@@ -34,6 +36,7 @@ services:
   api-v2:
     build:
       context: ..
+      dockerfile: Dockerfile-debug
     container_name: api-v2
     depends_on:
       mongo:

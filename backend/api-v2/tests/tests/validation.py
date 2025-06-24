@@ -54,7 +54,7 @@ def _valid_data(body: dict, keys):
     return True
 
 def get_data(r: Response):
-    return r.json()["data"]
+    return r.json()
 
 # 
 

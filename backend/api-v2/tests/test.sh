@@ -4,6 +4,7 @@
 MAIN_SERVICE="api-v2"
 
 # Поднимаем Docker Compose в фоновых процессах
+docker-compose build
 docker-compose up -d
 
 # Ждём, пока контейнер перейдёт в состояние Running
@@ -12,10 +13,10 @@ until [[ "$(docker inspect -f "{{.State.Running}}" ${MAIN_SERVICE})" = "true" ]]
     echo "Ожидаем старт контейнера $MAIN_SERVICE..."
 done
 
-sleep 1
+sleep $1
 
 # После того, как все контейнеры готовы, запускаем тесты
-python test.py $@ > test.log
+python test.py ${@:2} > test.log
 
 docker-compose logs | grep "${MAIN_SERVICE}" > server.log
 
