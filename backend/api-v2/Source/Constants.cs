@@ -18,3 +18,8 @@ public static class Platform
 	public const string Vk = "vk";
 	public const string Tg = "tg";
 }
+
+public static class MongoCollections
+{
+	public const string Templates = "templates";
+}

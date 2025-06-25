@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Tdn.Db.Contexts;
@@ -10,10 +9,9 @@ namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("groups/{groupId}/users")]
-public class UserGroupController : BaseController
+public class UserGroupController : GroupsBaseController
 {
     private UserContext _userContext;
-    private GroupContext _groupContext;
     
     public class UserAccessData
     {
@@ -21,17 +19,9 @@ public class UserGroupController : BaseController
         public int? AccessLevel { get; set; }
     }
 
-    public UserGroupController(UserContext userContext, GroupContext groupContext)
+    public UserGroupController(UserContext userContext, GroupContext groupContext) : base(groupContext)
     {
         _userContext = userContext;
-        _groupContext = groupContext;
-    }
-
-    private bool TryGetGroup(int groupId, out GroupData group)
-    {
-        var tmp = _groupContext.Groups.Where(e => e.Id == groupId).FirstOrDefault();
-        group = tmp!;
-        return tmp != null;    
     }
     
     private bool TryGetUser(int userId, out UserData user)
@@ -46,7 +36,7 @@ public class UserGroupController : BaseController
     {
         if (TryGetGroup(groupId, out var group))
         {
-            var users = _groupContext.Users.Where(e => e.GroupId == groupId);
+            var users = GroupContext.Users.Where(e => e.GroupId == groupId);
             if (adminsOnly)
                 users = users.Where(e => e.Privileges >= (int)AccessLevel.Full);
             if (userId != null)
@@ -64,7 +54,7 @@ public class UserGroupController : BaseController
         {
             if (!TryGetUser(data.UserId, out var user))
                 return NotFound("User not found");
-            if (_groupContext.Users.Any(e => e.UserId == data.UserId && e.GroupId == groupId))
+            if (GroupContext.Users.Any(e => e.UserId == data.UserId && e.GroupId == groupId))
                 return Conflict("User+Group pair already exist");
             if (data.AccessLevel == null)
                 data.AccessLevel = 0;
@@ -74,8 +64,8 @@ public class UserGroupController : BaseController
                 GroupId = group.Id,
                 Privileges = (int)data.AccessLevel
             };
-            _groupContext.Users.Add(ug);
-            _groupContext.SaveChanges();
+            GroupContext.Users.Add(ug);
+            GroupContext.SaveChanges();
             return Created($"/groups/{groupId}/users", ug.ToDict());
         }
         return NotFound("Group not found");
@@ -90,11 +80,11 @@ public class UserGroupController : BaseController
         {
             if (!TryGetUser(data.UserId, out var user))
                 return NotFound("User not found");
-            var ug = _groupContext.Users.Where(e => e.GroupId == groupId && e.UserId == data.UserId).Include(e => e.User).Include(e => e.Group).FirstOrDefault();
+            var ug = GroupContext.Users.Where(e => e.GroupId == groupId && e.UserId == data.UserId).Include(e => e.User).Include(e => e.Group).FirstOrDefault();
             if (ug == null)
                 return PostUser(groupId, data);
             ug.Privileges = (int)data.AccessLevel;
-            _groupContext.SaveChanges();
+            GroupContext.SaveChanges();
             return Ok(ug.ToDict());
         }
         return NotFound("Group not found");
@@ -105,11 +95,11 @@ public class UserGroupController : BaseController
     {
         if (TryGetGroup(groupId, out var group))
         {
-            var ug = _groupContext.Users.Where(e => e.GroupId == groupId && e.UserId == userId).Include(e => e.User).Include(e => e.Group).FirstOrDefault();
+            var ug = GroupContext.Users.Where(e => e.GroupId == groupId && e.UserId == userId).Include(e => e.User).Include(e => e.Group).FirstOrDefault();
             if (ug == null)
                 return NotFound("User Group Pair not found");
-            _groupContext.Users.Remove(ug);
-            _groupContext.SaveChanges();
+            GroupContext.Users.Remove(ug);
+            GroupContext.SaveChanges();
             return Ok(ug.ToDict());
         }
         return NotFound("Group not found");
