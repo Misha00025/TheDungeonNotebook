@@ -60,3 +60,38 @@ def with_group_scenario():
     ])
     create_scenario("Groups", tests)
 
+def with_user_group_scenario():
+    tests = []
+    tests.extend(
+    [
+        Test(headers=h, request="groups", method="POST", data={"name": "TestGroup"}, requirement=CREATED),
+        Test(headers=h, request="users", method="POST", data={"firstName": "TestUser", "lastName": "Tester"}, requirement=CREATED),
+        Test(headers=h, request="users", method="POST", data={"firstName": "TestAdmin", "lastName": "Tester"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/users", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/users", method="POST", data={"userId": "{steps.1.id}"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/users", method="POST", data={"userId": "{steps.2.id}", "accessLevel": 2}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/users", method="POST", data={"userId": "{steps.1.id}"}, requirement=CONFLICT),
+        Test(headers=h, request="groups/{steps.0.id}/users", method="POST", data={"userId": "{steps.1.id}", "accessLevel": 2}, requirement=CONFLICT),
+        Test(headers=h, request="groups/{steps.0.id}/users", method="POST", data={"userId": "{steps.2.id}", "accessLevel": 2}, requirement=CONFLICT),
+        Test(headers=h, request="groups/{steps.0.id}/users", method="POST", requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/users", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/users", method="PUT", data={"userId": "{steps.1.id}", "accessLevel": 2}, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/users", method="PUT", data={"userId": "{steps.1.id}"}, requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/users", method="PUT", requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/users/{steps.-4.users.1.user.id}", method="DELETE", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/users/{steps.-5.users.1.user.id}", method="DELETE", requirement=NOT_FOUND),
+
+        Test(headers=h, request="groups/{steps.0.id}", method="DELETE", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}", requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/users", requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/users", method="POST", data={"userId": "{steps.1.id}"}, requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/users", method="POST", data={"userId": "{steps.2.id}", "accessLevel": 2}, requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/users", method="POST", data={"userId": "{steps.1.id}"}, requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/users", method="POST", data={"userId": "{steps.1.id}", "accessLevel": 2}, requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/users", method="POST", data={"userId": "{steps.2.id}", "accessLevel": 2}, requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/users", method="POST", requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/users", requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/users/1", method="DELETE", requirement=NOT_FOUND),
+    ])
+    create_scenario("UsersGroups", tests)

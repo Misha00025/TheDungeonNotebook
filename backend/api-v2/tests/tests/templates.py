@@ -20,6 +20,7 @@ def get_http_status_message(status_code):
 		403: 'Forbidden',
 		404: 'Not Found',
 		405: 'Method Not Allowed',
+		409: 'Conflict',
 		500: 'Internal Server Error'
 	}
 	
@@ -101,7 +102,16 @@ def replace_placeholders(text, data):
 	if test_variables.debug:
 		print("DEBUG: Parse:", text)
 	pattern = r'\{([-]?[a-zA-Z0-9-_.]+)\}'
-	result = re.sub(pattern, replace_match, text)
+	str_result = re.sub(pattern, replace_match, text)
+	try:
+		result = int(str_result)
+	except:
+		try: 
+			result = float(str_result)
+		except:
+			result = str_result
+	if test_variables.debug:
+		print("DEBUG: Result:", result, "of type ", type(result))
 	return result
 
 
@@ -109,7 +119,11 @@ def prepare_data(data: dict, results):
 	result = data.copy()
 	if data is not None:
 		for key in data.keys():
-			result[key] = replace_placeholders(data[key], results)
+			try:
+				result[key] = replace_placeholders(data[key], results)
+			except:
+				if test_variables.debug:
+					print("WARNING: Can't parse:", result[key])
 	return result
 
 
@@ -174,7 +188,7 @@ class Scenario:
 					data["steps"].append(res.text)
 			test = step.test
 			if not step.ok:
-				print("ERROR:", step.message, "\n   |- Headers:", test.headers, "\n   |- Data:", test.data, "\n   |- Message:", test.message)
+				print("ERROR:", step.message, "\n   |- Headers:", test.headers, "\n   |- Data:", test.data, "\n   |- Message:", test.message, "\n   |- Req. status:", test.requirement)
 				self.ok = False
 			elif test_variables.debug:
 				print(step.message)

@@ -17,6 +17,7 @@ NOT_AUTH = 401
 FORBID = 403
 NOT_FOUND = 404
 NOT_ALLOW = 405
+CONFLICT = 409
 
 
 default_debug = True

@@ -24,4 +24,14 @@ public static class DataToDictExtensions
             {"icon", data.Icon},
         };
     }
+    
+    public static Dictionary<string, object?> ToDict(this UserGroupData data)
+    {
+        return new()
+        {
+            {"user", data.User != null ? data.User.ToDict() : new UserData(){ Id = data.UserId }.ToDict()},
+            {"group", data.Group != null ? data.Group.ToDict() : new GroupData(){ Id = data.GroupId }.ToDict()},
+            {"accessLevel", data.Privileges}
+        };
+    }
 }

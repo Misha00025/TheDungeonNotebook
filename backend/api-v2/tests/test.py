@@ -20,6 +20,8 @@ if __name__ == "__main__":
                     with_user_scenario()
                 case "groups":
                     with_group_scenario()
+                case "user-group":
+                    with_user_group_scenario()
 
     test_variables.compact = args.compact
     test_variables.debug = args.debug
