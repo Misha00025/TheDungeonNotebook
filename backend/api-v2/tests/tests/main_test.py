@@ -2,9 +2,7 @@ import sys
 from .scenarios import *
 
 
-def start():
-	with_user_scenario()
-	
+def start():	
 	ok = True
 	for scenario in scenarios:
 		scenario.start()

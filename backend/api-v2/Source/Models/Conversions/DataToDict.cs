@@ -14,4 +14,14 @@ public static class DataToDictExtensions
             {"photoLink", data.PhotoLink},
         };
     }
+    
+    public static Dictionary<string, object?> ToDict(this GroupData data)
+    {
+        return new()
+        {
+            {"id", data.Id},
+            {"name", data.Name},
+            {"icon", data.Icon},
+        };
+    }
 }
