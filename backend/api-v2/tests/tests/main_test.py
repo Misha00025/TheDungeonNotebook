@@ -1,5 +1,5 @@
 import sys
-from .scenarios import *
+from scenarios import *
 
 
 def start():	

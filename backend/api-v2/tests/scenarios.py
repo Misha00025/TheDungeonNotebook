@@ -1,9 +1,9 @@
 import json
-from .tests_data import *
-from .templates import Scenario, Step, Test, replace_placeholders
-from .validation import *
-from .test_variables import *
-from . import test_variables as tv
+from tests.tests_data import *
+from tests.templates import Scenario, Step, Test, replace_placeholders
+from tests.validation import *
+from tests.test_variables import *
+import tests.test_variables as tv
 
 scenarios: list[Scenario] = []
 h = headers_template

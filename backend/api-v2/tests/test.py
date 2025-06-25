@@ -1,6 +1,6 @@
 from tests import test_variables
 from tests import main_test
-from tests.scenarios import *
+from scenarios import *
 
 if __name__ == "__main__":
     import argparse
