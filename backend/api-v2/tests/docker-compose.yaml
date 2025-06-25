@@ -7,6 +7,8 @@ services:
     restart: always
     networks:
       - backend-network
+    volumes:
+      - ./mongo_data:/data/db
     env_file:
       - ./.env
     healthcheck:
@@ -25,6 +27,7 @@ services:
     env_file:
       - ./.env
     volumes:
+      - ./mysql_data:/var/lib/mysql
       - ../../migrate/sql_script.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
@@ -36,7 +39,6 @@ services:
   api-v2:
     build:
       context: ..
-      dockerfile: Dockerfile-debug
     container_name: api-v2
     depends_on:
       mongo:

@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Tdn.Models.Providing;
-using Tdn.Models.Saving;
 
 namespace Tdn.Api.Controllers;
 
@@ -14,21 +13,6 @@ public abstract class BaseController : ControllerBase
 		if (provider == null)
 			throw new System.Exception("Model provider is null");
 		return provider;
-	}
-	
-	protected IModelSaver<T> GetSaver<T>()
-	{
-		var saver = HttpContext.RequestServices.GetService<IModelSaver<T>>();
-		if (saver == null)
-			throw new System.Exception("Model saver is null");
-		return saver;
-	}
-	
-	protected void SaveModel<T>(T model)
-	{
-		var ok = GetSaver<T>().TrySaveModel(model);
-		if (!ok)
-			throw new Exception($"Can't save model: {model}");
 	}
 	
 	// General
@@ -52,10 +36,4 @@ public abstract class BaseController : ControllerBase
 			StatusCode = StatusCodes.Status501NotImplemented
 		};
 	}
-}
-
-public abstract class BaseController<T> : BaseController
-{
-	public IModelProvider<T> ModelProvider => GetProvider<T>();
-	public IModelSaver<T> ModelSaver => GetSaver<T>();
 }

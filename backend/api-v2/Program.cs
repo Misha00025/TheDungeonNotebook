@@ -3,9 +3,6 @@ using Tdn.Db.Configuers;
 using Tdn.Db.Contexts;
 using Tdn.Settings;
 using Tdn.Db;
-using Tdn.Models.Providing;
-using Tdn.Models;
-using Tdn.Models.Saving;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = new ConfigParser();
