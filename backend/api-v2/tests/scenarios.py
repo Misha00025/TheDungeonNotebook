@@ -95,3 +95,33 @@ def with_user_group_scenario():
         Test(headers=h, request="groups/{steps.0.id}/users/1", method="DELETE", requirement=NOT_FOUND),
     ])
     create_scenario("UsersGroups", tests)
+
+def with_charlist_templates_scenario():
+    tests = []
+    new_template = {
+        "name": "TestTemplate",
+        "description": "TestTestTest",
+        "fields":{
+            "strong":{"name": "Strong", "description": "This is strong", "value": 10},
+            "agility":{"name": "Agility", "description": "This is agility", "value": 12},
+        }
+    }
+    new_template_2 = new_template.copy()
+    new_template["fields"]["intellect"] = {"name": "Intellect", "description": "This is intellect", "value": 100000}
+    wrong_template = {"name": "WrongTemplate"}
+    tests.extend([
+        Test(headers=h, request="groups", method="POST", data={"name": "TestGroup"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/templates", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/templates", method="POST", data=new_template, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters/templates", method="POST", data=wrong_template, requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/characters/templates/{steps.3.id}", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/templates/1244512133", requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/characters/templates/{steps.3.id}", method="PUT", data=new_template_2, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/templates/{steps.3.id}", method="PUT", data=wrong_template, requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/characters/templates/{steps.3.id}", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/templates/{steps.3.id}", method="DELETE", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/templates/{steps.3.id}", method="DELETE", requirement=NOT_FOUND),
+    ])
+    create_scenario("Charlists", tests)
+    

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Driver;
 using Tdn.Db;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
@@ -19,9 +20,9 @@ public class TemplatesController : GroupsBaseController
 
     public struct CharlistPostData
     {
-        public string? Name { get; set; }
-        public string? Description { get; set; }
-        public Dictionary<string, FieldPostData>? Fields { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public Dictionary<string, FieldPostData> Fields { get; set; }
     }
 
     private EntityContext _dbContext;
@@ -33,10 +34,29 @@ public class TemplatesController : GroupsBaseController
         _mongo = mongo;
     }
     
+    private FieldMongoData CreateFieldMongoData(FieldPostData data)
+    {
+        return new FieldMongoData()
+        {
+            Name = data.Name,
+            Description = data.Description,
+            Value = data.Value,
+        };
+    }
+    
+    private IMongoCollection<CharlistMongoData> GetCollection() =>  _mongo.GetCollection<CharlistMongoData>(MongoCollections.Templates);
+    
+    private Dictionary<string, FieldMongoData> Convert(Dictionary<string, FieldPostData> fields)
+    {
+        return fields.Select(
+                    e => new KeyValuePair<string, FieldMongoData>(e.Key, CreateFieldMongoData(e.Value)))
+                    .ToDictionary();
+    }
+    
     [HttpGet]
     public ActionResult GetAll(int groupId)
     {
-        if (TryGetGroup(groupId, out var _))
+        if (TryGetGroup(groupId, out var group))
         {
             var charlistSet = _dbContext.Set<CharlistData>();
             var charlists = charlistSet.Where(e => e.GroupId == groupId).Select(e => e.ToDict(_mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, e.UUID)));
@@ -51,19 +71,32 @@ public class TemplatesController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var _))
         {
-            if (data.Name == null)
-                return BadRequest("Name must be not null");
-            if (data.Description == null)
-                data.Description = "";
-            if (data.Fields == null)
-                data.Fields = new();
             var mongoItem = new CharlistMongoData()
             {
                 Name = data.Name,
                 Description = data.Description,
-                Fields = new() // TODO: Continue me please
+                Fields = Convert(data.Fields)
             };
-            return NotImplemented();
+            var set = _dbContext.Set<CharlistData>();
+            var collection = GetCollection();
+            collection.InsertOne(mongoItem);
+            var charlist = new CharlistData()
+            {
+                UUID = mongoItem.Id.ToString(),
+                GroupId = groupId
+            };
+            set.Add(charlist);
+            try
+            {
+                _dbContext.SaveChanges();
+            }
+            catch
+            {
+		        var filter = Builders<CharlistMongoData>.Filter.Eq("_id", mongoItem.Id);
+                collection.DeleteOne(filter);
+                throw new Exception($"Can't create charlist");
+            }
+            return Created($"/groups/{groupId}/characters/templates/{charlist.Id}", charlist.ToDict(mongoItem));
         }
         return NotFound("Group not found");
     }
@@ -73,7 +106,55 @@ public class TemplatesController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var _))
         {
-            
+            var charlistSet = _dbContext.Set<CharlistData>();
+            var charlist = charlistSet.Where(e => e.GroupId == groupId && e.Id == templateId).FirstOrDefault();
+            if (charlist == null)
+                return NotFound("Template not found");
+            return Ok(charlist.ToDict(_mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, charlist.UUID)));
+        }
+        return NotFound("Group not found");
+    }
+    
+    [HttpPut("{templateId}")]
+    public ActionResult PutTemplate(int groupId, int templateId, CharlistPostData data)
+    {
+        if (TryGetGroup(groupId, out var _))
+        {
+            var charlistSet = _dbContext.Set<CharlistData>();
+            var charlist = charlistSet.Where(e => e.GroupId == groupId && e.Id == templateId).FirstOrDefault();
+            if (charlist == null)
+                return NotFound("Template not found");
+            var mongoData = _mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, charlist.UUID);
+            if (mongoData == null)
+                return NotFound("Template document not found");
+            mongoData.Name = data.Name;
+            mongoData.Description = data.Description;
+            mongoData.Fields = Convert(data.Fields);
+            var collection = GetCollection();
+		    var filter = Builders<CharlistMongoData>.Filter.Eq("_id", mongoData.Id);
+            collection.ReplaceOne(filter, mongoData);
+            return Ok(charlist.ToDict(mongoData));
+        }
+        return NotFound("Group not found");
+    }
+    
+    [HttpDelete("{templateId}")]
+    public ActionResult DeleteTemplate(int groupId, int templateId)
+    {
+        if (TryGetGroup(groupId, out var _))
+        {
+            var charlistSet = _dbContext.Set<CharlistData>();
+            var charlist = charlistSet.Where(e => e.GroupId == groupId && e.Id == templateId).FirstOrDefault();
+            if (charlist == null)
+                return NotFound("Template not found");
+            var mongoData = _mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, charlist.UUID);
+            if (mongoData == null)
+                return NotFound("Template document not found");
+		    var filter = Builders<CharlistMongoData>.Filter.Eq("_id", mongoData.Id);
+            _dbContext.Remove(charlist);
+            _dbContext.SaveChanges();
+            GetCollection().DeleteOne(filter);
+            return Ok(charlist.ToDict(mongoData));
         }
         return NotFound("Group not found");
     }

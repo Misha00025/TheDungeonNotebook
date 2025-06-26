@@ -10,7 +10,7 @@ if __name__ == "__main__":
                     epilog='Good testings')
     p.add_argument("-c", "--compact", nargs='?', const=True, default=False)
     p.add_argument("-d", "--debug", nargs='?', const=True, default=False)
-    p.add_argument('-S', action='append', help='Добавляет сценарий для исполнения')
+    p.add_argument('-S', action='append', help='Добавляет сценарий для исполнения из списка: users, groups, user-group, templates')
     args = p.parse_args()
 
     if args.S:
@@ -22,6 +22,8 @@ if __name__ == "__main__":
                     with_group_scenario()
                 case "user-group":
                     with_user_group_scenario()
+                case "templates":
+                    with_charlist_templates_scenario()
 
     test_variables.compact = args.compact
     test_variables.debug = args.debug

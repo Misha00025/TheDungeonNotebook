@@ -1,9 +1,5 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
-using Tdn.Models;
-using Tdn.Models.Conversions;
 
 namespace Tdn.Api.Controllers;
 
@@ -17,7 +13,7 @@ public abstract class GroupsBaseController : BaseController
         _groupContext = context;
     }
 
-    protected GroupContext GroupContext => GroupContext;
+    protected GroupContext GroupContext => _groupContext;
 
     protected bool TryGetGroup(int groupId, out GroupData group)
     {
