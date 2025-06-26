@@ -125,3 +125,67 @@ def with_charlist_templates_scenario():
     ])
     create_scenario("Charlists", tests)
     
+def with_characters_scenario():
+    tests = []
+    new_template = {
+        "name": "TestTemplate",
+        "description": "TestTestTest",
+        "fields":{
+            "strong":{"name": "Strong", "description": "This is strong", "value": 10},
+            "agility":{"name": "Agility", "description": "This is agility", "value": 12},
+        }
+    }
+    new_character = {
+        "name": "Steve",
+        "description": "Minecraft is my life",
+        "templateId": "{steps.2.id}"
+    }
+    update_description = {
+        "description": "Oh, no! My description is updated!"
+    }
+    update_stats = {
+        "fields":{
+            "strong": {"value": 15},
+            "agility": None,
+            "intellect": {"name": "Intellect", "description": "You stupid", "value": -1}
+        }
+    }
+    wrong_update_1 = {
+        "name": "Samson",
+        "fields":{
+            "agility": {"name": "Test"}
+        }
+    }
+    wrong_update_2 = {}
+    wrong_update_3 = {
+        "fields":{}
+    }
+    wrong_update_4 = {
+        "fields":{
+            "strong": {}
+        }
+    }
+    wrong_character = {
+        "name": "Not Steve",
+        "description": "Minecraft is not my life",
+    }
+    tests.extend([
+        Test(headers=h, request="groups", method="POST", data={"name": "TestGroup"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/templates", method="POST", data=new_template, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters", method="POST", data=new_character, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters", method="POST", data=wrong_character, requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.3.id}", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/1245313", requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.3.id}", method="PATCH", data=update_description, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.3.id}", method="PATCH", data=update_stats, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.3.id}", method="PATCH", data=wrong_update_1, requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.3.id}", method="PATCH", data=wrong_update_2, requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.3.id}", method="PATCH", data=wrong_update_3, requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.3.id}", method="PATCH", data=wrong_update_4, requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.3.id}", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.3.id}", method="DELETE", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.3.id}", method="DELETE", requirement=NOT_FOUND),
+    ])
+    create_scenario("Characters", tests)
+
