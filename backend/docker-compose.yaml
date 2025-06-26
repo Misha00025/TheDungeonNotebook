@@ -51,9 +51,9 @@ services:
       - DB_HOST=mysql
       - DB_PORT=3306
 
-  api-v2:
-    build: ./api-v2
-    container_name: api-v2
+  api-characters:
+    build: ./api-characters
+    container_name: api-characters
     depends_on:
       mongo:
         condition: service_healthy
@@ -75,7 +75,7 @@ services:
     build: ./api-proxy
     container_name: api-proxy
     depends_on:
-      api-v2:
+      api-characters:
         condition: service_started
       api-auth:
         condition: service_started
@@ -87,7 +87,7 @@ services:
       - ./.env
     environment:
       - AUTH_SERVICE_URL=http://api-auth:5000
-      - BACKEND_URL=http://api-v2:8080
+      - BACKEND_URL=http://api-characters:8080
 
 networks:
   backend-network:
