@@ -189,3 +189,48 @@ def with_characters_scenario():
     ])
     create_scenario("Characters", tests)
 
+def with_notes_scenario():
+    tests = []
+    new_template = {
+        "name": "TestTemplate",
+        "description": "TestTestTest",
+        "fields":{
+            "strong":{"name": "Strong", "description": "This is strong", "value": 10},
+            "agility":{"name": "Agility", "description": "This is agility", "value": 12},
+        }
+    }
+    new_character = {
+        "name": "Steve",
+        "description": "Minecraft is my life",
+        "templateId": "{steps.1.id}"
+    }
+    new_note = {
+        "header": "TestNote",
+        "body": "You is tested now :)"
+    }
+    updated_note = {
+        "header": "{steps.5.header}",
+        "body": "{steps.5.body} UPD: And updated too",
+    }
+    wrong_note = { "header": "I am wrong note :C" }
+    tests.extend([
+        Test(headers=h, request="groups", method="POST", data={"name": "TestGroup"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters/templates", method="POST", data=new_template, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters", method="POST", data=new_character, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/notes", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/notes", method="POST", data=new_note, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/notes", method="POST", data=new_note, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/notes", method="POST", data=new_note, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/notes", method="POST", data=wrong_note, requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/notes/{steps.5.id}", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/notes", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/notes/{steps.5.id}", method="PUT", data=updated_note, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/notes/1231353", method="PUT", data=updated_note, requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/notes/{steps.5.id}", method="PUT", data=wrong_note, requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/notes/{steps.5.id}", method="PUT", requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/notes/{steps.5.id}", method="DELETE", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/notes/{steps.5.id}", method="DELETE", requirement=NOT_FOUND),
+    ])
+    create_scenario("Notes", tests)
+

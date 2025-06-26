@@ -69,10 +69,11 @@ public static class DataToDictExtensions
         return result;
     }
     
-    public static Dictionary<string, object?> ToDict(this NoteMongoData data)
+    public static Dictionary<string, object?> ToDict(this NoteMongoData data, int index)
     {
         return new Dictionary<string, object?>()
         {
+            {"id", index},
             {"header", data.Header},
             {"body", data.Body},
             {"additionDate", data.AdditionDate},
@@ -80,8 +81,9 @@ public static class DataToDictExtensions
         };
     }
     
-    public static List<Dictionary<string, object?>> ToDict(this List<NoteMongoData> dataList)
+    public static List<Dictionary<string, object?>> ToDict(this List<NoteMongoData> dataList, int startIndex = 0)
     {
-        return dataList.Select(e => e.ToDict()).ToList();
+        int index = startIndex;
+        return dataList.Select(e => e.ToDict(index++)).ToList();
     }
 }

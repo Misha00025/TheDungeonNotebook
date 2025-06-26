@@ -26,6 +26,8 @@ if __name__ == "__main__":
                     with_charlist_templates_scenario()
                 case "characters":
                     with_characters_scenario()
+                case "notes":
+                    with_notes_scenario()
 
     test_variables.compact = args.compact
     test_variables.debug = args.debug
