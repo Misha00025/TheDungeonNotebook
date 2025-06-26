@@ -23,4 +23,5 @@ public static class MongoCollections
 {
 	public const string Templates = "templates";
 	public const string Characters = "characters";
+	public const string Items = "items";
 }

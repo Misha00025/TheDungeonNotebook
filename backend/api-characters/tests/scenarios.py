@@ -234,3 +234,84 @@ def with_notes_scenario():
     ])
     create_scenario("Notes", tests)
 
+def with_group_items_scenario():
+    tests = []
+    new_item = {
+        "name": "TestItem",
+        "description": "TestDescription",
+    }
+    new_item_2 = {
+        "name": "TestItem 2",
+        "description": "TestDescription 2",
+        "price": 10,
+    }
+    wrong_item = {
+        "description": "Test Wrong"
+    }
+    tests.extend([
+        Test(headers=h, request="groups", method="POST", data={"name": "TestGroup"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/items", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/items", method="POST", data=new_item, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/items", method="POST", data=new_item_2, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/items", method="POST", data=wrong_item, requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/items", method="POST", requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/items/{steps.2.id}", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/items/{steps.3.id}", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/items/{steps.3.id}", method="DELETE", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/items/{steps.3.id}", requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/items/124324184", requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/items/{steps.2.id}", method="PUT", data=new_item_2, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/items/{steps.2.id}", method="PUT", data=wrong_item, requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/items/{steps.2.id}", method="DELETE", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/items/{steps.2.id}", method="DELETE", requirement=NOT_FOUND),
+    ])
+    create_scenario("Groups Items", tests)
+
+def with_character_items_scenario():
+    tests = []
+    new_template = {
+        "name": "TestTemplate",
+        "description": "TestTestTest",
+        "fields":{
+            "strong":{"name": "Strong", "description": "This is strong", "value": 10},
+            "agility":{"name": "Agility", "description": "This is agility", "value": 12},
+        }
+    }
+    new_character = {
+        "name": "Steve",
+        "description": "Minecraft is my life",
+        "templateId": "{steps.1.id}"
+    }
+    new_item = {
+        "name": "TestItem",
+        "description": "TestDescription",
+    }
+    new_item_2 = {
+        "name": "TestItem 2",
+        "description": "TestDescription 2",
+        "amount": 10,
+    }
+    wrong_item = {
+        "description": "Test Wrong"
+    }
+    tests.extend([
+        Test(headers=h, request="groups", method="POST", data={"name": "TestGroup"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters/templates", method="POST", data=new_template, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters", method="POST", data=new_character, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items", method="POST", data=new_item, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items", method="POST", data=new_item_2, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items", method="POST", data=wrong_item, requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items", method="POST", requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.4.id}", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.5.id}", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.5.id}", method="DELETE", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.5.id}", requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items/124324184", requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.4.id}", method="PUT", data=new_item_2, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.4.id}", method="PUT", data=wrong_item, requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.4.id}", method="DELETE", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.4.id}", method="DELETE", requirement=NOT_FOUND),
+    ])
+    create_scenario("Character Items", tests)
+

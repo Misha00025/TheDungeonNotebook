@@ -19,7 +19,11 @@ public class FieldMongoData
 	[BsonElement("value")]
 	public int Value;
 }
-public class ItemMongoData : GroupEntityMongoData { }
+public class ItemMongoData : GroupEntityMongoData 
+{
+	[BsonElement("price")]
+	public int Price { get; set; } = 0;
+}
 
 public class CharlistMongoData : GroupEntityMongoData 
 { 

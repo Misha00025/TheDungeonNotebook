@@ -51,16 +51,29 @@ public static class DataToDictExtensions
         return result;
     }
     
-    public static Dictionary<string, object?> ToDict(this GroupEntityData data, CharlistMongoData? mongoData)
+    public static Dictionary<string, object?> ToDict(this GroupEntityData data, GroupEntityMongoData? groupEntity)
     {
         return new()
         {
             {"id", data.Id},
             {"group", data.Group != null ? data.Group.ToDict() : new GroupData(){Id = data.GroupId}.ToDict()},
-            {"name", mongoData?.Name},
-            {"description", mongoData?.Description},
-            {"fields", mongoData?.Fields.ToDict()},
+            {"name", groupEntity?.Name},
+            {"description", groupEntity?.Description},
         };
+    }
+    
+    public static Dictionary<string, object?> ToDict(this GroupEntityData data, CharlistMongoData? mongoData)
+    {
+        var result = data.ToDict(mongoData as GroupEntityMongoData);
+        result.Add("fields", mongoData?.Fields.ToDict());
+        return result;
+    }
+    
+    public static Dictionary<string, object?> ToDict(this GroupEntityData data, ItemMongoData? mongoData)
+    {
+        var result = data.ToDict(mongoData as GroupEntityMongoData);
+        result.Add("price", mongoData?.Price);
+        return result;
     }
     
     public static Dictionary<string, object?> ToDict(this CharacterData data, CharacterMongoData? mongoData)

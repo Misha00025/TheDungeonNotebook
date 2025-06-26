@@ -28,6 +28,10 @@ if __name__ == "__main__":
                     with_characters_scenario()
                 case "notes":
                     with_notes_scenario()
+                case "group-items":
+                    with_group_items_scenario()
+                case "character-items":
+                    with_character_items_scenario()
 
     test_variables.compact = args.compact
     test_variables.debug = args.debug
