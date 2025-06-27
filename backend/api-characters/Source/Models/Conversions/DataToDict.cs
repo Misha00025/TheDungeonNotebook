@@ -73,6 +73,7 @@ public static class DataToDictExtensions
     {
         var result = data.ToDict(mongoData as GroupEntityMongoData);
         result.Add("price", mongoData?.Price);
+        result.Add("image_link", mongoData?.Image);
         return result;
     }
     
@@ -94,7 +95,26 @@ public static class DataToDictExtensions
         };
     }
     
+    public static Dictionary<string, object?> ToDict(this AmountedItemMongoData data, int index)
+    {
+        return new Dictionary<string, object?>()
+        {
+            {"id", index},
+            {"name", data.Name},
+            {"description", data.Description},
+            {"price", data.Price},
+            {"amount", data.Amount},
+            {"image_link", data.Image}
+        };
+    }
+    
     public static List<Dictionary<string, object?>> ToDict(this List<NoteMongoData> dataList, int startIndex = 0)
+    {
+        int index = startIndex;
+        return dataList.Select(e => e.ToDict(index++)).ToList();
+    }
+    
+    public static List<Dictionary<string, object?>> ToDict(this List<AmountedItemMongoData> dataList, int startIndex = 0)
     {
         int index = startIndex;
         return dataList.Select(e => e.ToDict(index++)).ToList();

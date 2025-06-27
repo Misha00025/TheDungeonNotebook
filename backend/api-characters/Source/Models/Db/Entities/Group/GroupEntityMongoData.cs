@@ -23,6 +23,8 @@ public class ItemMongoData : GroupEntityMongoData
 {
 	[BsonElement("price")]
 	public int Price { get; set; } = 0;
+	[BsonElement("image_link")]
+	public string? Image;
 }
 
 public class CharlistMongoData : GroupEntityMongoData 
@@ -51,6 +53,8 @@ public class AmountedItemMongoData
 	public string Description = "";
 	[BsonElement("amount")]
 	public int Amount;
+	[BsonElement("price")]
+	public int Price { get; set; } = 0;
 	[BsonElement("image_link")]
 	public string? Image;
 }
