@@ -13,11 +13,7 @@ public class GroupContext : BaseDbContext<GroupContext>
 	protected override void OnModelCreating(ModelBuilder builder)
 	{
 		Configurer.ConfigureModel(builder.Entity<GroupData>());
-		Configurer.ConfigureModel(builder.Entity<UserData>());
-		Configurer.ConfigureModel(builder.Entity<UserGroupData>());
 		base.OnModelCreating(builder);
 	}
 	public DbSet<GroupData> Groups => Set<GroupData>();
-	public DbSet<UserGroupData> Users => Set<UserGroupData>();
-	
 }

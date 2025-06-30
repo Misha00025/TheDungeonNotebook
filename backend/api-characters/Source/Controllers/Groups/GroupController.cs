@@ -40,18 +40,9 @@ public class GroupsController : BaseController
     }
     
     [HttpGet]
-    public ActionResult GetAll(int? userId = null, bool adminsOnly = false)
+    public ActionResult GetAll()
     {
-        List<GroupData>? groups = null;
-        if (userId != null)
-        {
-            var tmp = _dbContext.Users.Where(e => e.UserId == userId);
-            if (adminsOnly)
-                tmp.Where(e => e.Privileges >= (int)AccessLevel.Full);
-            groups = tmp.Include(e => e.Group).Select(e => e.Group!).ToList();
-        }
-        if (groups == null)
-            groups = _dbContext.Groups.ToList();
+        var groups = _dbContext.Groups.ToList();
         return Ok(groups.Select(e => e.ToDict()));
     }
     

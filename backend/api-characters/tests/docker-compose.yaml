@@ -28,7 +28,7 @@ services:
       - ./.env
     volumes:
       - ./mysql_data:/var/lib/mysql
-      - ../../migrate/sql_script.sql:/docker-entrypoint-initdb.d/init.sql
+      - ../sql_script.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
       interval: 20s

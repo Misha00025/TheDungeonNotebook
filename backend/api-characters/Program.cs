@@ -16,7 +16,6 @@ builder.Services.AddLogging(e => e.AddConsole());
 builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
 builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigurer>();
 builder.Services.AddDbContext<GroupContext>(config.ConfigDbConnections);
-builder.Services.AddDbContext<UserContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<EntityContext>(config.ConfigDbConnections);
 builder.Services.AddScoped(_ => new MongoDbContext(config.GetMongoDbSettings()));
 
