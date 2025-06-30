@@ -18,20 +18,6 @@ if __name__ == "__main__":
             match scenario:
                 case "users":
                     with_user_scenario()
-                case "groups":
-                    with_group_scenario()
-                case "user-group":
-                    with_user_group_scenario()
-                case "templates":
-                    with_charlist_templates_scenario()
-                case "characters":
-                    with_characters_scenario()
-                case "notes":
-                    with_notes_scenario()
-                case "group-items":
-                    with_group_items_scenario()
-                case "character-items":
-                    with_character_items_scenario()
 
     test_variables.compact = args.compact
     test_variables.debug = args.debug
