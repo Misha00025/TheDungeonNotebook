@@ -1,17 +1,11 @@
-DROP TABLE IF EXISTS `item`;
-DROP TABLE IF EXISTS `character`;
-DROP TABLE IF EXISTS `charlist_template`;
-DROP TABLE IF EXISTS `group`;
-
-
-CREATE TABLE `group` (
+CREATE TABLE IF NOT EXISTS `group` (
   `group_id` int NOT NULL AUTO_INCREMENT,
   `name` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
   `photo_link` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL,
   PRIMARY KEY (`group_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE `charlist_template` (
+CREATE TABLE IF NOT EXISTS `charlist_template` (
   `template_id` int NOT NULL AUTO_INCREMENT,
   `group_id` int NOT NULL,
   `uuid` text NOT NULL,
@@ -20,7 +14,7 @@ CREATE TABLE `charlist_template` (
   CONSTRAINT `charlist_template_group_FK` FOREIGN KEY (`group_id`) REFERENCES `group` (`group_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE `character` (
+CREATE TABLE IF NOT EXISTS `character` (
   `character_id` int NOT NULL AUTO_INCREMENT,
   `group_id` int NOT NULL,
   `template_id` int NOT NULL,
@@ -33,7 +27,7 @@ CREATE TABLE `character` (
   CONSTRAINT `FK_character_group_group_id` FOREIGN KEY (`group_id`) REFERENCES `group` (`group_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE `item` (
+CREATE TABLE IF NOT EXISTS `item` (
   `item_id` int NOT NULL AUTO_INCREMENT,
   `group_id` int NOT NULL,
   `uuid` text NOT NULL,

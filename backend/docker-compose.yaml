@@ -1,14 +1,14 @@
 version: '3'
 
 services:
-  mongo:
+  campaign-mongo:
     image: mongo:latest
-    container_name: mongo_db
+    container_name: campaign-mongo
     restart: always
     networks:
       - backend-network
     volumes:
-      - ./mongo_data:/data/db
+      - ./campaign-mongo-data:/data/db
     env_file:
       - ./.env
     healthcheck:
@@ -18,16 +18,34 @@ services:
       retries: 5
       start_period: 30s
 
-  mysql:
+  campaign-mysql:
     image: mysql:8.0
-    container_name: mysql_db
+    container_name: campaign-mysql
     restart: always
     networks:
       - backend-network
     env_file:
       - ./.env
     volumes:
-      - ./mysql_data:/var/lib/mysql
+      - ./campaign-mysql-data:/var/lib/mysql
+      - ./campaign-service/sql_script.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  auth-mysql:
+    image: mysql:8.0
+    container_name: auth-mysql
+    restart: always
+    networks:
+      - backend-network
+    env_file:
+      - ./.env
+    volumes:
+      - ./auth-mysql-data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
       interval: 20s
@@ -35,59 +53,53 @@ services:
       retries: 5
       start_period: 60s
       
-  api-auth:
-    build: ./api-auth
-    container_name: api-auth
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
     depends_on:
-      mysql:
+      auth-mysql:
         condition: service_healthy
     networks:
       - backend-network
-    ports:
-      - "5001:5000"  # Пример отображения порта, измените на нужный вам порт
     env_file:
       - ./.env
     environment:
-      - DB_HOST=mysql
+      - DB_HOST=auth-mysql
       - DB_PORT=3306
 
-  api-characters:
-    build: ./api-characters
-    container_name: api-characters
+  campaign-service:
+    build: ./campaign-service
+    container_name: campaign-service
     depends_on:
-      mongo:
+      campaign-mongo:
         condition: service_healthy
-      mysql:
+      campaign-mysql:
         condition: service_healthy
-      api-auth:
-        condition: service_started
     networks:
       - backend-network
-    ports:
-      - "5077:8080"
     env_file:
       - ./.env
     environment:
-      - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
-      - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+      - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@campaign-mongo:27017/
+      - MYSQL_CONNECTION_STRING=server=campaign-mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
   api-proxy:
     build: ./api-proxy
     container_name: api-proxy
     depends_on:
-      api-characters:
+      campaign-service:
         condition: service_started
-      api-auth:
+      auth-service:
         condition: service_started
     networks:
       - backend-network
     ports:
-      - "5000:5000"  # Пример отображения порта, измените на нужный вам порт
+      - "5000:5000"
     env_file:
       - ./.env
     environment:
-      - AUTH_SERVICE_URL=http://api-auth:5000
-      - BACKEND_URL=http://api-characters:8080
+      - AUTH_SERVICE_URL=http://auth-service:5000
+      - BACKEND_URL=http://campaign-service:8080
 
 networks:
   backend-network:
