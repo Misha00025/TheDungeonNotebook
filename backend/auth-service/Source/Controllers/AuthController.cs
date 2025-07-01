@@ -119,8 +119,9 @@ namespace Tdn.Api.Controllers
             try
             {
                 var p = tokenHandler.ValidateToken(model.RefreshToken, validationParameters, out var validatedToken);
+                var claims = p.Claims.Where(e => e.Type != "exp" && e.Type != "nbf" && e.Type != "iat");
                 var tokenString = GenerateTokenString(
-                    new ClaimsIdentity(p.Claims),
+                    new ClaimsIdentity(claims),
                     DateTime.UtcNow.AddMinutes(10)
                 );
                 return Ok(new {accessToken = tokenString});
