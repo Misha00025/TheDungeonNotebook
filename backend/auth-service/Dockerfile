@@ -1,19 +1,17 @@
-FROM python:3.13
-
-LABEL maintainer="Misha00025<misha00025@mail.ru>"
-
-ENV TZ=Europe/Moscow
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
 
-# Копируем все файлы из текущей директории в контейнер
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY ["auth-service.csproj", "./"]
+RUN dotnet restore "auth-service.csproj"
 COPY . .
+RUN dotnet build "auth-service.csproj" -c Release -o /app/build
 
-# Создаем виртуальное окружение и устанавливаем зависимости
-# RUN /bin/python3 -m venv venv
-RUN pip install -r req.txt \
-	&& pip install gunicorn
+FROM build AS publish
+RUN dotnet publish "auth-service.csproj" -c Release -o /app/publish
 
-EXPOSE 5000
-
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "-w", "4", "wsgi:application"]
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "auth-service.dll"]

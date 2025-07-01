@@ -1,0 +1,44 @@
+version: '3'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_db
+    restart: always
+    networks:
+      - backend-network
+    env_file:
+      - ./.env
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+      - ../sql_script.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  auth:
+    build:
+      context: ..
+    container_name: auth
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - backend-network
+    ports:
+      - "5077:8080"
+    volumes:
+      - ./certs:/certs:r
+    env_file:
+      - ./.env
+    environment:
+      - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+      - PRIVATE_KEY_PATH=/certs/private.pem
+      - PUBLIC_KEY_PATH=/certs/public.pem
+
+networks:
+  backend-network:
+    driver: bridge
