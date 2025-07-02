@@ -25,9 +25,9 @@ def with_auth_service_scenario():
     tests = []
 
     invalid_user_credentials = {"username": "invaliduser", "password": "wrongpass"}
-    valid_registration_data = {"userId":1, "username": "newuser", "password": "securepassword"}
+    valid_registration_data = {"username": "newuser", "password": "securepassword"}
     valid_user_credentials = {"username": "newuser", "password": "securepassword"}
-    missing_field_registration_data = {"username": "newuser", "password": "securepassword"}
+    missing_field_registration_data = {"username": "newuser"}
     duplicate_registration_data = valid_registration_data
     valid_refresh_token_request = {"refreshToken": "{steps.3.token}"}
     invalid_refresh_token_request = {"refreshToken": "invalid-refreshtoken"}

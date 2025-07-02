@@ -23,10 +23,10 @@ def create_scenario(name, tests, data = None):
 
 def with_user_scenario():
     tests = []
-    new_user_1 = {"nickname": "Test"}
-    new_user_2 = {"nickname": "Test 1", "visibleName":"LastTest"}
-    new_user_3 = {"nickname": "Test 2", "imageLink":"LastTest"}
-    wrong_user = {"visibleName": "LastTest", "imageLink":"LastTest"}
+    new_user_1 = {"id": 1, "nickname": "Test"}
+    new_user_2 = {"id": 2, "nickname": "Test 1", "visibleName":"LastTest"}
+    new_user_3 = {"id": 3, "nickname": "Test 2", "imageLink":"LastTest"}
+    wrong_user = {"id": 4, "visibleName": "LastTest", "imageLink":"LastTest"}
 
     tests.extend([
         Test(headers=h, request=f"users"),

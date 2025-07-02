@@ -12,6 +12,7 @@ public class UserController : BaseController
 {
     public struct UserPostData
     {
+        public int? Id { get; set; }
         public string Nickname { get; set; }
         public string? VisibleName { get; set; }
         public string? ImageLink { get; set; }
@@ -45,11 +46,14 @@ public class UserController : BaseController
     [HttpPost]
     public ActionResult PostUser([FromBody] UserPostData data)
     {
-        var user = _dbContext.Users.Where(e => e.Nickname == data.Nickname).FirstOrDefault();
+        if (data.Id == null)
+            return BadRequest();
+        var user = _dbContext.Users.Where(e => e.Nickname == data.Nickname || e.Id == data.Id).FirstOrDefault();
         if (user != null)
             return Conflict("User with this username already exist");
         user = new UserData()
         {
+            Id = (int)data.Id,
             Nickname = data.Nickname,
             VisibleName = data.VisibleName != null ? data.VisibleName : data.Nickname,
             Image = data.ImageLink != null ? data.ImageLink : "" 

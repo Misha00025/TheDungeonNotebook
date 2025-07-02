@@ -58,15 +58,12 @@ namespace Tdn.Api.Controllers
         [HttpPost("register")]
         public ActionResult Register([FromBody] RegistrationRequest data)
         {
-            if (data.UserId == null)
-                return BadRequest();
-            var user = _dbContext.Users.Where(e => e.Username == data.Username || e.Id == data.UserId).FirstOrDefault();
+            var user = _dbContext.Users.Where(e => e.Username == data.Username).FirstOrDefault();
             if (user != null)
                 return Conflict();
             string passwordHash = BCrypt.Net.BCrypt.HashPassword(data.Password);
             var newUser = new UserData()
             {
-                Id = (int)data.UserId,
                 Username = data.Username,
                 PasswordHash = passwordHash
             };
@@ -181,7 +178,6 @@ namespace Tdn.Api.Controllers
 
     public struct RegistrationRequest
     {
-        public int? UserId { get; set; }
         public string Username { get; set; }
         public string Password { get; set; }
     }
