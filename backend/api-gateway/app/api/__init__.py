@@ -40,6 +40,16 @@ def _group(group_id: int):
     raise NotImplementedError()
 
 
+@route("groups/<int:group_id>/users", ["GET", "POST"])
+def _group_users(group_id: int):
+    raise NotImplementedError()
+
+
+@route("groups/<int:group_id>/users/<int:user_id>", ["PUT", "DELETE"])
+def _group_user(group_id: int, user_id: int):
+    raise NotImplementedError()
+
+
 @route("groups/<int:group_id>/items", ["GET", "POST"])
 def _items(group_id: int):
     raise NotImplementedError()
@@ -62,6 +72,16 @@ def _item(group_id: int, item_id: int):
 
 @route("groups/<int:group_id>/characters/<int:character_id>", ["GET", "PATCH", "DELETE"])
 def _character(group_id: int, character_id: int):
+    raise NotImplementedError()
+
+
+@route("groups/<int:group_id>/characters/<int:character_id>/users", ["GET", "POST"])
+def _character_users(group_id: int, character_id: int):
+    raise NotImplementedError()
+
+
+@route("groups/<int:group_id>/characters/<int:character_id>/users/<int:user_id>", ["PUT", "DELETE"])
+def _character_user(group_id: int, character_id: int, user_id: int):
     raise NotImplementedError()
 
 
