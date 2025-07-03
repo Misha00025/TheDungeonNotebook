@@ -3,68 +3,67 @@ import requests as rq
 
 
 class ItemsEndpoints:
-    def __init__(self, url: str, owner_id: int):
-        self._url: str = url + f"/{owner_id}/items"
-
-    def all(self) -> Response:
-        raise NotImplementedError()
+    def __init__(self, url: str, item_id = None):
+        self._url: str = url + "/items"
+        if item_id is not None:
+            self._url += f"/{item_id}"
     
     def post(self, data) -> Response:
         raise NotImplementedError()
     
-    def get(self, item_id: int) -> Response:
+    def get(self) -> Response:
         raise NotImplementedError()
     
-    def put(self, item_id: int, data) -> Response:
+    def put(self, data) -> Response:
         raise NotImplementedError()
     
-    def delete(self, item_id: int) -> Response:
+    def delete(self) -> Response:
         raise NotImplementedError()
 
 
 class NotesEndpoints:
-    def __init__(self, url: str, character_id: int):
-        self._url: str = url + f"/{character_id}/notes"
-
-    def all(self) -> Response:
-        raise NotImplementedError()
+    def __init__(self, url: str, note_id: int = None):
+        self._url: str = url + "/notes"
+        if note_id is not None:
+            self._url += f"/{note_id}"
     
     def post(self, data) -> Response:
         raise NotImplementedError()
     
-    def get(self, note_id: int) -> Response:
+    def get(self) -> Response:
         raise NotImplementedError()
     
-    def put(self, note_id: int, data) -> Response:
+    def put(self, data) -> Response:
         raise NotImplementedError()
     
-    def delete(self, note_id: int) -> Response:
+    def delete(self) -> Response:
         raise NotImplementedError()
 
 
 class TemplatesEndpoints:
-    def __init__(self, url: str):
+    def __init__(self, url: str, template_id: int = None):
         self._url: str = url + "/templates"
-
-    def all(self) -> Response:
-        raise NotImplementedError()
+        if template_id is not None:
+            self._url += f"/{template_id}"
     
     def post(self, data) -> Response:
         raise NotImplementedError()
     
-    def get(self, template_id: int) -> Response:
+    def get(self) -> Response:
         raise NotImplementedError()
     
-    def put(self, template_id: int, data) -> Response:
+    def put(self, data) -> Response:
         raise NotImplementedError()
     
-    def delete(self, template_id: int) -> Response:
+    def delete(self) -> Response:
         raise NotImplementedError()
 
 
 class CharactersEndpoints:
-    def __init__(self, url: str, group_id: int):
-        self._url: str = url + f"/{group_id}/characters"
+    def __init__(self, url: str, character_id: int = None):
+        self._url: str = url + f"/{character_id}/characters"
+        if character_id is not None:
+            self._url += f"/{character_id}"
 
     def templates(self) -> TemplatesEndpoints:
         return TemplatesEndpoints(self._url)
@@ -74,44 +73,41 @@ class CharactersEndpoints:
     
     def items(self, character_id) -> ItemsEndpoints:
         return ItemsEndpoints(self._url, character_id)
-
-    def all(self) -> Response:
-        raise NotImplementedError()
     
     def post(self, data) -> Response:
         raise NotImplementedError()
     
-    def get(self, character_id: int) -> Response:
+    def get(self) -> Response:
         raise NotImplementedError()
     
-    def patch(self, character_id: int, data) -> Response:
+    def patch(self, data) -> Response:
         raise NotImplementedError()
     
-    def delete(self, character_id: int) -> Response:
+    def delete(self) -> Response:
         raise NotImplementedError()
 
 
 class CampaignService: 
-    def __init__(self, url: str):
+    def __init__(self, url: str, group_id: int = None):
         self._url: str = url + "/groups"
-    
-    def characters(self, group_id) -> CharactersEndpoints:
-        return CharactersEndpoints(self._url, group_id)
-    
-    def items(self, group_id) -> ItemsEndpoints:
-        return ItemsEndpoints(self._url, group_id)
+        if group_id is not None:
+            self._url += f"/{group_id}"
 
-    def all(self) -> Response:
+    
+    def characters(self, character_id: int = None) -> CharactersEndpoints:
+        return CharactersEndpoints(self._url, character_id)
+    
+    def items(self, item_id: int = None) -> ItemsEndpoints:
+        return ItemsEndpoints(self._url, item_id)
+    
+    def post(self, user_id, data) -> Response:
         raise NotImplementedError()
     
-    def post(self, data) -> Response:
+    def get(self) -> Response:
         raise NotImplementedError()
     
-    def get(self, group_id: int) -> Response:
+    def patch(self, data) -> Response:
         raise NotImplementedError()
     
-    def patch(self, group_id: int, data) -> Response:
-        raise NotImplementedError()
-    
-    def delete(self, group_id: int) -> Response:
+    def delete(self) -> Response:
         raise NotImplementedError()

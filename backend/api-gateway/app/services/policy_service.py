@@ -7,7 +7,7 @@ class CharacterPolicesEndpoints:
         self._url = url
         self._full_url = url + "/characters"
 
-    def put(self, group_id: int, user_id: int, character_id: int, can_write = False) -> Response:
+    def put(self, group_id: int, user_id: int, character_id: int, data) -> Response:
         raise NotImplementedError()
 
     def delete(self, group_id: int, user_id: int, character_id: int) -> Response:
@@ -21,7 +21,7 @@ class GroupPolicesEndpoints:
     def all(self, group_id: int = None, user_id: int = None) -> Response:
         raise NotImplementedError()
 
-    def put(self, group_id: int, user_id: int, is_admin = False) -> Response:
+    def put(self, group_id: int, user_id: int, data) -> Response:
         raise NotImplementedError()
 
     def delete(self, group_id: int, user_id: int) -> Response:
