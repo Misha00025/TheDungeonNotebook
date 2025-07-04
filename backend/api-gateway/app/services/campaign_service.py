@@ -65,14 +65,14 @@ class CharactersEndpoints:
         if character_id is not None:
             self._url += f"/{character_id}"
 
-    def templates(self) -> TemplatesEndpoints:
-        return TemplatesEndpoints(self._url)
+    def templates(self, template_id = None) -> TemplatesEndpoints:
+        return TemplatesEndpoints(self._url, template_id)
     
-    def notes(self, character_id) -> NotesEndpoints:
-        return NotesEndpoints(self._url, character_id)
+    def notes(self, note_id = None) -> NotesEndpoints:
+        return NotesEndpoints(self._url, note_id)
     
-    def items(self, character_id) -> ItemsEndpoints:
-        return ItemsEndpoints(self._url, character_id)
+    def items(self, item_id = None) -> ItemsEndpoints:
+        return ItemsEndpoints(self._url, item_id)
     
     def post(self, data) -> Response:
         raise NotImplementedError()
