@@ -1,4 +1,5 @@
 from flask import request as rq, Response
+import flask
 import requests
 from app import services
 from app.api_controller import get_routers_info, route, version
@@ -10,11 +11,14 @@ version("")
 
 
 def make_response(result : requests.Response):
-    return Response(
+    if result is requests.Response:
+        return Response(
             result.content,
             result.status_code,
             content_type=result.headers['Content-Type']
         )
+    else:
+        return result
 
 
 @route("get_api", ["GET"])
