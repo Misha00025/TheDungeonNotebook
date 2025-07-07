@@ -1,14 +1,14 @@
 version: '3'
 
 services:
-  campaign-mongo:
+  mongo:
     image: mongo:latest
-    container_name: campaign-mongo
+    container_name: mongo_db
     restart: always
     networks:
       - backend-network
     volumes:
-      - ./campaign-mongo-data:/data/db
+      - ./mongo_data:/data/db
     env_file:
       - ./.env
     healthcheck:
@@ -18,17 +18,20 @@ services:
       retries: 5
       start_period: 30s
 
-  campaign-mysql:
+  mysql:
     image: mysql:8.0
-    container_name: campaign-mysql
+    container_name: mysql_db
     restart: always
     networks:
       - backend-network
     env_file:
       - ./.env
     volumes:
-      - ./campaign-mysql-data:/var/lib/mysql
-      - ./campaign-service/sql_script.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./mysql_data:/var/lib/mysql
+      - ./auth-service/sql_script.sql:/docker-entrypoint-initdb.d/0_auth.sql
+      - ./policy-service/sql_script.sql:/docker-entrypoint-initdb.d/1_polices.sql
+      - ./users-service/sql_script.sql:/docker-entrypoint-initdb.d/2_users.sql
+      - ./campaign-service/sql_script.sql:/docker-entrypoint-initdb.d/3_campaign.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
       interval: 20s
@@ -36,58 +39,79 @@ services:
       retries: 5
       start_period: 60s
 
-  auth-mysql:
-    image: mysql:8.0
-    container_name: auth-mysql
-    restart: always
-    networks:
-      - backend-network
-    env_file:
-      - ./.env
-    volumes:
-      - ./auth-mysql-data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
-      interval: 20s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-      
   auth-service:
-    build: ./auth-service
+    build:
+      context: ./auth-service
     container_name: auth-service
     depends_on:
-      auth-mysql:
+      mysql:
+        condition: service_healthy
+    networks:
+      - backend-network
+    volumes:
+      - ./certs:/certs
+    env_file:
+      - ./.env
+    environment:
+      - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+      - PRIVATE_KEY_PATH=/certs/private.pem
+      - PUBLIC_KEY_PATH=/certs/public.pem
+
+  policy-service:
+    build:
+      context: ./policy-service
+    container_name: policy-service
+    depends_on:
+      mysql:
         condition: service_healthy
     networks:
       - backend-network
     env_file:
       - ./.env
     environment:
-      - DB_HOST=auth-mysql
-      - DB_PORT=3306
+      - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+
+  users-service:
+    build:
+      context: ./users-service
+    container_name: users-service
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - backend-network
+    env_file:
+      - ./.env
+    environment:
+      - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
   campaign-service:
-    build: ./campaign-service
+    build:
+      context: ./campaign-service
     container_name: campaign-service
     depends_on:
-      campaign-mongo:
+      mongo:
         condition: service_healthy
-      campaign-mysql:
+      mysql:
         condition: service_healthy
     networks:
       - backend-network
     env_file:
       - ./.env
     environment:
-      - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@campaign-mongo:27017/
-      - MYSQL_CONNECTION_STRING=server=campaign-mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+      - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
+      - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
-  api-proxy:
-    build: ./api-proxy
-    container_name: api-proxy
+  api-gateway:
+    build: 
+      context: ./api-gateway
+    container_name: api-gateway
     depends_on:
       campaign-service:
+        condition: service_started
+      users-service:
+        condition: service_started
+      policy-service:
         condition: service_started
       auth-service:
         condition: service_started
@@ -98,8 +122,10 @@ services:
     env_file:
       - ./.env
     environment:
-      - AUTH_SERVICE_URL=http://auth-service:5000
-      - BACKEND_URL=http://campaign-service:8080
+      - AUTH_SERVICE_URL=http://auth-service:8080
+      - POLICY_SERVICE_URL=http://policy-service:8080
+      - USERS_SERVICE_URL=http://users-service:8080
+      - CAMPAIGN_SERVICE_URL=http://campaign-service:8080
 
 networks:
   backend-network:
