@@ -14,7 +14,7 @@ class CharacterPolicesEndpoints:
         params["groupId"] = group_id
         params["userId"] = user_id
         params["characterId"] = character_id
-        return rq.put(self._url, headers=self._headers, json=params)
+        return rq.put(self._full_url, headers=self._headers, json=params)
 
     def delete(self, group_id: int, user_id: int, character_id: int) -> Response:
         params = {}

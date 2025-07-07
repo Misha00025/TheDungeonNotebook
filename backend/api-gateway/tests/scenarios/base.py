@@ -55,7 +55,21 @@ def main():
     character_id_4 = create_character(headers_1, group_id, new_character_4)
     add_character_access(headers_1, group_id, character_id_2, user_id_2, can_write=True)
     add_character_access(headers_1, group_id, character_id_3, user_id_3)
-    
+    new_note = {"header": "Test", "body": "Test Test"}
+    add_notes(headers_1, group_id, character_id_1, new_note)
+    add_notes(headers_2, group_id, character_id_2, new_note)
+    add_notes(headers_3, group_id, character_id_3, new_note)
+    new_item = {"name": "TestItem", "description": "Test"}
+    new_group_item = new_item.copy()
+    new_group_item["price"] = 10
+    new_character_item = new_item.copy()
+    new_character_item["amount"] = 5
+    add_character_items(headers_1, group_id, character_id_1, new_character_item)
+    add_character_items(headers_2, group_id, character_id_2, new_character_item)
+    add_character_items(headers_3, group_id, character_id_3, new_character_item)
+    add_group_items(headers_1, group_id, new_group_item)
+    add_group_items(headers_3, group_id, new_group_item)
+
 
 
 def get_access_token(headers):
@@ -106,6 +120,19 @@ def create_character(headers, group_id, data):
 def add_character_access(headers, group_id, character_id, user_id, can_write=False):
     res = rq.put(f"{v.server_url}/groups/{group_id}/characters/{character_id}/users/{user_id}", json={"canWrite": can_write}, headers=headers)
     outputs.write_result(res)
+
+def add_notes(headers, group_id, character_id, data):
+    res = rq.post(f"{v.server_url}/groups/{group_id}/characters/{character_id}/notes", json=data, headers=headers)
+    outputs.write_result(res)
+
+def add_group_items(headers, group_id, data):
+    res = rq.post(f"{v.server_url}/groups/{group_id}/items", json=data, headers=headers)
+    outputs.write_result(res)
+
+def add_character_items(headers, group_id, character_id, data):
+    res = rq.post(f"{v.server_url}/groups/{group_id}/characters/{character_id}/items", json=data, headers=headers)
+    outputs.write_result(res)
+
 
 
 def register(user_data, headers) -> rq.Response:
