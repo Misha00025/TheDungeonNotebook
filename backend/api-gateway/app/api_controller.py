@@ -2,7 +2,7 @@ from enum import Enum
 from app import application
 
 
-_prefix = "/api/"
+_prefix = "/"
 _url_prefix = ""
 _version = ""
 _urls = {}

@@ -7,12 +7,14 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 WORKDIR /app
 
 # Копируем все файлы из текущей директории в контейнер
-COPY . .
+COPY ./req.txt ./req.txt
 
 # Создаем виртуальное окружение и устанавливаем зависимости
 # RUN /bin/python3 -m venv venv
 RUN pip install -r req.txt \
 	&& pip install gunicorn
+
+COPY . .
 
 EXPOSE 5000
 

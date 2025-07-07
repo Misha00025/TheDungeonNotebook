@@ -15,8 +15,8 @@ class ItemsEndpoints:
     def get(self) -> Response:
         return rq.get(self._url, headers=self._headers)
     
-    def patch(self, data) -> Response:
-        return rq.patch(self._url, headers=self._headers, data=data)
+    def put(self, data) -> Response:
+        return rq.put(self._url, headers=self._headers, data=data)
     
     def delete(self) -> Response:
         return rq.delete(self._url, headers=self._headers)
@@ -35,8 +35,8 @@ class NotesEndpoints:
     def get(self) -> Response:
         return rq.get(self._url, headers=self._headers)
     
-    def patch(self, data) -> Response:
-        return rq.patch(self._url, headers=self._headers, data=data)
+    def put(self, data) -> Response:
+        return rq.put(self._url, headers=self._headers, data=data)
     
     def delete(self) -> Response:
         return rq.delete(self._url, headers=self._headers)
@@ -55,8 +55,8 @@ class TemplatesEndpoints:
     def get(self) -> Response:
         return rq.get(self._url, headers=self._headers)
     
-    def patch(self, data) -> Response:
-        return rq.patch(self._url, headers=self._headers, data=data)
+    def put(self, data) -> Response:
+        return rq.put(self._url, headers=self._headers, data=data)
     
     def delete(self) -> Response:
         return rq.delete(self._url, headers=self._headers)
@@ -64,19 +64,19 @@ class TemplatesEndpoints:
 
 class CharactersEndpoints:
     def __init__(self, url: str, headers, character_id: int = None):
-        self._url: str = url + f"/{character_id}/characters"
+        self._url: str = url + f"/characters"
         self._headers = headers
         if character_id is not None:
             self._url += f"/{character_id}"
 
     def templates(self, template_id = None) -> TemplatesEndpoints:
-        return TemplatesEndpoints(self._url, template_id)
+        return TemplatesEndpoints(self._url, self._headers, template_id)
     
     def notes(self, note_id = None) -> NotesEndpoints:
-        return NotesEndpoints(self._url, note_id)
+        return NotesEndpoints(self._url, self._headers, note_id)
     
     def items(self, item_id = None) -> ItemsEndpoints:
-        return ItemsEndpoints(self._url, item_id)
+        return ItemsEndpoints(self._url, self._headers, item_id)
     
     def post(self, data) -> Response:
         return rq.post(self._url, headers=self._headers, data=data)
@@ -100,10 +100,10 @@ class CampaignService:
 
     
     def characters(self, character_id: int = None) -> CharactersEndpoints:
-        return CharactersEndpoints(self._url, character_id)
+        return CharactersEndpoints(self._url, self._headers, character_id)
     
     def items(self, item_id: int = None) -> ItemsEndpoints:
-        return ItemsEndpoints(self._url, item_id)
+        return ItemsEndpoints(self._url, self._headers, item_id)
     
     def post(self, data) -> Response:
         return rq.post(self._url, headers=self._headers, data=data)

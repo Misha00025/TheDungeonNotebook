@@ -1,1 +1,6 @@
 **/configs
+**/__pycache__
+/tests
+/venv
+.gitignore
+.dockerignore

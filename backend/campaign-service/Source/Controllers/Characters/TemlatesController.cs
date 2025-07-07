@@ -67,7 +67,7 @@ public class TemplatesController : GroupsBaseController
     }
     
     [HttpPost]
-    public ActionResult PostTemplate(int groupId, CharlistPostData data)
+    public ActionResult PostTemplate(int groupId, [FromBody] CharlistPostData data)
     {
         if (TryGetGroup(groupId, out var _))
         {
@@ -116,7 +116,7 @@ public class TemplatesController : GroupsBaseController
     }
     
     [HttpPut("{templateId}")]
-    public ActionResult PutTemplate(int groupId, int templateId, CharlistPostData data)
+    public ActionResult PutTemplate(int groupId, int templateId, [FromBody] CharlistPostData data)
     {
         if (TryGetGroup(groupId, out var _))
         {

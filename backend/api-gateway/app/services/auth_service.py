@@ -15,7 +15,7 @@ class AuthService:
         return rq.post(self._url + "/login", data=data, headers=self._headers)
 
     def refresh(self, token: str) -> Response:
-        return rq.post(self._url + "/token/refresh", data={"refreshToken": token}, headers=self._headers)
+        return rq.post(self._url + "/token/refresh", json={"RefreshToken": token}, headers=self._headers)
 
     def check(self, token: str) -> Response:
         return rq.get(self._url + "/check", params={"accessToken": token}, headers=self._headers)

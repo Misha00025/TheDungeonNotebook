@@ -1,6 +1,6 @@
 import json
 from flask import Request
-from jwt import PyJWT as jwt
+import jwt
 from app.services import auth
 
 
@@ -8,11 +8,11 @@ from app.services import auth
 def extract_tokens(rq: Request) ->  tuple[str | None, str | None] :
     '''
     returns:
-    access_token, refresh_token
+    refresh_token, access_token
     '''
     access_token = rq.headers.get('Authorization')
     refresh_token = rq.headers.get('Refresh-Token')
-    return access_token, refresh_token
+    return refresh_token, access_token
 
 def check_token(token: str | None) -> bool:
     from app import services
@@ -20,7 +20,7 @@ def check_token(token: str | None) -> bool:
     return res.ok
 
 def extract_ids(token: str) -> tuple[str | None, str | None]:
-    payload = jwt.decode(token, verify=False)
+    payload = jwt.decode(token, options={"verify_signature": False})
             
     return payload.get("userId"), payload.get("groupId")
 

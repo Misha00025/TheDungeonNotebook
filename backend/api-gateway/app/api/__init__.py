@@ -11,14 +11,10 @@ version("")
 
 
 def make_response(result : requests.Response):
-    if result is requests.Response:
-        return Response(
-            result.content,
-            result.status_code,
-            content_type=result.headers['Content-Type']
-        )
-    else:
-        return result
+    try:
+        return result.json(), result.status_code
+    except requests.exceptions.JSONDecodeError:
+        return result.content, result.status_code
 
 
 @route("get_api", ["GET"])
@@ -42,7 +38,7 @@ def _login():
 def _refresh():
     rt, _ = extract_tokens(rq)
     if rt is None:
-        return unauthorized()
+        return unauthorized("Refresh-Token not found")
     result = services.auth(rq.headers).refresh(rt)
     return make_response(result)
 
@@ -90,7 +86,12 @@ def _groups():
                     groups.append(res.json())
             return ok({"groups": groups})
         case "POST":
-            return make_response(services.groups(rq.headers).post(uid, rq.data))
+            res = services.groups(rq.headers).post(rq.data)
+            if res.ok:
+                access = services.polices(rq.headers).groups().put(group_id=res.json()["id"], user_id=uid, data=json.dumps({"isAdmin": True}).encode('utf-8'))
+                if not access.ok:
+                    return answer(500, "Can't create access rule for group")
+            return make_response(res)
 
 
 # TODO: Вернуть DELETE метод, когда буду готов
@@ -297,7 +298,7 @@ def _character_notes(group_id: int, character_id: int):
 
 
 @route("groups/<int:group_id>/characters/<int:character_id>/items/<int:item_id>", ["GET", "PUT", "DELETE"])
-def _character_items(group_id: int, character_id: int, item_id: int):
+def _character_item(group_id: int, character_id: int, item_id: int):
     success, _, can_write, response = check_access_to_character(group_id, character_id, rq)
     if not success:
         return response
@@ -315,7 +316,7 @@ def _character_items(group_id: int, character_id: int, item_id: int):
 
 
 @route("groups/<int:group_id>/characters/<int:character_id>/notes/<int:note_id>", ["GET", "PUT", "DELETE"])
-def _character_notes(group_id: int, character_id: int, note_id: int):
+def _character_note(group_id: int, character_id: int, note_id: int):
     success, _, can_write, response = check_access_to_character(group_id, character_id, rq)
     if not success:
         return response
