@@ -3,19 +3,20 @@ import requests as rq
 
 
 class UsersService: 
-    def __init__(self, url: str, user_id: int = None):
+    def __init__(self, url: str, headers, user_id: int = None):
         self._url: str = url + "/users"
         if user_id is not None:
             self._url += f"/{user_id}"
+        self._headers = headers
     
     def post(self, data) -> Response:
-        raise NotImplementedError()
+        return rq.post(self._url, headers=self._headers, data=data)
     
     def get(self) -> Response:
-        raise NotImplementedError()
+        return rq.get(self._url, headers=self._headers)
     
     def patch(self, data) -> Response:
-        raise NotImplementedError()
+        return rq.patch(self._url, headers=self._headers, data=data)
     
     def delete(self) -> Response:
-        raise NotImplementedError()
+        return rq.delete(self._url)

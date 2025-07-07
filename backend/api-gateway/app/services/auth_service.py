@@ -18,7 +18,7 @@ class AuthService:
         return rq.post(self._url + "/token/refresh", data={"refreshToken": token}, headers=self._headers)
 
     def check(self, token: str) -> Response:
-        return rq.get(self._url + "/token/refresh", params={"accessToken": token}, headers=self._headers)
+        return rq.get(self._url + "/check", params={"accessToken": token}, headers=self._headers)
 
     def service_token(self, group_id, data) -> Response:
         return rq.post(self._url + f"/groups/{group_id}/service-token/generate", data=data, headers=self._headers)
