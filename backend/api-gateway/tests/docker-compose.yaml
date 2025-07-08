@@ -1,5 +1,15 @@
 version: '3'
 
+x-common-resources: &common_resources
+  deploy:
+    resources:
+      limits:
+        cpus: '0.5'
+        memory: '256m'
+      reservations:
+        cpus: '0.25'
+        memory: '128m'
+
 services:
   mongo:
     image: mongo:latest
@@ -28,10 +38,10 @@ services:
       - ./.env
     volumes:
       - ./mysql_data:/var/lib/mysql
-      - ./auth-service/sql_script.sql:/docker-entrypoint-initdb.d/0_auth.sql
-      - ./policy-service/sql_script.sql:/docker-entrypoint-initdb.d/1_polices.sql
-      - ./users-service/sql_script.sql:/docker-entrypoint-initdb.d/2_users.sql
-      - ./campaign-service/sql_script.sql:/docker-entrypoint-initdb.d/3_campaign.sql
+      - ../../auth-service/sql_script.sql:/docker-entrypoint-initdb.d/0_auth.sql
+      - ../../policy-service/sql_script.sql:/docker-entrypoint-initdb.d/1_polices.sql
+      - ../../users-service/sql_script.sql:/docker-entrypoint-initdb.d/2_users.sql
+      - ../../campaign-service/sql_script.sql:/docker-entrypoint-initdb.d/3_campaign.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
       interval: 20s
@@ -40,8 +50,9 @@ services:
       start_period: 60s
 
   auth-service:
+    <<: *common_resources
     build:
-      context: ./auth-service
+      context: ../../auth-service
     container_name: auth-service
     depends_on:
       mysql:
@@ -58,8 +69,9 @@ services:
       - PUBLIC_KEY_PATH=/certs/public.pem
 
   policy-service:
+    <<: *common_resources
     build:
-      context: ./policy-service
+      context: ../../policy-service
     container_name: policy-service
     depends_on:
       mysql:
@@ -72,8 +84,9 @@ services:
       - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
   users-service:
+    <<: *common_resources
     build:
-      context: ./users-service
+      context: ../../users-service
     container_name: users-service
     depends_on:
       mysql:
@@ -86,8 +99,9 @@ services:
       - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
   campaign-service:
+    <<: *common_resources
     build:
-      context: ./campaign-service
+      context: ../../campaign-service
     container_name: campaign-service
     depends_on:
       mongo:
@@ -104,7 +118,7 @@ services:
 
   api-gateway:
     build: 
-      context: ./api-gateway
+      context: ../
     container_name: api-gateway
     depends_on:
       campaign-service:
@@ -126,6 +140,7 @@ services:
       - POLICY_SERVICE_URL=http://policy-service:8080
       - USERS_SERVICE_URL=http://users-service:8080
       - CAMPAIGN_SERVICE_URL=http://campaign-service:8080
+    command: ["python", "main.py"]
 
 networks:
   backend-network:

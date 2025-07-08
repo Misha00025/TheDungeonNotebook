@@ -1,0 +1,60 @@
+version: '3'
+
+services:
+  mongo:
+    image: mongo:latest
+    container_name: mongo_db
+    restart: always
+    networks:
+      - backend-network
+    volumes:
+      - ./mongo_data:/data/db
+    env_file:
+      - ./.env
+    healthcheck:
+      test: ["CMD", "echo", "db.runCommand(\"ping\").ok", "|", "mongosh", "mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@localhost:27017/?authSource=${MYSQL_DATABASE}", "--quiet"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_db
+    restart: always
+    networks:
+      - backend-network
+    env_file:
+      - ./.env
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+      - ../sql_script.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  api-v2:
+    build:
+      context: ..
+    container_name: api-v2
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    networks:
+      - backend-network
+    ports:
+      - "5077:8080"
+    env_file:
+      - ./.env
+    environment:
+      - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
+      - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+
+networks:
+  backend-network:
+    driver: bridge

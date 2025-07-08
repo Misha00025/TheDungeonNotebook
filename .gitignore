@@ -5,4 +5,8 @@
 
 **/mongo_data/
 **/mysql_data/
+**/*-mysql-data/
+**/*-mongo-data/
+
+**/__pycache__/
 memory-bank/**
