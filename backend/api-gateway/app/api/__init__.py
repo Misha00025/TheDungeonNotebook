@@ -217,7 +217,7 @@ def _character(group_id: int, character_id: int):
     match (rq.method):
         case "GET":
             return make_response(services.groups(rq.headers, group_id).characters(character_id).get())
-        case "PUT":
+        case "PATCH":
             if not can_write:
                 return forbidden()
             return make_response(services.groups(rq.headers, group_id).characters(character_id).patch(rq.data))
