@@ -220,7 +220,7 @@ def _character(group_id: int, character_id: int):
         case "PUT":
             if not can_write:
                 return forbidden()
-            return make_response(services.groups(rq.headers, group_id).characters(character_id).put(rq.data))
+            return make_response(services.groups(rq.headers, group_id).characters(character_id).patch(rq.data))
         case "DELETE":
             if not can_write:
                 return forbidden()
