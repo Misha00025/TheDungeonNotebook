@@ -76,7 +76,8 @@ public class CharacterItemsController : CharactersBaseController
             var item = character.Items[itemId];
             item.Name = data.Name;
             item.Description = data.Description;
-            item.Price = data.Amount != null ? (int)data.Amount : item.Price;
+            item.Amount = data.Amount != null ? (int)data.Amount : item.Amount;
+            item.Price = data.Price != null ? (int)data.Price : item.Price;
             var filter = Builders<CharacterMongoData>.Filter.Eq("_id", character.Id);
             GetCollection().ReplaceOne(filter, character);
             return Ok(item.ToDict(itemId));
