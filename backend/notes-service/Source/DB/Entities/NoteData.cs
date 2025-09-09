@@ -5,6 +5,8 @@ namespace Tdn.Db.Entities;
 
 public class NoteData : MongoDbContext.MongoEntity
 {
+	[BsonElement("id")]
+	public int NoteId;
 	[BsonElement("header")]
 	public string Header = "";
 	[BsonElement("body")]

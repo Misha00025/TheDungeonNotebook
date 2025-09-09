@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Tdn.Db;
 using Tdn.Db.Contexts;
 
 namespace Tdn.Api.Controllers;
@@ -21,6 +22,7 @@ public abstract class BaseController<T> : ControllerBase
 	
 
 	protected abstract string CollectionName { get; }
+	protected NoteIdGenerator IdGenerator => _mongoDb.IdGenerator;
 
 	public MongoDB.Driver.IMongoCollection<T> Collection => _mongoDb.GetCollection<T>(CollectionName);
 

@@ -1,4 +1,6 @@
+using System.Text.Json.Serialization;
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 using Tdn.Settings;
 
@@ -8,6 +10,7 @@ public class MongoDbContext
 {
 	public class MongoEntity
 	{
+		[BsonId]
 		public ObjectId Id;
 	}
 	
@@ -17,7 +20,10 @@ public class MongoDbContext
 	{
 		var client = new MongoClient(mongoDbSettings.ConnectionString);
 		_database = client.GetDatabase(mongoDbSettings.DatabaseName);
+		IdGenerator = new NoteIdGenerator(this);
 	}
+
+	public NoteIdGenerator IdGenerator { get; private set; }
 
 	public IMongoCollection<T> GetCollection<T>(string collectionName)
 	{
