@@ -13,7 +13,7 @@ x-common-resources: &common_resources
 services:
   mongo:
     image: mongo:latest
-    container_name: mongo_db
+    container_name: mongo-db-gateway-test
     restart: always
     networks:
       - backend-network
@@ -30,7 +30,7 @@ services:
 
   mysql:
     image: mysql:8.0
-    container_name: mysql_db
+    container_name: mysql-db-gateway-test
     restart: always
     networks:
       - backend-network
@@ -53,7 +53,7 @@ services:
     <<: *common_resources
     build:
       context: ../../auth-service
-    container_name: auth-service
+    container_name: auth-service-gateway-test
     depends_on:
       mysql:
         condition: service_healthy
@@ -72,7 +72,7 @@ services:
     <<: *common_resources
     build:
       context: ../../policy-service
-    container_name: policy-service
+    container_name: policy-service-gateway-test
     depends_on:
       mysql:
         condition: service_healthy
@@ -87,7 +87,7 @@ services:
     <<: *common_resources
     build:
       context: ../../users-service
-    container_name: users-service
+    container_name: users-service-gateway-test
     depends_on:
       mysql:
         condition: service_healthy
@@ -102,7 +102,7 @@ services:
     <<: *common_resources
     build:
       context: ../../campaign-service
-    container_name: campaign-service
+    container_name: campaign-service-gateway-test
     depends_on:
       mongo:
         condition: service_healthy
@@ -116,11 +116,29 @@ services:
       - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
       - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
+  notes-service:
+    <<: *common_resources
+    build:
+      context: ../../notes-service
+    container_name: notes-service-gateway-test
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - backend-network
+    env_file:
+      - ./.env
+    environment:
+      - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
+      - MONGO_DATABASE=tdn-notes
+
   api-gateway:
     build: 
       context: ../
     container_name: api-gateway
     depends_on:
+      notes-service:
+        condition: service_started
       campaign-service:
         condition: service_started
       users-service:
@@ -140,6 +158,7 @@ services:
       - POLICY_SERVICE_URL=http://policy-service:8080
       - USERS_SERVICE_URL=http://users-service:8080
       - CAMPAIGN_SERVICE_URL=http://campaign-service:8080
+      - NOTES_SERVICE_URL=http://notes-service:8080
     command: ["python", "main.py"]
 
 networks:

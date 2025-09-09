@@ -102,11 +102,28 @@ services:
       - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
       - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
+  notes-service:
+    build:
+      context: ./notes-service
+    container_name: notes-service
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - backend-network
+    env_file:
+      - ./.env
+    environment:
+      - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
+      - MONGO_DATABASE=tdn-notes
+
   api-gateway:
     build: 
       context: ./api-gateway
     container_name: api-gateway
     depends_on:
+      notes-service:
+        condition: service_started
       campaign-service:
         condition: service_started
       users-service:
@@ -126,6 +143,7 @@ services:
       - POLICY_SERVICE_URL=http://policy-service:8080
       - USERS_SERVICE_URL=http://users-service:8080
       - CAMPAIGN_SERVICE_URL=http://campaign-service:8080
+      - NOTES_SERVICE_URL=http://notes-service:8080
 
 networks:
   backend-network:

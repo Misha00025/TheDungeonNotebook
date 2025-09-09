@@ -48,7 +48,7 @@ class TemplatesEndpoints:
         self._headers = headers
         if template_id is not None:
             self._url += f"/{template_id}"
-    
+
     def post(self, data) -> Response:
         return rq.post(self._url, headers=self._headers, data=data)
     
@@ -63,56 +63,70 @@ class TemplatesEndpoints:
 
 
 class CharactersEndpoints:
-    def __init__(self, url: str, headers, character_id: int = None):
+    def __init__(self, host: str, notes_host: str, url: str, headers, character_id: int = None):
+        self._host: str = host
+        self._notes_host: str = notes_host
         self._url: str = url + f"/characters"
         self._headers = headers
         if character_id is not None:
             self._url += f"/{character_id}"
 
+    @property
+    def url(self):
+        return self._host + self._url
+
     def templates(self, template_id = None) -> TemplatesEndpoints:
-        return TemplatesEndpoints(self._url, self._headers, template_id)
+        return TemplatesEndpoints(self.url, self._headers, template_id)
     
     def notes(self, note_id = None) -> NotesEndpoints:
-        return NotesEndpoints(self._url, self._headers, note_id)
+        return NotesEndpoints(self._notes_host + self._url, self._headers, note_id)
     
     def items(self, item_id = None) -> ItemsEndpoints:
-        return ItemsEndpoints(self._url, self._headers, item_id)
+        return ItemsEndpoints(self.url, self._headers, item_id)
     
     def post(self, data) -> Response:
-        return rq.post(self._url, headers=self._headers, data=data)
+        return rq.post(self.url, headers=self._headers, data=data)
     
     def get(self) -> Response:
-        return rq.get(self._url, headers=self._headers)
+        return rq.get(self.url, headers=self._headers)
     
     def patch(self, data) -> Response:
-        return rq.patch(self._url, headers=self._headers, data=data)
+        return rq.patch(self.url, headers=self._headers, data=data)
     
     def delete(self) -> Response:
-        return rq.delete(self._url, headers=self._headers)
+        return rq.delete(self.url, headers=self._headers)
 
 
 class CampaignService: 
-    def __init__(self, url: str, headers, group_id: int = None):
-        self._url: str = url + "/groups"
+    def __init__(self, host: str, notes_host: str, headers, group_id: int = None):
+        self._host: str = host
+        self._notes_host: str = notes_host
+        self._url: str = "/groups"
         self._headers = headers
         if group_id is not None:
             self._url += f"/{group_id}"
 
+    @property
+    def url(self):
+        return self._host + self._url
     
+    def notes(self, note_id = None) -> NotesEndpoints:
+        return NotesEndpoints(self._notes_host+self._url, note_id)
+
     def characters(self, character_id: int = None) -> CharactersEndpoints:
-        return CharactersEndpoints(self._url, self._headers, character_id)
+        return CharactersEndpoints(self._host, self._notes_host, self._url, self._headers, character_id)
     
     def items(self, item_id: int = None) -> ItemsEndpoints:
-        return ItemsEndpoints(self._url, self._headers, item_id)
+        return ItemsEndpoints(self.url, self._headers, item_id)
     
     def post(self, data) -> Response:
-        return rq.post(self._url, headers=self._headers, data=data)
+        return rq.post(self.url, headers=self._headers, data=data)
     
     def get(self) -> Response:
-        return rq.get(self._url, headers=self._headers)
+        return rq.get(self.url, headers=self._headers)
     
     def patch(self, data) -> Response:
-        return rq.patch(self._url, headers=self._headers, data=data)
+        return rq.patch(self.url, headers=self._headers, data=data)
     
     def delete(self) -> Response:
-        return rq.delete(self._url, headers=self._headers)
+        return rq.delete(self.url, headers=self._headers)

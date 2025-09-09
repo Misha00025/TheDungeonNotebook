@@ -33,18 +33,6 @@ public class CharlistMongoData : GroupEntityMongoData
 	public Dictionary<string, FieldMongoData> Fields { get; set; } = new();
 }
 
-public class NoteMongoData
-{
-	[BsonElement("header")]
-	public string Header = "";
-	[BsonElement("body")]
-	public string Body = "";
-	[BsonElement("addition_date")]
-	public DateTime AdditionDate;
-	[BsonElement("modified_date")]
-	public DateTime ModifyDate;
-}
-
 public class AmountedItemMongoData
 {
 	[BsonElement("name")]
@@ -60,9 +48,7 @@ public class AmountedItemMongoData
 }
 
 public class CharacterMongoData : CharlistMongoData
-{  
-	[BsonElement("notes")]
-	public List<NoteMongoData> Notes = new();
+{
 	[BsonElement("items")]
 	public List<AmountedItemMongoData> Items = new();
 }
