@@ -128,3 +128,34 @@ def _item(group_id: int, item_id: int):
             if not is_admin:
                 return forbidden()
             return make_response(services.groups(rq.headers, group_id).items(item_id).put())
+
+# Notes
+
+@route("groups/<int:group_id>/notes", ["GET", "POST"])
+def _group_notes(group_id: int):
+    success, is_admin, response = check_access_to_group(group_id, rq)
+    if not success:
+        return response
+    if not is_admin:
+        return forbidden()
+    match (rq.method):
+        case "GET":
+            return make_response(services.groups(rq.headers, group_id).notes().get())
+        case "POST":
+            return make_response(services.groups(rq.headers, group_id).notes().post(rq.data))
+
+
+@route("groups/<int:group_id>/notes/<int:note_id>", ["GET", "PUT", "DELETE"])
+def _group_note(group_id: int, note_id: int):
+    success, is_admin, response = check_access_to_group(group_id, rq)
+    if not success:
+        return response
+    if not is_admin:
+        return forbidden()
+    match (rq.method):
+        case "GET":
+            return make_response(services.groups(rq.headers, group_id).notes(note_id).get())
+        case "PUT":
+            return make_response(services.groups(rq.headers, group_id).notes(note_id).put(rq.data))
+        case "DELETE":
+            return make_response(services.groups(rq.headers, group_id).notes(note_id).delete())
