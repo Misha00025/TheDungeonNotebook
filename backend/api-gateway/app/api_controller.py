@@ -52,3 +52,12 @@ def route(url, methods, access: Access = Access.all):
         _urls[url] = (methods, f)
         return dec(f)
     return decorator
+
+from flask import request as rq, Response
+import requests
+
+def make_response(result : requests.Response):
+    try:
+        return result.json(), result.status_code
+    except requests.exceptions.JSONDecodeError:
+        return result.content, result.status_code

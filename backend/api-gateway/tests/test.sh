@@ -22,9 +22,9 @@ mkdir logs
 python test.py ${@:2} > logs/test.log
 
 docker-compose logs | grep "${MAIN_SERVICE}" > logs/server.log
-docker-compose logs | grep -v "mongo_db  " | grep -v "mysql_db  " | grep -v "${MAIN_SERVICE}" > logs/all.log
-docker-compose logs | grep "mongo_db  " > logs/db.log
-docker-compose logs | grep "mysql_db  " >> logs/db.log
+docker-compose logs | grep -v "mongo-db-gateway-test  " | grep -v "mysql-db-gateway-test  " | grep -v "${MAIN_SERVICE}" > logs/all.log
+docker-compose logs | grep "mongo-db-gateway-test  " > logs/db.log
+docker-compose logs | grep "mysql-db-gateway-test  " >> logs/db.log
 
 # Завершаем работу
 docker-compose down

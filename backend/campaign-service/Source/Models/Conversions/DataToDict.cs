@@ -62,18 +62,6 @@ public static class DataToDictExtensions
         return result;
     }
     
-    public static Dictionary<string, object?> ToDict(this NoteMongoData data, int index)
-    {
-        return new Dictionary<string, object?>()
-        {
-            {"id", index},
-            {"header", data.Header},
-            {"body", data.Body},
-            {"additionDate", data.AdditionDate},
-            {"modifyDate", data.ModifyDate}
-        };
-    }
-    
     public static Dictionary<string, object?> ToDict(this AmountedItemMongoData data, int index)
     {
         return new Dictionary<string, object?>()
@@ -85,12 +73,6 @@ public static class DataToDictExtensions
             {"amount", data.Amount},
             {"image_link", data.Image}
         };
-    }
-    
-    public static List<Dictionary<string, object?>> ToDict(this List<NoteMongoData> dataList, int startIndex = 0)
-    {
-        int index = startIndex;
-        return dataList.Select(e => e.ToDict(index++)).ToList();
     }
     
     public static List<Dictionary<string, object?>> ToDict(this List<AmountedItemMongoData> dataList, int startIndex = 0)
