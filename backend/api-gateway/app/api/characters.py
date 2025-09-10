@@ -44,7 +44,7 @@ def _character(group_id: int, character_id: int):
 
 
 @route("groups/<int:group_id>/characters/<int:character_id>/users", ["GET"])
-def _character_user(group_id: int, character_id: int):
+def _character_users(group_id: int, character_id: int):
     success, _, _, response = check_access_to_character(group_id, character_id, rq)
     if not success:
         return response
