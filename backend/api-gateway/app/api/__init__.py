@@ -14,6 +14,23 @@ def _get_api():
     return ok({"api_methods": get_routers_info()})
 
 
+@route("whoami", ["GET"])
+def _whoami():
+    _, at = extract_tokens(rq)
+    if at is None:
+        return unauthorized()
+    uid, gid = extract_ids(at)
+    res_id = None
+    access_type = "anonymous"
+    if uid is not None:
+        res_id = uid
+        access_type = "user"
+    elif gid is not None:
+        res_id = gid
+        access_type = "group"
+    return ok({"id": int(res_id) if res_id is not None else None, "type": access_type})
+
+
 @route("auth/register", ["POST"])
 def _register():
     result = services.auth(rq.headers).register(rq.data)
@@ -34,25 +51,6 @@ def _refresh():
     result = services.auth(rq.headers).refresh(rt)
     return make_response(result)
 
-
-@route("users/<int:user_id>", ["GET", "PATCH", "POST"])
-def _user(user_id: int):
-    _, at = extract_tokens(rq)
-    if at is None:
-        return unauthorized()
-    uid, _ = extract_ids(at)
-    users = services.users(rq.headers, user_id)
-    match(rq.method):
-        case "GET":
-            return make_response(users.get())
-        case "PATCH":
-            if int(uid) != user_id:
-                return forbidden()
-            return make_response(users.patch(rq.data))
-        case "POST":
-            if int(uid) != user_id:
-                return forbidden()
-            return make_response(users.post(rq.data))
-
 from .groups import *
 from .characters import *
+from .users import *

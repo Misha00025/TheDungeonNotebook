@@ -9,11 +9,11 @@ class UsersService:
             self._url += f"/{user_id}"
         self._headers = headers
     
-    def post(self, data) -> Response:
+    def post(self, data=None, json=None) -> Response:
         return rq.post(self._url, headers=self._headers, data=data)
     
-    def get(self) -> Response:
-        return rq.get(self._url, headers=self._headers)
+    def get(self, params = None) -> Response:
+        return rq.get(self._url, headers=self._headers, params=params)
     
     def patch(self, data) -> Response:
         return rq.patch(self._url, headers=self._headers, data=data)

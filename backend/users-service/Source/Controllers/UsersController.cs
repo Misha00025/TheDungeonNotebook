@@ -32,11 +32,13 @@ public class UserController : BaseController
     }
     
     [HttpGet]
-    public ActionResult GetAll([FromQuery(Name = "ids")]IEnumerable<int>? ids = null)
+    public ActionResult GetAll([FromQuery(Name = "ids")]IEnumerable<int>? ids = null, [FromQuery(Name = "nickname")] string? nickname = null)
     {
         var users = _dbContext.Users.Where(_ => true);
         if (ids != null)
-            users = users.Where(e => ids.Contains(e.Id));        
+            users = users.Where(e => ids.Contains(e.Id));
+        if (nickname != null)
+            users = users.Where(e => e.Nickname == nickname);
         return Ok(new Dictionary<string, object?>()
         {
             {"users", users.Select(e => e.ToDict()).ToList()}
@@ -50,7 +52,7 @@ public class UserController : BaseController
             return BadRequest();
         var user = _dbContext.Users.Where(e => e.Nickname == data.Nickname || e.Id == data.Id).FirstOrDefault();
         if (user != null)
-            return Conflict("User with this username already exist");
+            return Conflict("User with this nickname already exist");
         user = new UserData()
         {
             Id = (int)data.Id,
