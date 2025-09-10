@@ -20,7 +20,7 @@ def _post_user():
             if uid is None:
                 return forbidden()
             data: dict = rq.get_json()
-            data["userId"] = int(uid) 
+            data["id"] = int(uid) 
             return make_response(users.post(json=data))
 
 
