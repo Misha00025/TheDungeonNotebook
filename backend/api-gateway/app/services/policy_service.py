@@ -9,6 +9,13 @@ class CharacterPolicesEndpoints:
         self._full_url = url + "/characters"
         self._headers = headers
 
+    def get(self, group_id: int, character_id: int):
+        params = {}
+        params["groupId"] = group_id
+        params["characterId"] = character_id
+        return rq.get(self._full_url, headers=self._headers, params=params)
+
+
     def put(self, group_id: int, user_id: int, character_id: int, data: bytes) -> Response:
         params = json.loads(data)
         params["groupId"] = group_id

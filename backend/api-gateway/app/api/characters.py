@@ -43,15 +43,22 @@ def _character(group_id: int, character_id: int):
             return make_response(services.groups(rq.headers, group_id).characters(character_id).delete())
 
 
-# @route("groups/<int:group_id>/characters/<int:character_id>/users", ["GET"])
-# def _character_users(group_id: int, character_id: int):
-#     success, _, response = check_access_to_character(group_id, character_id, rq)
-#     if not success:
-#         return response
-#     pres = services.polices({}).groups().characters().get(group_id=group_id)
-#     if not pres.ok:
-#         return None
-
+@route("groups/<int:group_id>/characters/<int:character_id>/users", ["GET"])
+def _character_user(group_id: int, character_id: int):
+    success, _, _, response = check_access_to_character(group_id, character_id, rq)
+    if not success:
+        return response
+    pres = services.polices({}).groups().characters().get(group_id, character_id)
+    if not pres.ok:
+        return None
+    group_ids: list = pres.json()["users"]
+    group_users: list[dict] = []
+    for data in group_ids:
+        res = services.users(rq.headers, data["userId"]).get()
+        if res.ok:
+            group_users.append({"user": res.json(), "canWrite": data["canWrite"]})
+    return ok({"users": group_users})
+        
 
 @route("groups/<int:group_id>/characters/<int:character_id>/users/<int:user_id>", ["PUT", "DELETE"])
 def _character_user(group_id: int, character_id: int, user_id: int):

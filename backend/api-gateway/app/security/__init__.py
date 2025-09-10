@@ -79,7 +79,7 @@ def check_access_to_group(group_id, rq, characters: list[dict] = None) -> tuple[
         is_admin = bool(group_access["isAdmin"])
     return True, is_admin, None
 
-def check_access_to_character(group_id, character_id, rq) -> tuple[bool, bool, object]:
+def check_access_to_character(group_id, character_id, rq) -> tuple[bool, bool, bool, object]:
     '''
         return: status, is_admin, can_write, response
     '''

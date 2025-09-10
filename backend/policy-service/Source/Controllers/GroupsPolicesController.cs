@@ -86,6 +86,17 @@ public class GroupsPolicesController : BaseController
         return result;
     }
     
+    [HttpGet("characters")]
+    public ActionResult GetCharacterRules([FromQuery] int groupId, [FromQuery] int? userId = null, [FromQuery] int? characterId = null)
+    {
+        var characters = _dbContext.Characters.Where(e => e.GroupId == groupId);
+        if (userId != null)
+            characters = characters.Where(e => e.UserId == (int)userId);
+        if (characterId != null)
+            characters = characters.Where(e => e.CharacterId == (int)characterId);
+        return Ok(new { users = characters.Select(e => new { userId = e.UserId, canWrite = e.CanWrite }).ToList() });
+    }
+    
     [HttpPut("characters")]
     public ActionResult PutCharacterRule([FromBody] CharacterPutData data)
     {
