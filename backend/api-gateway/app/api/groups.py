@@ -127,7 +127,7 @@ def _item(group_id: int, item_id: int):
         case "DELETE":
             if not is_admin:
                 return forbidden()
-            return make_response(services.groups(rq.headers, group_id).items(item_id).put())
+            return make_response(services.groups(rq.headers, group_id).items(item_id).delete())
 
 # Notes
 
