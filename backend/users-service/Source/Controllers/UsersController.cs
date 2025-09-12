@@ -37,8 +37,15 @@ public class UserController : BaseController
         var users = _dbContext.Users.Where(_ => true);
         if (ids != null)
             users = users.Where(e => ids.Contains(e.Id));
-        if (nickname != null)
-            users = users.Where(e => e.Nickname == nickname);
+        if (!string.IsNullOrEmpty(nickname))
+        {
+            users = users.Where(u => u.Nickname.Contains(nickname)).AsQueryable();
+            users = users
+                .OrderByDescending(u => u.Nickname == nickname) // Точное совпадение
+                .ThenByDescending(u => u.Nickname.StartsWith(nickname)) // Начинается с nickname
+                .ThenBy(u => u.Nickname.Length) // Затем по длине nickname
+                .ThenBy(u => u.Nickname); // Алфавитная сортировка
+        }
         return Ok(new Dictionary<string, object?>()
         {
             {"users", users.Select(e => e.ToDict()).ToList()}
