@@ -20,12 +20,15 @@ public static class DataToDictExtensions
         foreach (var name in fields.Keys)
         {
             var field = fields[name];
-            result.Add(name, new Dictionary<string, object?>()
+            var addedField = new Dictionary<string, object?>()
             {
                 {"name", field.Name},
                 {"description", field.Description},
                 {"value", field.Value},
-            });
+            };
+            if (field.Category != null)
+                addedField.Add("category", field.Category);
+            result.Add(name, addedField);
         }
         return result;
     }
