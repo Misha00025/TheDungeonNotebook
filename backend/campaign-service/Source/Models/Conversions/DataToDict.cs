@@ -56,7 +56,7 @@ public static class DataToDictExtensions
         var result = data.ToDict(mongoData as GroupEntityMongoData);
         result.Add("fields", mongoData?.Fields.ToDict());
         if (mongoData?.Schema != null)
-            result.Add("schema", mongoData?.Schema.Select(e => e.ToDict()).ToList());
+            result.Add("schema", new { categories = mongoData?.Schema.Categories.Select(e => e.ToDict()).ToList() });
         else
             result.Add("schema", new { });
         return result;

@@ -25,12 +25,17 @@ public class TemplatesController : GroupsBaseController
         public List<string> Fields { get; set; }
     }
 
+    public struct SchemaPostData
+    {
+        public List<CategorySchemaPostData> Categories { get; set; }
+    }
+
     public struct CharlistPostData
     {
         public string Name { get; set; }
         public string Description { get; set; }
         public Dictionary<string, FieldPostData> Fields { get; set; }
-        public List<CategorySchemaPostData>? Schema { get; set; }
+        public SchemaPostData? Schema { get; set; }
     }
 
     private EntityContext _dbContext;
@@ -53,16 +58,17 @@ public class TemplatesController : GroupsBaseController
         return field;
     }
     
-    private List<CategorySchema> ConvertSchema(List<CategorySchemaPostData>? schemaPost)
+    private TemplateSchema ConvertSchema(SchemaPostData? schemaPost)
     {
-        if (schemaPost == null)
-            return new List<CategorySchema>();
-        return schemaPost.Select(s => new CategorySchema
-        {
-            Key = s.Key,
-            Name = s.Name,
-            Fields = s.Fields
-        }).ToList();
+        var schema = new TemplateSchema();
+        if (schemaPost != null)
+            schema.Categories = schemaPost.Value.Categories.Select(s => new CategorySchema
+            {
+                Key = s.Key,
+                Name = s.Name,
+                Fields = s.Fields
+            }).ToList();
+        return schema;
     }
     
     private IMongoCollection<CharlistMongoData> GetCollection() =>  _mongo.GetCollection<CharlistMongoData>(MongoCollections.Templates);

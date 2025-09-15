@@ -39,12 +39,17 @@ public class CategorySchema
     public List<string> Fields { get; set; } = new List<string>();
 }
 
+public class TemplateSchema
+{
+	public List<CategorySchema> Categories { get; set; } = new();
+}
+
 public class CharlistMongoData : GroupEntityMongoData 
 { 
 	[BsonElement("fields")]
 	public Dictionary<string, FieldMongoData> Fields { get; set; } = new();
 	[BsonElement("schema")]
-    public List<CategorySchema>? Schema { get; set; } = new();
+    public TemplateSchema? Schema { get; set; } = new();
 }
 
 public class AmountedItemMongoData
