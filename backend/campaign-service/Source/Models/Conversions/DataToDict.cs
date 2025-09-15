@@ -73,6 +73,7 @@ public static class DataToDictExtensions
     public static Dictionary<string, object?> ToDict(this CharacterData data, CharacterMongoData? mongoData)
     {
         var result = data.ToDict(mongoData as CharlistMongoData);
+        result.Add("templateId", data.TemplateId);
         return result;
     }
     
