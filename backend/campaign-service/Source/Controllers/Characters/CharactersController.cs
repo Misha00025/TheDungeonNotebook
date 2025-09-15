@@ -16,13 +16,13 @@ public class CharactersController : CharactersBaseController
         public string Name { get; set; }
         public string Description { get; set; }
         public int? TemplateId { get; set; }
-        public int? OwnerId { get; set; }
     }
     
     public struct FieldPatchData
     {
         public string? Name { get; set; }
         public string? Description { get; set; }
+        public string? Category { get; set; }
         public int? Value { get; set; }
     }
     
@@ -69,7 +69,7 @@ public class CharactersController : CharactersBaseController
                 Description = data.Description,
                 Fields = charlist.Fields
             };
-            var characterData = new CharacterData(){ GroupId = groupId, OwnerId = data.OwnerId, TemplateId = (int)data.TemplateId };
+            var characterData = new CharacterData(){ GroupId = groupId, TemplateId = (int)data.TemplateId };
             GetCollection().InsertOne(character);
             characterData.UUID = character.Id.ToString();
             DbContext.Set<CharacterData>().Add(characterData);
@@ -85,15 +85,6 @@ public class CharactersController : CharactersBaseController
         if (TryGetCharacter(groupId, characterId, out var data, out var character))
             return Ok(data.ToDict(character));
         return NotFound("Character or Group not found");
-    }
-    
-    private bool TryChangeOwnerId(CharacterData cd, CharacterPatchData data)
-    {
-        var ok = data.OwnerId != null;
-        if (data.OwnerId == -1)
-            data.OwnerId = null;
-        cd.OwnerId = data.OwnerId;
-        return ok;
     }
     
     private bool TryChangeProperties(CharacterMongoData character, CharacterPatchData data)
@@ -130,6 +121,7 @@ public class CharactersController : CharactersBaseController
                     existField.Name = value.Name != null ? value.Name : existField.Name;
                     existField.Description = value.Description != null ? value.Description : existField.Description;
                     existField.Value = value.Value != null ? (int)value.Value : existField.Value;
+                    existField.Category = value.Category != null ? value.Category : existField.Category;
                 }
             }
             else
@@ -145,6 +137,8 @@ public class CharactersController : CharactersBaseController
                     Description = value.Description!,
                     Value = value.Value != null ? (int)value.Value : 0
                 };
+                if (value.Category != null)
+                    newField.Category = value.Category;
                 character.Fields.Add(field.Key, newField);
             }
         }
@@ -156,7 +150,7 @@ public class CharactersController : CharactersBaseController
     {
         if (TryGetCharacter(groupId, characterId, out var characterData, out var character))
         {
-            var anythingChanged = TryChangeOwnerId(characterData, data);
+            var anythingChanged = false;
             anythingChanged = anythingChanged || TryChangeProperties(character, data);
             anythingChanged = (anythingChanged && data.Fields == null) || TryChangeFields(character, data);
             if (anythingChanged)

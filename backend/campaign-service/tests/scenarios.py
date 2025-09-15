@@ -104,7 +104,12 @@ def with_charlist_templates_scenario():
         "fields":{
             "strong":{"name": "Strong", "description": "This is strong", "value": 10},
             "agility":{"name": "Agility", "description": "This is agility", "value": 12},
-        }
+            "intellect":{"name": "Intellect", "description": "This is intellect", "value": 12},
+        },
+        "schema":[
+            {"key": "physics", "name": "Physics", "fields": ["strong", "agility"]},
+            {"key": "mental", "name": "Mental", "fields": ["intellect"]}
+        ]
     }
     new_template_2 = new_template.copy()
     new_template["fields"]["intellect"] = {"name": "Intellect", "description": "This is intellect", "value": 100000}

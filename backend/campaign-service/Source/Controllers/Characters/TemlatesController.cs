@@ -18,11 +18,19 @@ public class TemplatesController : GroupsBaseController
         public int Value { get; set; }
     }
 
+    public struct CategorySchemaPostData
+    {
+        public string Key { get; set; }
+        public string Name { get; set; }
+        public List<string> Fields { get; set; }
+    }
+
     public struct CharlistPostData
     {
         public string Name { get; set; }
         public string Description { get; set; }
         public Dictionary<string, FieldPostData> Fields { get; set; }
+        public List<CategorySchemaPostData>? Schema { get; set; }
     }
 
     private EntityContext _dbContext;
@@ -36,12 +44,25 @@ public class TemplatesController : GroupsBaseController
     
     private FieldMongoData CreateFieldMongoData(FieldPostData data)
     {
-        return new FieldMongoData()
+        var field = new FieldMongoData()
         {
             Name = data.Name,
             Description = data.Description,
-            Value = data.Value,
+            Value = data.Value
         };
+        return field;
+    }
+    
+    private List<CategorySchema> ConvertSchema(List<CategorySchemaPostData>? schemaPost)
+    {
+        if (schemaPost == null)
+            return new List<CategorySchema>();
+        return schemaPost.Select(s => new CategorySchema
+        {
+            Key = s.Key,
+            Name = s.Name,
+            Fields = s.Fields
+        }).ToList();
     }
     
     private IMongoCollection<CharlistMongoData> GetCollection() =>  _mongo.GetCollection<CharlistMongoData>(MongoCollections.Templates);
@@ -75,7 +96,8 @@ public class TemplatesController : GroupsBaseController
             {
                 Name = data.Name,
                 Description = data.Description,
-                Fields = Convert(data.Fields)
+                Fields = Convert(data.Fields),
+                Schema = ConvertSchema(data.Schema)
             };
             var set = _dbContext.Set<CharlistData>();
             var collection = GetCollection();
@@ -130,6 +152,7 @@ public class TemplatesController : GroupsBaseController
             mongoData.Name = data.Name;
             mongoData.Description = data.Description;
             mongoData.Fields = Convert(data.Fields);
+            mongoData.Schema = ConvertSchema(data.Schema);
             var collection = GetCollection();
 		    var filter = Builders<CharlistMongoData>.Filter.Eq("_id", mongoData.Id);
             collection.ReplaceOne(filter, mongoData);

@@ -41,10 +41,24 @@ public static class DataToDictExtensions
         };
     }
     
+    public static object ToDict(this CategorySchema data)
+    {
+        return new
+        {
+            fields = data.Fields,
+            name = data.Name,
+            key = data.Key
+        };
+    }
+    
     public static Dictionary<string, object?> ToDict(this GroupEntityData data, CharlistMongoData? mongoData)
     {
         var result = data.ToDict(mongoData as GroupEntityMongoData);
         result.Add("fields", mongoData?.Fields.ToDict());
+        if (mongoData?.Schema != null)
+            result.Add("schema", mongoData?.Schema.Select(e => e.ToDict()).ToList());
+        else
+            result.Add("schema", new { });
         return result;
     }
     
