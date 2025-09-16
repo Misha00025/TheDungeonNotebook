@@ -89,8 +89,7 @@ public class CharactersController : CharactersBaseController
             {
                 var charField = result.Fields[field.Key];
                 charField.Name = field.Value.Name;
-                if (charField.Description == null)
-                    charField.Description = field.Value.Description;
+                charField.Description = field.Value.Description;
                 result.Fields[field.Key] = charField;
             }
             else
@@ -168,7 +167,6 @@ public class CharactersController : CharactersBaseController
                     return false;
                 var newField = new FieldMongoData()
                 {
-                    Description = value.Description!,
                     Value = value.Value != null ? (int)value.Value : 0
                 };
                 if (value.Category != null)
