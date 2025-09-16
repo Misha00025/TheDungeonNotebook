@@ -50,7 +50,7 @@ public class CharactersController : CharactersBaseController
     }
     
     [HttpPost]
-    public ActionResult PostCharacter(int groupId, [FromBody] CharacterPostData data)
+    public ActionResult PostCharacter(int groupId, [FromBody] CharacterPostData data, [FromQuery] bool copyTemplate = false)
     {
         if (data.TemplateId == null)
             return BadRequest("TemplateId must be not null");
@@ -66,9 +66,10 @@ public class CharactersController : CharactersBaseController
             var character = new CharacterMongoData()
             {
                 Name = data.Name,
-                Description = data.Description,
-                Fields = charlist.Fields
+                Description = data.Description
             };
+            if (copyTemplate)
+                character.Fields = charlist.Fields;
             var characterData = new CharacterData(){ GroupId = groupId, TemplateId = (int)data.TemplateId };
             GetCollection().InsertOne(character);
             characterData.UUID = character.Id.ToString();
@@ -78,12 +79,48 @@ public class CharactersController : CharactersBaseController
         }
         return NotFound("Group not found");
     }
-    
+
+    private CharacterMongoData CompareCharacterWithTemplate(CharacterMongoData character, CharlistMongoData charlist)
+    {
+        var result = character;
+        foreach (var field in charlist.Fields)
+        {
+            if (result.Fields.ContainsKey(field.Key))
+            {
+                var charField = result.Fields[field.Key];
+                if (charField.Name == null)
+                    charField.Name = field.Value.Name;
+                if (charField.Description == null)
+                    charField.Description = field.Value.Description;
+                result.Fields[field.Key] = charField;
+            }
+            else
+            {
+                result.Fields.Add(field.Key, field.Value);
+            }
+        }
+        result.Schema = charlist.Schema;
+        return result;
+    }
+
     [HttpGet("{characterId}")]
-    public ActionResult GetCharacter(int groupId, int characterId)
+    public ActionResult GetCharacter(int groupId, int characterId, [FromQuery] bool witEmptyFields = true)
     {
         if (TryGetCharacter(groupId, characterId, out var data, out var character))
+        {
+            var charlistSet = DbContext.Set<CharlistData>();
+            var charlistData = charlistSet.Where(e => e.GroupId == groupId && e.Id == data.TemplateId).FirstOrDefault();
+            if (witEmptyFields)
+            {
+                if (charlistData == null)
+                    return NotFound("Template not found");
+                var charlist = Mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, charlistData.UUID);
+                if (charlist == null)
+                    return NotFound("Template document not found");
+                character = CompareCharacterWithTemplate(character, charlist);
+            }
             return Ok(data.ToDict(character));
+        }
         return NotFound("Character or Group not found");
     }
     
