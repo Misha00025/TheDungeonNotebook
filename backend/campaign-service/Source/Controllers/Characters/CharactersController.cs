@@ -101,22 +101,25 @@ public class CharactersController : CharactersBaseController
         return result;
     }
 
+    private CharacterMongoData AsCharacterWithTemplate(CharacterData data, CharacterMongoData character)
+    {
+        var charlistSet = DbContext.Set<CharlistData>();
+        var charlistData = charlistSet.Where(e => e.GroupId == data.GroupId && e.Id == data.TemplateId).FirstOrDefault();
+        if (charlistData == null)
+            return character;
+        var charlist = Mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, charlistData.UUID);
+        if (charlist == null)
+            return character;
+        return CompareCharacterWithTemplate(character, charlist);
+    }
+
     [HttpGet("{characterId}")]
     public ActionResult GetCharacter(int groupId, int characterId, [FromQuery] bool witEmptyFields = true)
     {
         if (TryGetCharacter(groupId, characterId, out var data, out var character))
         {
-            var charlistSet = DbContext.Set<CharlistData>();
-            var charlistData = charlistSet.Where(e => e.GroupId == groupId && e.Id == data.TemplateId).FirstOrDefault();
             if (witEmptyFields)
-            {
-                if (charlistData == null)
-                    return NotFound("Template not found");
-                var charlist = Mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, charlistData.UUID);
-                if (charlist == null)
-                    return NotFound("Template document not found");
-                character = CompareCharacterWithTemplate(character, charlist);
-            }
+                character = AsCharacterWithTemplate(data, character);
             return Ok(data.ToDict(character));
         }
         return NotFound("Character or Group not found");
@@ -178,7 +181,7 @@ public class CharactersController : CharactersBaseController
     }
           
     [HttpPatch("{characterId}")]
-    public ActionResult PatchCharacter(int groupId, int characterId, CharacterPatchData data)
+    public ActionResult PatchCharacter(int groupId, int characterId, CharacterPatchData data, [FromQuery] bool witEmptyFields = true)
     {
         if (TryGetCharacter(groupId, characterId, out var characterData, out var character))
         {
@@ -190,6 +193,8 @@ public class CharactersController : CharactersBaseController
                 var filter = Builders<CharacterMongoData>.Filter.Eq("_id", character.Id);
                 GetCollection().ReplaceOne(filter, character);
                 DbContext.SaveChanges();
+                if (witEmptyFields)
+                    character = AsCharacterWithTemplate(characterData, character);
                 return Ok(characterData.ToDict(character));
             }
             return BadRequest("Nothing to do");
@@ -198,7 +203,7 @@ public class CharactersController : CharactersBaseController
     }
     
     [HttpDelete("{characterId}")]
-    public ActionResult DeleteCharacter(int groupId, int characterId)
+    public ActionResult DeleteCharacter(int groupId, int characterId, [FromQuery] bool witEmptyFields = true)
     {
         if (TryGetCharacter(groupId, characterId, out var data, out var character))
         {
@@ -206,6 +211,8 @@ public class CharactersController : CharactersBaseController
             DbContext.Remove(data);
             DbContext.SaveChanges();
             GetCollection().DeleteOne(filter);
+            if (witEmptyFields)
+                character = AsCharacterWithTemplate(data, character);
             return Ok(data.ToDict(character));
         }
         return NotFound("Character or Group not found");
