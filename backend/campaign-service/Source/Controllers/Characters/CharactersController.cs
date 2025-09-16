@@ -88,8 +88,7 @@ public class CharactersController : CharactersBaseController
             if (result.Fields.ContainsKey(field.Key))
             {
                 var charField = result.Fields[field.Key];
-                if (charField.Name == null)
-                    charField.Name = field.Value.Name;
+                charField.Name = field.Value.Name;
                 if (charField.Description == null)
                     charField.Description = field.Value.Description;
                 result.Fields[field.Key] = charField;
@@ -152,10 +151,9 @@ public class CharactersController : CharactersBaseController
                 else
                 {   
                     var value = (FieldPatchData)tmp;
-                    if (value.Name == null && value.Description == null && value.Value == null) 
+                    if (value.Name == null && value.Description == null && value.Value == null && value.Category == null) 
                         return false;
                     var existField = character.Fields[field.Key];
-                    existField.Name = value.Name != null ? value.Name : existField.Name;
                     existField.Description = value.Description != null ? value.Description : existField.Description;
                     existField.Value = value.Value != null ? (int)value.Value : existField.Value;
                     existField.Category = value.Category != null ? value.Category : existField.Category;
@@ -170,7 +168,6 @@ public class CharactersController : CharactersBaseController
                     return false;
                 var newField = new FieldMongoData()
                 {
-                    Name = value.Name!,
                     Description = value.Description!,
                     Value = value.Value != null ? (int)value.Value : 0
                 };
