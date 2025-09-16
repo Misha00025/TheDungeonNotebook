@@ -156,6 +156,7 @@ public class CharactersController : CharactersBaseController
                     if (value.Name == null && value.Description == null && value.Value == null && value.Category == null) 
                         return false;
                     var existField = character.Fields[field.Key];
+                    existField.Name = value.Name != null ? value.Name : existField.Name;
                     existField.Description = value.Description != null ? value.Description : existField.Description;
                     existField.Value = value.Value != null ? (int)value.Value : existField.Value;
                     existField.Category = value.Category != null ? value.Category : existField.Category;
@@ -187,6 +188,13 @@ public class CharactersController : CharactersBaseController
         {
             var anythingChanged = false;
             anythingChanged = anythingChanged || TryChangeProperties(character, data);
+            var charlistSet = DbContext.Set<CharlistData>();
+            var charlistData = charlistSet.Where(e => e.GroupId == groupId && e.Id == characterData.TemplateId).FirstOrDefault();
+            if (charlistData == null)
+                return NotFound("Template not found");
+            var charlist = Mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, charlistData.UUID);
+            if (charlist == null)
+                return NotFound("Template document not found");
             anythingChanged = (anythingChanged && data.Fields == null) || TryChangeFields(character, data);
             if (anythingChanged)
             {
