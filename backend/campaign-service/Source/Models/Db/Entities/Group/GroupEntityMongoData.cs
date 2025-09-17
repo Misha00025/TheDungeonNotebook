@@ -1,5 +1,4 @@
 using MongoDB.Bson.Serialization.Attributes;
-using Tdn.Models;
 
 namespace Tdn.Db.Entities;
 
@@ -10,17 +9,34 @@ public class GroupEntityMongoData : MongoDbContext.MongoEntity
 	[BsonElement("description")]
 	public string Description = "";
 }
-public class FieldMongoData 
+
+public class NamedMongoElement
 {
 	[BsonElement("name")]
+	[BsonIgnoreIfDefault]
 	public string Name = "";
+	
 	[BsonElement("description")]
+	[BsonIgnoreIfDefault]
 	public string Description = "";
+}
+
+
+[BsonKnownTypes(typeof(PropertyMongoData))]
+public class FieldMongoData : NamedMongoElement
+{
 	[BsonElement("category")]
 	public string? Category = null;
 	[BsonElement("value")]
 	public int Value;
 }
+
+public class PropertyMongoData : FieldMongoData
+{
+	[BsonElement("max_value")]
+	public int MaxValue;
+}
+
 public class ItemMongoData : GroupEntityMongoData 
 {
 	[BsonElement("price")]
@@ -48,16 +64,13 @@ public class CharlistMongoData : GroupEntityMongoData
 { 
 	[BsonElement("fields")]
 	public Dictionary<string, FieldMongoData> Fields { get; set; } = new();
+	
 	[BsonElement("schema")]
     public TemplateSchema? Schema { get; set; } = new();
 }
 
-public class AmountedItemMongoData
+public class AmountedItemMongoData : NamedMongoElement
 {
-	[BsonElement("name")]
-	public string Name = "";
-	[BsonElement("description")]
-	public string Description = "";
 	[BsonElement("amount")]
 	public int Amount;
 	[BsonElement("price")]

@@ -16,6 +16,7 @@ public class TemplatesController : GroupsBaseController
         public string Name { get; set; } 
         public string Description { get; set; }
         public int Value { get; set; }
+        public int? MaxValue { get; set; }
     }
 
     public struct CategorySchemaPostData
@@ -49,11 +50,20 @@ public class TemplatesController : GroupsBaseController
     
     private FieldMongoData CreateFieldMongoData(FieldPostData data)
     {
-        var field = new FieldMongoData()
+    
+        var field = data.MaxValue == null ?  
+        new FieldMongoData()
         {
             Name = data.Name,
             Description = data.Description,
             Value = data.Value
+        } : 
+        new PropertyMongoData()
+        {
+            Name = data.Name,
+            Description = data.Description,
+            Value = data.Value,
+            MaxValue = (int)data.MaxValue
         };
         return field;
     }

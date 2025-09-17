@@ -105,6 +105,7 @@ def with_charlist_templates_scenario():
             "strong":{"name": "Strong", "description": "This is strong", "value": 10},
             "agility":{"name": "Agility", "description": "This is agility", "value": 12},
             "intellect":{"name": "Intellect", "description": "This is intellect", "value": 12},
+            "health": {"name": "Health", "description": "This is health", "value": 10, "maxValue": 20}
         },
         "schema":{
             "categories": [
@@ -140,6 +141,7 @@ def with_characters_scenario():
         "fields":{
             "strong":{"name": "Strong", "description": "This is strong", "value": 10},
             "agility":{"name": "Agility", "description": "This is agility", "value": 12},
+            "health": {"name": "Health", "description": "This is health", "value": 10, "maxValue": 20}
         }
     }
     new_character = {
@@ -154,13 +156,14 @@ def with_characters_scenario():
         "fields":{
             "strong": {"value": 15},
             "agility": None,
-            "intellect": {"name": "Intellect", "description": "You stupid", "value": -1}
+            "intellect": {"name": "Intellect", "description": "You stupid", "value": -1},
+            "mana": {"name": "Mana", "description": "Mana", "value": 0, "maxValue": 20}
         }
     }
     wrong_update_1 = {
         "name": "Samson",
         "fields":{
-            "agility": {"name": "Test"}
+            "heh": {"name": "Test"}
         }
     }
     wrong_update_2 = {}

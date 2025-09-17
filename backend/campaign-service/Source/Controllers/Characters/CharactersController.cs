@@ -24,6 +24,7 @@ public class CharactersController : CharactersBaseController
         public string? Description { get; set; }
         public string? Category { get; set; }
         public int? Value { get; set; }
+        public int? MaxValue { get; set; }
     }
     
     public struct CharacterPatchData
@@ -135,9 +136,10 @@ public class CharactersController : CharactersBaseController
         return ok;
     } 
     
-    private bool TryChangeFields(CharacterMongoData character, CharacterPatchData data)
+    private bool TryChangeFields(CharacterMongoData character, CharlistMongoData template, CharacterPatchData data, out List<string> errors)
     {
-        var allFieldsCorrect = true;
+        var doSomething = false;
+        errors = new();
         if (data.Fields == null || data.Fields.Count == 0)
             return false;
         foreach (var field in data.Fields)
@@ -153,32 +155,56 @@ public class CharactersController : CharactersBaseController
                 else
                 {   
                     var value = (FieldPatchData)tmp;
-                    if (value.Name == null && value.Description == null && value.Value == null && value.Category == null) 
-                        return false;
-                    var existField = character.Fields[field.Key];
+                    if (value.Name == null && value.Description == null && value.Value == null && value.Category == null && value.MaxValue == null) 
+                        continue;
+                    FieldMongoData existField = character.Fields[field.Key];
+                    if (value.MaxValue != null && existField is PropertyMongoData)
+                        ((PropertyMongoData)existField).MaxValue = (int)value.MaxValue;
                     existField.Name = value.Name != null ? value.Name : existField.Name;
                     existField.Description = value.Description != null ? value.Description : existField.Description;
                     existField.Value = value.Value != null ? (int)value.Value : existField.Value;
                     existField.Category = value.Category != null ? value.Category : existField.Category;
+                    doSomething = true;
                 }
             }
             else
             {
                 if (tmp == null)
-                    return false;
-                var value = (FieldPatchData)tmp;
-                if (value.Name == null || value.Description == null)
-                    return false;
-                var newField = new FieldMongoData()
                 {
-                    Value = value.Value != null ? (int)value.Value : 0
-                };
-                if (value.Category != null)
-                    newField.Category = value.Category;
-                character.Fields.Add(field.Key, newField);
+                    errors.Add($"Can't delete field with key '{field.Key}': this field does not exist or set as default");
+                    continue;
+                }
+                var value = (FieldPatchData)tmp;
+                var isDefaultField = template.Fields.ContainsKey(field.Key);
+                if (isDefaultField)
+                {
+                    var newField = template.Fields[field.Key];
+                    if (value.MaxValue != null && newField is PropertyMongoData)
+                        ((PropertyMongoData)newField).MaxValue = (int)value.MaxValue;
+                    newField.Value = value.Value != null ? (int)value.Value : newField.Value;
+                    character.Fields.Add(field.Key, newField);
+                }
+                else
+                {
+                    if (value.Name == null || value.Description == null)
+                    {
+                        errors.Add($"Can't create field with key '{field.Key}': name and description must be not null");
+                        continue;
+                    }
+                    var newField = value.MaxValue == null ? 
+                        new FieldMongoData():
+                        new PropertyMongoData() { MaxValue = value.MaxValue != null ? (int)value.MaxValue : 0 };
+                    if (value.Category != null)
+                        newField.Category = value.Category;
+                    newField.Name = value.Name == null ? "" : value.Name;
+                    newField.Description = value.Description == null ? "" : value.Description;
+                    newField.Value = value.Value != null ? (int)value.Value : 0;
+                    character.Fields.Add(field.Key, newField);
+                }
+                doSomething = true;
             }
         }
-        return allFieldsCorrect;
+        return doSomething;
     }
           
     [HttpPatch("{characterId}")]
@@ -195,7 +221,8 @@ public class CharactersController : CharactersBaseController
             var charlist = Mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, charlistData.UUID);
             if (charlist == null)
                 return NotFound("Template document not found");
-            anythingChanged = (anythingChanged && data.Fields == null) || TryChangeFields(character, data);
+            var fieldsChanged = TryChangeFields(character, charlist, data, out var errors);
+            anythingChanged = (anythingChanged && data.Fields == null) || fieldsChanged;
             if (anythingChanged)
             {
                 var filter = Builders<CharacterMongoData>.Filter.Eq("_id", character.Id);
@@ -203,7 +230,10 @@ public class CharactersController : CharactersBaseController
                 DbContext.SaveChanges();
                 if (witEmptyFields)
                     character = AsCharacterWithTemplate(characterData, character);
-                return Ok(characterData.ToDict(character));
+                var result = characterData.ToDict(character);
+                if (errors.Count > 0)
+                    result.Add("errors", errors);
+                return Ok(result);
             }
             return BadRequest("Nothing to do");
         }
