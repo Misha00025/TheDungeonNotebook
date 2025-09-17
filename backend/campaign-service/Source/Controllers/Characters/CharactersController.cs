@@ -151,6 +151,7 @@ public class CharactersController : CharactersBaseController
                 if (tmp == null)
                 {
                     character.Fields.Remove(field.Key);
+                    doSomething = true;
                 }
                 else
                 {   
