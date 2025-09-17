@@ -29,20 +29,19 @@ public class FieldMongoData : NamedMongoElement
 	public string? Category = null;
 	[BsonElement("value")]
 	public int Value;
+	[BsonElement("formula")]
+	[BsonIgnoreIfNull]
+	public string? Formula = null;
+	
+	// Поля не используемые в БД
+	[BsonIgnore]
+	public int? CalculatedValue = null;
 }
 
 public class PropertyMongoData : FieldMongoData
 {
 	[BsonElement("max_value")]
 	public int MaxValue;
-}
-
-public class ItemMongoData : GroupEntityMongoData 
-{
-	[BsonElement("price")]
-	public int Price { get; set; } = 0;
-	[BsonElement("image_link")]
-	public string? Image;
 }
 
 public class CategorySchema
@@ -67,6 +66,14 @@ public class CharlistMongoData : GroupEntityMongoData
 	
 	[BsonElement("schema")]
     public TemplateSchema? Schema { get; set; } = new();
+}
+
+public class ItemMongoData : GroupEntityMongoData 
+{
+	[BsonElement("price")]
+	public int Price { get; set; } = 0;
+	[BsonElement("image_link")]
+	public string? Image;
 }
 
 public class AmountedItemMongoData : NamedMongoElement

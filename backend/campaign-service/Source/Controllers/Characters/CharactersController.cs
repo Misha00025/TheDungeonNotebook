@@ -183,6 +183,7 @@ public class CharactersController : CharactersBaseController
                     if (value.MaxValue != null && newField is PropertyMongoData)
                         ((PropertyMongoData)newField).MaxValue = (int)value.MaxValue;
                     newField.Value = value.Value != null ? (int)value.Value : newField.Value;
+                    newField.Category = value.Category;
                     character.Fields.Add(field.Key, newField);
                 }
                 else

@@ -28,6 +28,10 @@ public static class DataToDictExtensions
             };
             if (field.Category != null)
                 addedField.Add("category", field.Category);
+            if (field.Formula != null)
+                addedField.Add("formula", field.Formula);
+            if (field.CalculatedValue != null)
+                addedField.Add("calculatedValue", field.CalculatedValue);
             if (field is PropertyMongoData)
                 addedField.Add("maxValue", (field as PropertyMongoData)?.MaxValue);
             result.Add(name, addedField);
