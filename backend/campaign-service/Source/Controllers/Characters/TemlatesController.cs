@@ -17,6 +17,7 @@ public class TemplatesController : GroupsBaseController
         public string Description { get; set; }
         public int Value { get; set; }
         public int? MaxValue { get; set; }
+        public string? Formula { get; set; }
     }
 
     public struct CategorySchemaPostData
@@ -52,19 +53,12 @@ public class TemplatesController : GroupsBaseController
     {
     
         var field = data.MaxValue == null ?  
-        new FieldMongoData()
-        {
-            Name = data.Name,
-            Description = data.Description,
-            Value = data.Value
-        } : 
-        new PropertyMongoData()
-        {
-            Name = data.Name,
-            Description = data.Description,
-            Value = data.Value,
-            MaxValue = (int)data.MaxValue
-        };
+        new FieldMongoData() : 
+        new PropertyMongoData(){ MaxValue = (int)data.MaxValue };
+        field.Name = data.Name;
+        field.Description = data.Description;
+        field.Value = data.Value;
+        field.Formula = string.IsNullOrEmpty(data.Formula) ? "" : data.Formula;
         return field;
     }
     

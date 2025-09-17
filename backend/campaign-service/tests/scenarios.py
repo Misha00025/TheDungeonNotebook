@@ -104,8 +104,7 @@ def with_charlist_templates_scenario():
         "fields":{
             "strong":{"name": "Strong", "description": "This is strong", "value": 10},
             "agility":{"name": "Agility", "description": "This is agility", "value": 12},
-            "intellect":{"name": "Intellect", "description": "This is intellect", "value": 12},
-            "health": {"name": "Health", "description": "This is health", "value": 10, "maxValue": 20}
+            "intellect":{"name": "Intellect", "description": "This is intellect", "value": 12}
         },
         "schema":{
             "categories": [
@@ -141,7 +140,11 @@ def with_characters_scenario():
         "fields":{
             "strong":{"name": "Strong", "description": "This is strong", "value": 10},
             "agility":{"name": "Agility", "description": "This is agility", "value": 12},
-            "health": {"name": "Health", "description": "This is health", "value": 10, "maxValue": 20}
+            "vitality":{"name": "Vit", "description": "This is vit", "value": 14},
+            "level":{"name": "Level", "description": "This is Level", "value": 3},
+            "health": {"name": "Health", "description": "This is health", "value": 10, "maxValue": 20, "formula": ":level: * :vitality:"},
+            "vit_mod": {"name": "VitMod", "description": "This is VitMod", "value": 10, "formula": "(:vitality:-10)/2"},
+            "test": {"name": "test", "description": "This is test", "value": 10, "formula": "sqrt(16)"}
         }
     }
     new_character = {

@@ -4,6 +4,7 @@ using Tdn.Db;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 using Tdn.Models.Conversions;
+using Tdn.Models.Processing;
 
 namespace Tdn.Api.Controllers;
 
@@ -25,6 +26,7 @@ public class CharactersController : CharactersBaseController
         public string? Category { get; set; }
         public int? Value { get; set; }
         public int? MaxValue { get; set; }
+        public string? Formula { get; set; }
     }
     
     public struct CharacterPatchData
@@ -91,6 +93,7 @@ public class CharactersController : CharactersBaseController
                 var charField = result.Fields[field.Key];
                 charField.Name = field.Value.Name;
                 charField.Description = field.Value.Description;
+                charField.Formula = string.IsNullOrEmpty(charField.Formula) ? field.Value.Formula : charField.Formula;
                 result.Fields[field.Key] = charField;
             }
             else
@@ -121,6 +124,7 @@ public class CharactersController : CharactersBaseController
         {
             if (witEmptyFields)
                 character = AsCharacterWithTemplate(data, character);
+            FormulaCalculator.CalculateFields(character);
             return Ok(data.ToDict(character));
         }
         return NotFound("Character or Group not found");
@@ -156,7 +160,7 @@ public class CharactersController : CharactersBaseController
                 else
                 {   
                     var value = (FieldPatchData)tmp;
-                    if (value.Name == null && value.Description == null && value.Value == null && value.Category == null && value.MaxValue == null) 
+                    if (value.Name == null && value.Description == null && value.Value == null && value.Category == null && value.MaxValue == null && value.Formula == null) 
                         continue;
                     FieldMongoData existField = character.Fields[field.Key];
                     if (value.MaxValue != null && existField is PropertyMongoData)
@@ -165,6 +169,7 @@ public class CharactersController : CharactersBaseController
                     existField.Description = value.Description != null ? value.Description : existField.Description;
                     existField.Value = value.Value != null ? (int)value.Value : existField.Value;
                     existField.Category = value.Category != null ? value.Category : existField.Category;
+                    existField.Formula = value.Formula != null ? value.Formula : existField.Formula;
                     doSomething = true;
                 }
             }
@@ -184,6 +189,7 @@ public class CharactersController : CharactersBaseController
                         ((PropertyMongoData)newField).MaxValue = (int)value.MaxValue;
                     newField.Value = value.Value != null ? (int)value.Value : newField.Value;
                     newField.Category = value.Category;
+                    newField.Formula = value.Formula != null ? value.Formula : newField.Formula;
                     character.Fields.Add(field.Key, newField);
                 }
                 else
@@ -232,6 +238,7 @@ public class CharactersController : CharactersBaseController
                 DbContext.SaveChanges();
                 if (witEmptyFields)
                     character = AsCharacterWithTemplate(characterData, character);
+                FormulaCalculator.CalculateFields(character);
                 var result = characterData.ToDict(character);
                 if (errors.Count > 0)
                     result.Add("errors", errors);

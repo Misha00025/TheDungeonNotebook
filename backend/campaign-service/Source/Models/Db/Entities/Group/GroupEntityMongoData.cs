@@ -30,7 +30,6 @@ public class FieldMongoData : NamedMongoElement
 	[BsonElement("value")]
 	public int Value;
 	[BsonElement("formula")]
-	[BsonIgnoreIfNull]
 	public string? Formula = null;
 	
 	// Поля не используемые в БД

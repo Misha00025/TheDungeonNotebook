@@ -23,17 +23,22 @@ public static class DataToDictExtensions
             var addedField = new Dictionary<string, object?>()
             {
                 {"name", field.Name},
-                {"description", field.Description},
-                {"value", field.Value},
+                {"description", field.Description}
             };
             if (field.Category != null)
                 addedField.Add("category", field.Category);
-            if (field.Formula != null)
+            if (!string.IsNullOrEmpty(field.Formula))
                 addedField.Add("formula", field.Formula);
-            if (field.CalculatedValue != null)
-                addedField.Add("calculatedValue", field.CalculatedValue);
             if (field is PropertyMongoData)
-                addedField.Add("maxValue", (field as PropertyMongoData)?.MaxValue);
+            {
+                addedField.Add("maxValue", field.CalculatedValue == null ? (field as PropertyMongoData)?.MaxValue : field.CalculatedValue);
+                addedField.Add("value", field.Value);
+            }
+            else
+            {
+                addedField.Add("value", field.CalculatedValue == null ? field.Value : field.CalculatedValue);
+            }
+            // addedField.Add("calculated", field.CalculatedValue);
             result.Add(name, addedField);
         }
         return result;
