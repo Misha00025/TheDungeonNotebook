@@ -235,7 +235,10 @@ public class CharactersController : CharactersBaseController
                     result.Add("errors", errors);
                 return Ok(result);
             }
-            return BadRequest("Nothing to do");
+            else if (errors.Count > 0)
+                return BadRequest(new { errors = errors });
+            else
+                return BadRequest("Nothing to do");
         }
         return NotFound("Character or Group not found");
     }
