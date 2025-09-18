@@ -83,28 +83,6 @@ public class CharactersController : CharactersBaseController
         return NotFound("Group not found");
     }
 
-    private CharacterMongoData CompareCharacterWithTemplate(CharacterMongoData character, CharlistMongoData charlist)
-    {
-        var result = character;
-        foreach (var field in charlist.Fields)
-        {
-            if (result.Fields.ContainsKey(field.Key))
-            {
-                var charField = result.Fields[field.Key];
-                charField.Name = field.Value.Name;
-                charField.Description = field.Value.Description;
-                charField.Formula = string.IsNullOrEmpty(charField.Formula) ? field.Value.Formula : charField.Formula;
-                result.Fields[field.Key] = charField;
-            }
-            else
-            {
-                result.Fields.Add(field.Key, field.Value);
-            }
-        }
-        result.Schema = charlist.Schema;
-        return result;
-    }
-
     private CharacterMongoData AsCharacterWithTemplate(CharacterData data, CharacterMongoData character)
     {
         var charlistSet = DbContext.Set<CharlistData>();
@@ -114,7 +92,7 @@ public class CharactersController : CharactersBaseController
         var charlist = Mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, charlistData.UUID);
         if (charlist == null)
             return character;
-        return CompareCharacterWithTemplate(character, charlist);
+        return character.CompareWith(charlist);
     }
 
     [HttpGet("{characterId}")]
