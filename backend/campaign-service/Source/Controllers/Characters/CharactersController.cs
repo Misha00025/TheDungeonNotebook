@@ -185,6 +185,7 @@ public class CharactersController : CharactersBaseController
                     newField.Name = value.Name == null ? "" : value.Name;
                     newField.Description = value.Description == null ? "" : value.Description;
                     newField.Value = value.Value != null ? (int)value.Value : 0;
+                    newField.Formula = value.Formula;
                     character.Fields.Add(field.Key, newField);
                 }
                 doSomething = true;
