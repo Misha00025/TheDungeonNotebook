@@ -51,6 +51,9 @@ public class CategorySchema
     public string Name { get; set; } = "";
     [BsonElement("fields")]
     public List<string> Fields { get; set; } = new List<string>();
+    [BsonElement("categories")]
+    [BsonIgnoreIfNull]
+    public List<CategorySchema>? Categories { get; set; } = null;
 }
 
 public class TemplateSchema

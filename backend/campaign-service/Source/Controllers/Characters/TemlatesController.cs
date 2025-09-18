@@ -25,6 +25,7 @@ public class TemplatesController : GroupsBaseController
         public string Key { get; set; }
         public string Name { get; set; }
         public List<string> Fields { get; set; }
+        public List<CategorySchemaPostData>? Categories { get; set; }
     }
 
     public struct SchemaPostData
@@ -61,17 +62,20 @@ public class TemplatesController : GroupsBaseController
         field.Formula = string.IsNullOrEmpty(data.Formula) ? "" : data.Formula;
         return field;
     }
+
+    private CategorySchema GenerateCategory(CategorySchemaPostData data) => new CategorySchema
+    {
+        Key = data.Key,
+        Name = data.Name,
+        Fields = data.Fields,
+        Categories = data.Categories?.Select(e => GenerateCategory(e)).ToList()
+    };
     
     private TemplateSchema ConvertSchema(SchemaPostData? schemaPost)
     {
         var schema = new TemplateSchema();
         if (schemaPost != null)
-            schema.Categories = schemaPost.Value.Categories.Select(s => new CategorySchema
-            {
-                Key = s.Key,
-                Name = s.Name,
-                Fields = s.Fields
-            }).ToList();
+            schema.Categories = schemaPost.Value.Categories.Select(s => GenerateCategory(s)).ToList();
         return schema;
     }
     
