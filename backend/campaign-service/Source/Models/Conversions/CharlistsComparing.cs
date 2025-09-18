@@ -54,7 +54,7 @@ public static class CharlistsComparingExtensions
 
     public static CharacterMongoData CompareWith(this CharacterMongoData data, CharlistMongoData source)
     {
-        data.CompareWith(source);
+        ((CharlistMongoData)data).CompareWith(source);
         return data;
     }
 }
