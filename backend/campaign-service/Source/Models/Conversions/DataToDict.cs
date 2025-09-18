@@ -61,7 +61,8 @@ public static class DataToDictExtensions
         {
             fields = data.Fields,
             name = data.Name,
-            key = data.Key
+            key = data.Key,
+            categories = data.Categories?.Select(e => e.ToDict()).ToList()
         };
     }
     
