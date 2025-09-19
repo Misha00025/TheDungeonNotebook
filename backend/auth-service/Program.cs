@@ -11,6 +11,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddLogging(e => e.AddConsole());
 
 builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigurer>();
+builder.Services.AddSingleton<Configs, Configs>((_) => config.GetConfigs());
 builder.Services.AddDbContext<LoginContext>(config.ConfigDbConnections);
 
 // General

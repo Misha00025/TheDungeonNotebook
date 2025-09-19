@@ -6,6 +6,7 @@ using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using Tdn.Configuration;
 
 namespace Tdn.Api.Controllers
 {
@@ -15,10 +16,13 @@ namespace Tdn.Api.Controllers
     {
         private readonly IConfiguration _configuration;
         private readonly LoginContext _dbContext;
-        public AuthController(IConfiguration configuration, LoginContext context)
+        private readonly Configs _configs;
+        
+        public AuthController(IConfiguration configuration, LoginContext context, Configs configs)
         {
             _configuration = configuration;
             _dbContext = context;
+            _configs = configs;
         }
         
         private TokenValidationParameters GetValidationParameters()
@@ -98,11 +102,11 @@ namespace Tdn.Api.Controllers
             {
                 return Unauthorized(new { Error = "Invalid credentials" });
             }
+            var expireTime = DateTime.UtcNow.AddDays(_configs.RefreshTokenExpire.Days);
+            expireTime = expireTime.AddMinutes(_configs.RefreshTokenExpire.Minutes);
             var tokenString = GenerateTokenString(
-                new ClaimsIdentity(new Claim[]{ new Claim("userId", user!.Id.ToString()),}), 
-                DateTime.UtcNow.AddDays(3)
+                new ClaimsIdentity(new Claim[]{ new Claim("userId", user!.Id.ToString()),}), expireTime      
             );
-
             return Ok(new { token = tokenString });
         }
 
@@ -117,9 +121,11 @@ namespace Tdn.Api.Controllers
             {
                 var p = tokenHandler.ValidateToken(model.RefreshToken, validationParameters, out var validatedToken);
                 var claims = p.Claims.Where(e => e.Type != "exp" && e.Type != "nbf" && e.Type != "iat");
+                var expireTime = DateTime.UtcNow.AddDays(_configs.AccessTokenExpire.Days);
+                expireTime = expireTime.AddMinutes(_configs.AccessTokenExpire.Minutes);
                 var tokenString = GenerateTokenString(
                     new ClaimsIdentity(claims),
-                    DateTime.UtcNow.AddMinutes(10)
+                    expireTime
                 );
                 return Ok(new {accessToken = tokenString});
             }

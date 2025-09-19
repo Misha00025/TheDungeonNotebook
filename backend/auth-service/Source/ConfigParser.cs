@@ -34,4 +34,10 @@ public class ConfigParser
 	{
 		opt.UseMySql(Connection, new MySqlServerVersion(new Version(9, 0, 1)));
 	}
+	
+	public Configs GetConfigs()
+	{
+		var result = new Configs();
+		return result;
+	}
 }
