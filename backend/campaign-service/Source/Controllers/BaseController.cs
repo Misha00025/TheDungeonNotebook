@@ -5,16 +5,7 @@ using Tdn.Models.Providing;
 namespace Tdn.Api.Controllers;
 
 public abstract class BaseController : ControllerBase
-{
-
-	protected IModelProvider<T> GetProvider<T>()
-	{
-		var provider = HttpContext.RequestServices.GetService<IModelProvider<T>>();
-		if (provider == null)
-			throw new System.Exception("Model provider is null");
-		return provider;
-	}
-	
+{	
 	// General
 	protected bool IsDebug() => Request.Query.TryGetValue("debug", out var debugStr) && bool.TryParse(debugStr, out var debug) && debug;
 

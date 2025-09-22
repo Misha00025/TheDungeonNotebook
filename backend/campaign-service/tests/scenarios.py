@@ -328,3 +328,25 @@ def with_character_items_scenario():
     ])
     create_scenario("Character Items", tests)
 
+def with_skills_attributes():
+    attributes = [
+        { "key": "test1", "name": "Test 1", "description": "", "isFiltered": False},
+        { "key": "test2", "name": "Test 2"},
+        { "key": "test3", "name": "Test 3", "isFiltered": True},
+        { "key": "test4"},
+        { "key": "test5", "name": "Test 5", "description": "", "isFiltered": False},
+        { "key": "test6", "name": "Test 6", "description": "", "isFiltered": False}
+    ]
+    tests = [
+        Test(headers=h, request="groups", method="POST", data={"name": "TestGroup"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="GET", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[0], requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[1], requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[2], requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[3], requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[4], requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[5], requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="GET", requirement=OK),
+
+    ]
+    create_scenario("Attributes Scenario", tests)
