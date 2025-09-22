@@ -10,6 +10,8 @@ public interface IEntityBuildersConfigurer
 	void ConfigureModel(EntityTypeBuilder<ItemData> builder);
 	void ConfigureModel(EntityTypeBuilder<CharlistData> builder);
 	void ConfigureModel(EntityTypeBuilder<CharacterData> builder);
+	void ConfigureModel(EntityTypeBuilder<SkillData> builder);
+	void ConfigureModel(EntityTypeBuilder<CharacterSkillData> builder);
 }
 
 public class EntityBuildersConfigurer : IEntityBuildersConfigurer
@@ -55,5 +57,25 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
 		builder.Property(e => e.OwnerId).HasColumnName("owner_id");
 		builder.Property(e => e.TemplateId).HasColumnName("template_id");
 		builder.HasOne(e => e.Template).WithMany().HasForeignKey(e => e.TemplateId);
+	}
+	
+	public void ConfigureModel(EntityTypeBuilder<SkillData> builder)
+	{
+		builder.ToTable("skill");
+		builder.HasKey(e => e.Id);
+		builder.Property(e => e.Id).HasColumnName("skill_id");
+		builder.Property(e => e.GroupId).HasColumnName("group_id");
+		builder.Property(e => e.UUID).HasColumnName("uuid");
+		builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);		
+	}
+	
+	public void ConfigureModel(EntityTypeBuilder<CharacterSkillData> builder)
+	{
+		builder.ToTable("character_skill");
+		builder.HasKey(e => new { e.SkillId, e.GroupId });
+		builder.Property(e => e.SkillId).HasColumnName("skill_id");
+		builder.Property(e => e.GroupId).HasColumnName("group_id");
+		builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);		
+		builder.HasOne(e => e.Skill).WithMany().HasForeignKey(e => e.SkillId);		
 	}
 }

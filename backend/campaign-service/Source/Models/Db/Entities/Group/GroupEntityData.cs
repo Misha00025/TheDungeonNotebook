@@ -9,10 +9,21 @@ public class GroupEntityData : IndexedData
 
 public class ItemData : GroupEntityData {}
 public class CharlistData : GroupEntityData {}
+public class SkillData : GroupEntityData {}
+
 public class CharacterData : GroupEntityData 
 {
 	public int TemplateId;
 	public int? OwnerId;
 	
 	public CharlistData Template = null!;
+}
+
+public class CharacterSkillData
+{
+	public int GroupId;
+	public int SkillId;
+	
+	public GroupData Group = null!;
+	public SkillData Skill = null!;
 }
