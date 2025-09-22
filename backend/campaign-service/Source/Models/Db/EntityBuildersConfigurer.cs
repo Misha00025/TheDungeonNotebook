@@ -72,10 +72,10 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
 	public void ConfigureModel(EntityTypeBuilder<CharacterSkillData> builder)
 	{
 		builder.ToTable("character_skill");
-		builder.HasKey(e => new { e.SkillId, e.GroupId });
+		builder.HasKey(e => new { e.SkillId, e.CharacterId });
 		builder.Property(e => e.SkillId).HasColumnName("skill_id");
-		builder.Property(e => e.GroupId).HasColumnName("group_id");
-		builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);		
+		builder.Property(e => e.CharacterId).HasColumnName("character_id");
+		builder.HasOne(e => e.Character).WithMany().HasForeignKey(e => e.CharacterId);		
 		builder.HasOne(e => e.Skill).WithMany().HasForeignKey(e => e.SkillId);		
 	}
 }

@@ -21,9 +21,9 @@ public class CharacterData : GroupEntityData
 
 public class CharacterSkillData
 {
-	public int GroupId;
+	public int CharacterId;
 	public int SkillId;
 	
-	public GroupData Group = null!;
+	public CharacterData Character = null!;
 	public SkillData Skill = null!;
 }
