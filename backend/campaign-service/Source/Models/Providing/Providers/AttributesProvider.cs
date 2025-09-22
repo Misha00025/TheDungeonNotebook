@@ -26,7 +26,7 @@ public class AttributesProvider
     public static AttributeMongoData ToData(Attribute attribute) => new()
     {
         Key = attribute.Key,
-        Name = attribute.Key, 
+        Name = attribute.Name, 
         Description = attribute.Description,
         IsFiltered = attribute.IsFiltered,
         KnownValues = attribute.KnownValues

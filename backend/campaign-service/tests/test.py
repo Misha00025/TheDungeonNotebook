@@ -34,6 +34,8 @@ if __name__ == "__main__":
                     with_character_items_scenario()
                 case "attributes":
                     with_skills_attributes()
+                case "group_skills":
+                    with_group_skills()
 
     test_variables.compact = args.compact
     test_variables.debug = args.debug

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.VisualBasic;
 using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 using Tdn.Db;
@@ -67,7 +68,10 @@ public class SkillsProvider
     
     public Skill? GetSkill(int groupId, int skillId)
     {
-        var data = _sql.Skills.Where(e => e.GroupId == groupId && e.Id == skillId).FirstOrDefault();
+        var data = _sql.Skills
+                    .Where(e => e.GroupId == groupId && e.Id == skillId)
+                    .Include(e => e.Group)
+                    .FirstOrDefault();
         if (data == null)
             return null;
         return GetSkill(data);
@@ -76,7 +80,7 @@ public class SkillsProvider
     public IEnumerable<Skill> GetSkills(int groupId)
     {
         var skills = _sql.Skills
-                        .Where(e => e.Id == groupId)
+                        .Where(e => e.GroupId == groupId)
                         .Include(e => e.Group)
                         .AsEnumerable()
                         .Select(GetSkill)
@@ -88,6 +92,7 @@ public class SkillsProvider
     {
         var skills = _sql.CharacterSkills
                         .Include(e => e.Skill)
+                        .Include(e => e.Skill.Group)
                         .Where(e => e.Skill.GroupId == groupId && e.CharacterId == characterId)
                         .AsEnumerable()
                         .Select(e => GetSkill(e.Skill))
@@ -99,21 +104,23 @@ public class SkillsProvider
     {
         try
         {
-            var data = new SkillMongoData()
+            var mongoData = new SkillMongoData()
             {
                 Name = skill.Name,
                 Description = skill.Description,
                 Attributes = skill.Attributes
-                .Select(e => new ValuedAttributeMongoData()
-                {
-                    Key = e.Key,
-                    Value = e.Value    
-                })
-                .ToList()
+                    .Select(e => new ValuedAttributeMongoData()
+                    {
+                        Key = e.Key,
+                        Value = e.Value
+                    })
+                    .ToList()
             };
-            _mongo.GetCollection<SkillMongoData>(SKILLS_COLLECTION_NAME).InsertOne(data);
-            _sql.Skills.Add(new SkillData() { GroupId = groupId, UUID = data.Id.ToString() });
+            _mongo.GetCollection<SkillMongoData>(SKILLS_COLLECTION_NAME).InsertOne(mongoData);
+            SkillData data = new SkillData() { GroupId = groupId, UUID = mongoData.Id.ToString() };
+            _sql.Skills.Add(data);
             _sql.SaveChanges();
+            skill.Id = data.Id;
             return true;
         }
         catch
@@ -124,6 +131,6 @@ public class SkillsProvider
     
     public bool TryUpdateSkill(Skill skill)
     {
-        return true;
+        return false;
     }
 }

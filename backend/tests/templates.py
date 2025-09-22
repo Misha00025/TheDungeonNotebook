@@ -36,7 +36,7 @@ class Test:
 				 data: dict = {},
 				 method: str = "GET",
 				 requirement: int = 200,
-				 debug: bool = True,
+				 debug: bool = False,
 				 is_valid: callable = None,
 				 check_access: bool = False
 				 ) -> None:

@@ -350,3 +350,38 @@ def with_skills_attributes():
 
     ]
     create_scenario("Attributes Scenario", tests)
+
+def with_group_skills():
+    new_skill = {
+         "name": "Fireball",
+         "description": "FIRE-BA-A-A-A-AL!!!!",
+         "attributes": [
+              { "key": "damage", "name": "Damage", "value": "10d8"},
+              { "key": "range", "name": "Range", "value": "100 fut"},
+         ]
+    }
+    new_skill_2 = {
+         "name": "Fireball 2",
+         "description": "FIRE-BA-A-A-A-AL!!!!",
+         "attributes": [
+              { "key": "damage", "name": "Damage", "value": "10d8"},
+              { "key": "range", "name": "Range", "value": "80 fut"},
+         ]
+    }
+    attributes = [
+        { "key": "damage", "name": "Damage", "description": "How many HP you can take", "isFiltered": False},
+        { "key": "range", "name": "Range"},
+    ]
+    tests = [
+        Test(headers=h, request="groups", method="POST", data={"name": "TestGroup"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="GET", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[0], requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[1], requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="GET", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="POST", data=new_skill, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="POST", data=new_skill_2, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/skills/{steps.-1.id}", method="GET", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="GET", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="GET", params={"range": "100 fut"}, requirement=OK),
+    ]
+    create_scenario("Group Skills Scenario", tests)

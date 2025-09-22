@@ -12,10 +12,10 @@ public class GroupAttributesController : BaseController
 
     public struct AttributePostData 
     {
-        public string? Key;
-        public string? Name;
-        public string? Description;
-        public bool? isFiltered;
+        public string? Key { get; set; }
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public bool? isFiltered { get; set; }
     }
 
     public GroupAttributesController(AttributesProvider attributesProvider)
