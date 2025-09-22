@@ -94,4 +94,36 @@ public class SkillsProvider
                         .ToList();
         return skills;
     }
+    
+    public bool TryCreateSkill(int groupId, Skill skill)
+    {
+        try
+        {
+            var data = new SkillMongoData()
+            {
+                Name = skill.Name,
+                Description = skill.Description,
+                Attributes = skill.Attributes
+                .Select(e => new ValuedAttributeMongoData()
+                {
+                    Key = e.Key,
+                    Value = e.Value    
+                })
+                .ToList()
+            };
+            _mongo.GetCollection<SkillMongoData>(SKILLS_COLLECTION_NAME).InsertOne(data);
+            _sql.Skills.Add(new SkillData() { GroupId = groupId, UUID = data.Id.ToString() });
+            _sql.SaveChanges();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+    
+    public bool TryUpdateSkill(Skill skill)
+    {
+        return true;
+    }
 }

@@ -23,7 +23,7 @@ public class AttributesProvider
         KnownValues = data.KnownValues
     };
 
-    private static AttributeMongoData ToData(Attribute attribute) => new()
+    public static AttributeMongoData ToData(Attribute attribute) => new()
     {
         Key = attribute.Key,
         Name = attribute.Key, 

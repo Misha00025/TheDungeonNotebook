@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
 
 namespace Tdn.Api.Controllers;
@@ -21,15 +22,6 @@ public class GroupAttributesController : BaseController
     {
         _provider = attributesProvider;
     }
-
-    private object ToResponse(Tdn.Models.Attribute attribute) => new
-    {
-        key = attribute.Key,
-        name = attribute.Name,
-        description = attribute.Description,
-        knownValues = attribute.KnownValues,
-        isFiltered = attribute.IsFiltered
-    };
     
     [HttpGet]
     public ActionResult GetAttributes(int groupId)
@@ -37,7 +29,7 @@ public class GroupAttributesController : BaseController
         var attributes = _provider.GetAttributes(groupId);
         return Ok(new 
         {
-            attributes = attributes.Select(ToResponse).ToList(),
+            attributes = attributes.Select(e => e.ToResponse()).ToList(),
             total = attributes.Count
         });
     }
