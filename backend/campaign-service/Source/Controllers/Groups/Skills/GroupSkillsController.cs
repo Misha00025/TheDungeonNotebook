@@ -1,9 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Tdn.Models;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
-using YamlDotNet.Core.Tokens;
 
 namespace Tdn.Api.Controllers;
 
@@ -12,6 +10,7 @@ namespace Tdn.Api.Controllers;
 public class GroupSkillsController : BaseController
 {
     private SkillsProvider _provider;
+    private AttributesProvider _attributesProvider;
 
     public struct AttributePostData
     {
@@ -27,14 +26,54 @@ public class GroupSkillsController : BaseController
         public List<AttributePostData>? Attributes { get; set; }
     }
 
-    public GroupSkillsController(SkillsProvider skillsProvider)
+    public GroupSkillsController(SkillsProvider skillsProvider, AttributesProvider attributesProvider)
     {
         _provider = skillsProvider;
+        _attributesProvider = attributesProvider;
+    }
+
+    private void UpdateGroupAttributes(int groupId, Skill skill)
+    {
+        var groupAttributes = _attributesProvider.GetAttributes(groupId);
+        var attributesToUpdate = new List<Tdn.Models.Attribute>();
+
+        foreach (var valuedAttr in skill.Attributes)
+        {
+            var existingAttr = groupAttributes.FirstOrDefault(a => a.Key == valuedAttr.Key);
+            if (existingAttr == null)
+            {
+                attributesToUpdate.Add(new Tdn.Models.Attribute()
+                {
+                    Key = valuedAttr.Key,
+                    Name = valuedAttr.Name,
+                    Description = valuedAttr.Description,
+                    IsFiltered = false,
+                    KnownValues = new List<string>()
+                });
+            }
+            else if (existingAttr.IsFiltered)
+            {
+                if (!existingAttr.KnownValues.Contains(valuedAttr.Value))
+                {
+                    existingAttr.KnownValues.Add(valuedAttr.Value);
+                    attributesToUpdate.Add(existingAttr);
+                }
+            }
+        }
+
+        if (attributesToUpdate.Any())
+        {
+            var finalAttributes = groupAttributes
+                .Where(ga => !attributesToUpdate.Any(ua => ua.Key == ga.Key))
+                .Concat(attributesToUpdate)
+                .ToList();
+            
+            _attributesProvider.TrySaveAttributes(groupId, finalAttributes);
+        }
     }
 
     private IEnumerable<Skill> ApplyFilters(IEnumerable<Skill> skills, Dictionary<string, string> filters)
     {
-        var result = new List<Skill>();
         foreach (var skill in skills)
         {
             var matchesAllFilters = true;
@@ -89,11 +128,18 @@ public class GroupSkillsController : BaseController
             Description = data.Description != null ? data.Description : "",
             Attributes = data.Attributes == null ? new() : data.Attributes
                                 .Where(e => !(e.Key == null || e.Value == null))
-                                .Select(e => new ValuedAttribute() { Key = e.Key!, Value = e.Value! }).ToList()
+                                .Select(e => new ValuedAttribute() { 
+                                    Key = e.Key!, 
+                                    Name = e.Name ?? e.Key!,
+                                    Value = e.Value! 
+                                }).ToList()
         };
 
         if (_provider.TryCreateSkill(groupId, skill))
+        {
+            UpdateGroupAttributes(groupId, skill);
             return Created($"groups/{groupId}/skills/{skill.Id}", skill.ToResponse());
+        }
         else
             return BadRequest("Unknown error");
     }
@@ -107,13 +153,22 @@ public class GroupSkillsController : BaseController
         Skill? skill = _provider.GetSkill(groupId, skillId);
         if (skill == null)
             return NotFound("Skill not found");
+        
         skill.Name = data.Name;
         skill.Description = data.Description != null ? data.Description : "";
         skill.Attributes = data.Attributes == null ? new() : data.Attributes
                             .Where(e => !(e.Key == null || e.Value == null))
-                            .Select(e => new ValuedAttribute() { Key = e.Key!, Value = e.Value! }).ToList();
+                            .Select(e => new ValuedAttribute() { 
+                                Key = e.Key!, 
+                                Name = e.Name ?? e.Key!,
+                                Value = e.Value! 
+                            }).ToList();
+        
         if (_provider.TryUpdateSkill(skill))
-            return Created($"groups/{groupId}/skills/{skill.Id}", skill.ToResponse());
+        {
+            UpdateGroupAttributes(groupId, skill);
+            return Ok(skill.ToResponse());
+        }
         else
             return BadRequest("Unknown error");
     }
@@ -121,6 +176,11 @@ public class GroupSkillsController : BaseController
     [HttpDelete("{skillId}")]
     public ActionResult DeleteSkill(int groupId, int skillId)
     {
-        return NotImplemented();
+        if (_provider.TryDeleteSkill(groupId, skillId))
+            return Ok();
+        else
+            return BadRequest("Unknown error");
     }
+    
+    
 }

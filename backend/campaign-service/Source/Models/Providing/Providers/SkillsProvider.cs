@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualBasic;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 using Tdn.Db;
@@ -15,12 +16,14 @@ public class SkillsProvider
     private SkillsContext _sql;
     private MongoDbContext _mongo;
     private AttributesProvider _attributes;
+    private ILogger<SkillsProvider> _logger;
 
-    public SkillsProvider(SkillsContext skillsContext, MongoDbContext mongoDbContext, AttributesProvider attributesProvider)
+    public SkillsProvider(SkillsContext skillsContext, MongoDbContext mongoDbContext, AttributesProvider attributesProvider, ILogger<SkillsProvider> logger)
     {
         _sql = skillsContext;
         _mongo = mongoDbContext;
         _attributes = attributesProvider;
+        _logger = logger;
     }
 
     private static Group ToGroup(GroupData data) => new()
@@ -123,14 +126,70 @@ public class SkillsProvider
             skill.Id = data.Id;
             return true;
         }
-        catch
+        catch (Exception e)
         {
+            _logger.LogWarning($"Error with create skill: {e}");
             return false;
         }
     }
     
     public bool TryUpdateSkill(Skill skill)
     {
-        return false;
+        try
+        {
+            var skillData = _sql.Skills
+                .Include(e => e.Group)
+                .FirstOrDefault(e => e.Id == skill.Id && e.GroupId == skill.Group.Id);
+            
+            if (skillData == null)
+                return false;
+
+            var mongoData = new SkillMongoData()
+            {
+                Id = new ObjectId(skillData.UUID),
+                Name = skill.Name,
+                Description = skill.Description,
+                Attributes = skill.Attributes
+                    .Select(e => new ValuedAttributeMongoData()
+                    {
+                        Key = e.Key,
+                        Value = e.Value
+                    })
+                    .ToList()
+            };
+
+            var collection = _mongo.GetCollection<SkillMongoData>(SKILLS_COLLECTION_NAME);
+            var result = collection.ReplaceOne(
+                Builders<SkillMongoData>.Filter.Eq(x => x.Id, new ObjectId(skillData.UUID)),
+                mongoData);
+
+            return result.IsAcknowledged && result.ModifiedCount > 0;
+        }
+        catch (Exception e)
+        {
+            _logger.LogWarning($"Error with update skill: {e}");
+            return false;
+        }
+    }
+    
+    public bool TryDeleteSkill(int groupId, int skillId)
+    {
+        try
+        {
+            var skillData = _sql.Skills
+                .FirstOrDefault(e => e.GroupId == groupId && e.Id == skillId);
+            if (skillData == null)
+                return false;
+            var collection = _mongo.GetCollection<SkillMongoData>(SKILLS_COLLECTION_NAME);
+            var mongoResult = collection.DeleteOne(Builders<SkillMongoData>.Filter.Eq(x => x.Id, new ObjectId(skillData.UUID)));
+            _sql.Skills.Remove(skillData);
+            _sql.SaveChanges();
+            return mongoResult.IsAcknowledged && mongoResult.DeletedCount > 0;
+        }
+        catch (Exception e)
+        {
+            _logger.LogWarning($"Error with delete skill: {e}");
+            return false;
+        }
     }
 }
