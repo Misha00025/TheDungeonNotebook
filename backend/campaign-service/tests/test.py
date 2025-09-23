@@ -36,6 +36,8 @@ if __name__ == "__main__":
                     with_skills_attributes()
                 case "group_skills":
                     with_group_skills()
+                case "character_skills":
+                    with_character_skills()
 
     test_variables.compact = args.compact
     test_variables.debug = args.debug

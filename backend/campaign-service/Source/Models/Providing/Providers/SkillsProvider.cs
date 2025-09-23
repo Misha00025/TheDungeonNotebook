@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.VisualBasic;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Linq;
@@ -190,6 +189,71 @@ public class SkillsProvider
         {
             _logger.LogWarning($"Error with delete skill: {e}");
             return false;
+        }
+    }
+    
+    public bool TryAddSkillToCharacter(Skill skill, int characterId)
+    {
+        try
+        {
+            var existing = _sql.CharacterSkills
+                .FirstOrDefault(e => e.CharacterId == characterId && e.SkillId == skill.Id);
+            if (existing != null)
+                return true;
+            var characterSkill = new CharacterSkillData()
+            {
+                CharacterId = characterId,
+                SkillId = skill.Id
+            };
+            _sql.CharacterSkills.Add(characterSkill);
+            _sql.SaveChanges();
+            return true;
+        }
+        catch (Exception e)
+        {
+            _logger.LogWarning($"Error adding skill to character: {e}");
+            return false;
+        }
+    }
+    
+    public bool TryRemoveSkillFromCharacter(Skill skill, int characterId)
+    {
+        try
+        {
+            var existing = _sql.CharacterSkills
+                .FirstOrDefault(e => e.CharacterId == characterId && e.SkillId == skill.Id);
+            if (existing == null)
+                return true;
+            _sql.CharacterSkills.Remove(existing);
+            _sql.SaveChanges();
+            return true;
+        }
+        catch (Exception e)
+        {
+            _logger.LogWarning($"Error removing skill from character: {e}");
+            return false;
+        }
+    }
+    
+    public IEnumerable<Skill> ApplyFilters(IEnumerable<Skill> skills, Dictionary<string, string> filters)
+    {
+        foreach (var skill in skills)
+        {
+            var matchesAllFilters = true;
+
+            foreach (var filter in filters)
+            {
+                var attribute = skill.Attributes.FirstOrDefault(a =>
+                    a.Key.Equals(filter.Key, StringComparison.OrdinalIgnoreCase));
+
+                if (attribute == null || !attribute.Value.Equals(filter.Value, StringComparison.OrdinalIgnoreCase))
+                {
+                    matchesAllFilters = false;
+                    break;
+                }
+            }
+            if (matchesAllFilters)
+                yield return skill;
         }
     }
 }

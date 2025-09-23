@@ -72,27 +72,7 @@ public class GroupSkillsController : BaseController
         }
     }
 
-    private IEnumerable<Skill> ApplyFilters(IEnumerable<Skill> skills, Dictionary<string, string> filters)
-    {
-        foreach (var skill in skills)
-        {
-            var matchesAllFilters = true;
-
-            foreach (var filter in filters)
-            {
-                var attribute = skill.Attributes.FirstOrDefault(a =>
-                    a.Key.Equals(filter.Key, StringComparison.OrdinalIgnoreCase));
-
-                if (attribute == null || !attribute.Value.Equals(filter.Value, StringComparison.OrdinalIgnoreCase))
-                {
-                    matchesAllFilters = false;
-                    break;
-                }
-            }
-            if (matchesAllFilters)
-                yield return skill;
-        }
-    }
+    private IEnumerable<Skill> ApplyFilters(IEnumerable<Skill> skills, Dictionary<string, string> filters) => _provider.ApplyFilters(skills, filters);
 
     [HttpGet]
     public ActionResult GetSkills(int groupId, [FromQuery] Dictionary<string, string>? filters = null)
