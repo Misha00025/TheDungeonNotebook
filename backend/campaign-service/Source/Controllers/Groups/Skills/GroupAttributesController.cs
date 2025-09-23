@@ -17,6 +17,11 @@ public class GroupAttributesController : BaseController
         public string? Description { get; set; }
         public bool? isFiltered { get; set; }
     }
+    
+    public struct PostData
+    {
+        public List<AttributePostData> attributes { get; set; }
+    }
 
     public GroupAttributesController(AttributesProvider attributesProvider)
     {
@@ -33,30 +38,25 @@ public class GroupAttributesController : BaseController
             total = attributes.Count
         });
     }
+
+    private Tdn.Models.Attribute ToAttribute(AttributePostData data) => new ()
+    {
+        Key = data.Key ?? "",
+        Name = data.Name ?? "",
+        Description = data.Description ?? "",
+        IsFiltered = data.isFiltered ?? false
+    };
     
     [HttpPut]
-    public ActionResult PutAttribute(int groupId, [FromBody] AttributePostData data)
+    public ActionResult PutAttribute(int groupId, [FromBody] PostData data)
     {
-        if (data.Name == null || data.Key == null)
-            return BadRequest("Name and Key must not be null");
-    
-        Tdn.Models.Attribute attribute;
-        var exist = _provider.TryGetAttribute(groupId, data.Key, out attribute);
-        if (!exist)
-            attribute = new();
-        attribute.Key = data.Key;
-        attribute.Name = data.Name;
-        attribute.Description = data.Description != null ? data.Description : attribute.Description;
-        attribute.IsFiltered = data.isFiltered != null ? (bool)data.isFiltered : attribute.IsFiltered;
-
+        var attributesData = data.attributes.Where(e => e.Key != null && e.Name != null);
+        var attributes = attributesData.Select(ToAttribute).ToList();
         bool success;
-        if (exist)
-            success = _provider.TryPatchAttribute(groupId, attribute);
-        else
-            success = _provider.TryAddAttribute(groupId, attribute);
+        success = _provider.TrySaveAttributes(groupId, attributes);
         if (success)
             return Ok();
         else
-            return exist ? BadRequest(new { error = $"Can't patch attribute with key: {data.Key}" }) : BadRequest(new { error = $"Can't create attribute with key: {data.Key}" });
+            return BadRequest("Unknown error");
     }
 }
