@@ -154,3 +154,27 @@ def _character_note(group_id: int, character_id: int, note_id: int):
             if not can_write:
                 return forbidden()
             return make_response(services.groups(rq.headers, group_id).characters(character_id).notes(note_id).delete())
+        
+
+@route("groups/<int:group_id>/characters/<int:character_id>/skills", ["GET"])
+def _character_skills(group_id: int, character_id: int):
+    success, _, can_write, response = check_access_to_character(group_id, character_id, rq)
+    if not success:
+        return response
+    match (rq.method):
+        case "GET":
+            return make_response(services.groups(rq.headers, group_id).characters(character_id).skills().get(rq.args))
+
+
+@route("groups/<int:group_id>/characters/<int:character_id>/skills/<int:skill_id>", ["PUT", "DELETE"])
+def _character_skill(group_id: int, character_id: int, skill_id: int):
+    success, _, can_write, response = check_access_to_character(group_id, character_id, rq)
+    if not success:
+        return response
+    if not can_write:
+        return forbidden()
+    match (rq.method):
+        case "PUT":
+            return make_response(services.groups(rq.headers, group_id).characters(character_id).skills(skill_id).put())
+        case "DELETE":
+            return make_response(services.groups(rq.headers, group_id).characters(character_id).skills(skill_id).delete())

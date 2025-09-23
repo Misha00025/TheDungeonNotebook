@@ -32,6 +32,12 @@ if __name__ == "__main__":
                     with_group_items_scenario()
                 case "character-items":
                     with_character_items_scenario()
+                case "attributes":
+                    with_skills_attributes()
+                case "group_skills":
+                    with_group_skills()
+                case "character_skills":
+                    with_character_skills()
 
     test_variables.compact = args.compact
     test_variables.debug = args.debug

@@ -328,3 +328,132 @@ def with_character_items_scenario():
     ])
     create_scenario("Character Items", tests)
 
+def with_skills_attributes():
+    attributes = [
+        { "key": "test1", "name": "Test 1", "description": "", "isFiltered": False},
+        { "key": "test2", "name": "Test 2"},
+        { "key": "test3", "name": "Test 3", "isFiltered": True},
+        { "key": "test4"},
+        { "key": "test5", "name": "Test 5", "description": "", "isFiltered": False},
+        { "key": "test6", "name": "Test 6", "description": "", "isFiltered": False}
+    ]
+    tests = [
+        Test(headers=h, request="groups", method="POST", data={"name": "TestGroup"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="GET", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[0], requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[1], requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[2], requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[3], requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[4], requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[5], requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="GET", requirement=OK),
+
+    ]
+    create_scenario("Attributes Scenario", tests)
+
+def with_group_skills():
+    new_skill = {
+         "name": "Fireball",
+         "description": "FIRE-BA-A-A-A-AL!!!!",
+         "attributes": [
+              { "key": "damage", "name": "Damage", "value": "10d8"},
+              { "key": "range", "name": "Range", "value": "100 fut"},
+         ]
+    }
+    new_skill_2 = {
+         "name": "Fireball 2",
+         "description": "FIRE-BA-A-A-A-AL!!!!",
+         "attributes": [
+              { "key": "damage", "name": "Damage", "value": "14d8"},
+              { "key": "range", "name": "Range", "value": "80 fut"},
+         ]
+    }
+
+    update_skill_2 = {
+         "name": "Fireball 3",
+         "description": "FIRE-BA-A-A-A-AL!!!!",
+         "attributes": [
+              { "key": "damage", "name": "Damage", "value": "12d8"},
+              { "key": "range", "name": "Range", "value": "120 fut"},
+         ]
+    }
+    attributes = [
+        { "key": "damage", "name": "Damage", "description": "How many HP you can take", "isFiltered": True},
+        { "key": "range", "name": "Range"},
+    ]
+    tests = [
+        Test(headers=h, request="groups", method="POST", data={"name": "TestGroup"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="GET", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[0], requirement=OK),
+        # Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[1], requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="GET", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="POST", data=new_skill, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="POST", data=new_skill_2, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/skills/{steps.-1.id}", method="GET", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/{steps.-1.id}", method="PUT", data=update_skill_2, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="GET", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="GET", params={"range": "100 fut"}, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/{steps.-4.id}", method="DELETE", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="GET", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="GET", requirement=OK),
+    ]
+    create_scenario("Group Skills Scenario", tests)
+
+def with_character_skills():
+    new_skill = {
+         "name": "Fireball",
+         "description": "FIRE-BA-A-A-A-AL!!!!",
+         "attributes": [
+              { "key": "damage", "name": "Damage", "value": "10d8"},
+              { "key": "range", "name": "Range", "value": "100 fut"},
+         ]
+    }
+    new_skill_2 = {
+         "name": "Fireball 2",
+         "description": "FIRE-BA-A-A-A-AL!!!!",
+         "attributes": [
+              { "key": "damage", "name": "Damage", "value": "14d8"},
+              { "key": "range", "name": "Range", "value": "80 fut"},
+         ]
+    }
+    update_skill_2 = {
+         "name": "Fireball 3",
+         "description": "FIRE-BA-A-A-A-AL!!!!",
+         "attributes": [
+              { "key": "damage", "name": "Damage", "value": "12d8"},
+              { "key": "range", "name": "Range", "value": "120 fut"},
+         ]
+    }
+    attributes = [
+        { "key": "damage", "name": "Damage", "description": "How many HP you can take", "isFiltered": True},
+        { "key": "range", "name": "Range"},
+    ]
+    new_template = {
+        "name": "TestTemplate",
+        "description": "TestTestTest",
+        "fields":{
+            "strong":{"name": "Strong", "description": "This is strong", "value": 10},
+            "agility":{"name": "Agility", "description": "This is agility", "value": 12},
+        }
+    }
+    new_character = {
+        "name": "Steve",
+        "description": "Minecraft is my life",
+        "templateId": "{steps.1.id}"
+    }
+    tests = [
+        Test(headers=h, request="groups", method="POST", data={"name": "TestGroup"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters/templates", method="POST", data=new_template, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters", method="POST", data=new_character, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="GET", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/attributes", method="PUT", data=attributes[0], requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="POST", data=new_skill, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="POST", data=new_skill_2, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/skills", method="GET", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/skills/{steps.5.id}", method="PUT", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/skills/{steps.5.id}", method="PUT", data=update_skill_2, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/skills", method="GET", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/skills/{steps.5.id}", method="DELETE", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/skills", method="GET", requirement=OK),
+    ]
+    create_scenario("Character Skills Scenario", tests)

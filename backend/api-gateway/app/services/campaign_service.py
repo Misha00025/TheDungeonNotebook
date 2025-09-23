@@ -62,6 +62,31 @@ class TemplatesEndpoints:
         return rq.delete(self._url, headers=self._headers)
 
 
+class SkillsEndpoint:
+    def __init__(self, url: str, headers, skill_id: int = None):
+        self._url: str = url + "/skills"
+        self._headers = headers
+        if skill_id is not None:
+            self._url += f"/{skill_id}"
+
+    def post(self, data) -> Response:
+        return rq.post(self._url, headers=self._headers, data=data)
+    
+    def get(self, params = None) -> Response:
+        if params is None:
+            params = {}
+        return rq.get(self._url, headers=self._headers, params=params)
+    
+    def put(self, data = None) -> Response:
+        if data is None:
+            return rq.put(self._url, headers=self._headers)
+        else:
+            return rq.put(self._url, headers=self._headers, data=data)
+    
+    def delete(self) -> Response:
+        return rq.delete(self._url, headers=self._headers)
+
+
 class CharactersEndpoints:
     def __init__(self, host: str, notes_host: str, url: str, headers, character_id: int = None):
         self._host: str = host
@@ -83,6 +108,9 @@ class CharactersEndpoints:
     
     def items(self, item_id = None) -> ItemsEndpoints:
         return ItemsEndpoints(self.url, self._headers, item_id)
+    
+    def skills(self, skill_id: int = None) -> SkillsEndpoint:
+        return SkillsEndpoint(self.url, self._headers, skill_id)
     
     def post(self, data) -> Response:
         return rq.post(self.url, headers=self._headers, data=data)
@@ -118,6 +146,9 @@ class CampaignService:
     
     def items(self, item_id: int = None) -> ItemsEndpoints:
         return ItemsEndpoints(self.url, self._headers, item_id)
+    
+    def skills(self, skill_id: int = None) -> SkillsEndpoint:
+        return SkillsEndpoint(self.url, self._headers, skill_id)
     
     def post(self, data) -> Response:
         return rq.post(self.url, headers=self._headers, data=data)

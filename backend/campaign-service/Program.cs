@@ -3,6 +3,7 @@ using Tdn.Db.Configuers;
 using Tdn.Db.Contexts;
 using Tdn.Settings;
 using Tdn.Db;
+using Tdn.Models.Providing;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = new ConfigParser();
@@ -17,7 +18,12 @@ builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("Mo
 builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigurer>();
 builder.Services.AddDbContext<GroupContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<EntityContext>(config.ConfigDbConnections);
+builder.Services.AddDbContext<SkillsContext>(config.ConfigDbConnections);
 builder.Services.AddScoped(_ => new MongoDbContext(config.GetMongoDbSettings()));
+
+// Providers
+builder.Services.AddScoped<AttributesProvider, AttributesProvider>();
+builder.Services.AddScoped<SkillsProvider, SkillsProvider>();
 
 // General
 builder.Services.AddEndpointsApiExplorer();

@@ -93,3 +93,40 @@ public class CharacterMongoData : CharlistMongoData
 	[BsonElement("items")]
 	public List<AmountedItemMongoData> Items = new();
 }
+
+public class AttributeMongoData
+{
+	[BsonElement("key")]
+	public string Key = "";
+	[BsonElement("name")]
+	public string Name = "";
+	[BsonElement("description")]
+	public string Description = "";
+	[BsonElement("is_filtered")]
+	public bool IsFiltered = false;
+	[BsonElement("known_values")]
+	public List<string> KnownValues = new();
+}
+
+public class GroupAttributesMongoData : MongoDbContext.MongoEntity
+{
+	[BsonElement("group_id")]
+	public int GroupId;
+
+	[BsonElement("attributes")]
+	public List<AttributeMongoData> Attributes = new();
+}
+
+public class ValuedAttributeMongoData
+{
+	[BsonElement("key")]
+	public string Key = "";
+	[BsonElement("value")]
+	public string Value = "";
+}
+
+public class SkillMongoData : GroupEntityMongoData
+{
+	[BsonElement("attributes")]
+	public List<ValuedAttributeMongoData> Attributes = new();
+}

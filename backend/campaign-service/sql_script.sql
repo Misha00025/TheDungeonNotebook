@@ -35,3 +35,20 @@ CREATE TABLE IF NOT EXISTS `item` (
   KEY `IX_item_group_id` (`group_id`),
   CONSTRAINT `FK_item_group_group_id` FOREIGN KEY (`group_id`) REFERENCES `group` (`group_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS `skill` (
+  `skill_id` int NOT NULL AUTO_INCREMENT,
+  `group_id` int NOT NULL,
+  `uuid` text NOT NULL,
+  PRIMARY KEY (`skill_id`),
+  KEY `IX_skill_group_id` (`group_id`),
+  CONSTRAINT `FK_skill_group_group_id` FOREIGN KEY (`group_id`) REFERENCES `group` (`group_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS `character_skill` (
+  `skill_id` int NOT NULL,
+  `character_id` int NOT NULL,
+  PRIMARY KEY (`character_id`, `skill_id`),
+  FOREIGN KEY (`character_id`) REFERENCES `character`(`character_id`) ON DELETE CASCADE,
+  FOREIGN KEY (`skill_id`) REFERENCES `skill`(`skill_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
