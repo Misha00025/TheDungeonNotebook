@@ -87,8 +87,9 @@ public static class FormulaCalculator
             string fieldKey = match.Groups[1].Value;
             if (!allFields.TryGetValue(fieldKey, out var referencedField))
                 return false;
-
-            int value = referencedField.CalculatedValue ?? referencedField.Value;
+            if (referencedField.CalculatedValue == null)
+                return false;
+            int value = (int)referencedField.CalculatedValue;
             expression = expression.Replace(match.Value, value.ToString());
         }
         try
