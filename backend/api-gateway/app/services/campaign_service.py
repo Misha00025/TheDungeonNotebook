@@ -61,6 +61,17 @@ class TemplatesEndpoints:
     def delete(self) -> Response:
         return rq.delete(self._url, headers=self._headers)
 
+class AttributesEndpoint:
+    def __init__(self, url: str, headers):
+        self._url: str = url + "/attributes"
+        self._headers = headers
+
+    def get(self) -> Response:
+        return rq.get(self._url, headers=self._headers)
+    
+    def put(self, data) -> Response:
+        return rq.put(self._url, headers=self._headers, data=data)
+
 
 class SkillsEndpoint:
     def __init__(self, url: str, headers, skill_id: int = None):
@@ -68,6 +79,9 @@ class SkillsEndpoint:
         self._headers = headers
         if skill_id is not None:
             self._url += f"/{skill_id}"
+
+    def attributes(self) -> AttributesEndpoint:
+        return AttributesEndpoint(self._url, self._headers)
 
     def post(self, data) -> Response:
         return rq.post(self._url, headers=self._headers, data=data)

@@ -163,6 +163,20 @@ def _group_note(group_id: int, note_id: int):
 
 # Skills
 
+@route("groups/<int:group_id>/skills/attributes", ["GET", "PUT"])
+def _group_attributes(group_id: int):
+    success, is_admin, response = check_access_to_group(group_id, rq)
+    if not success:
+        return response
+    match (rq.method):
+        case "GET":
+            return make_response(services.groups(rq.headers, group_id).skills().attributes().get())
+        case "PUT":
+            if not is_admin:
+                return forbidden()
+            return make_response(services.groups(rq.headers, group_id).skills().attributes().put(rq.data))
+        
+
 @route("groups/<int:group_id>/skills", ["GET", "POST"])
 def _group_skills(group_id: int):
     success, is_admin, response = check_access_to_group(group_id, rq)
