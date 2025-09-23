@@ -159,3 +159,37 @@ def _group_note(group_id: int, note_id: int):
             return make_response(services.groups(rq.headers, group_id).notes(note_id).put(rq.data))
         case "DELETE":
             return make_response(services.groups(rq.headers, group_id).notes(note_id).delete())
+        
+
+# Skills
+
+@route("groups/<int:group_id>/skills", ["GET", "POST"])
+def _group_skills(group_id: int):
+    success, is_admin, response = check_access_to_group(group_id, rq)
+    if not success:
+        return response
+    match (rq.method):
+        case "GET":
+            return make_response(services.groups(rq.headers, group_id).skills().get())
+        case "POST":
+            if not is_admin:
+                return forbidden()
+            return make_response(services.groups(rq.headers, group_id).skills().post(rq.data))
+        
+
+@route("groups/<int:group_id>/skills/<int:skill_id>", ["GET", "PUT", "DELETE"])
+def _skill(group_id: int, skill_id: int):
+    success, is_admin, response = check_access_to_group(group_id, rq)
+    if not success:
+        return response
+    match (rq.method):
+        case "GET":
+            return make_response(services.groups(rq.headers, group_id).skills(skill_id).get())
+        case "PUT":
+            if not is_admin:
+                return forbidden()
+            return make_response(services.groups(rq.headers, group_id).skills(skill_id).put(rq.data))
+        case "DELETE":
+            if not is_admin:
+                return forbidden()
+            return make_response(services.groups(rq.headers, group_id).skills(skill_id).delete())
