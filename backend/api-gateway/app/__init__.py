@@ -1,8 +1,12 @@
 import os
 from flask import Flask
+from prometheus_flask_exporter import PrometheusMetrics 
 
 application = Flask(__name__)
 application.config['JSON_AS_ASCII'] = False
+metrics = PrometheusMetrics(application)
+
+
 from flask import json
 json.provider.DefaultJSONProvider.ensure_ascii = False
 
