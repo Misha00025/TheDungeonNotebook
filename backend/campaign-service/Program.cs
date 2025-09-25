@@ -4,6 +4,7 @@ using Tdn.Db.Contexts;
 using Tdn.Settings;
 using Tdn.Db;
 using Tdn.Models.Providing;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = new ConfigParser();
@@ -30,5 +31,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers();
 
 var app = builder.Build();
+app.UseHttpMetrics();
+app.MapMetrics();
 app.MapControllers();
 app.Run();

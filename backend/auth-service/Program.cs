@@ -1,6 +1,7 @@
 using Tdn.Configuration;
 using Tdn.Db.Configuers;
 using Tdn.Db.Contexts;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = new ConfigParser();
@@ -18,5 +19,7 @@ builder.Services.AddDbContext<LoginContext>(config.ConfigDbConnections);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers();
 var app = builder.Build();
+app.UseHttpMetrics();
+app.MapMetrics();
 app.MapControllers();
 app.Run();
