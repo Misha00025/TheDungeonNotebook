@@ -1,0 +1,20 @@
+version: '3'
+
+
+services:
+  upload-service:
+    build:
+      context: .
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:8080
+    networks:
+      - backend-network
+    ports:
+      - "8081:8080"
+    volumes:
+      - "./wwwroot:/app/wwwroot"
+  
+
+networks:
+  backend-network:
+    external: true

@@ -1,0 +1,77 @@
+version: '3'
+
+x-common-resources: &common_resources
+  deploy:
+    resources:
+      limits:
+        cpus: '0.5'
+        memory: '256m'
+      reservations:
+        cpus: '0.25'
+        memory: '128m'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-db-gateway-test
+    restart: always
+    networks:
+      - backend-network
+    env_file:
+      - ./.env
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+      - ../../auth-service/sql_script.sql:/docker-entrypoint-initdb.d/0_auth.sql
+      - ../../policy-service/sql_script.sql:/docker-entrypoint-initdb.d/1_polices.sql
+      - ../../users-service/sql_script.sql:/docker-entrypoint-initdb.d/2_users.sql
+      - ../../campaign-service/sql_script.sql:/docker-entrypoint-initdb.d/3_campaign.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  auth-service:
+    <<: *common_resources
+    build:
+      context: ../../auth-service
+    container_name: auth-service-gateway-test
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - backend-network
+    volumes:
+      - ./certs:/certs
+    env_file:
+      - ./.env
+    ports:
+      - "8080:8080"
+    environment:
+      - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+      - PRIVATE_KEY_PATH=/certs/private.pem
+      - PUBLIC_KEY_PATH=/certs/public.pem
+
+  upload-service:
+    <<: *common_resources
+    build:
+      context: ../
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:8080
+    networks:
+      - backend-network
+    ports:
+      - "8081:8080"
+    volumes:
+      - "./logs/uploads:/app/wwwroot"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+  
+
+networks:
+  backend-network:
+    driver: bridge
