@@ -21,15 +21,28 @@ public static class CharlistsComparingExtensions
         Formula = field.Formula,
         MaxValue = MaxValue
     };
+
+
+    public static ModifiedFieldMongoData AsModifier(this FieldMongoData field, string formula) => new ModifiedFieldMongoData()
+    {
+        Name = field.Name,
+        Description = field.Description,
+        Category = field.Category,
+        Value = field.Value,
+        Formula = field.Formula,
+        ModifierFormula = formula
+    };
     
 
     private static FieldMongoData CompareWith(this FieldMongoData field, FieldMongoData source)
     {
         if (source is PropertyMongoData && !(field is PropertyMongoData))
             field = field.AsProperty(((PropertyMongoData)source).MaxValue);
+        if (source is ModifiedFieldMongoData)
+            field = field.AsModifier(((ModifiedFieldMongoData)source).ModifierFormula);
         field.Name = source.Name;
         field.Description = source.Description;
-        field.Formula = string.IsNullOrEmpty(field.Formula) ? source.Formula : field.Formula;    
+        field.Formula = string.IsNullOrEmpty(field.Formula) ? source.Formula : field.Formula;
         return field;
     }
          
