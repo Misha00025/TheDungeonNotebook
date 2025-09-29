@@ -23,6 +23,7 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
 		builder.Property(e => e.Id).HasColumnName("group_id");
 		builder.HasKey(e => e.Id);
 		builder.Property(e => e.Name).HasColumnName("name");
+		builder.Property(e => e.Icon).HasColumnName("photo_link");
 	}
 
 	public void ConfigureModel(EntityTypeBuilder<ItemData> builder)
