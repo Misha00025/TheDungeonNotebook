@@ -144,7 +144,9 @@ def with_characters_scenario():
             "level":{"name": "Level", "description": "This is Level", "value": 3},
             "health": {"name": "Health", "description": "This is health", "value": 10, "maxValue": 20, "formula": ":level: * :vitality:"},
             "vit_mod": {"name": "VitMod", "description": "This is VitMod", "value": 10, "formula": "(:vitality:-10)/2"},
-            "test": {"name": "test", "description": "This is test", "value": 10, "formula": "sqrt(16)"}
+            "test": {"name": "test", "description": "This is test", "value": 10, "formula": "sqrt(16)"},
+            "m_tests": {"name": "test M", "description": "This is test", "value": 15, "modifier": "floor(:value:/2 - 5)"},
+            "m_m_tests": {"name": "test M", "description": "This is test", "value": 15, "formula": "10+:!m_tests:"}
         }
     }
     new_character = {

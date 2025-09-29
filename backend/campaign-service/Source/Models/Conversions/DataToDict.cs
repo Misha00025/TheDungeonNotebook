@@ -34,6 +34,12 @@ public static class DataToDictExtensions
                 addedField.Add("maxValue", field.CalculatedValue == null || string.IsNullOrEmpty(field.Formula) ? (field as PropertyMongoData)?.MaxValue : field.CalculatedValue);
                 addedField.Add("value", field.Value);
             }
+            else if (field is ModifiedFieldMongoData)
+            {
+                addedField.Add("modifier", (field as ModifiedFieldMongoData)?.Modifier);
+                addedField.Add("modifierFormula", (field as ModifiedFieldMongoData)?.ModifierFormula);
+                addedField.Add("value", field.Value);
+            }
             else
             {
                 addedField.Add("value", field.CalculatedValue == null ? field.Value : field.CalculatedValue);

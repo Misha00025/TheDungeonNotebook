@@ -22,7 +22,7 @@ public class NamedMongoElement
 }
 
 
-[BsonKnownTypes(typeof(PropertyMongoData))]
+[BsonKnownTypes(typeof(PropertyMongoData), typeof(ModifiedFieldMongoData))]
 public class FieldMongoData : NamedMongoElement
 {
 	[BsonElement("category")]
@@ -43,17 +43,26 @@ public class PropertyMongoData : FieldMongoData
 	public int MaxValue;
 }
 
+public class ModifiedFieldMongoData : FieldMongoData
+{
+	[BsonElement("modifier")]
+	public string ModifierFormula = ":value:";
+
+	[BsonIgnore]
+	public int Modifier;
+}
+
 public class CategorySchema
 {
-    [BsonElement("key")]
-    public string Key { get; set; } = "";
-    [BsonElement("name")]
-    public string Name { get; set; } = "";
-    [BsonElement("fields")]
-    public List<string> Fields { get; set; } = new List<string>();
-    [BsonElement("categories")]
-    [BsonIgnoreIfNull]
-    public List<CategorySchema>? Categories { get; set; } = null;
+	[BsonElement("key")]
+	public string Key { get; set; } = "";
+	[BsonElement("name")]
+	public string Name { get; set; } = "";
+	[BsonElement("fields")]
+	public List<string> Fields { get; set; } = new List<string>();
+	[BsonElement("categories")]
+	[BsonIgnoreIfNull]
+	public List<CategorySchema>? Categories { get; set; } = null;
 }
 
 public class TemplateSchema

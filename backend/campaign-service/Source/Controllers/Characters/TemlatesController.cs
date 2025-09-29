@@ -13,11 +13,12 @@ public class TemplatesController : GroupsBaseController
 {
     public struct FieldPostData
     {
-        public string Name { get; set; } 
+        public string Name { get; set; }
         public string Description { get; set; }
         public int Value { get; set; }
         public int? MaxValue { get; set; }
         public string? Formula { get; set; }
+        public string? Modifier { get; set; }
     }
 
     public struct CategorySchemaPostData
@@ -52,10 +53,14 @@ public class TemplatesController : GroupsBaseController
     
     private FieldMongoData CreateFieldMongoData(FieldPostData data)
     {
-    
-        var field = data.MaxValue == null ?  
-        new FieldMongoData() : 
-        new PropertyMongoData(){ MaxValue = (int)data.MaxValue };
+        FieldMongoData field;
+
+        if (data.MaxValue != null)
+            field = new PropertyMongoData() { MaxValue = (int)data.MaxValue };
+        else if (data.Modifier != null)
+            field = new ModifiedFieldMongoData() { ModifierFormula = data.Modifier };
+        else
+            field = new FieldMongoData();
         field.Name = data.Name;
         field.Description = data.Description;
         field.Value = data.Value;

@@ -30,6 +30,8 @@ public static class FormulaCalculator
         var fields = charlist.Fields;
         var computed = new HashSet<string>();
         var unresolved = new List<string>();
+        
+        // Сначала устанавливаем CalculatedValue для полей без формул
         foreach (var (key, field) in fields)
         {
             if (string.IsNullOrEmpty(field.Formula))
@@ -39,6 +41,7 @@ public static class FormulaCalculator
             }
         }
 
+        // Основной цикл расчета полей с формулами
         bool changed;
         do
         {
@@ -68,6 +71,50 @@ public static class FormulaCalculator
                 }
             }
         } while (changed && unresolved.Count > 0);
+
+        // Расчет модификаторов для ModifiedFieldMongoData
+        var computedModifiers = new HashSet<string>();
+        var unresolvedModifiers = new List<string>();
+        bool changedModifiers;
+        
+        do
+        {
+            changedModifiers = false;
+            unresolvedModifiers.Clear();
+
+            foreach (var (key, field) in fields)
+            {
+                if (field is not ModifiedFieldMongoData modifiedField) continue;
+                if (computedModifiers.Contains(key)) continue;
+
+                try
+                {
+                    if (TryCalculateModifier(modifiedField, fields, out int modifierResult))
+                    {
+                        modifiedField.Modifier = modifierResult;
+                        computedModifiers.Add(key);
+                        changedModifiers = true;
+                    }
+                    else
+                    {
+                        unresolvedModifiers.Add(key);
+                    }
+                }
+                catch
+                {
+                    unresolvedModifiers.Add(key);
+                }
+            }
+        } while (changedModifiers && unresolvedModifiers.Count > 0);
+
+        // Установка модификатора равным CalculatedValue для невычисленных полей
+        foreach (var key in unresolvedModifiers)
+        {
+            if (fields[key] is ModifiedFieldMongoData modifiedField)
+            {
+                modifiedField.Modifier = modifiedField.CalculatedValue ?? modifiedField.Value;
+            }
+        }
     }
 
     private static bool TryCalculateField(
@@ -80,18 +127,116 @@ public static class FormulaCalculator
 
         string expression = field.Formula;
         
-        // Заменяем ссылки на поля
-        var matches = Regex.Matches(expression, @":(\w+):");
+        // Заменяем ссылки на поля и модификаторы
+        var matches = Regex.Matches(expression, @":(!?\w+):");
         foreach (Match match in matches)
         {
-            string fieldKey = match.Groups[1].Value;
+            string fullMatch = match.Groups[1].Value;
+            bool isModifier = fullMatch.StartsWith("!");
+            string fieldKey = isModifier ? fullMatch.Substring(1) : fullMatch;
+
             if (!allFields.TryGetValue(fieldKey, out var referencedField))
                 return false;
-            if (referencedField.CalculatedValue == null)
-                return false;
-            int value = (int)referencedField.CalculatedValue;
-            expression = expression.Replace(match.Value, value.ToString());
+
+            if (isModifier)
+            {
+                // Ссылка на модификатор
+                if (referencedField is ModifiedFieldMongoData modifiedReferencedField)
+                {
+                    // Используем модификатор поля
+                    expression = expression.Replace(match.Value, modifiedReferencedField.Modifier.ToString());
+                }
+                else
+                {
+                    // Если поле не является ModifiedFieldMongoData, используем его CalculatedValue
+                    if (referencedField.CalculatedValue == null)
+                        return false;
+                    int value = (int)referencedField.CalculatedValue;
+                    expression = expression.Replace(match.Value, value.ToString());
+                }
+            }
+            else
+            {
+                // Обычная ссылка на значение поля
+                if (referencedField.CalculatedValue == null)
+                    return false;
+                int value = (int)referencedField.CalculatedValue;
+                expression = expression.Replace(match.Value, value.ToString());
+            }
         }
+        
+        try
+        {
+            result = EvaluateExpression(expression);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool TryCalculateModifier(
+        ModifiedFieldMongoData field,
+        Dictionary<string, FieldMongoData> allFields,
+        out int result)
+    {
+        result = field.Modifier;
+        if (string.IsNullOrEmpty(field.ModifierFormula)) 
+        {
+            // Если формула модификатора пуста, используем CalculatedValue
+            result = field.CalculatedValue ?? field.Value;
+            return true;
+        }
+
+        string expression = field.ModifierFormula;
+        
+        // Заменяем ссылки на поля, включая специальное значение :value:
+        var matches = Regex.Matches(expression, @":(!?\w+):");
+        foreach (Match match in matches)
+        {
+            string fullMatch = match.Groups[1].Value;
+            bool isModifier = fullMatch.StartsWith("!");
+            string fieldKey = isModifier ? fullMatch.Substring(1) : fullMatch;
+
+            if (fieldKey == "value")
+            {
+                // :value: означает CalculatedValue текущего поля
+                int value = field.CalculatedValue ?? field.Value;
+                expression = expression.Replace(match.Value, value.ToString());
+            }
+            else
+            {
+                if (!allFields.TryGetValue(fieldKey, out var referencedField))
+                    return false;
+
+                if (isModifier)
+                {
+                    // Ссылка на модификатор
+                    if (referencedField is ModifiedFieldMongoData modifiedReferencedField)
+                    {
+                        expression = expression.Replace(match.Value, modifiedReferencedField.Modifier.ToString());
+                    }
+                    else
+                    {
+                        // Если поле не является ModifiedFieldMongoData, используем его CalculatedValue
+                        if (referencedField.CalculatedValue == null)
+                            return false;
+                        int value = (int)referencedField.CalculatedValue;
+                        expression = expression.Replace(match.Value, value.ToString());
+                    }
+                }
+                else
+                {
+                    // Обычная ссылка на значение поля
+                    if (referencedField.CalculatedValue == null)
+                        return false;
+                    int value = (int)referencedField.CalculatedValue;
+                    expression = expression.Replace(match.Value, value.ToString());
+                }
+            }
+        }
+        
         try
         {
             result = EvaluateExpression(expression);
