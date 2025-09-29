@@ -18,7 +18,7 @@ public class TemplatesController : GroupsBaseController
         public int Value { get; set; }
         public int? MaxValue { get; set; }
         public string? Formula { get; set; }
-        public string? Modifier { get; set; }
+        public string? ModifierFormula { get; set; }
     }
 
     public struct CategorySchemaPostData
@@ -57,8 +57,8 @@ public class TemplatesController : GroupsBaseController
 
         if (data.MaxValue != null)
             field = new PropertyMongoData() { MaxValue = (int)data.MaxValue };
-        else if (data.Modifier != null)
-            field = new ModifiedFieldMongoData() { ModifierFormula = data.Modifier };
+        else if (data.ModifierFormula != null)
+            field = new ModifiedFieldMongoData() { ModifierFormula = data.ModifierFormula };
         else
             field = new FieldMongoData();
         field.Name = data.Name;
