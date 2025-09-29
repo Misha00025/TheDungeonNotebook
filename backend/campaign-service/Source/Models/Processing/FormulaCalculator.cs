@@ -140,11 +140,28 @@ public static class FormulaCalculator
 
             if (isModifier)
             {
-                // Ссылка на модификатор
+                // Ссылка на модификатор - пытаемся вычислить его на месте
                 if (referencedField is ModifiedFieldMongoData modifiedReferencedField)
                 {
-                    // Используем модификатор поля
-                    expression = expression.Replace(match.Value, modifiedReferencedField.Modifier.ToString());
+                    // Если модификатор уже вычислен, используем его
+                    if (modifiedReferencedField.Modifier != 0)
+                    {
+                        expression = expression.Replace(match.Value, modifiedReferencedField.Modifier.ToString());
+                    }
+                    else
+                    {
+                        // Пытаемся вычислить модификатор на месте
+                        if (TryCalculateModifier(modifiedReferencedField, allFields, out int modifierValue))
+                        {
+                            modifiedReferencedField.Modifier = modifierValue;
+                            expression = expression.Replace(match.Value, modifierValue.ToString());
+                        }
+                        else
+                        {
+                            // Не удалось вычислить модификатор - откладываем вычисление этого поля
+                            return false;
+                        }
+                    }
                 }
                 else
                 {
@@ -202,7 +219,9 @@ public static class FormulaCalculator
             if (fieldKey == "value")
             {
                 // :value: означает CalculatedValue текущего поля
-                int value = field.CalculatedValue ?? field.Value;
+                if (field.CalculatedValue == null)
+                    return false;
+                int value = (int)field.CalculatedValue;
                 expression = expression.Replace(match.Value, value.ToString());
             }
             else
@@ -212,10 +231,28 @@ public static class FormulaCalculator
 
                 if (isModifier)
                 {
-                    // Ссылка на модификатор
+                    // Ссылка на модификатор - пытаемся вычислить его на месте
                     if (referencedField is ModifiedFieldMongoData modifiedReferencedField)
                     {
-                        expression = expression.Replace(match.Value, modifiedReferencedField.Modifier.ToString());
+                        // Если модификатор уже вычислен, используем его
+                        if (modifiedReferencedField.Modifier != 0)
+                        {
+                            expression = expression.Replace(match.Value, modifiedReferencedField.Modifier.ToString());
+                        }
+                        else
+                        {
+                            // Пытаемся вычислить модификатор на месте
+                            if (TryCalculateModifier(modifiedReferencedField, allFields, out int modifierValue))
+                            {
+                                modifiedReferencedField.Modifier = modifierValue;
+                                expression = expression.Replace(match.Value, modifierValue.ToString());
+                            }
+                            else
+                            {
+                                // Не удалось вычислить модификатор - откладываем вычисление этого модификатора
+                                return false;
+                            }
+                        }
                     }
                     else
                     {
