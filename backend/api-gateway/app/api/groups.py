@@ -98,20 +98,6 @@ def _items(group_id: int):
             return make_response(services.groups(rq.headers, group_id).items().post(rq.data))
 
 
-@route("groups/<int:group_id>/characters/templates", ["GET", "POST"])
-def _templates(group_id: int):
-    success, is_admin, response = check_access_to_group(group_id, rq)
-    if not success:
-        return response
-    match (rq.method):
-        case "GET":
-            return make_response(services.groups(rq.headers, group_id).characters().templates().get())
-        case "POST":
-            if not is_admin:
-                return forbidden()
-            return make_response(services.groups(rq.headers, group_id).characters().templates().post(rq.data))
-
-
 @route("groups/<int:group_id>/items/<int:item_id>", ["GET", "PUT", "DELETE"])
 def _item(group_id: int, item_id: int):
     success, is_admin, response = check_access_to_group(group_id, rq)

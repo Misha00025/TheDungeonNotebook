@@ -74,7 +74,25 @@ def _character_user(group_id: int, character_id: int, user_id: int):
             return make_response(services.polices(rq.headers).groups().characters().delete(group_id, user_id, character_id))    
 
 
-@route("groups/<int:group_id>/characters/templates/<int:template_id>", ["GET", "PUT", "DELETE"])
+@route("groups/<int:group_id>/characters/templates", ["GET", "POST", "PUT"])
+def _templates(group_id: int):
+    success, is_admin, response = check_access_to_group(group_id, rq)
+    if not success:
+        return response
+    match (rq.method):
+        case "GET":
+            return make_response(services.groups(rq.headers, group_id).characters().templates().get())
+        case "POST":
+            if not is_admin:
+                return forbidden()
+            return make_response(services.groups(rq.headers, group_id).characters().templates().post(rq.data))
+        case "PUT":
+            if not is_admin:
+                return forbidden()
+            return make_response(services.groups(rq.headers, group_id).characters().templates().put(rq.data))
+
+
+@route("groups/<int:group_id>/characters/templates/<int:template_id>", ["GET", "PUT"])
 def _template(group_id: int, template_id: int):
     success, is_admin, response = check_access_to_group(group_id, rq)
     if not success:
@@ -86,10 +104,6 @@ def _template(group_id: int, template_id: int):
             if not is_admin:
                 return forbidden()
             return make_response(services.groups(rq.headers, group_id).characters().templates(template_id).put(rq.data))
-        case "DELETE":
-            if not is_admin:
-                return forbidden()
-            return make_response(services.groups(rq.headers, group_id).characters().templates(template_id).delete())
 
 
 @route("groups/<int:group_id>/characters/<int:character_id>/items", ["GET", "POST"])
