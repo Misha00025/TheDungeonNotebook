@@ -52,6 +52,14 @@ public class GroupAttributesController : BaseController
     {
         var attributesData = data.attributes.Where(e => e.Key != null && e.Name != null);
         var attributes = attributesData.Select(ToAttribute).ToList();
+        var oldAttributes = _provider.GetAttributes(groupId);
+        attributes = attributes.Select(e =>
+        {
+            var old = oldAttributes.Where(o => o.Key == e.Key).FirstOrDefault();
+            if (old != null)
+                e.KnownValues = old.KnownValues;
+            return e;
+        }).ToList();
         bool success;
         success = _provider.TrySaveAttributes(groupId, attributes);
         if (success)

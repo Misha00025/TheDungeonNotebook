@@ -56,7 +56,6 @@ public class GroupSkillsController : BaseController
                 if (!existingAttr.KnownValues.Contains(valuedAttr.Value))
                 {
                     existingAttr.KnownValues.Add(valuedAttr.Value);
-                    attributesToUpdate.Add(existingAttr);
                 }
             }
         }
