@@ -170,7 +170,7 @@ def _group_skills(group_id: int):
         return response
     match (rq.method):
         case "GET":
-            params = rq.args
+            params = rq.args.to_dict()
             params["withSecrets"] = is_admin
             return make_response(services.groups(rq.headers, group_id).skills().get(params=params))
         case "POST":
