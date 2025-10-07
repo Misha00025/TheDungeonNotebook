@@ -59,6 +59,7 @@ public class SkillsProvider
         skill.Name = mongoData.Name;
         skill.Description = mongoData.Description;
         skill.Attributes = mongoData.Attributes.Select(e => ToAttribute(data.GroupId, e)).ToList();
+        skill.IsSecret = mongoData.IsSecret;
         return skill;
     }
     
@@ -116,7 +117,8 @@ public class SkillsProvider
                         Key = e.Key,
                         Value = e.Value
                     })
-                    .ToList()
+                    .ToList(),
+                IsSecret = skill.IsSecret
             };
             _mongo.GetCollection<SkillMongoData>(SKILLS_COLLECTION_NAME).InsertOne(mongoData);
             SkillData data = new SkillData() { GroupId = groupId, UUID = mongoData.Id.ToString() };
@@ -154,7 +156,8 @@ public class SkillsProvider
                         Key = e.Key,
                         Value = e.Value
                     })
-                    .ToList()
+                    .ToList(),
+                IsSecret = skill.IsSecret
             };
 
             var collection = _mongo.GetCollection<SkillMongoData>(SKILLS_COLLECTION_NAME);

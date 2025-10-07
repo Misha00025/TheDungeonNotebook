@@ -138,4 +138,8 @@ public class SkillMongoData : GroupEntityMongoData
 {
 	[BsonElement("attributes")]
 	public List<ValuedAttributeMongoData> Attributes = new();
+
+	[BsonIgnoreIfNull]
+	[BsonElement("is_secret")]
+	public bool IsSecret;
 }

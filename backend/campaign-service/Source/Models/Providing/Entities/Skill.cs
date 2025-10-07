@@ -24,6 +24,7 @@ public class Skill
     public string Description = "";
     public Group Group { get; private set; }
     public List<ValuedAttribute> Attributes = new ();
+    public bool IsSecret;
     
     public Skill(Group group)
     {

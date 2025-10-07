@@ -170,7 +170,9 @@ def _group_skills(group_id: int):
         return response
     match (rq.method):
         case "GET":
-            return make_response(services.groups(rq.headers, group_id).skills().get())
+            params = rq.args
+            params["withSecrets"] = is_admin
+            return make_response(services.groups(rq.headers, group_id).skills().get(params=params))
         case "POST":
             if not is_admin:
                 return forbidden()

@@ -24,6 +24,8 @@ public class GroupSkillsController : BaseController
         public string? Name { get; set; }
         public string? Description { get; set; }
         public List<AttributePostData>? Attributes { get; set; }
+        public bool? IsSecret { get; set; }
+
     }
 
     public GroupSkillsController(SkillsProvider skillsProvider, AttributesProvider attributesProvider)
@@ -74,11 +76,13 @@ public class GroupSkillsController : BaseController
     private IEnumerable<Skill> ApplyFilters(IEnumerable<Skill> skills, Dictionary<string, string> filters) => _provider.ApplyFilters(skills, filters);
 
     [HttpGet]
-    public ActionResult GetSkills(int groupId, [FromQuery] Dictionary<string, string>? filters = null)
+    public ActionResult GetSkills(int groupId, [FromQuery] bool withSecrets = false, [FromQuery] Dictionary<string, string>? filters = null)
     {
         var skills = _provider.GetSkills(groupId);
+        if (withSecrets == false)
+            skills = skills.Where(e => e.IsSecret == false).ToList();
         if (filters != null && filters.Any())
-            skills = ApplyFilters(skills, filters);
+            skills = ApplyFilters(skills, filters.Where(e => e.Key != "withSecrets").ToDictionary());
         return Ok(new
         {
             skills = skills.Select(e => e.ToResponse()).ToList(),
@@ -107,11 +111,13 @@ public class GroupSkillsController : BaseController
             Description = data.Description != null ? data.Description : "",
             Attributes = data.Attributes == null ? new() : data.Attributes
                                 .Where(e => !(e.Key == null || e.Value == null))
-                                .Select(e => new ValuedAttribute() { 
-                                    Key = e.Key!, 
+                                .Select(e => new ValuedAttribute()
+                                {
+                                    Key = e.Key!,
                                     Name = e.Name ?? e.Key!,
-                                    Value = e.Value! 
-                                }).ToList()
+                                    Value = e.Value!
+                                }).ToList(),
+            IsSecret = data.IsSecret ?? false
         };
 
         if (_provider.TryCreateSkill(groupId, skill))
@@ -142,6 +148,7 @@ public class GroupSkillsController : BaseController
                                 Name = e.Name ?? e.Key!,
                                 Value = e.Value! 
                             }).ToList();
+        skill.IsSecret = data.IsSecret ?? false;
         
         if (_provider.TryUpdateSkill(skill))
         {

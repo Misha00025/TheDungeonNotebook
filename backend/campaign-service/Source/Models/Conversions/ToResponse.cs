@@ -24,6 +24,7 @@ public static class ModelToResponseExtensions
         id = skill.Id,
         name = skill.Name,
         description = skill.Description,
-        attributes = skill.Attributes.Select(e => e.ToResponse())
+        attributes = skill.Attributes.Select(e => e.ToResponse()),
+        isSecret = skill.IsSecret
     };
 }
