@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Tdn.Models;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
 
@@ -9,14 +10,6 @@ namespace Tdn.Api.Controllers;
 public class GroupAttributesController : BaseController
 {
     private AttributesProvider _provider;
-
-    public struct AttributePostData 
-    {
-        public string? Key { get; set; }
-        public string? Name { get; set; }
-        public string? Description { get; set; }
-        public bool? isFiltered { get; set; }
-    }
     
     public struct PostData
     {

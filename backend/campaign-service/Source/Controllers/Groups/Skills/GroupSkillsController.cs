@@ -12,22 +12,6 @@ public class GroupSkillsController : BaseController
     private SkillsProvider _provider;
     private AttributesProvider _attributesProvider;
 
-    public struct AttributePostData
-    {
-        public string? Key { get; set; }
-        public string? Name { get; set; }
-        public string? Value { get; set; }
-    }
-
-    public struct SkillPostData
-    {
-        public string? Name { get; set; }
-        public string? Description { get; set; }
-        public List<AttributePostData>? Attributes { get; set; }
-        public bool? IsSecret { get; set; }
-
-    }
-
     public GroupSkillsController(SkillsProvider skillsProvider, AttributesProvider attributesProvider)
     {
         _provider = skillsProvider;
