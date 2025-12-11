@@ -20,11 +20,13 @@ builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigure
 builder.Services.AddDbContext<GroupContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<EntityContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<SkillsContext>(config.ConfigDbConnections);
+builder.Services.AddDbContext<ItemsContext>(config.ConfigDbConnections);
 builder.Services.AddScoped(_ => new MongoDbContext(config.GetMongoDbSettings()));
 
 // Providers
 builder.Services.AddScoped<AttributesProvider, AttributesProvider>();
 builder.Services.AddScoped<SkillsProvider, SkillsProvider>();
+builder.Services.AddScoped<ItemsProvider, ItemsProvider>();
 
 // General
 builder.Services.AddEndpointsApiExplorer();

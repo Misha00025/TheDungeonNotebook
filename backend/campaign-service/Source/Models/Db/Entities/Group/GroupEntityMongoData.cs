@@ -79,29 +79,6 @@ public class CharlistMongoData : GroupEntityMongoData
     public TemplateSchema? Schema { get; set; } = new();
 }
 
-public class ItemMongoData : GroupEntityMongoData 
-{
-	[BsonElement("price")]
-	public int Price { get; set; } = 0;
-	[BsonElement("image_link")]
-	public string? Image;
-}
-
-public class AmountedItemMongoData : NamedMongoElement
-{
-	[BsonElement("amount")]
-	public int Amount;
-	[BsonElement("price")]
-	public int Price { get; set; } = 0;
-	[BsonElement("image_link")]
-	public string? Image;
-}
-
-public class CharacterMongoData : CharlistMongoData
-{
-	[BsonElement("items")]
-	public List<AmountedItemMongoData> Items = new();
-}
 
 public class AttributeMongoData
 {
@@ -134,12 +111,42 @@ public class ValuedAttributeMongoData
 	public string Value = "";
 }
 
-public class SkillMongoData : GroupEntityMongoData
+public class AttributedMongoData : GroupEntityMongoData
 {
+	[BsonIgnoreIfDefault]
 	[BsonElement("attributes")]
 	public List<ValuedAttributeMongoData> Attributes = new();
 
 	[BsonIgnoreIfNull]
 	[BsonElement("is_secret")]
 	public bool IsSecret;
+}
+
+public class ItemMongoData : AttributedMongoData
+{
+	[BsonElement("price")]
+	public int Price { get; set; } = 0;
+	[BsonElement("image_link")]
+	public string? Image;
+}
+
+public class AmountedItemMongoData : NamedMongoElement
+{
+	[BsonElement("amount")]
+	public int Amount;
+	[BsonElement("price")]
+	public int Price { get; set; } = 0;
+	[BsonElement("image_link")]
+	public string? Image;
+}
+
+public class CharacterMongoData : CharlistMongoData
+{
+	[BsonElement("items")]
+	public List<AmountedItemMongoData> Items = new();
+}
+
+public class SkillMongoData : AttributedMongoData
+{
+    
 }

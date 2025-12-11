@@ -3,6 +3,7 @@ using MongoDB.Driver;
 using Tdn.Db;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
+using Tdn.Models;
 using Tdn.Models.Conversions;
 
 namespace Tdn.Api.Controllers;
@@ -16,6 +17,8 @@ public class GroupItemsController : GroupsBaseController
         public string Name { get; set; }
         public string Description { get; set; }
         public int? Price { get; set; }
+        public List<AttributePostData>? Attributes { get; set; }
+        public bool? IsSecret { get; set; }
     }
 
     private EntityContext _dbContext;
