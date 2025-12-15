@@ -27,3 +27,13 @@ public class CharacterSkillData
 	public CharacterData Character = null!;
 	public SkillData Skill = null!;
 }
+
+public class CharacterItemData
+{
+	public int CharacterId;
+	public int ItemId;
+	public int Amount;
+	
+	public CharacterData Character = null!;
+	public ItemData Item = null!;
+}

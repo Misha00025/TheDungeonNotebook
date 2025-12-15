@@ -3,7 +3,9 @@ using MongoDB.Driver;
 using Tdn.Db;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
+using Tdn.Models;
 using Tdn.Models.Conversions;
+using Tdn.Models.Providing;
 
 namespace Tdn.Api.Controllers;
 
@@ -11,16 +13,12 @@ namespace Tdn.Api.Controllers;
 [Route("/groups/{groupId}/characters/{characterId}/items")]
 public class CharacterItemsController : CharactersBaseController
 {
-    public struct ItemPostData
-    {
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public int? Price { get; set; }
-        public int? Amount { get; set; }
-    }
 
-    public CharacterItemsController(EntityContext context, MongoDbContext mongo, GroupContext groupContext) : base(context, mongo, groupContext)
+    private ItemsProvider _provider;
+
+    public CharacterItemsController(EntityContext context, MongoDbContext mongo, GroupContext groupContext, ItemsProvider itemsProvider) : base(context, mongo, groupContext)
     {
+            _provider = itemsProvider;
     }
     
     [HttpGet]
@@ -28,7 +26,9 @@ public class CharacterItemsController : CharactersBaseController
     {
         if (TryGetCharacter(groupId, characterId, out var data, out var character))
         {
-            return Ok(new Dictionary<string, object>(){ {"items", character.Items.ToDict()} });
+            var items = _provider.GetItems(groupId, characterId);
+            var result = items.Select(e => e.ToResponse()).Concat(character.Items.ToDict()).ToList();
+            return Ok(new Dictionary<string, object>(){ {"items", result} });
         }
         return NotFound("Character not found");
     }
@@ -38,18 +38,14 @@ public class CharacterItemsController : CharactersBaseController
     {
         if (TryGetCharacter(groupId, characterId, out var _, out var character))
         {
-            var index = character.Items.Count;
-            var item = new AmountedItemMongoData()
+            var item = data.AsItem(groupId);
+            item.IsSecret = true;
+            if (_provider.TryCreateItem(groupId, item))
             {
-                Name = data.Name,
-                Description = data.Description,
-                Price = data.Price != null ? (int)data.Price : 0,
-                Amount = data.Amount != null ? (int)data.Amount : 1,                
-            };
-            character.Items.Add(item);
-            var filter = Builders<CharacterMongoData>.Filter.Eq("_id", character.Id);
-            GetCollection().ReplaceOne(filter, character);
-            return Created($"groups/{groupId}/characters/{characterId}/items/{index}", item.ToDict(index));
+                if (_provider.TrySetItemToCharacter(item, characterId, item.Amount ?? 0))
+                return Created($"groups/{groupId}/characters/{characterId}/items/{item.Id}", item.ToResponse());
+            }
+            return BadRequest();
         }
         return NotFound("Character not found");
     }
@@ -59,9 +55,10 @@ public class CharacterItemsController : CharactersBaseController
     {
         if (TryGetCharacter(groupId, characterId, out var _, out var character))
         {
-            if (itemId >= character.Items.Count || itemId < 0)
+            var item = _provider.GetItem(groupId, itemId, characterId);
+            if (item == null)
                 return NotFound();
-            return Ok(character.Items[itemId].ToDict(itemId));
+            return Ok(item.ToResponse());
         }
         return NotFound("Character not found");
     }
@@ -71,16 +68,12 @@ public class CharacterItemsController : CharactersBaseController
     {
         if (TryGetCharacter(groupId, characterId, out var _, out var character))
         {
-            if (itemId >= character.Items.Count || itemId < 0)
-                return NotFound();
-            var item = character.Items[itemId];
-            item.Name = data.Name;
-            item.Description = data.Description;
+            var item = _provider.GetItem(groupId, itemId);
+            if (item == null)
+                return NotFound("Item not found");
             item.Amount = data.Amount != null ? (int)data.Amount : item.Amount;
-            item.Price = data.Price != null ? (int)data.Price : item.Price;
-            var filter = Builders<CharacterMongoData>.Filter.Eq("_id", character.Id);
-            GetCollection().ReplaceOne(filter, character);
-            return Ok(item.ToDict(itemId));
+            _provider.TrySetItemToCharacter(item, characterId, item.Amount ?? 0);
+            return Ok(item.ToResponse());
         }
         return NotFound("Character not found");
     }
@@ -90,13 +83,11 @@ public class CharacterItemsController : CharactersBaseController
     {
         if (TryGetCharacter(groupId, characterId, out var _, out var character))
         {
-            if (itemId >= character.Items.Count || itemId < 0)
-                return NotFound();
-            var filter = Builders<CharacterMongoData>.Filter.Eq("_id", character.Id);
-            var item = character.Items[itemId];
-            character.Items.RemoveAt(itemId);
-            GetCollection().ReplaceOne(filter, character);
-            return Ok(item.ToDict(itemId));
+            var item = _provider.GetItem(groupId, itemId, characterId);
+            if (item == null)
+                return NotFound("Item not found");
+            _provider.TryRemoveItemFromCharacter(item, characterId);
+            return Ok(item.ToResponse());
         }
         return NotFound("Character not found");
     }

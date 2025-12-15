@@ -91,7 +91,7 @@ def _items(group_id: int):
         return response
     match (rq.method):
         case "GET":
-            return make_response(services.groups(rq.headers, group_id).items().get())
+            return make_response(services.groups(rq.headers, group_id).items().get({"withSecrets": is_admin}))
         case "POST":
             if not is_admin:
                 return forbidden()

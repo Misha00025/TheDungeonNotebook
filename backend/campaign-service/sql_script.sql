@@ -36,6 +36,15 @@ CREATE TABLE IF NOT EXISTS `item` (
   CONSTRAINT `FK_item_group_group_id` FOREIGN KEY (`group_id`) REFERENCES `group` (`group_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE IF NOT EXISTS `character_item` (
+  `item_id` int NOT NULL,
+  `character_id` int NOT NULL,
+  `amount` int NOT NULL,
+  PRIMARY KEY (`character_id`, `item_id`),
+  FOREIGN KEY (`character_id`) REFERENCES `character`(`character_id`) ON DELETE CASCADE,
+  FOREIGN KEY (`item_id`) REFERENCES `item`(`item_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE IF NOT EXISTS `skill` (
   `skill_id` int NOT NULL AUTO_INCREMENT,
   `group_id` int NOT NULL,

@@ -80,6 +80,20 @@ public class ItemsProvider
         return GetItem(data);
     }
     
+    public Item? GetItem(int groupId, int itemId, int characterId)
+    {
+        var data = _sql.CharacterItems
+                    .Include(e => e.Item)
+                    .Where(e => e.Item.GroupId == groupId && e.ItemId == itemId && e.CharacterId == characterId)
+                    .Include(e => e.Item.Group)
+                    .FirstOrDefault();
+        if (data == null)
+            return null;
+        var item = GetItem(data.Item);
+        item.Amount = data.Amount;
+        return item;
+    }
+       
     public IEnumerable<Item> GetItems(int groupId)
     {
         var skills = _sql.Items
@@ -87,6 +101,18 @@ public class ItemsProvider
                         .Include(e => e.Group)
                         .AsEnumerable()
                         .Select(GetItem)
+                        .ToList();
+        return skills;
+    }
+    
+    public IEnumerable<Item> GetItems(int groupId, int characterId)
+    {
+        var skills = _sql.CharacterItems
+                        .Include(e => e.Item)
+                        .Include(e => e.Item.Group)
+                        .Where(e => e.Item.GroupId == groupId && e.CharacterId == characterId)
+                        .AsEnumerable()
+                        .Select(e => {var item = GetItem(e.Item); item.Amount = e.Amount; return item;})
                         .ToList();
         return skills;
     }
@@ -159,7 +185,7 @@ public class ItemsProvider
         }
         catch (Exception e)
         {
-            _logger.LogWarning($"Error with update skill: {e}");
+            _logger.LogWarning($"Error with update item: {e}");
             return false;
         }
     }
@@ -181,6 +207,55 @@ public class ItemsProvider
         catch (Exception e)
         {
             _logger.LogWarning($"Error with delete skill: {e}");
+            return false;
+        }
+    }
+    
+    public bool TrySetItemToCharacter(Item item, int characterId, int amount)
+    {
+        try
+        {
+            var existing = _sql.CharacterItems
+                .FirstOrDefault(e => e.CharacterId == characterId && e.ItemId == item.Id);
+            if (existing != null)
+            {
+                existing.Amount = amount;
+            }
+            else
+            {
+                var characterItem = new CharacterItemData()
+                {
+                    CharacterId = characterId,
+                    ItemId = item.Id,
+                    Amount = amount
+                };
+                _sql.CharacterItems.Add(characterItem);
+            }
+            _sql.SaveChanges();
+            return true;
+        }
+        catch (Exception e)
+        {
+            _logger.LogWarning($"Error adding item to character: {e}");
+            return false;
+        }
+    }
+    
+    public bool TryRemoveItemFromCharacter(Item item, int characterId)
+    {
+        try
+        {
+            var existing = _sql.CharacterItems
+                .FirstOrDefault(e => e.CharacterId == characterId && e.ItemId == item.Id);
+            if (existing == null)
+                return true;
+            _sql.CharacterItems.Remove(existing);
+            _sql.SaveChanges();
+            return true;
+        }
+        catch (Exception e)
+        {
+            _logger.LogWarning($"Error removing item from character: {e}");
             return false;
         }
     }

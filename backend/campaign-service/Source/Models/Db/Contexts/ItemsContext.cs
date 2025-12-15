@@ -11,4 +11,5 @@ public class ItemsContext : EntityContext
     }
 
     public DbSet<ItemData> Items => Set<ItemData>();
+    public DbSet<CharacterItemData> CharacterItems => Set<CharacterItemData>();
 }

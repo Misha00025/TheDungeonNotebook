@@ -13,39 +13,7 @@ namespace Tdn.Api.Controllers;
 [Route("groups/{groupId}/items")]
 public class GroupItemsController : GroupsBaseController
 {
-    public struct ItemPostData
-    {
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public int? Price { get; set; }
-        public List<AttributePostData>? Attributes { get; set; }
-        public bool? IsSecret { get; set; }
-    }
-
     private ItemsProvider _provider;
-    
-    private List<ValuedAttribute> AsAttributes(List<AttributePostData> data)
-    {
-        return data.Select(e => new ValuedAttribute()
-        {
-            Key = e.Key ?? "",
-            Name = e.Name ?? e.Key ?? "",
-            Description = e.Description ?? "",
-            Value = e.Value ?? "",
-        }).ToList();
-    }
-    
-    private Item AsItem(int groupId, ItemPostData data)
-    {
-        return new Item(new Group(){Id = groupId})
-        {
-            Name = data.Name,
-            Description = data.Description,
-            Price = data.Price ?? 0,
-            Attributes = AsAttributes(data.Attributes ?? new()),
-            IsSecret = data.IsSecret ?? false
-        };
-    }
     
     public GroupItemsController(GroupContext groupContext, ItemsProvider provider) : base(groupContext)
     {
@@ -53,11 +21,14 @@ public class GroupItemsController : GroupsBaseController
     }
 
     [HttpGet]
-    public ActionResult GetAll(int groupId)
+    public ActionResult GetAll(int groupId, bool withSecrets = false)
     {
         if (TryGetGroup(groupId, out var _))
         {
-            return Ok(new Dictionary<string, object>(){{"items", _provider.GetItems(groupId).Select(e => e.ToResponse())}});
+            var items = _provider.GetItems(groupId);
+            if (!withSecrets)
+                items = items.Where(e => !e.IsSecret).ToList();
+            return Ok(new Dictionary<string, object>(){{"items", items.Select(e => e.ToResponse())}});
         }
         return NotFound("Group not found");
     }
@@ -67,7 +38,7 @@ public class GroupItemsController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var _))
         {
-            var item = AsItem(groupId, data);
+            var item = data.AsItem(groupId);
             if (_provider.TryCreateItem(groupId, item))
                 return Created($"groups/{groupId}/items/{item.Id}", item.ToResponse());
             return BadRequest("Can't create ");
@@ -95,7 +66,7 @@ public class GroupItemsController : GroupsBaseController
         {
             if (_provider.GetItem(groupId, itemId) == null)
                 return NotFound("Item not found");
-            var item = AsItem(groupId, data);
+            var item = data.AsItem(groupId);
             item.Id = itemId;
             if (_provider.TryUpdateItem(item))
                 return Ok(item.ToResponse());

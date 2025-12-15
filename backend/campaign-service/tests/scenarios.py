@@ -325,6 +325,7 @@ def with_character_items_scenario():
         Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items", method="POST", data=new_item_2, requirement=CREATED),
         Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items", method="POST", data=wrong_item, requirement=BAD),
         Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items", method="POST", requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items", requirement=OK),
         Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.4.id}", requirement=OK),
         Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.5.id}", requirement=OK),
         Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.5.id}", method="DELETE", requirement=OK),

@@ -12,6 +12,7 @@ public interface IEntityBuildersConfigurer
 	void ConfigureModel(EntityTypeBuilder<CharacterData> builder);
 	void ConfigureModel(EntityTypeBuilder<SkillData> builder);
 	void ConfigureModel(EntityTypeBuilder<CharacterSkillData> builder);
+	void ConfigureModel(EntityTypeBuilder<CharacterItemData> builder);
 }
 
 public class EntityBuildersConfigurer : IEntityBuildersConfigurer
@@ -79,4 +80,15 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
 		builder.HasOne(e => e.Character).WithMany().HasForeignKey(e => e.CharacterId);		
 		builder.HasOne(e => e.Skill).WithMany().HasForeignKey(e => e.SkillId);		
 	}
+
+    public void ConfigureModel(EntityTypeBuilder<CharacterItemData> builder)
+    {
+        builder.ToTable("character_item");
+		builder.HasKey(e => new { e.ItemId, e.CharacterId });
+		builder.Property(e => e.ItemId).HasColumnName("item_id");
+		builder.Property(e => e.CharacterId).HasColumnName("character_id");
+		builder.Property(e => e.Amount).HasColumnName("amount");
+		builder.HasOne(e => e.Character).WithMany().HasForeignKey(e => e.CharacterId);		
+		builder.HasOne(e => e.Item).WithMany().HasForeignKey(e => e.ItemId);
+    }
 }

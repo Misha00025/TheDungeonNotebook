@@ -111,9 +111,9 @@ public static class DataToDictExtensions
         };
     }
     
-    public static List<Dictionary<string, object?>> ToDict(this List<AmountedItemMongoData> dataList, int startIndex = 0)
+    public static List<Dictionary<string, object?>> ToDict(this List<AmountedItemMongoData> dataList, int startIndex = -1)
     {
         int index = startIndex;
-        return dataList.Select(e => e.ToDict(index++)).ToList();
+        return dataList.Select(e => e.ToDict(index--)).ToList();
     }
 }
