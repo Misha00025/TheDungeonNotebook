@@ -5,6 +5,7 @@ using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 using Tdn.Models;
 using Tdn.Models.Conversions;
+using Tdn.Models.Providing;
 
 namespace Tdn.Api.Controllers;
 
@@ -21,13 +22,34 @@ public class GroupItemsController : GroupsBaseController
         public bool? IsSecret { get; set; }
     }
 
-    private EntityContext _dbContext;
-    private MongoDbContext _mongo;
+    private ItemsProvider _provider;
     
-    public GroupItemsController(EntityContext context, MongoDbContext mongo, GroupContext groupContext) : base(groupContext)
+    private List<ValuedAttribute> AsAttributes(List<AttributePostData> data)
     {
-        _dbContext = context;
-        _mongo = mongo;
+        return data.Select(e => new ValuedAttribute()
+        {
+            Key = e.Key ?? "",
+            Name = e.Name ?? e.Key ?? "",
+            Description = e.Description ?? "",
+            Value = e.Value ?? "",
+        }).ToList();
+    }
+    
+    private Item AsItem(int groupId, ItemPostData data)
+    {
+        return new Item(new Group(){Id = groupId})
+        {
+            Name = data.Name,
+            Description = data.Description,
+            Price = data.Price ?? 0,
+            Attributes = AsAttributes(data.Attributes ?? new()),
+            IsSecret = data.IsSecret ?? false
+        };
+    }
+    
+    public GroupItemsController(GroupContext groupContext, ItemsProvider provider) : base(groupContext)
+    {
+        _provider = provider;
     }
 
     [HttpGet]
@@ -35,9 +57,7 @@ public class GroupItemsController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var _))
         {
-            var items = _dbContext.Set<ItemData>().Where(e => e.GroupId == groupId);
-            var result = items.Select(e => e.ToDict(_mongo.GetEntity<ItemMongoData>(MongoCollections.Items, e.UUID))).ToList();
-            return Ok(new Dictionary<string, object>(){{"items", result}});
+            return Ok(new Dictionary<string, object>(){{"items", _provider.GetItems(groupId).Select(e => e.ToResponse())}});
         }
         return NotFound("Group not found");
     }
@@ -47,21 +67,10 @@ public class GroupItemsController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var _))
         {
-            var mongoItem = new ItemMongoData()
-            {
-                Name = data.Name,
-                Description = data.Description,
-                Price = data.Price != null ? (int)data.Price : 0
-            };
-            _mongo.GetCollection<ItemMongoData>(MongoCollections.Items).InsertOne(mongoItem);
-            var item = new ItemData()
-            {
-                GroupId = groupId,
-                UUID = mongoItem.Id.ToString()
-            };
-            _dbContext.Add(item);
-            _dbContext.SaveChanges();
-            return Created($"groups/{groupId}/items/{item.Id}", item.ToDict(mongoItem));
+            var item = AsItem(groupId, data);
+            if (_provider.TryCreateItem(groupId, item))
+                return Created($"groups/{groupId}/items/{item.Id}", item.ToResponse());
+            return BadRequest("Can't create ");
         }
         return NotFound("Group not found");
     }
@@ -71,11 +80,10 @@ public class GroupItemsController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var _))
         {
-            var item = _dbContext.Set<ItemData>().Where(e => e.GroupId == groupId && e.Id == itemId).FirstOrDefault();
+            var item = _provider.GetItem(groupId, itemId);
             if (item == null)
                 return NotFound("Item not found");
-            var result = item.ToDict(_mongo.GetEntity<ItemMongoData>(MongoCollections.Items, item.UUID));
-            return Ok(result);
+            return Ok(item.ToResponse());
         }
         return NotFound("Group not found");
     }
@@ -85,18 +93,13 @@ public class GroupItemsController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var _))
         {
-            var item = _dbContext.Set<ItemData>().Where(e => e.GroupId == groupId && e.Id == itemId).FirstOrDefault();
-            if (item == null)
+            if (_provider.GetItem(groupId, itemId) == null)
                 return NotFound("Item not found");
-            var mongoItem = _mongo.GetEntity<ItemMongoData>(MongoCollections.Items, item.UUID);
-            if (mongoItem == null)
-                return PostItem(groupId, data);
-            mongoItem.Name = data.Name;
-            mongoItem.Description = data.Description;
-            mongoItem.Price = data.Price != null ? (int)data.Price : mongoItem.Price;
-            var filter = Builders<ItemMongoData>.Filter.Eq("_id", mongoItem.Id);
-            _mongo.GetCollection<ItemMongoData>(MongoCollections.Items).ReplaceOne(filter, mongoItem);
-            return Ok(item.ToDict(mongoItem));
+            var item = AsItem(groupId, data);
+            item.Id = itemId;
+            if (_provider.TryUpdateItem(item))
+                return Ok(item.ToResponse());
+            return BadRequest();
         }
         return NotFound("Group not found");
     }
@@ -106,15 +109,12 @@ public class GroupItemsController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var _))
         {
-            var item = _dbContext.Set<ItemData>().Where(e => e.GroupId == groupId && e.Id == itemId).FirstOrDefault();
+            var item = _provider.GetItem(groupId, itemId);
             if (item == null)
                 return NotFound("Item not found");
-            var mongoItem = _mongo.GetEntity<ItemMongoData>(MongoCollections.Items, item.UUID);
-            _dbContext.Remove(item);
-            _dbContext.SaveChanges();
-            var filter = Builders<ItemMongoData>.Filter.Eq("_id", mongoItem?.Id);
-            _mongo.GetCollection<ItemMongoData>(MongoCollections.Items).DeleteOne(filter);
-            return Ok(item.ToDict(mongoItem));
+            if (_provider.TryDeleteItem(groupId, itemId))
+                return Ok(item.ToResponse());
+            return BadRequest();
         }
         return NotFound("Group not found");
     }

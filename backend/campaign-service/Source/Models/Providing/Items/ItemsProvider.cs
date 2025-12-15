@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using MongoDB.Bson;
+using MongoDB.Driver;
 using Tdn.Db;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
@@ -7,7 +9,7 @@ namespace Tdn.Models.Providing;
 
 public class ItemsProvider
 {
-    private const string ITEMS_COLLECTION_NAME = "skills";
+    private const string ITEMS_COLLECTION_NAME = "items";
     
     private ItemsContext _sql;
     private MongoDbContext _mongo;
@@ -117,6 +119,68 @@ public class ItemsProvider
         catch (Exception e)
         {
             _logger.LogWarning($"Error with create item: {e}");
+            return false;
+        }
+    }
+    
+    public bool TryUpdateItem(Item item)
+    {
+        try
+        {
+            var itemData = _sql.Items
+                .Include(e => e.Group)
+                .FirstOrDefault(e => e.Id == item.Id && e.GroupId == item.Group.Id);
+            
+            if (itemData == null)
+                return false;
+
+            var mongoData = new ItemMongoData()
+            {
+                Id = new ObjectId(itemData.UUID),
+                Name = item.Name,
+                Description = item.Description,
+                Price = item.Price,
+                Attributes = item.Attributes
+                    .Select(e => new ValuedAttributeMongoData()
+                    {
+                        Key = e.Key,
+                        Value = e.Value
+                    })
+                    .ToList(),
+                IsSecret = item.IsSecret
+            };
+
+            var collection = _mongo.GetCollection<ItemMongoData>(ITEMS_COLLECTION_NAME);
+            var result = collection.ReplaceOne(
+                Builders<ItemMongoData>.Filter.Eq(x => x.Id, new ObjectId(itemData.UUID)),
+                mongoData);
+
+            return result.IsAcknowledged && result.ModifiedCount > 0;
+        }
+        catch (Exception e)
+        {
+            _logger.LogWarning($"Error with update skill: {e}");
+            return false;
+        }
+    }
+    
+    public bool TryDeleteItem(int groupId, int itemId)
+    {
+        try
+        {
+            var itemData = _sql.Items
+                .FirstOrDefault(e => e.GroupId == groupId && e.Id == itemId);
+            if (itemData == null)
+                return false;
+            var collection = _mongo.GetCollection<ItemMongoData>(ITEMS_COLLECTION_NAME);
+            _sql.Items.Remove(itemData);
+            _sql.SaveChanges();
+            var mongoResult = collection.DeleteOne(Builders<ItemMongoData>.Filter.Eq(x => x.Id, new ObjectId(itemData.UUID)));
+            return mongoResult.IsAcknowledged && mongoResult.DeletedCount > 0;
+        }
+        catch (Exception e)
+        {
+            _logger.LogWarning($"Error with delete skill: {e}");
             return false;
         }
     }

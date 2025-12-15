@@ -14,6 +14,7 @@ if __name__ == "__main__":
     args = p.parse_args()
 
     if args.S:
+        print(f"scenarios: {args.S}")
         for scenario in args.S:
             match scenario:
                 case "users":

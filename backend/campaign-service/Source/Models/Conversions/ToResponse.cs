@@ -27,4 +27,23 @@ public static class ModelToResponseExtensions
         attributes = skill.Attributes.Select(e => e.ToResponse()),
         isSecret = skill.IsSecret
     };
+    
+    public static object ToResponse(this Item item) => item.Amount != null ? new 
+    {
+        id = item.Id,
+        name = item.Name,
+        description = item.Description,
+        attributes = item.Attributes.Select(e => e.ToResponse()),
+        price = item.Price,
+        amount = item.Amount,
+        isSecret = item.IsSecret
+    } : new 
+    {
+        id = item.Id,
+        name = item.Name,
+        description = item.Description,
+        attributes = item.Attributes.Select(e => e.ToResponse()),
+        price = item.Price,
+        isSecret = item.IsSecret
+    };
 }

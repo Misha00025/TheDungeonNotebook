@@ -263,13 +263,20 @@ def with_group_items_scenario():
     wrong_item = {
         "description": "Test Wrong"
     }
+    new_item_3 = new_item_2.copy()
+    new_item_3["attributes"] = [
+              { "key": "damage", "name": "Damage", "value": "10d8"},
+              { "key": "range", "name": "Range", "value": "100 fut"},
+         ]
     tests.extend([
         Test(headers=h, request="groups", method="POST", data={"name": "TestGroup"}, requirement=CREATED),
         Test(headers=h, request="groups/{steps.0.id}/items", requirement=OK),
         Test(headers=h, request="groups/{steps.0.id}/items", method="POST", data=new_item, requirement=CREATED),
         Test(headers=h, request="groups/{steps.0.id}/items", method="POST", data=new_item_2, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/items", method="POST", data=new_item_3, requirement=CREATED),
         Test(headers=h, request="groups/{steps.0.id}/items", method="POST", data=wrong_item, requirement=BAD),
         Test(headers=h, request="groups/{steps.0.id}/items", method="POST", requirement=BAD),
+        Test(headers=h, request="groups/{steps.0.id}/items", requirement=OK),
         Test(headers=h, request="groups/{steps.0.id}/items/{steps.2.id}", requirement=OK),
         Test(headers=h, request="groups/{steps.0.id}/items/{steps.3.id}", requirement=OK),
         Test(headers=h, request="groups/{steps.0.id}/items/{steps.3.id}", method="DELETE", requirement=OK),
