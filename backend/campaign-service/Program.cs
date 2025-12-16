@@ -27,6 +27,7 @@ builder.Services.AddScoped(_ => new MongoDbContext(config.GetMongoDbSettings()))
 builder.Services.AddScoped<AttributesProvider, AttributesProvider>();
 builder.Services.AddScoped<SkillsProvider, SkillsProvider>();
 builder.Services.AddScoped<ItemsProvider, ItemsProvider>();
+builder.Services.AddScoped<SchemasProvider, SchemasProvider>();
 
 // General
 builder.Services.AddEndpointsApiExplorer();

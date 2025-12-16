@@ -138,6 +138,51 @@ class CharactersEndpoints:
     def delete(self) -> Response:
         return rq.delete(self.url, headers=self._headers)
 
+class ItemsSchemasEndpoints:
+    def __init__(self, host: str, notes_host: str, url: str, headers):
+        self._host: str = host
+        self._notes_host: str = notes_host
+        self._url: str = url + f"/items"
+        self._headers = headers
+
+    def get(self, params = None) -> Response:
+        if params is None:
+            params = {}
+        return rq.get(self._url, headers=self._headers, params=params)
+    
+    def put(self, data) -> Response:
+        return rq.put(self._url, headers=self._headers, data=data)
+
+
+class SkillsSchemasEndpoints:
+    def __init__(self, host: str, notes_host: str, url: str, headers):
+        self._host: str = host
+        self._notes_host: str = notes_host
+        self._url: str = url + f"/skills"
+        self._headers = headers
+
+    def get(self, params = None) -> Response:
+        if params is None:
+            params = {}
+        return rq.get(self._url, headers=self._headers, params=params)
+    
+    def put(self, data) -> Response:
+        return rq.put(self._url, headers=self._headers, data=data)
+
+
+class SchemasEndpoints:
+    def __init__(self, host: str, notes_host: str, url: str, headers):
+        self._host: str = host
+        self._notes_host: str = notes_host
+        self._url: str = url + f"/schemas"
+        self._headers = headers
+
+    def items(self) -> ItemsSchemasEndpoints:
+        return ItemsSchemasEndpoints(self._host, self._notes_host, self._url, self._headers)
+
+    def skills(self) -> SkillsSchemasEndpoints:
+        return SkillsSchemasEndpoints(self._host, self._notes_host, self._url, self._headers)
+
 
 class CampaignService: 
     def __init__(self, host: str, notes_host: str, headers, group_id: int = None):
@@ -163,6 +208,9 @@ class CampaignService:
     
     def skills(self, skill_id: int = None) -> SkillsEndpoint:
         return SkillsEndpoint(self.url, self._headers, skill_id)
+
+    def schemas(self) -> SchemasEndpoints:
+        return SchemasEndpoints(self._host, self._notes_host, self._url, self._headers)
     
     def post(self, data) -> Response:
         return rq.post(self.url, headers=self._headers, data=data)

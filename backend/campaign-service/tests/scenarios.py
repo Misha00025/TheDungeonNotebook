@@ -474,7 +474,33 @@ def with_character_skills():
 
 
 def with_schemas_scenario():
-    create_scenario("Schemas Scenario", [])
+    schema_items_1 = {
+        "categories": [
+            {"title": "Weapon", "filters": [{"key": "type", "value": "weapon"}], "children": []},
+            {"title": "Armour", "filters": [{"key": "type", "value": "armour"}], "children": [
+                {"title": "Shields", "filters": [{"key": "type", "value": "shield"}], "children": []},
+            ]},
+        ]
+    }
+    schema_skills_1 = {
+        "categories": [
+            {"title": "Warrior", "filters": [{"key": "class", "value": "warrior"}], "children": []},
+            {"title": "Magic", "filters": [{"key": "class", "value": "mage"}], "children": [
+                {"title": "Destruction", "filters": [{"key": "category", "value": "destruction"}], "children": []},
+            ]},
+        ]
+    }
+    tests = [
+        Test(headers=h, request="groups", method="POST", data={"name": "TestGroup"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/schemas/skills", method="GET", requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/schemas/items", method="GET", requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/schemas/items", method="PUT", data=schema_items_1, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/schemas/items", method="GET", requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/schemas/skills", method="GET", requirement=NOT_FOUND),
+        Test(headers=h, request="groups/{steps.0.id}/schemas/skills", method="PUT", data=schema_skills_1, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/schemas/skills", method="GET", requirement=OK),
+    ]
+    create_scenario("Schemas Scenario", tests)
 
 
 scenarios_command: dict = {

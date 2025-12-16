@@ -195,3 +195,32 @@ def _skill(group_id: int, skill_id: int):
             if not is_admin:
                 return forbidden()
             return make_response(services.groups(rq.headers, group_id).skills(skill_id).delete())
+
+
+# Schemas
+
+@route("groups/<int:group_id>/schemas/items", ["GET", "PUT"])
+def _group_schemas(group_id: int):
+    success, is_admin, response = check_access_to_group(group_id, rq)
+    if not success:
+        return response
+    match (rq.method):
+        case "GET":
+            return make_response(services.groups(rq.headers, group_id).schemas().items().get())
+        case "PUT":
+            if not is_admin:
+                return forbidden()
+            return make_response(services.groups(rq.headers, group_id).schemas().items().put(rq.data))
+
+@route("groups/<int:group_id>/schemas/skills", ["GET", "PUT"])
+def _group_schemas(group_id: int):
+    success, is_admin, response = check_access_to_group(group_id, rq)
+    if not success:
+        return response
+    match (rq.method):
+        case "GET":
+            return make_response(services.groups(rq.headers, group_id).schemas().skills().get())
+        case "PUT":
+            if not is_admin:
+                return forbidden()
+            return make_response(services.groups(rq.headers, group_id).schemas().skills().put(rq.data))
