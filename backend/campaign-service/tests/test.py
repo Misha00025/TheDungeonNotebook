@@ -10,35 +10,14 @@ if __name__ == "__main__":
                     epilog='Good testings')
     p.add_argument("-c", "--compact", nargs='?', const=True, default=False)
     p.add_argument("-d", "--debug", nargs='?', const=True, default=False)
-    p.add_argument('-S', action='append', help='Добавляет сценарий для исполнения из списка: users, groups, user-group, templates')
+    p.add_argument('-S', action='append', help=f'Добавляет сценарий для исполнения из списка: {", ".join(scenarios_command.keys())}')
     args = p.parse_args()
 
     if args.S:
         print(f"scenarios: {args.S}")
         for scenario in args.S:
-            match scenario:
-                case "users":
-                    with_user_scenario()
-                case "groups":
-                    with_group_scenario()
-                case "user-group":
-                    with_user_group_scenario()
-                case "templates":
-                    with_charlist_templates_scenario()
-                case "characters":
-                    with_characters_scenario()
-                case "notes":
-                    with_notes_scenario()
-                case "group-items":
-                    with_group_items_scenario()
-                case "character-items":
-                    with_character_items_scenario()
-                case "attributes":
-                    with_skills_attributes()
-                case "group_skills":
-                    with_group_skills()
-                case "character_skills":
-                    with_character_skills()
+            if scenario in scenarios_command.keys():
+                scenarios_command[scenario]()
 
     test_variables.compact = args.compact
     test_variables.debug = args.debug

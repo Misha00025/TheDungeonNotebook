@@ -8,7 +8,6 @@ import tests.test_variables as tv
 scenarios: list[Scenario] = []
 h = headers_template
 
-
 def to_steps(tests):
 	steps = []
 	for test in tests:
@@ -472,3 +471,23 @@ def with_character_skills():
         Test(headers=h, request="groups/{steps.0.id}/characters/{steps.2.id}/skills", method="GET", requirement=OK),
     ]
     create_scenario("Character Skills Scenario", tests)
+
+
+def with_schemas_scenario():
+    create_scenario("Schemas Scenario", [])
+
+
+scenarios_command: dict = {
+    "users": with_user_scenario,
+    "groups": with_group_scenario,
+    "user-group": with_user_group_scenario,
+    "templates": with_charlist_templates_scenario,
+    "characters": with_characters_scenario,
+    "notes": with_notes_scenario,
+    "group-items": with_group_items_scenario,
+    "character-items": with_character_items_scenario,
+    "attributes": with_skills_attributes,
+    "group-skills": with_group_skills,
+    "character-skills": with_character_skills,
+    "schemas": with_schemas_scenario
+}
