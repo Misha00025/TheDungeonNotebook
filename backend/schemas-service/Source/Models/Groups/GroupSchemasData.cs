@@ -16,6 +16,7 @@ public class CategoryMongoData
     
 }
 
+
 public class FilterPresetMongoData
 {
     [BsonElement("name")]
@@ -30,8 +31,8 @@ public class SchemaMongoData : MongoDbContext.MongoEntity
     public int GroupId;
     [BsonElement("type")]
     public string Type = "";
-    [BsonElement("group_attributes")]
-    public List<string> groupAttributes = new();
+    [BsonElement("grouping_attributes")]
+    public List<string> GroupingAttributes = new();
     [BsonElement("presets")]
     public List<FilterPresetMongoData> Categories = new();
 }

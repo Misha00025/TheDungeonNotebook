@@ -6,27 +6,27 @@ public struct FilterPostData
     public string Value { get; set; }
 }
 
-public struct CategoryPostData
+public struct FilterPresetPostData
 {
-    public string Title { get; set; }
-    public List<FilterPostData> Filters { get; set; }
-    public List<CategoryPostData> Children { get; set; }
+    public string Name;
+    public List<FilterPostData> Filters;
 }
 
 public struct SchemaPostData 
 {
-    public List<CategoryPostData> Categories { get; set; }
+    public List<string> GroupBy { get; set; }
+    public List<FilterPresetPostData>? FilterPresets { get; set; }
 }
 
-public class Category
+public class FilterPreset
 {
-    public string Title = "";
+    public string Name = "";
     public List<(string key, string value)> Filters = new();
-    public List<Category> Children = new();
 }
 
 public class Schema 
 {
     public string Type = "";
-    public List<Category> Categories = new();
+    public List<string> GroupingAttributes = new();
+    public List<FilterPreset> FilterPresets = new();
 }
