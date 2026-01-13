@@ -12,7 +12,9 @@ class ItemsEndpoints:
     def post(self, data) -> Response:
         return rq.post(self._url, headers=self._headers, data=data)
     
-    def get(self, params = {}) -> Response:
+    def get(self, params = None) -> Response:
+        if params is None:
+            params = {}
         return rq.get(self._url, headers=self._headers, params=params)
     
     def put(self, data) -> Response:
