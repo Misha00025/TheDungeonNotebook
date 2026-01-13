@@ -16,12 +16,22 @@ public class CategoryMongoData
     
 }
 
+public class FilterPresetMongoData
+{
+    [BsonElement("name")]
+    public string Name = "";
+    [BsonElement("filters")]
+    public List<(string key, string value)> Filters = new();    
+}
+
 public class SchemaMongoData : MongoDbContext.MongoEntity
 {
     [BsonElement("group_id")]
     public int GroupId;
     [BsonElement("type")]
     public string Type = "";
-    [BsonElement("categories")]
-    public List<CategoryMongoData> Categories = new();
+    [BsonElement("group_attributes")]
+    public List<string> groupAttributes = new();
+    [BsonElement("presets")]
+    public List<FilterPresetMongoData> Categories = new();
 }
