@@ -102,6 +102,21 @@ services:
       - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
       - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
+  schemas-service:
+    build:
+      context: ./schemas-service
+    container_name: schemas-service
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - backend-network
+    env_file:
+      - ./.env
+    environment:
+      - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
+      - MONGO_DATABASE=tdn-schemas
+
   notes-service:
     build:
       context: ./notes-service

@@ -47,16 +47,4 @@ public static class ModelToResponseExtensions
         isSecret = item.IsSecret
     };
     
-    public static object ToResponse(this Category category) => new 
-    {
-        title = category.Title,
-        filters = category.Filters.Select(e => new {key = e.key, value = e.value}).ToList(),
-        children = category.Children.Select(e => e.ToResponse()).ToList()
-    };
-    
-    public static object ToResponse(this Schema schema) => new
-    {
-        type = schema.Type,
-        categories = schema.Categories.Select(e => e.ToResponse()).ToList()
-    };
 }

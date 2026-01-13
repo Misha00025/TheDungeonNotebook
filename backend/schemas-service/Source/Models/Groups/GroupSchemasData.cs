@@ -1,6 +1,7 @@
 using MongoDB.Bson.Serialization.Attributes;
+using Tdn.Db;
 
-namespace Tdn.Db.Entities;
+namespace Tdn.Models.Groups;
 
 public class CategoryMongoData
 {

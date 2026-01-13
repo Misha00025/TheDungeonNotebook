@@ -1,17 +1,16 @@
 using MongoDB.Driver;
 using Tdn.Db;
-using Tdn.Db.Entities;
 
-namespace Tdn.Models.Providing;
+namespace Tdn.Models.Groups.Providing;
 
-public class SchemasProvider
+public class GroupSchemasProvider
 {
     private const string COLLECTION_NAME = "schemas";
 
     public MongoDbContext _dbContext;
     
     
-    public SchemasProvider(MongoDbContext context)
+    public GroupSchemasProvider(MongoDbContext context)
     {
         _dbContext = context;
     }

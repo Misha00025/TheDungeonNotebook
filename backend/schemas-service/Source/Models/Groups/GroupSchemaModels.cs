@@ -1,4 +1,4 @@
-namespace Tdn.Models;
+namespace Tdn.Models.Groups;
 
 public struct FilterPostData
 {

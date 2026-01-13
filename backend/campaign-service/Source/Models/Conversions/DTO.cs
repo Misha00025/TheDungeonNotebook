@@ -25,22 +25,4 @@ public static class DTO
             IsSecret = data.IsSecret ?? false
         };
     }
-    
-    private static Category AsCategory(this CategoryPostData data)
-    {
-        var category = new Category()
-        {
-            Title = data.Title, 
-            Filters = data.Filters.Select(e => (e.Key, e.Value)).ToList()
-        };
-        category.Children = data.Children.Select(e => e.AsCategory()).ToList();
-        return category;
-    }
-    
-    public static Schema AsSchema(this SchemaPostData data, string type)
-    {
-        var schema = new Schema() {Type = type};
-        schema.Categories = data.Categories.Select(e => e.AsCategory()).ToList();
-        return schema;
-    }
 }
