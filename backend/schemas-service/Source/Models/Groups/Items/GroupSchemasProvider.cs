@@ -31,6 +31,7 @@ public class GroupSchemasProvider
         {
             GroupId = groupId,
             Type = schema.Type,
+            GroupingAttributes = schema.GroupingAttributes
             // FilterPresets = schema.FilterPresets.Select(e => new FilterPresetMongoData()
             // {
             //     Name = e.Name,

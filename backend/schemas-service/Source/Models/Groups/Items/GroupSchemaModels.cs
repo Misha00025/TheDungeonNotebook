@@ -15,7 +15,7 @@ public struct FilterPresetPostData
 public struct SchemaPostData 
 {
     public List<string> GroupBy { get; set; }
-    public List<FilterPresetPostData>? FilterPresets { get; set; }
+    // public List<FilterPresetPostData>? FilterPresets { get; set; }
 }
 
 public class FilterPreset
@@ -28,5 +28,5 @@ public class Schema
 {
     public string Type = "";
     public List<string> GroupingAttributes = new();
-    public List<FilterPreset> FilterPresets = new();
+    // public List<FilterPreset> FilterPresets = new();
 }
