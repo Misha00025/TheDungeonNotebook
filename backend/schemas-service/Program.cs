@@ -2,7 +2,7 @@ using Tdn.Configuration;
 using Tdn.Settings;
 using Tdn.Db;
 using Prometheus;
-using Tdn.Models.Groups.Providing;
+using Tdn.Models.Groups.Items;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = new ConfigParser();
