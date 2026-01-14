@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Tdn.Models.Groups;
-using Tdn.Models.Groups.Conversion;
-using Tdn.Models.Groups.Providing;
+using Tdn.Models.Groups.Items;
+using Tdn.Models.Groups.Items.Conversion;
 
 namespace Tdn.Api.Controllers;
 

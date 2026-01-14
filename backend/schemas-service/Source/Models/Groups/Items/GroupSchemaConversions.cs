@@ -1,4 +1,4 @@
-namespace Tdn.Models.Groups.Conversion;
+namespace Tdn.Models.Groups.Items.Conversion;
 
 public static class GroupSchemaConversion
 {
@@ -11,7 +11,7 @@ public static class GroupSchemaConversion
     
     public static Schema AsSchema(this SchemaPostData data, string type)
     {
-        var schema = new Schema() {Type = type};
+        var schema = new Schema() {Type = type, GroupingAttributes = data.GroupBy};
         schema.FilterPresets = data.FilterPresets?.Select(e => e.AsModel()).ToList() ?? new();
         return schema;
     }

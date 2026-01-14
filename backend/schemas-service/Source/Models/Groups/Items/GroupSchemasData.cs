@@ -1,21 +1,7 @@
 using MongoDB.Bson.Serialization.Attributes;
 using Tdn.Db;
 
-namespace Tdn.Models.Groups;
-
-public class CategoryMongoData
-{
-    [BsonElement("title")]
-    public string Title = "";
-    
-    [BsonElement("filters")]
-    public List<(string key, string value)> Filters = new();
-    
-    [BsonElement("children")]
-    public List<CategoryMongoData> Children = new();
-    
-}
-
+namespace Tdn.Models.Groups.Items;
 
 public class FilterPresetMongoData
 {
@@ -33,6 +19,6 @@ public class SchemaMongoData : MongoDbContext.MongoEntity
     public string Type = "";
     [BsonElement("grouping_attributes")]
     public List<string> GroupingAttributes = new();
-    [BsonElement("presets")]
-    public List<FilterPresetMongoData> Categories = new();
+    // [BsonElement("presets")]
+    // public List<FilterPresetMongoData> FilterPresets = new();
 }

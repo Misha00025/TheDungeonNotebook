@@ -1,7 +1,7 @@
 using MongoDB.Driver;
 using Tdn.Db;
 
-namespace Tdn.Models.Groups.Providing;
+namespace Tdn.Models.Groups.Items;
 
 public class GroupSchemasProvider
 {
@@ -14,23 +14,14 @@ public class GroupSchemasProvider
     {
         _dbContext = context;
     }
-    
-    private Category AsCategory(CategoryMongoData data)
-    {
-        return new ()
-        {
-            Title = data.Title,
-            Filters = data.Filters,
-            Children = data.Children.Select(AsCategory).ToList()
-        };
-    }
 
     private Schema AsSchema(SchemaMongoData data)
     {
         return new()
         {
             Type = data.Type,
-            Categories = data.Categories.Select(AsCategory).ToList()
+            GroupingAttributes = data.GroupingAttributes
+            // FilterPresets = data.FilterPresets.Select(AsCategory).ToList()
         };
     }
     
@@ -40,12 +31,12 @@ public class GroupSchemasProvider
         {
             GroupId = groupId,
             Type = schema.Type,
-            Categories = schema.Categories.Select(e => new CategoryMongoData()
-            {
-                Title = e.Title,
-                Filters = e.Filters,
+            // FilterPresets = schema.FilterPresets.Select(e => new FilterPresetMongoData()
+            // {
+            //     Name = e.Name,
+            //     Filters = e.Filters,
                 
-            }).ToList()
+            // }).ToList()
         };
     }
 
