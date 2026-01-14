@@ -25,6 +25,7 @@ public static class GroupSchemaConversion
     public static object ToResponse(this Schema schema) => new
     {
         type = schema.Type,
-        filterPresets = schema.FilterPresets.Select(e => e.ToResponse()).ToList()
+        groupBy = schema.GroupingAttributes
+        // filterPresets = schema.FilterPresets.Select(e => e.ToResponse()).ToList()
     };
 }
