@@ -1,3 +1,6 @@
+using MongoDB.Bson.Serialization.Attributes;
+using Tdn.Db;
+
 namespace Tdn.Models.Groups.Items;
 
 public struct FilterPostData
@@ -39,12 +42,8 @@ public class FilterPresetMongoData
     public List<(string key, string value)> Filters = new();    
 }
 
-public class SchemaMongoData : MongoDbContext.MongoEntity
+public class SchemaMongoData : GroupSchemaMongoData
 {
-    [BsonElement("group_id")]
-    public int GroupId;
-    [BsonElement("type")]
-    public string Type = "";
     [BsonElement("grouping_attributes")]
     public List<string> GroupingAttributes = new();
     // [BsonElement("presets")]

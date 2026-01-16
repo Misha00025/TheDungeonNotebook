@@ -3,6 +3,7 @@ using Tdn.Settings;
 using Tdn.Db;
 using Prometheus;
 using Tdn.Models.Groups.Items;
+using Tdn.Models.Groups.Templates;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = new ConfigParser();
@@ -18,6 +19,7 @@ builder.Services.AddScoped(_ => new MongoDbContext(config.GetMongoDbSettings()))
 
 // Providers
 builder.Services.AddScoped<GroupSchemasProvider, GroupSchemasProvider>();
+builder.Services.AddScoped<CharacterTemplateSchemaProvider, CharacterTemplateSchemaProvider>();
 
 // General
 builder.Services.AddEndpointsApiExplorer();
