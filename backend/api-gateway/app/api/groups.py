@@ -225,3 +225,17 @@ def _group_skills_schemas(group_id: int):
             if not is_admin:
                 return forbidden()
             return make_response(services.schemas(rq.headers).groups(group_id).skills().put(rq.data))
+
+
+@route("groups/<int:group_id>/schemas/template", ["GET", "PUT"])
+def _group_template_schemas(group_id: int):
+    success, is_admin, response = check_access_to_group(group_id, rq)
+    if not success:
+        return response
+    match (rq.method):
+        case "GET":
+            return make_response(services.schemas(rq.headers).groups(group_id).template().get())
+        case "PUT":
+            if not is_admin:
+                return forbidden()
+            return make_response(services.schemas(rq.headers).groups(group_id).template().put(rq.data))
