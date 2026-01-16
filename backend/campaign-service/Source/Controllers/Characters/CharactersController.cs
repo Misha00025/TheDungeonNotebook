@@ -23,7 +23,6 @@ public class CharactersController : CharactersBaseController
     {
         public string? Name { get; set; }
         public string? Description { get; set; }
-        public string? Category { get; set; }
         public int? Value { get; set; }
         public int? MaxValue { get; set; }
         public string? Formula { get; set; }
@@ -138,7 +137,7 @@ public class CharactersController : CharactersBaseController
                 else
                 {   
                     var value = (FieldPatchData)tmp;
-                    if (value.Name == null && value.Description == null && value.Value == null && value.Category == null && value.MaxValue == null && value.Formula == null) 
+                    if (value.Name == null && value.Description == null && value.Value == null && value.MaxValue == null && value.Formula == null) 
                         continue;
                     FieldMongoData existField = character.Fields[field.Key];
                     if (value.MaxValue != null && existField is PropertyMongoData)
@@ -146,7 +145,6 @@ public class CharactersController : CharactersBaseController
                     existField.Name = value.Name != null ? value.Name : existField.Name;
                     existField.Description = value.Description != null ? value.Description : existField.Description;
                     existField.Value = value.Value != null ? (int)value.Value : existField.Value;
-                    existField.Category = value.Category != null ? value.Category : existField.Category;
                     existField.Formula = value.Formula != null ? value.Formula : existField.Formula;
                     doSomething = true;
                 }
@@ -166,27 +164,13 @@ public class CharactersController : CharactersBaseController
                     if (value.MaxValue != null && newField is PropertyMongoData)
                         ((PropertyMongoData)newField).MaxValue = (int)value.MaxValue;
                     newField.Value = value.Value != null ? (int)value.Value : newField.Value;
-                    newField.Category = value.Category;
                     newField.Formula = value.Formula != null ? value.Formula : newField.Formula;
                     character.Fields.Add(field.Key, newField);
                 }
                 else
                 {
-                    if (value.Name == null || value.Description == null)
-                    {
-                        errors.Add($"Can't create field with key '{field.Key}': name and description must be not null");
-                        continue;
-                    }
-                    var newField = value.MaxValue == null ? 
-                        new FieldMongoData():
-                        new PropertyMongoData() { MaxValue = value.MaxValue != null ? (int)value.MaxValue : 0 };
-                    if (value.Category != null)
-                        newField.Category = value.Category;
-                    newField.Name = value.Name == null ? "" : value.Name;
-                    newField.Description = value.Description == null ? "" : value.Description;
-                    newField.Value = value.Value != null ? (int)value.Value : 0;
-                    newField.Formula = value.Formula;
-                    character.Fields.Add(field.Key, newField);
+                    errors.Add($"Can't create field with key '{field.Key}': name and description must be not null");
+                    continue;
                 }
                 doSomething = true;
             }

@@ -25,8 +25,6 @@ public static class DataToDictExtensions
                 {"name", field.Name},
                 {"description", field.Description}
             };
-            if (field.Category != null)
-                addedField.Add("category", field.Category);
             if (!string.IsNullOrEmpty(field.Formula))
                 addedField.Add("formula", field.Formula);
             if (field is PropertyMongoData)
@@ -61,25 +59,10 @@ public static class DataToDictExtensions
         };
     }
     
-    public static object ToDict(this CategorySchema data)
-    {
-        return new
-        {
-            fields = data.Fields,
-            name = data.Name,
-            key = data.Key,
-            categories = data.Categories?.Select(e => e.ToDict()).ToList()
-        };
-    }
-    
     public static Dictionary<string, object?> ToDict(this GroupEntityData data, CharlistMongoData? mongoData)
     {
         var result = data.ToDict(mongoData as GroupEntityMongoData);
         result.Add("fields", mongoData?.Fields.ToDict());
-        if (mongoData?.Schema != null)
-            result.Add("schema", new { categories = mongoData?.Schema.Categories.Select(e => e.ToDict()).ToList() });
-        else
-            result.Add("schema", new { });
         return result;
     }
     

@@ -25,8 +25,6 @@ public class NamedMongoElement
 [BsonKnownTypes(typeof(PropertyMongoData), typeof(ModifiedFieldMongoData))]
 public class FieldMongoData : NamedMongoElement
 {
-	[BsonElement("category")]
-	public string? Category = null;
 	[BsonElement("value")]
 	public int Value;
 	[BsonElement("formula")]
@@ -52,33 +50,13 @@ public class ModifiedFieldMongoData : FieldMongoData
 	public int Modifier;
 }
 
-public class CategorySchema
-{
-	[BsonElement("key")]
-	public string Key { get; set; } = "";
-	[BsonElement("name")]
-	public string Name { get; set; } = "";
-	[BsonElement("fields")]
-	public List<string> Fields { get; set; } = new List<string>();
-	[BsonElement("categories")]
-	[BsonIgnoreIfNull]
-	public List<CategorySchema>? Categories { get; set; } = null;
-}
 
-public class TemplateSchema
-{
-	public List<CategorySchema> Categories { get; set; } = new();
-}
 
 public class CharlistMongoData : GroupEntityMongoData 
 { 
 	[BsonElement("fields")]
 	public Dictionary<string, FieldMongoData> Fields { get; set; } = new();
-	
-	[BsonElement("schema")]
-    public TemplateSchema? Schema { get; set; } = new();
 }
-
 
 public class AttributeMongoData
 {

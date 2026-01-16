@@ -9,14 +9,12 @@ public static class CharlistsComparingExtensions
         Name = data.Name,
         Description = data.Description,
         Fields = data.Fields,
-        Schema = data.Schema
     };
 
     public static PropertyMongoData AsProperty(this FieldMongoData field, int MaxValue = 0) => new PropertyMongoData()
     {
         Name = field.Name,
         Description = field.Description,
-        Category = field.Category,
         Value = field.Value,
         Formula = field.Formula,
         MaxValue = MaxValue
@@ -27,7 +25,6 @@ public static class CharlistsComparingExtensions
     {
         Name = field.Name,
         Description = field.Description,
-        Category = field.Category,
         Value = field.Value,
         Formula = field.Formula,
         ModifierFormula = formula
@@ -62,7 +59,6 @@ public static class CharlistsComparingExtensions
                 result.Fields.Add(field.Key, field.Value);
             }
         }
-        result.Schema = source.Schema;
     }
 
     public static CharacterMongoData CompareWith(this CharacterMongoData data, CharlistMongoData source)
