@@ -24,6 +24,9 @@ public class CategorySchemaMongoData
 	[BsonElement("categories")]
 	[BsonIgnoreIfNull]
 	public List<CategorySchemaMongoData>? Categories { get; set; } = null;
+	[BsonElement("key")]
+	[BsonIgnoreIfNull]
+	public string Key { get; set; } = "";
 }
 
 public class TemplateSchemaMongoData : GroupSchemaMongoData
