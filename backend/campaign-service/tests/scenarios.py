@@ -475,33 +475,56 @@ def with_character_skills():
 
 def with_schemas_scenario():
     schema_items_1 = {
-        "categories": [
-            {"title": "Weapon", "filters": [{"key": "type", "value": "weapon"}], "children": []},
-            {"title": "Armour", "filters": [{"key": "type", "value": "armour"}], "children": [
-                {"title": "Shields", "filters": [{"key": "type", "value": "shield"}], "children": []},
-            ]},
-        ]
+        "groupBy": ["type"]
     }
     schema_skills_1 = {
-        "categories": [
-            {"title": "Warrior", "filters": [{"key": "class", "value": "warrior"}], "children": []},
-            {"title": "Magic", "filters": [{"key": "class", "value": "mage"}], "children": [
-                {"title": "Destruction", "filters": [{"key": "category", "value": "destruction"}], "children": []},
-            ]},
-        ]
+        "groupBy": ["class", "category"]
     }
     tests = [
         Test(headers=h, request="groups", method="POST", data={"name": "TestGroup"}, requirement=CREATED),
-        Test(headers=h, request="groups/{steps.0.id}/schemas/skills", method="GET", requirement=NOT_FOUND),
-        Test(headers=h, request="groups/{steps.0.id}/schemas/items", method="GET", requirement=NOT_FOUND),
-        Test(headers=h, request="groups/{steps.0.id}/schemas/items", method="PUT", data=schema_items_1, requirement=OK),
-        Test(headers=h, request="groups/{steps.0.id}/schemas/items", method="GET", requirement=OK),
-        Test(headers=h, request="groups/{steps.0.id}/schemas/skills", method="GET", requirement=NOT_FOUND),
-        Test(headers=h, request="groups/{steps.0.id}/schemas/skills", method="PUT", data=schema_skills_1, requirement=OK),
-        Test(headers=h, request="groups/{steps.0.id}/schemas/skills", method="GET", requirement=OK),
+        Test(headers=h, request="schemas/groups/{steps.0.id}/skills", method="GET", requirement=NOT_FOUND),
+        Test(headers=h, request="schemas/groups/{steps.0.id}/items", method="GET", requirement=NOT_FOUND),
+        Test(headers=h, request="schemas/groups/{steps.0.id}/items", method="PUT", data=schema_items_1, requirement=OK),
+        Test(headers=h, request="schemas/groups/{steps.0.id}/items", method="GET", requirement=OK),
+        Test(headers=h, request="schemas/groups/{steps.0.id}/skills", method="GET", requirement=NOT_FOUND),
+        Test(headers=h, request="schemas/groups/{steps.0.id}/skills", method="PUT", data=schema_skills_1, requirement=OK),
+        Test(headers=h, request="schemas/groups/{steps.0.id}/skills", method="GET", requirement=OK),
     ]
-    create_scenario("Schemas Scenario", tests)
+    create_scenario("Schemas", tests)
 
+
+def with_rules_scenario():
+    tests = []
+
+    tests.extend([
+        Test(headers=h, request=f"polices/groups"),
+        Test(headers=h, request=f"polices/groups/characters", method="PUT", data={"userId": 1, "groupId": 1, "characterId": 1, "canWrite": True}, requirement=NOT_FOUND),
+        Test(headers=h, request=f"polices/groups", method="PUT", data={"userId": 1, "groupId": 1, "isAdmin": True}, requirement=CREATED),
+        Test(headers=h, request=f"polices/groups/characters", method="PUT", data={"userId": 1, "groupId": 1, "characterId": 1, "canWrite": True}, requirement=CREATED),
+        Test(headers=h, request=f"polices/groups", method="PUT", data={"userId": 2, "groupId": 1, "isAdmin": False}, requirement=CREATED),
+        Test(headers=h, request=f"polices/groups/characters", method="PUT", data={"userId": 2, "groupId": 1, "characterId": 1, "canWrite": False}, requirement=CREATED),
+        Test(headers=h, request=f"polices/groups/characters", method="PUT", data={"userId": 2, "groupId": 1, "characterId": 1, "canWrite": True}, requirement=OK),
+        Test(headers=h, request=f"polices/groups", method="PUT", data={"userId": 3, "groupId": 1}, requirement=CREATED),
+        Test(headers=h, request=f"polices/groups", method="PUT", data={"userId": 4, "groupId": 1}, requirement=CREATED),
+        Test(headers=h, request=f"polices/groups", method="PUT", data={"userId": 2, "groupId": 1, "isAdmin": True}, requirement=OK),
+        Test(headers=h, request=f"polices/groups", method="PUT", data={"userId": 2, "groupId": 1, "isAdmin": False}, requirement=OK),
+        Test(headers=h, request=f"polices/groups", method="PUT", data={"userId": 1, "groupId": 2, "isAdmin": True}, requirement=CREATED),
+        Test(headers=h, request=f"polices/groups", method="PUT", data={"userId": 2, "groupId": 2}, requirement=CREATED),
+        Test(headers=h, request=f"polices/groups", method="PUT", data={"userId": 2}, requirement=BAD),
+        Test(headers=h, request=f"polices/groups", params={}),
+        Test(headers=h, request=f"polices/groups", params={"userId": 1}),
+        Test(headers=h, request=f"polices/groups", params={"userId": 2}),
+        Test(headers=h, request=f"polices/groups/characters", method="PUT", data={"userId": 2, "groupId": 1, "characterId": 1, "canWrite": False}, requirement=OK),
+        Test(headers=h, request=f"polices/groups", params={"userId": 2}),
+        Test(headers=h, request=f"polices/groups", params={"groupId": 1, "userId": 2}, method="DELETE", requirement=OK),
+        Test(headers=h, request=f"polices/groups", params={"groupId": 1, "userId": 2}, method="DELETE", requirement=NOT_FOUND),
+        Test(headers=h, request=f"polices/groups", params={"groupId": 1, "userId": 2, "characterId": 1}, method="DELETE", requirement=NOT_FOUND),
+        Test(headers=h, request=f"polices/groups", params={"groupId": 1, "userId": 1, "characterId": 1}, method="DELETE", requirement=OK),
+        Test(headers=h, request=f"polices/groups", params={"groupId": 1, "userId": 1, "characterId": 1}, method="DELETE", requirement=NOT_FOUND),
+        Test(headers=h, request=f"polices/groups", params={"groupId": 1, "userId": 1}, method="DELETE", requirement=OK),
+        Test(headers=h, request=f"polices/groups", params={"groupId": 1, "userId": 1}, method="DELETE", requirement=NOT_FOUND),
+    ])
+    create_scenario("Rules", tests)
 
 scenarios_command: dict = {
     "users": with_user_scenario,
@@ -515,5 +538,6 @@ scenarios_command: dict = {
     "attributes": with_skills_attributes,
     "group-skills": with_group_skills,
     "character-skills": with_character_skills,
-    "schemas": with_schemas_scenario
+    "schemas": with_schemas_scenario,
+    "rules": with_rules_scenario
 }

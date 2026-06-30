@@ -4,6 +4,8 @@ using Tdn.Db.Contexts;
 using Tdn.Settings;
 using Tdn.Db;
 using Tdn.Models.Providing;
+using Tdn.Models.Schemas.Items;
+using Tdn.Models.Schemas.Templates;
 using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,12 +23,15 @@ builder.Services.AddDbContext<GroupContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<EntityContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<SkillsContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<ItemsContext>(config.ConfigDbConnections);
+builder.Services.AddDbContext<PolicesContext>(config.ConfigDbConnections);
 builder.Services.AddScoped(_ => new MongoDbContext(config.GetMongoDbSettings()));
 
 // Providers
 builder.Services.AddScoped<AttributesProvider, AttributesProvider>();
 builder.Services.AddScoped<SkillsProvider, SkillsProvider>();
 builder.Services.AddScoped<ItemsProvider, ItemsProvider>();
+builder.Services.AddScoped<GroupSchemasProvider, GroupSchemasProvider>();
+builder.Services.AddScoped<CharacterTemplateSchemaProvider, CharacterTemplateSchemaProvider>();
 
 // General
 builder.Services.AddEndpointsApiExplorer();

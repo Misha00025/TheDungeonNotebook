@@ -10,8 +10,8 @@
 - **Users Service** — управление пользователями и их профилями
 - **Groups Service** — управление группами и персонажами
 - **Notes Service** — хранение заметок по персонажам и группам
-- **Policy Service** — управление политиками доступа
-- **Schemas Service** — управление схемами и шаблонами
+- ~~**Policy Service** — управление политиками доступа~~ *(перенесён в Campaign Service)*
+- ~~**Schemas Service** — управление схемами и шаблонами~~ *(перенесён в Campaign Service)*
 - **API Gateway** — единая точка входа для всех запросов
 
 ---
@@ -34,13 +34,15 @@
 
 [Раздел для документации Notes Service](./notes-service.md)
 
-### Policy Service
+### ~~Policy Service~~ *(перенесён в Campaign Service)*
 
-[Раздел для документации Policy Service](./policy-service.md)
+Функциональность управления политиками доступа перенесена в **Campaign Service**.
+Эндпоинты остались прежними: `/polices/groups`.
 
-### Schemas Service
+### ~~Schemas Service~~ *(перенесён в Campaign Service)*
 
-[Раздел для документации Schemas Service](./schemas-service.md)
+Функциональность управления схемами и шаблонами перенесена в **Campaign Service**.
+Эндпоинты остались прежними: `/schemas/groups/{groupId}/...`.
 
 ### Campaign Service
 
