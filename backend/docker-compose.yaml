@@ -29,7 +29,6 @@ services:
     volumes:
       - ./mysql_data:/var/lib/mysql
       - ./auth-service/sql_script.sql:/docker-entrypoint-initdb.d/0_auth.sql
-      - ./policy-service/sql_script.sql:/docker-entrypoint-initdb.d/1_polices.sql
       - ./users-service/sql_script.sql:/docker-entrypoint-initdb.d/2_users.sql
       - ./campaign-service/sql_script.sql:/docker-entrypoint-initdb.d/3_campaign.sql
     healthcheck:
@@ -56,20 +55,6 @@ services:
       - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
       - PRIVATE_KEY_PATH=/certs/private.pem
       - PUBLIC_KEY_PATH=/certs/public.pem
-
-  policy-service:
-    build:
-      context: ./policy-service
-    container_name: policy-service
-    depends_on:
-      mysql:
-        condition: service_healthy
-    networks:
-      - backend-network
-    env_file:
-      - ./.env
-    environment:
-      - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
   users-service:
     build:
@@ -102,21 +87,6 @@ services:
       - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
       - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
-  schemas-service:
-    build:
-      context: ./schemas-service
-    container_name: schemas-service
-    depends_on:
-      mongo:
-        condition: service_healthy
-    networks:
-      - backend-network
-    env_file:
-      - ./.env
-    environment:
-      - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
-      - MONGO_DATABASE=tdn-schemas
-
   notes-service:
     build:
       context: ./notes-service
@@ -137,15 +107,11 @@ services:
       context: ./api-gateway
     container_name: api-gateway
     depends_on:
-      schemas-service:
-        condition: service_started
       notes-service:
         condition: service_started
       campaign-service:
         condition: service_started
       users-service:
-        condition: service_started
-      policy-service:
         condition: service_started
       auth-service:
         condition: service_started
@@ -157,10 +123,8 @@ services:
       - ./.env
     environment:
       - AUTH_SERVICE_URL=http://auth-service:8080
-      - POLICY_SERVICE_URL=http://policy-service:8080
       - USERS_SERVICE_URL=http://users-service:8080
       - CAMPAIGN_SERVICE_URL=http://campaign-service:8080
-      - SCHEMAS_SERVICE_URL=http://schemas-service:8080
       - NOTES_SERVICE_URL=http://notes-service:8080
 
 networks:

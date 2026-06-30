@@ -22,7 +22,6 @@ services:
     volumes:
       - ./mysql_data:/var/lib/mysql
       - ../../auth-service/sql_script.sql:/docker-entrypoint-initdb.d/0_auth.sql
-      - ../../policy-service/sql_script.sql:/docker-entrypoint-initdb.d/1_polices.sql
       - ../../users-service/sql_script.sql:/docker-entrypoint-initdb.d/2_users.sql
       - ../../campaign-service/sql_script.sql:/docker-entrypoint-initdb.d/3_campaign.sql
     healthcheck:

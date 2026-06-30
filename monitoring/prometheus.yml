@@ -33,11 +33,11 @@ scrape_configs:
     static_configs:
       - targets: [ 'users-service:8080' ]
 
-  - job_name: 'policy-service'
-    metrics_path: /metrics
-    scheme: http
-    static_configs:
-      - targets: [ 'policy-service:8080' ]
+  # policy-service is now merged into campaign-service
+  # - job_name: 'policy-service'
+  #   scrape_interval: 5s
+  #   static_configs:
+  #       - targets: [ 'policy-service:8080' ]
 
   - job_name: 'auth-service'
     metrics_path: /metrics
