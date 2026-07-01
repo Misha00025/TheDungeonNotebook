@@ -68,8 +68,10 @@ class AttributesEndpoint:
         self._url: str = url + "/attributes"
         self._headers = headers
 
-    def get(self) -> Response:
-        return rq.get(self._url, headers=self._headers)
+    def get(self, params = None) -> Response:
+        if params is None:
+            params = {}
+        return rq.get(self._url, headers=self._headers, params=params)
     
     def put(self, data) -> Response:
         return rq.put(self._url, headers=self._headers, data=data)
@@ -131,8 +133,10 @@ class CharactersEndpoints:
     def post(self, data) -> Response:
         return rq.post(self.url, headers=self._headers, data=data)
     
-    def get(self) -> Response:
-        return rq.get(self.url, headers=self._headers)
+    def get(self, params = None) -> Response:
+        if params is None:
+            params = {}
+        return rq.get(self.url, headers=self._headers, params=params)
     
     def patch(self, data) -> Response:
         return rq.patch(self.url, headers=self._headers, data=data)
