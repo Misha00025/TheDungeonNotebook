@@ -9,6 +9,7 @@ public class ConfigParser
 	private string? _mongoConnectionString;
 	private string? _databaseName;
 	private string? _mongoDBName;
+	private string? _schemasMongoDBName;
 	private string? _mysqlConnectionString;
 	
 	private string? _connection = null;
@@ -25,6 +26,7 @@ public class ConfigParser
 		_mysqlConnectionString = Environment.GetEnvironmentVariable("MYSQL_CONNECTION_STRING");
 		_databaseName = Environment.GetEnvironmentVariable("MYSQL_DATABASE");
 		_mongoDBName = Environment.GetEnvironmentVariable("MONGO_DATABASE");
+		_schemasMongoDBName = Environment.GetEnvironmentVariable("MONGO_SCHEMAS_DATABASE");
 		if (_mongoConnectionString == null || _mysqlConnectionString == null || _databaseName == null)
 		{
 			throw new Exception($"Can't find information to connect to databases:\n"+
@@ -35,6 +37,8 @@ public class ConfigParser
 		}
 		if (_mongoDBName == null)
 			_mongoDBName = _databaseName;
+		if (_schemasMongoDBName == null)
+			_schemasMongoDBName = "tdn-schemas";
 	}
 
 	public void ConfigDbConnections(DbContextOptionsBuilder opt)
@@ -52,6 +56,16 @@ public class ConfigParser
 		{
 			ConnectionString = connection,
 			DatabaseName = dbName
+		};
+		return settings;
+	}
+
+	public SchemasMongoDbSettings GetSchemasMongoDbSettings()
+	{
+		var settings = new SchemasMongoDbSettings
+		{
+			ConnectionString = _mongoConnectionString!,
+			DatabaseName = _schemasMongoDBName!
 		};
 		return settings;
 	}
