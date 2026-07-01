@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Tdn.Models;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
@@ -12,12 +13,14 @@ public class GroupSkillsController : BaseController
     private SkillsProvider _provider;
     private AttributesProvider _attributesProvider;
     private GroupAccessHelper _accessHelper;
+    private ILogger<GroupSkillsController> _logger;
 
-    public GroupSkillsController(SkillsProvider skillsProvider, AttributesProvider attributesProvider, GroupAccessHelper accessHelper)
+    public GroupSkillsController(SkillsProvider skillsProvider, AttributesProvider attributesProvider, GroupAccessHelper accessHelper, ILogger<GroupSkillsController> logger)
     {
         _provider = skillsProvider;
         _attributesProvider = attributesProvider;
         _accessHelper = accessHelper;
+        _logger = logger;
     }
 
     private void UpdateGroupAttributes(int groupId, Skill skill)
@@ -66,9 +69,14 @@ public class GroupSkillsController : BaseController
     {
         if (!CheckAccess(groupId, userId))
             return NotFound("Group not found");
+        _logger.LogInformation($"GetSkills called: groupId={groupId}, userId={userId}, withSecrets={withSecrets}");
         var skills = _provider.GetSkills(groupId);
+        _logger.LogInformation($"GetSkills result: {skills.Count()} skills before filtering");
         if (withSecrets == false)
+        {
             skills = skills.Where(e => e.IsSecret == false).ToList();
+            _logger.LogInformation($"After withSecrets filter: {skills.Count()} skills");
+        }
         if (filters != null && filters.Any())
             skills = ApplyFilters(skills, filters.Where(e => e.Key != "withSecrets").ToDictionary());
         return Ok(new

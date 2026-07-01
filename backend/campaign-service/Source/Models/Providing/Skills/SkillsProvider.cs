@@ -65,7 +65,12 @@ public class SkillsProvider
     
     private Skill GetSkill(SkillData data)
     {
+        _logger.LogInformation($"GetSkill: skillId={data.Id}, groupId={data.GroupId}, UUID={data.UUID}");
         var mongoData = _mongo.GetEntity<SkillMongoData>(SKILLS_COLLECTION_NAME, data.UUID);
+        if (mongoData == null)
+        {
+            _logger.LogWarning($"GetSkill: Mongo document not found for UUID={data.UUID}, skillId={data.Id}");
+        }
         return ToSkill(data, mongoData!);
     }
     
@@ -88,6 +93,7 @@ public class SkillsProvider
                         .AsEnumerable()
                         .Select(GetSkill)
                         .ToList();
+        _logger.LogInformation($"GetSkills(groupId={groupId}): SQL returned {skills.Count} skills");
         return skills;
     }
     
