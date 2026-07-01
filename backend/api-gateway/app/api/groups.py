@@ -20,7 +20,8 @@ def _groups():
     match(rq.method):
         case "GET":
             params = {"userId": uid}
-            res = services.groups(rq.headers).get(params=params)
+            res = {}
+            res["groups"] = services.groups(rq.headers).get(params=params)
             if res.ok:
                 return ok(res.json())
             return make_response(res)
