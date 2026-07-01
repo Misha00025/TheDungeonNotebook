@@ -54,8 +54,10 @@ class TemplatesEndpoints:
     def post(self, data) -> Response:
         return rq.post(self._url, headers=self._headers, data=data)
     
-    def get(self) -> Response:
-        return rq.get(self._url, headers=self._headers)
+    def get(self, params = None) -> Response:
+        if params is None:
+            params = {}
+        return rq.get(self._url, headers=self._headers, params=params)
     
     def put(self, data) -> Response:
         return rq.put(self._url, headers=self._headers, data=data)
