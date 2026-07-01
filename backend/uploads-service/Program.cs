@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using Prometheus;
 using Tdn.UploadService.Services;
 
@@ -26,7 +27,14 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers();
 
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+    options.ForwardLimit = null;
+});
+
 var app = builder.Build();
+app.UseForwardedHeaders();
 app.UseAuthorization();
 app.UseStaticFiles();
 app.UseHttpMetrics();
