@@ -28,7 +28,7 @@ public class CharacterSkillsController : BaseController
             
         var skills = _provider.GetSkills(groupId, characterId);
         if (filters != null && filters.Any())
-            skills = ApplyFilters(skills, filters);
+            skills = ApplyFilters(skills, filters.Where(e => e.Key != "userId").ToDictionary());
         return Ok(new
         {
             skills = skills.Select(e => e.ToResponse()).ToList(),
