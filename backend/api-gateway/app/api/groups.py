@@ -223,6 +223,42 @@ def _skill(group_id: int, skill_id: int):
             return make_response(services.groups(rq.headers, group_id).skills(skill_id).delete())
 
 
+# Export/Import
+
+@route("groups/<int:group_id>/export", ["GET"])
+def _group_export(group_id: int):
+    success, uid, gid, response = check_auth(rq)
+    if not success:
+        return response
+    success, is_admin, response = check_access_to_group(group_id, rq)
+    if not success:
+        return response
+    if not is_admin:
+        return forbidden()
+
+    include = rq.args.get("include", "templates,characters,items,skills")
+    params = {"include": include, "userId": str(uid)}
+
+    return make_response(services.groups(rq.headers, group_id).export(params=params, headers=rq.headers))
+
+
+@route("groups/<int:group_id>/import", ["POST"])
+def _group_import(group_id: int):
+    success, uid, gid, response = check_auth(rq)
+    if not success:
+        return response
+    success, is_admin, response = check_access_to_group(group_id, rq)
+    if not success:
+        return response
+    if not is_admin:
+        return forbidden()
+
+    include = rq.args.get("include", "templates,characters,items,skills")
+    params = {"include": include, "userId": str(uid)}
+
+    return make_response(services.groups(rq.headers, group_id).import_data(data=rq.data, params=params, headers=rq.headers))
+
+
 # Schemas
 
 @route("groups/<int:group_id>/schemas/items", ["GET", "PUT"])

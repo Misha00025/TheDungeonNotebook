@@ -83,6 +83,13 @@ API Gateway — единая точка входа в систему. Прокс
 | `PUT` | `/groups/{groupId}/skills/{skillId}` | Обновление (админ) | Да |
 | `DELETE` | `/groups/{groupId}/skills/{skillId}` | Удаление (админ) | Да |
 
+### Экспорт и импорт данных группы
+
+| Метод | URL | Описание | Auth |
+|---|---|---|---|
+| `GET` | `/groups/{groupId}/export` | Экспорт данных. Query: `?include=templates,characters,items,skills` (выбор категорий через запятую, по умолчанию все) | Только админ |
+| `POST` | `/groups/{groupId}/import` | Импорт данных. Body: JSON в формате экспорта. Query: `?include=templates,characters,items,skills` (выбор категорий через запятую, по умолчанию все) | Только админ |
+
 ### Схемы
 
 | Метод | URL | Auth |

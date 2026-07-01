@@ -231,3 +231,9 @@ class CampaignService:
     
     def delete(self) -> Response:
         return rq.delete(self.url, headers=self._headers)
+
+    def export(self, params: dict = None, headers: dict = None) -> Response:
+        return rq.get(self.url + "/export", headers=headers or self._headers, params=params)
+
+    def import_data(self, data, params: dict = None, headers: dict = None) -> Response:
+        return rq.post(self.url + "/import", headers=headers or self._headers, data=data, params=params)

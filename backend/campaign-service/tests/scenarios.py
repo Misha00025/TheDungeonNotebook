@@ -526,6 +526,107 @@ def with_rules_scenario():
     ])
     create_scenario("Rules", tests)
 
+def with_export_import_scenario():
+    tests = []
+    new_template = {
+        "name": "TestTemplate",
+        "description": "TestTestTest",
+        "fields": {
+            "strong": {"name": "Strong", "description": "This is strong", "value": 10},
+            "agility": {"name": "Agility", "description": "This is agility", "value": 12},
+        }
+    }
+    new_character = {
+        "name": "Steve",
+        "description": "Minecraft is my life",
+        "templateId": "{steps.1.id}"
+    }
+    new_item = {
+        "name": "TestItem",
+        "description": "TestDescription",
+    }
+    new_skill = {
+        "name": "Fireball",
+        "description": "FIRE-BA-A-A-A-AL!!!!",
+    }
+    tests.extend([
+        Test(headers=h, request="groups", method="POST", data={"name": "TestGroup"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters/templates", method="POST", data=new_template, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/characters", method="POST", data=new_character, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/items", method="POST", data=new_item, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="POST", data=new_skill, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/items", method="POST", data={"name": "TestItem 2", "description": "TestDesc 2"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/skills", method="POST", data={"name": "Heal", "description": "Healing"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.0.id}/export", params={"include": "templates,characters,items,skills"}, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/export", params={"include": "items,skills"}, requirement=OK),
+        Test(headers=h, request="groups/{steps.0.id}/export", requirement=OK),
+        Test(headers=h, request="groups", method="POST", data={"name": "ImportGroup"}, requirement=CREATED),
+        Test(headers=h, request="groups/{steps.10.id}/import", method="POST",
+             data={
+                 "version": 1,
+                 "exportedAt": "{steps.7.exportedAt}",
+                 "groupId": "{steps.10.id}",
+                 "charlists": [
+                     {
+                         "oldId": 0,
+                         "name": "TestTemplate",
+                         "description": "TestTestTest",
+                         "fields": {
+                             "strong": {"name": "Strong", "description": "This is strong", "value": 10},
+                             "agility": {"name": "Agility", "description": "This is agility", "value": 12},
+                         }
+                     }
+                 ],
+                 "characters": [
+                     {
+                         "oldId": 0,
+                         "name": "Steve",
+                         "description": "Minecraft is my life",
+                         "templateOldId": 0,
+                         "ownerId": None,
+                         "fields": {}
+                     }
+                 ],
+                 "items": [
+                     {
+                         "oldId": 0,
+                         "name": "TestItem", "description": "TestDescription",
+                         "price": 0, "isSecret": False, "imageLink": None, "attributes": []
+                     },
+                     {
+                         "oldId": 0,
+                         "name": "TestItem 2", "description": "TestDesc 2",
+                         "price": 0, "isSecret": False, "imageLink": None, "attributes": []
+                     }
+                 ],
+                 "skills": [
+                     {
+                         "oldId": 0,
+                         "name": "Fireball", "description": "FIRE-BA-A-A-A-AL!!!!",
+                         "isSecret": False, "attributes": []
+                     },
+                     {
+                         "oldId": 0,
+                         "name": "Heal", "description": "Healing",
+                         "isSecret": False, "attributes": []
+                     }
+                 ],
+              }, requirement=OK),
+
+    # 13. Verify imported templates exist in new group
+    Test(headers=h, request="groups/{steps.10.id}/characters/templates", requirement=OK),
+
+    # 14. Verify imported characters exist in new group
+    Test(headers=h, request="groups/{steps.10.id}/characters", requirement=OK),
+
+    # 15. Verify imported items exist in new group
+    Test(headers=h, request="groups/{steps.10.id}/items", requirement=OK),
+
+    # 16. Verify imported skills exist in new group
+    Test(headers=h, request="groups/{steps.10.id}/skills", requirement=OK),
+    ])
+    create_scenario("ExportImport", tests)
+
 scenarios_command: dict = {
     "users": with_user_scenario,
     "groups": with_group_scenario,
@@ -539,5 +640,6 @@ scenarios_command: dict = {
     "group-skills": with_group_skills,
     "character-skills": with_character_skills,
     "schemas": with_schemas_scenario,
-    "rules": with_rules_scenario
+    "rules": with_rules_scenario,
+    "export-import": with_export_import_scenario
 }

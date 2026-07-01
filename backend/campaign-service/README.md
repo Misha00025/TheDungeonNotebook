@@ -74,6 +74,39 @@
 | `GET` | `/groups/{groupId}/skills/attributes` | Получение атрибутов | `200` / `404` |
 | `PUT` | `/groups/{groupId}/skills/attributes` | Обновление. Body: `{ "attributes": [...] }` | `200` / `400` |
 
+### Экспорт и импорт данных группы
+
+| Метод | URL | Описание | Ответ |
+|---|---|---|---|
+| `GET` | `/groups/{groupId}/export` | Экспорт данных группы. Query: `?include=templates,characters,items,skills&userId=int` | `200` / `403` / `404` |
+| `POST` | `/groups/{groupId}/import` | Импорт данных группы. Body: ExportData JSON. Query: `?include=templates,characters,items,skills&userId=int` | `200` / `400` / `403` / `404` |
+
+**Формат ExportData:**
+```json
+{
+  "version": 1,
+  "exportedAt": "2026-07-02T01:14:06Z",
+  "groupId": 1,
+  "templateSchema": { "categories": [...] },
+  "charlists": [{ "oldId": 0, "name": "...", "description": "...", "fields": {...} }],
+  "characters": [{ "oldId": 0, "name": "...", "description": "...", "templateOldId": 0, "ownerId": null, "fields": {...} }],
+  "items": [{ "oldId": 0, "name": "...", "description": "...", "price": 0, "isSecret": false, "imageLink": null, "attributes": [...] }],
+  "skills": [{ "oldId": 0, "name": "...", "description": "...", "isSecret": false, "attributes": [...] }],
+  "skillAttributes": { "attributes": [{ "key": "...", "name": "...", "description": "...", "isFiltered": false, "knownValues": [...] }] },
+  "characterItems": [{ "characterOldId": 0, "itemOldId": 0, "amount": 1 }],
+  "characterSkills": [{ "characterOldId": 0, "skillOldId": 0 }]
+}
+```
+
+**Формат ImportResult:**
+```json
+{
+  "imported": { "templates": 1, "characters": 1, "items": 1, "skills": 1 },
+  "errors": [],
+  "success": true
+}
+```
+
 ### Предметы персонажа
 
 | Метод | URL | Ответ |
