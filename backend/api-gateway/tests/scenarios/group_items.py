@@ -45,7 +45,7 @@ def register_group_items_scenario():
     # 4. PUT /groups/{id}/items/{itemId} (admin, edit price) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.0.id}/items/{steps.2.id}", method="PUT",
-        data={"name": "Sword", "price": 15}, requirement=OK))
+        data={"name": "Sword", "description": "A sharp blade", "price": 15}, requirement=OK))
 
     # 5. DELETE /groups/{id}/items/{itemId} (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},

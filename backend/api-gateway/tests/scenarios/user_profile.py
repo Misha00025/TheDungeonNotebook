@@ -22,7 +22,7 @@ def register_user_profile_scenario():
     # 1. POST /users (with admin token) → 201
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="users", method="POST",
-        data={"firstName": "Admin", "lastName": "Tester"}, requirement=CREATED))
+        data={"firstName": "Admin", "lastName": "Tester", "nickname": "AdminTester"}, requirement=CREATED))
 
     # 2. GET /users/{aid} (own profile) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
@@ -31,7 +31,7 @@ def register_user_profile_scenario():
     # 3. PATCH /users/{aid} (own, firstName) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="users/{aid}", method="PATCH",
-        data={"firstName": "UpdatedAdmin"}, requirement=OK))
+        data={"firstName": "UpdatedAdmin", "visibleName": "UpdatedAdmin"}, requirement=OK))
 
     # 4. GET /users/{aid} verify name changed → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},

@@ -3,6 +3,10 @@
 # Имя контейнера, состояние которого нужно отслеживать
 MAIN_SERVICE="api-gateway"
 
+# Очистка данных БД между запусками
+sudo rm -rf mongo_data/*
+sudo rm -rf mysql_data/*
+
 # Поднимаем Docker Compose в фоновых процессах
 docker-compose build
 docker-compose up -d
@@ -19,7 +23,7 @@ rm -r logs
 mkdir logs
 
 # После того, как все контейнеры готовы, запускаем тесты
-python test.py ${@:2} > logs/test.log
+./venv/bin/python test.py ${@:2} > logs/test.log
 
 docker-compose logs | grep "${MAIN_SERVICE}" > logs/server.log
 docker-compose logs | grep -v "mongo-db-gateway-test  " | grep -v "mysql-db-gateway-test  " | grep -v "${MAIN_SERVICE}" > logs/all.log
