@@ -78,7 +78,7 @@ public class GroupSkillsController : BaseController
             _logger.LogInformation($"After withSecrets filter: {skills.Count()} skills");
         }
         if (filters != null && filters.Any())
-            skills = ApplyFilters(skills, filters.Where(e => e.Key != "withSecrets").ToDictionary());
+            skills = ApplyFilters(skills, filters.Where(e => e.Key != "withSecrets" && e.Key != "userId").ToDictionary());
         return Ok(new
         {
             skills = skills.Select(e => e.ToResponse()).ToList(),
