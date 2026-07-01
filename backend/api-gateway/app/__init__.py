@@ -36,3 +36,19 @@ def _sanitize_user_params():
             _flask_request.args = args
 
 
+# ============================================================
+# Bootstrap декларативного engine
+# ============================================================
+# Регистрирует маршруты из config/routes.yaml на /v2/
+# Параллельно с существующими @route-декораторами на /
+# Потом можно будет переключить url_prefix на "/"
+# для полной замены.
+# ============================================================
+from app.engine.bootstrap import bootstrap
+_config = bootstrap(
+    application,
+    url_prefix="/v2",  # ← временно, для параллельной работы
+    import_handlers=True,
+)
+
+

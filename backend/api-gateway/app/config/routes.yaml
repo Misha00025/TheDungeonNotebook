@@ -1,0 +1,607 @@
+# ============================================================
+# API Gateway — Декларативная конфигурация маршрутов
+# ============================================================
+# Движок не знает бизнес-логики. Все access-хендлеры (group_member,
+# group_admin, character_writer и т.д.) — кастомные, определены
+# в app/handlers/access.py.
+# ============================================================
+
+# ------ Сервисы ------
+services:
+  auth:      { base_url: "http://auth-service:8080" }
+  users:     { base_url: "http://users-service:8080" }
+  campaign:  { base_url: "http://campaign-service:8080" }
+  notes:     { base_url: "http://notes-service:8080" }
+
+# ------ Маршруты ------
+routes:
+
+  # ============================================================
+  # Local endpoints
+  # ============================================================
+  - path: /get_api
+    methods: [GET]
+    handler: get_api
+    auth: none
+
+  - path: /whoami
+    methods: [GET]
+    handler: whoami
+    auth: required
+
+  # ============================================================
+  # Auth
+  # ============================================================
+  - path: /auth/register
+    methods: [POST]
+    proxy:
+      service: auth
+      path: /auth/register
+    auth: none
+
+  - path: /auth/login
+    methods: [POST]
+    proxy:
+      service: auth
+      path: /auth/login
+    auth: none
+
+  - path: /auth/refresh
+    methods: [POST]
+    handler: auth_refresh
+    auth: none
+
+  # ============================================================
+  # Users
+  # ============================================================
+  - path: /users
+    methods:
+      GET:
+        proxy:
+          service: users
+          path: /users
+        auth: none
+      POST:
+        handler: user_create
+        auth: required
+
+  - path: /users/<int:user_id>
+    methods:
+      GET:
+        proxy:
+          service: users
+          path: /users/{user_id}
+        auth: required
+      PATCH:
+        proxy:
+          service: users
+          path: /users/{user_id}
+        auth: required
+        access: self_only
+
+  # ============================================================
+  # Groups
+  # ============================================================
+  - path: /groups
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups
+        auth: required
+        access: authenticated
+        params:
+          query:
+            userId: "{jwt.userId}"
+      POST:
+        proxy:
+          service: campaign
+          path: /groups
+        auth: required
+        access: authenticated
+        params:
+          query:
+            userId: "{jwt.userId}"
+
+  - path: /groups/<int:group_id>
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}
+        auth: required
+        access: group_member
+        params:
+          query:
+            userId: "{jwt.userId}"
+      PATCH:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}
+        auth: required
+        access: group_admin
+
+  # ============================================================
+  # Group Users (composite)
+  # ============================================================
+  - path: /groups/<int:group_id>/users
+    methods: [GET]
+    handler: group_users
+    auth: required
+
+  - path: /groups/<int:group_id>/users/<int:user_id>
+    methods:
+      PUT:
+        proxy:
+          service: campaign
+          path: /polices/groups
+        auth: required
+        access: group_admin
+        params:
+          query:
+            groupId: "{path.group_id}"
+            userId: "{path.user_id}"
+      DELETE:
+        proxy:
+          service: campaign
+          path: /polices/groups
+        auth: required
+        access: group_admin
+        params:
+          query:
+            groupId: "{path.group_id}"
+            userId: "{path.user_id}"
+
+  # ============================================================
+  # Group Items
+  # ============================================================
+  - path: /groups/<int:group_id>/items
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/items
+        auth: required
+        access: group_member
+        params:
+          query:
+            userId: "{jwt.userId}"
+      POST:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/items
+        auth: required
+        access: group_admin
+
+  - path: /groups/<int:group_id>/items/<int:item_id>
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/items/{item_id}
+        auth: required
+        access: group_member
+        params:
+          query:
+            userId: "{jwt.userId}"
+      PUT:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/items/{item_id}
+        auth: required
+        access: group_admin
+      DELETE:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/items/{item_id}
+        auth: required
+        access: group_admin
+
+  # ============================================================
+  # Group Notes (notes-service)
+  # ============================================================
+  - path: /groups/<int:group_id>/notes
+    methods:
+      GET:
+        proxy:
+          service: notes
+          path: /groups/{group_id}/notes
+        auth: required
+        access: group_admin
+      POST:
+        proxy:
+          service: notes
+          path: /groups/{group_id}/notes
+        auth: required
+        access: group_admin
+
+  - path: /groups/<int:group_id>/notes/<int:note_id>
+    methods:
+      GET:
+        proxy:
+          service: notes
+          path: /groups/{group_id}/notes/{note_id}
+        auth: required
+        access: group_admin
+      PUT:
+        proxy:
+          service: notes
+          path: /groups/{group_id}/notes/{note_id}
+        auth: required
+        access: group_admin
+      DELETE:
+        proxy:
+          service: notes
+          path: /groups/{group_id}/notes/{note_id}
+        auth: required
+        access: group_admin
+
+  # ============================================================
+  # Group Skills
+  # ============================================================
+  - path: /groups/<int:group_id>/skills/attributes
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/skills/attributes
+        auth: required
+        access: group_member
+        params:
+          query:
+            userId: "{jwt.userId}"
+      PUT:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/skills/attributes
+        auth: required
+        access: group_admin
+
+  - path: /groups/<int:group_id>/skills
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/skills
+        auth: required
+        access: group_member
+        params:
+          query: "*"
+      POST:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/skills
+        auth: required
+        access: group_admin
+
+  - path: /groups/<int:group_id>/skills/<int:skill_id>
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/skills/{skill_id}
+        auth: required
+        access: group_member
+        params:
+          query:
+            userId: "{jwt.userId}"
+      PUT:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/skills/{skill_id}
+        auth: required
+        access: group_admin
+      DELETE:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/skills/{skill_id}
+        auth: required
+        access: group_admin
+
+  # ============================================================
+  # Group Schemas
+  # ============================================================
+  - path: /groups/<int:group_id>/schemas/items
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /schemas/groups/{group_id}/items
+        auth: required
+        access: group_member
+        params:
+          query:
+            userId: "{jwt.userId}"
+      PUT:
+        proxy:
+          service: campaign
+          path: /schemas/groups/{group_id}/items
+        auth: required
+        access: group_admin
+
+  - path: /groups/<int:group_id>/schemas/skills
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /schemas/groups/{group_id}/skills
+        auth: required
+        access: group_member
+        params:
+          query:
+            userId: "{jwt.userId}"
+      PUT:
+        proxy:
+          service: campaign
+          path: /schemas/groups/{group_id}/skills
+        auth: required
+        access: group_admin
+
+  - path: /groups/<int:group_id>/schemas/template
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /schemas/groups/{group_id}/template
+        auth: required
+        access: group_member
+        params:
+          query:
+            userId: "{jwt.userId}"
+      PUT:
+        proxy:
+          service: campaign
+          path: /schemas/groups/{group_id}/template
+        auth: required
+        access: group_admin
+
+  # ============================================================
+  # Export / Import
+  # ============================================================
+  - path: /groups/<int:group_id>/export
+    methods: [GET]
+    handler: group_export
+    auth: required
+    access: group_admin
+
+  - path: /groups/<int:group_id>/import
+    methods: [POST]
+    handler: group_import
+    auth: required
+    access: group_admin
+
+  # ============================================================
+  # Characters
+  # ============================================================
+  - path: /groups/<int:group_id>/characters
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters
+        auth: required
+        access: group_member
+        params:
+          query:
+            userId: "{jwt.userId}"
+      POST:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters
+        auth: required
+        access: group_admin
+
+  - path: /groups/<int:group_id>/characters/<int:character_id>
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/{character_id}
+        auth: required
+        access: group_member
+        params:
+          query:
+            userId: "{jwt.userId}"
+      PATCH:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/{character_id}
+        auth: required
+        access: character_writer
+      DELETE:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/{character_id}
+        auth: required
+        access: character_writer
+
+  # ============================================================
+  # Character Users (composite)
+  # ============================================================
+  - path: /groups/<int:group_id>/characters/<int:character_id>/users
+    methods: [GET]
+    handler: character_users
+    auth: required
+
+  - path: /groups/<int:group_id>/characters/<int:character_id>/users/<int:user_id>
+    methods:
+      PUT:
+        proxy:
+          service: campaign
+          path: /polices/groups/characters
+        auth: required
+        access: character_admin
+        params:
+          query:
+            groupId: "{path.group_id}"
+            userId: "{path.user_id}"
+            characterId: "{path.character_id}"
+      DELETE:
+        proxy:
+          service: campaign
+          path: /polices/groups/characters
+        auth: required
+        access: character_admin
+        params:
+          query:
+            groupId: "{path.group_id}"
+            userId: "{path.user_id}"
+            characterId: "{path.character_id}"
+
+  # ============================================================
+  # Character Templates
+  # ============================================================
+  - path: /groups/<int:group_id>/characters/templates
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/templates
+        auth: required
+        access: group_member
+        params:
+          query:
+            userId: "{jwt.userId}"
+      POST:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/templates
+        auth: required
+        access: group_admin
+      PUT:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/templates
+        auth: required
+        access: group_admin
+
+  - path: /groups/<int:group_id>/characters/templates/<int:template_id>
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/templates/{template_id}
+        auth: required
+        access: group_member
+        params:
+          query:
+            userId: "{jwt.userId}"
+      PUT:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/templates/{template_id}
+        auth: required
+        access: group_admin
+
+  # ============================================================
+  # Character Items (campaign-service)
+  # ============================================================
+  - path: /groups/<int:group_id>/characters/<int:character_id>/items
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/{character_id}/items
+        auth: required
+        access: group_member
+        params:
+          query:
+            userId: "{jwt.userId}"
+      POST:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/{character_id}/items
+        auth: required
+        access: character_writer
+
+  - path: /groups/<int:group_id>/characters/<int:character_id>/items/<int:item_id>
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/{character_id}/items/{item_id}
+        auth: required
+        access: group_member
+        params:
+          query:
+            userId: "{jwt.userId}"
+      PUT:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/{character_id}/items/{item_id}
+        auth: required
+        access: character_writer
+      DELETE:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/{character_id}/items/{item_id}
+        auth: required
+        access: character_writer
+
+  # ============================================================
+  # Character Notes (notes-service)
+  # ============================================================
+  - path: /groups/<int:group_id>/characters/<int:character_id>/notes
+    methods:
+      GET:
+        proxy:
+          service: notes
+          path: /groups/{group_id}/characters/{character_id}/notes
+        auth: required
+        access: character_viewer
+      POST:
+        proxy:
+          service: notes
+          path: /groups/{group_id}/characters/{character_id}/notes
+        auth: required
+        access: character_writer
+
+  - path: /groups/<int:group_id>/characters/<int:character_id>/notes/<int:note_id>
+    methods:
+      GET:
+        proxy:
+          service: notes
+          path: /groups/{group_id}/characters/{character_id}/notes/{note_id}
+        auth: required
+        access: character_viewer
+      PUT:
+        proxy:
+          service: notes
+          path: /groups/{group_id}/characters/{character_id}/notes/{note_id}
+        auth: required
+        access: character_writer
+      DELETE:
+        proxy:
+          service: notes
+          path: /groups/{group_id}/characters/{character_id}/notes/{note_id}
+        auth: required
+        access: character_writer
+
+  # ============================================================
+  # Character Skills
+  # ============================================================
+  - path: /groups/<int:group_id>/characters/<int:character_id>/skills
+    methods: [GET]
+    proxy:
+      service: campaign
+      path: /groups/{group_id}/characters/{character_id}/skills
+    auth: required
+    access: group_member
+    params:
+      query: "*"
+
+  - path: /groups/<int:group_id>/characters/<int:character_id>/skills/<int:skill_id>
+    methods:
+      PUT:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/{character_id}/skills/{skill_id}
+          skip_body: true
+        auth: required
+        access: character_writer
+      DELETE:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/{character_id}/skills/{skill_id}
+        auth: required
+        access: character_writer
