@@ -24,6 +24,11 @@ def register_character_skills_scenario():
         request="groups", method="POST",
         data={"name": "CharSkillsGroup"}, requirement=CREATED))
 
+    # 0.5 Add user to group
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/{steps.0.id}/users/{uid}", method="PUT",
+        data={"isAdmin": False}, requirement=CREATED))
+
     # 1. Create template
     template = {
         "name": "Rogue",
@@ -37,18 +42,18 @@ def register_character_skills_scenario():
     # 2. Create character
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.0.id}/characters", method="POST",
-        data={"name": "Shadow", "description": "Rogue", "templateId": "{steps.1.id}"},
+        data={"name": "Shadow", "description": "Rogue", "templateId": "{steps.2.id}"},
         requirement=CREATED))
 
     # 3. Add user to character with read-only access
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.0.id}/characters/{steps.2.id}/users/{uid}", method="PUT",
+        request="groups/{steps.0.id}/characters/{steps.3.id}/users/{uid}", method="PUT",
         data={"canWrite": False}, requirement=CREATED))
 
     # 4. PUT /groups/{id}/skills/attributes (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.0.id}/skills/attributes", method="PUT",
-        data={"stealth": {"name": "Stealth"}, "perception": {"name": "Perception"}},
+        data={"attributes": [{"key": "stealth", "name": "Stealth"}, {"key": "perception", "name": "Perception"}]},
         requirement=OK))
 
     # 5. POST /groups/{id}/skills (admin, 2 skills) → 201, 201
@@ -64,22 +69,22 @@ def register_character_skills_scenario():
 
     # 6. PUT /groups/{id}/characters/{charId}/skills/{skillId} (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.0.id}/characters/{steps.2.id}/skills/{steps.5.id}",
+        request="groups/{steps.0.id}/characters/{steps.3.id}/skills/{steps.6.id}",
         method="PUT", requirement=OK))
 
     # 7. GET /groups/{id}/characters/{charId}/skills (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.0.id}/characters/{steps.2.id}/skills",
+        request="groups/{steps.0.id}/characters/{steps.3.id}/skills",
         method="GET", requirement=OK))
 
     # 8. DELETE /groups/{id}/characters/{charId}/skills/{skillId} (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.0.id}/characters/{steps.2.id}/skills/{steps.5.id}",
+        request="groups/{steps.0.id}/characters/{steps.3.id}/skills/{steps.6.id}",
         method="DELETE", requirement=OK))
 
     # 9. PUT /groups/{id}/characters/{charId}/skills/{skillId} (user, read-only) → 403
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
-        request="groups/{steps.0.id}/characters/{steps.2.id}/skills/{steps.6.id}",
+        request="groups/{steps.0.id}/characters/{steps.3.id}/skills/{steps.7.id}",
         method="PUT", requirement=FORBID))
 
     steps = [GatewayStep(t) for t in tests]
