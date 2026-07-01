@@ -2,6 +2,9 @@ import sys
 from scripts import outputs, scenario_register
 import scenarios
 import variables
+from tests import test_variables
+from tests import main_test
+from scenarios.gateway_main import register_gateway_main, scenarios as gw_scenarios
 
 if __name__ == "__main__":
     import argparse
@@ -15,19 +18,29 @@ if __name__ == "__main__":
     p.add_argument('-S', "--scenario", action='append', help=f'Добавляет сценарий для исполнения. Доступные значения: {", ".join(scenario_register.scenarios.keys())}')
     args = p.parse_args()
 
-    if args.scenario:
-        for scenario in args.scenario:
-            scenario_register.include(scenario)
-
-    
     if args.server is not None:
         variables.server_url = args.server
     else:
         print("Аргумент '--server' не передан.")
         sys.exit(1)
 
+    test_variables.compact = args.compact
+    test_variables.debug = args.debug
+
     outputs.intro()
 
-    scenario_register.execute()
+    use_new_framework = False
+    if args.scenario:
+        for scenario in args.scenario:
+            if scenario == "GatewayMain":
+                use_new_framework = True
+            else:
+                scenario_register.include(scenario)
+
+    if use_new_framework:
+        register_gateway_main()
+        main_test.start(gw_scenarios)
+    else:
+        scenario_register.execute()
 
     outputs.end()
