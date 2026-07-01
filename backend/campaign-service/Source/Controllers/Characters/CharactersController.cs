@@ -5,6 +5,7 @@ using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 using Tdn.Models.Conversions;
 using Tdn.Models.Processing;
+using Tdn.Models.Providing;
 
 namespace Tdn.Api.Controllers;
 
@@ -36,16 +37,26 @@ public class CharactersController : CharactersBaseController
         public Dictionary<string, FieldPatchData?>? Fields { get; set; }
     }
 
-    public CharactersController(EntityContext context, MongoDbContext mongo, GroupContext groupContext) : base(context, mongo, groupContext)
+    public CharactersController(EntityContext context, MongoDbContext mongo, GroupContext groupContext, GroupAccessHelper accessHelper) : base(context, mongo, groupContext, accessHelper)
     {
     }
     
     [HttpGet]
-    public ActionResult GetAll(int groupId, int? ownerId = null)
+    public ActionResult GetAll(int groupId, int? ownerId = null, [FromQuery] int? userId = null)
     {
         var characters = GetCharacters(groupId);
         if (characters == null)
             return NotFound("Group not found");
+        if (userId != null)
+        {
+            if (!AccessHelper.HasGroupAccess(groupId, userId.Value))
+                return NotFound("Group not found");
+            if (!AccessHelper.IsAdmin(groupId, userId.Value))
+            {
+                var accessibleIds = AccessHelper.GetAccessibleCharacterIds(groupId, userId.Value);
+                characters = characters.Where(e => accessibleIds.Contains(e.metadata.Id)).ToList();
+            }
+        }
         if (ownerId != null)
             characters = characters.Where(e => e.metadata.OwnerId! == ownerId!).ToList();
         return Ok(characters.Select(e => e.metadata.ToDict(e.character)));
@@ -95,8 +106,10 @@ public class CharactersController : CharactersBaseController
     }
 
     [HttpGet("{characterId}")]
-    public ActionResult GetCharacter(int groupId, int characterId, [FromQuery] bool witEmptyFields = true)
+    public ActionResult GetCharacter(int groupId, int characterId, [FromQuery] bool witEmptyFields = true, [FromQuery] int? userId = null)
     {
+        if (userId != null && !AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
+            return NotFound("Character not found");
         if (TryGetCharacter(groupId, characterId, out var data, out var character))
         {
             if (witEmptyFields)

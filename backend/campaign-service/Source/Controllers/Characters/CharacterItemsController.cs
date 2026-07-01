@@ -16,14 +16,16 @@ public class CharacterItemsController : CharactersBaseController
 
     private ItemsProvider _provider;
 
-    public CharacterItemsController(EntityContext context, MongoDbContext mongo, GroupContext groupContext, ItemsProvider itemsProvider) : base(context, mongo, groupContext)
+    public CharacterItemsController(EntityContext context, MongoDbContext mongo, GroupContext groupContext, ItemsProvider itemsProvider, GroupAccessHelper accessHelper) : base(context, mongo, groupContext, accessHelper)
     {
             _provider = itemsProvider;
     }
     
     [HttpGet]
-    public ActionResult GetAll(int groupId, int characterId)
+    public ActionResult GetAll(int groupId, int characterId, [FromQuery] int? userId = null)
     {
+        if (userId != null && !AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
+            return NotFound("Character not found");
         if (TryGetCharacter(groupId, characterId, out var data, out var character))
         {
             var items = _provider.GetItems(groupId, characterId);
@@ -34,8 +36,10 @@ public class CharacterItemsController : CharactersBaseController
     }
     
     [HttpPost]
-    public ActionResult PostItem(int groupId, int characterId, [FromBody] ItemPostData data)
+    public ActionResult PostItem(int groupId, int characterId, [FromBody] ItemPostData data, [FromQuery] int? userId = null)
     {
+        if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+            return Forbidden();
         if (TryGetCharacter(groupId, characterId, out var _, out var character))
         {
             var item = data.AsItem(groupId);
@@ -51,8 +55,10 @@ public class CharacterItemsController : CharactersBaseController
     }
     
     [HttpGet("{itemId}")]
-    public ActionResult GetItem(int groupId, int characterId, int itemId)
+    public ActionResult GetItem(int groupId, int characterId, int itemId, [FromQuery] int? userId = null)
     {
+        if (userId != null && !AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
+            return NotFound("Character not found");
         if (TryGetCharacter(groupId, characterId, out var _, out var character))
         {
             var item = _provider.GetItem(groupId, itemId, characterId);
@@ -64,8 +70,10 @@ public class CharacterItemsController : CharactersBaseController
     }
     
     [HttpPut("{itemId}")]
-    public ActionResult PutItem(int groupId, int characterId, int itemId, [FromBody] ItemPostData data)
+    public ActionResult PutItem(int groupId, int characterId, int itemId, [FromBody] ItemPostData data, [FromQuery] int? userId = null)
     {
+        if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+            return Forbidden();
         if (TryGetCharacter(groupId, characterId, out var _, out var character))
         {
             var item = _provider.GetItem(groupId, itemId);

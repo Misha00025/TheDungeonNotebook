@@ -27,4 +27,9 @@ public abstract class BaseController : ControllerBase
 			StatusCode = StatusCodes.Status501NotImplemented
 		};
 	}
+	
+	public ActionResult Forbidden()
+	{
+	    return StatusCode(StatusCodes.Status403Forbidden);
+	}
 }

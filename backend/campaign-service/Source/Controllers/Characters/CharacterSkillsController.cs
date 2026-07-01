@@ -10,17 +10,22 @@ namespace Tdn.Api.Controllers;
 public class CharacterSkillsController : BaseController
 {
     private SkillsProvider _provider;
+    private GroupAccessHelper _accessHelper;
 
-    public CharacterSkillsController(SkillsProvider skillsProvider)
+    public CharacterSkillsController(SkillsProvider skillsProvider, GroupAccessHelper accessHelper)
     {
         _provider = skillsProvider;
+        _accessHelper = accessHelper;
     }
     
     private IEnumerable<Skill> ApplyFilters(IEnumerable<Skill> skills, Dictionary<string, string> filters) => _provider.ApplyFilters(skills, filters);
     
     [HttpGet]
-    public ActionResult GetSkills(int groupId, int characterId, [FromQuery] Dictionary<string, string>? filters = null)
+    public ActionResult GetSkills(int groupId, int characterId, [FromQuery] Dictionary<string, string>? filters = null, [FromQuery] int? userId = null)
     {
+        if (userId != null && !_accessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
+            return NotFound();
+            
         var skills = _provider.GetSkills(groupId, characterId);
         if (filters != null && filters.Any())
             skills = ApplyFilters(skills, filters);
@@ -32,8 +37,11 @@ public class CharacterSkillsController : BaseController
     }
     
     [HttpPut("{skillId}")]
-    public ActionResult PutSkill(int groupId, int characterId, int skillId)
+    public ActionResult PutSkill(int groupId, int characterId, int skillId, [FromQuery] int? userId = null)
     {
+        if (userId != null && !_accessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+            return Forbidden();
+
         var skill = _provider.GetSkill(groupId, skillId);
         if (skill == null)
             return NotFound(new { error = $"Skill with id {skillId} not found in group {groupId}" });
@@ -44,8 +52,11 @@ public class CharacterSkillsController : BaseController
     }
     
     [HttpDelete("{skillId}")]
-    public ActionResult DeleteSkill(int groupId, int characterId, int skillId)
+    public ActionResult DeleteSkill(int groupId, int characterId, int skillId, [FromQuery] int? userId = null)
     {
+        if (userId != null && !_accessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+            return Forbidden();
+            
         var skill = _provider.GetSkill(groupId, skillId);
         if (skill == null)
             return NotFound(new { error = $"Skill with id {skillId} not found in group {groupId}" });
