@@ -23,6 +23,7 @@ public class NamedMongoElement
 
 
 [BsonKnownTypes(typeof(PropertyMongoData), typeof(ModifiedFieldMongoData))]
+[BsonIgnoreExtraElements]
 public class FieldMongoData : NamedMongoElement
 {
 	[BsonElement("value")]
@@ -35,12 +36,14 @@ public class FieldMongoData : NamedMongoElement
 	public int? CalculatedValue = null;
 }
 
+[BsonIgnoreExtraElements]
 public class PropertyMongoData : FieldMongoData
 {
 	[BsonElement("max_value")]
 	public int MaxValue;
 }
 
+[BsonIgnoreExtraElements]
 public class ModifiedFieldMongoData : FieldMongoData
 {
 	[BsonElement("modifier")]
@@ -52,6 +55,7 @@ public class ModifiedFieldMongoData : FieldMongoData
 
 
 
+[BsonIgnoreExtraElements]
 public class CharlistMongoData : GroupEntityMongoData 
 { 
 	[BsonElement("fields")]
@@ -89,6 +93,7 @@ public class ValuedAttributeMongoData
 	public string Value = "";
 }
 
+[BsonIgnoreExtraElements]
 public class AttributedMongoData : GroupEntityMongoData
 {
 	[BsonIgnoreIfDefault]
@@ -100,6 +105,7 @@ public class AttributedMongoData : GroupEntityMongoData
 	public bool IsSecret;
 }
 
+[BsonIgnoreExtraElements]
 public class ItemMongoData : AttributedMongoData
 {
 	[BsonElement("price")]
@@ -108,6 +114,7 @@ public class ItemMongoData : AttributedMongoData
 	public string? Image;
 }
 
+[BsonIgnoreExtraElements]
 public class AmountedItemMongoData : NamedMongoElement
 {
 	[BsonElement("amount")]
@@ -118,12 +125,14 @@ public class AmountedItemMongoData : NamedMongoElement
 	public string? Image;
 }
 
+[BsonIgnoreExtraElements]
 public class CharacterMongoData : CharlistMongoData
 {
 	[BsonElement("items")]
 	public List<AmountedItemMongoData> Items = new();
 }
 
+[BsonIgnoreExtraElements]
 public class SkillMongoData : AttributedMongoData
 {
     
