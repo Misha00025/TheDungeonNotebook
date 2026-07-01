@@ -1,6 +1,4 @@
 import sys
-from scripts import outputs, scenario_register
-import scenarios
 import variables
 from tests import test_variables
 from tests import main_test
@@ -15,7 +13,7 @@ if __name__ == "__main__":
     p.add_argument("-c", "--compact", nargs='?', const=True, default=False)
     p.add_argument("-d", "--debug", nargs='?', const=True, default=False)
     p.add_argument("--server", type=str, help="Адрес сервера")
-    p.add_argument('-S', "--scenario", action='append', help=f'Добавляет сценарий для исполнения. Доступные значения: {", ".join(scenario_register.scenarios.keys())}')
+    p.add_argument('-S', "--scenario", action='append', help=f'Добавляет сценарий для исполнения. Доступные значения: GatewayMain')
     args = p.parse_args()
 
     if args.server is not None:
@@ -27,20 +25,11 @@ if __name__ == "__main__":
     test_variables.compact = args.compact
     test_variables.debug = args.debug
 
-    outputs.intro()
+    print("#  Tests started  #")
 
-    use_new_framework = False
     if args.scenario:
         for scenario in args.scenario:
             if scenario == "GatewayMain":
-                use_new_framework = True
-            else:
-                scenario_register.include(scenario)
+                register_gateway_main()
 
-    if use_new_framework:
-        register_gateway_main()
-        main_test.start(gw_scenarios)
-    else:
-        scenario_register.execute()
-
-    outputs.end()
+    main_test.start(gw_scenarios)
