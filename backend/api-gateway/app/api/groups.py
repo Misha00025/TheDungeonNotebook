@@ -19,35 +19,33 @@ def _groups():
         return forbidden()
     match(rq.method):
         case "GET":
-            accesses = get_user_accesses(uid)
-            if accesses is None:
-                return forbidden()
-            groups = []
-            for access in accesses:
-                res = services.groups(rq.headers, int(access["groupId"])).get()
-                if res.ok:
-                    groups.append(res.json())
-            return ok({"groups": groups})
-        case "POST":
-            res = services.groups(rq.headers).post(rq.data)
+            params = {"userId": uid}
+            res = services.groups(rq.headers).get(params=params)
             if res.ok:
-                access = services.polices(rq.headers).groups().put(group_id=res.json()["id"], user_id=uid, data=json.dumps({"isAdmin": True}).encode('utf-8'))
-                if not access.ok:
-                    return answer(500, "Can't create access rule for group")
+                return ok(res.json())
+            return make_response(res)
+        case "POST":
+            res = services.groups(rq.headers).post(rq.data, params={"userId": uid})
+            if res.ok:
+                pass
             return make_response(res)
 
 
 # TODO: Вернуть DELETE метод, когда буду готов
 @route("groups/<int:group_id>", ["GET", "PATCH"]) 
 def _group(group_id: int):
-    success, is_admin, response = check_access_to_group(group_id, rq)
+    success, uid, gid, response = check_auth(rq)
     if not success:
         return response
     groups = services.groups(rq.headers, group_id)
     match(rq.method):
         case "GET":
-            return make_response(groups.get())
+            params = {"userId": uid}
+            return make_response(groups.get(params=params))
         case "PATCH":
+            success, is_admin, response = check_access_to_group(group_id, rq)
+            if not success:
+                return response
             if not is_admin:
                 return forbidden()
             return make_response(groups.patch(rq.data))
@@ -55,9 +53,10 @@ def _group(group_id: int):
 
 @route("groups/<int:group_id>/users", ["GET"])
 def _group_users(group_id: int):
-    success, _, response = check_access_to_group(group_id, rq)
-    if not success:
-        return response
+    _, uid, _, _ = check_auth(rq)
+    if uid is None:
+        return unauthorized()
+    
     pres = services.polices({}).groups().all(group_id=group_id)
     if not pres.ok:
         return None
@@ -86,13 +85,17 @@ def _group_user(group_id: int, user_id: int):
 
 @route("groups/<int:group_id>/items", ["GET", "POST"])
 def _items(group_id: int):
-    success, is_admin, response = check_access_to_group(group_id, rq)
+    success, uid, gid, response = check_auth(rq)
     if not success:
         return response
     match (rq.method):
         case "GET":
-            return make_response(services.groups(rq.headers, group_id).items().get({"withSecrets": is_admin}))
+            params = {"userId": uid}
+            return make_response(services.groups(rq.headers, group_id).items().get(params=params))
         case "POST":
+            success, is_admin, response = check_access_to_group(group_id, rq)
+            if not success:
+                return response
             if not is_admin:
                 return forbidden()
             return make_response(services.groups(rq.headers, group_id).items().post(rq.data))
@@ -100,20 +103,28 @@ def _items(group_id: int):
 
 @route("groups/<int:group_id>/items/<int:item_id>", ["GET", "PUT", "DELETE"])
 def _item(group_id: int, item_id: int):
-    success, is_admin, response = check_access_to_group(group_id, rq)
+    success, uid, gid, response = check_auth(rq)
     if not success:
         return response
     match (rq.method):
         case "GET":
-            return make_response(services.groups(rq.headers, group_id).items(item_id).get())
+            params = {"userId": uid}
+            return make_response(services.groups(rq.headers, group_id).items(item_id).get(params=params))
         case "PUT":
+            success, is_admin, response = check_access_to_group(group_id, rq)
+            if not success:
+                return response
             if not is_admin:
                 return forbidden()
             return make_response(services.groups(rq.headers, group_id).items(item_id).put(rq.data))
         case "DELETE":
+            success, is_admin, response = check_access_to_group(group_id, rq)
+            if not success:
+                return response
             if not is_admin:
                 return forbidden()
             return make_response(services.groups(rq.headers, group_id).items(item_id).delete())
+
 
 # Notes
 
@@ -151,29 +162,37 @@ def _group_note(group_id: int, note_id: int):
 
 @route("groups/<int:group_id>/skills/attributes", ["GET", "PUT"])
 def _group_attributes(group_id: int):
-    success, is_admin, response = check_access_to_group(group_id, rq)
+    success, uid, gid, response = check_auth(rq)
     if not success:
         return response
     match (rq.method):
         case "GET":
-            return make_response(services.groups(rq.headers, group_id).skills().attributes().get())
+            params = {"userId": uid}
+            return make_response(services.groups(rq.headers, group_id).skills().attributes().get(params=params))
         case "PUT":
+            success, is_admin, response = check_access_to_group(group_id, rq)
+            if not success:
+                return response
             if not is_admin:
                 return forbidden()
             return make_response(services.groups(rq.headers, group_id).skills().attributes().put(rq.data))
-        
+    
 
 @route("groups/<int:group_id>/skills", ["GET", "POST"])
 def _group_skills(group_id: int):
-    success, is_admin, response = check_access_to_group(group_id, rq)
+    success, uid, gid, response = check_auth(rq)
     if not success:
         return response
     match (rq.method):
         case "GET":
-            params = rq.args.to_dict()
-            params["withSecrets"] = is_admin
+            params = dict(rq.args)
+            params.pop("userId", None)
+            params["userId"] = uid
             return make_response(services.groups(rq.headers, group_id).skills().get(params=params))
         case "POST":
+            success, is_admin, response = check_access_to_group(group_id, rq)
+            if not success:
+                return response
             if not is_admin:
                 return forbidden()
             return make_response(services.groups(rq.headers, group_id).skills().post(rq.data))
@@ -181,17 +200,24 @@ def _group_skills(group_id: int):
 
 @route("groups/<int:group_id>/skills/<int:skill_id>", ["GET", "PUT", "DELETE"])
 def _skill(group_id: int, skill_id: int):
-    success, is_admin, response = check_access_to_group(group_id, rq)
+    success, uid, gid, response = check_auth(rq)
     if not success:
         return response
     match (rq.method):
         case "GET":
-            return make_response(services.groups(rq.headers, group_id).skills(skill_id).get())
+            params = {"userId": uid}
+            return make_response(services.groups(rq.headers, group_id).skills(skill_id).get(params=params))
         case "PUT":
+            success, is_admin, response = check_access_to_group(group_id, rq)
+            if not success:
+                return response
             if not is_admin:
                 return forbidden()
             return make_response(services.groups(rq.headers, group_id).skills(skill_id).put(rq.data))
         case "DELETE":
+            success, is_admin, response = check_access_to_group(group_id, rq)
+            if not success:
+                return response
             if not is_admin:
                 return forbidden()
             return make_response(services.groups(rq.headers, group_id).skills(skill_id).delete())
@@ -201,13 +227,17 @@ def _skill(group_id: int, skill_id: int):
 
 @route("groups/<int:group_id>/schemas/items", ["GET", "PUT"])
 def _group_items_schemas(group_id: int):
-    success, is_admin, response = check_access_to_group(group_id, rq)
+    success, uid, gid, response = check_auth(rq)
     if not success:
         return response
     match (rq.method):
         case "GET":
-            return make_response(services.schemas(rq.headers).groups(group_id).items().get())
+            params = {"userId": uid}
+            return make_response(services.schemas(rq.headers).groups(group_id).items().get(params=params))
         case "PUT":
+            success, is_admin, response = check_access_to_group(group_id, rq)
+            if not success:
+                return response
             if not is_admin:
                 return forbidden()
             return make_response(services.schemas(rq.headers).groups(group_id).items().put(rq.data))
@@ -215,13 +245,17 @@ def _group_items_schemas(group_id: int):
 
 @route("groups/<int:group_id>/schemas/skills", ["GET", "PUT"])
 def _group_skills_schemas(group_id: int):
-    success, is_admin, response = check_access_to_group(group_id, rq)
+    success, uid, gid, response = check_auth(rq)
     if not success:
         return response
     match (rq.method):
         case "GET":
-            return make_response(services.schemas(rq.headers).groups(group_id).skills().get())
+            params = {"userId": uid}
+            return make_response(services.schemas(rq.headers).groups(group_id).skills().get(params=params))
         case "PUT":
+            success, is_admin, response = check_access_to_group(group_id, rq)
+            if not success:
+                return response
             if not is_admin:
                 return forbidden()
             return make_response(services.schemas(rq.headers).groups(group_id).skills().put(rq.data))
@@ -229,13 +263,17 @@ def _group_skills_schemas(group_id: int):
 
 @route("groups/<int:group_id>/schemas/template", ["GET", "PUT"])
 def _group_template_schemas(group_id: int):
-    success, is_admin, response = check_access_to_group(group_id, rq)
+    success, uid, gid, response = check_auth(rq)
     if not success:
         return response
     match (rq.method):
         case "GET":
-            return make_response(services.schemas(rq.headers).groups(group_id).template().get())
+            params = {"userId": uid}
+            return make_response(services.schemas(rq.headers).groups(group_id).template().get(params=params))
         case "PUT":
+            success, is_admin, response = check_access_to_group(group_id, rq)
+            if not success:
+                return response
             if not is_admin:
                 return forbidden()
             return make_response(services.schemas(rq.headers).groups(group_id).template().put(rq.data))

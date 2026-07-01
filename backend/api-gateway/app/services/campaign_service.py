@@ -214,11 +214,11 @@ class CampaignService:
     def schemas(self) -> SchemasEndpoints:
         return SchemasEndpoints(self._host, self._notes_host, self._url, self._headers)
     
-    def post(self, data) -> Response:
-        return rq.post(self.url, headers=self._headers, data=data)
+    def post(self, data, params: dict = None) -> Response:
+        return rq.post(self.url, headers=self._headers, data=data, params=params)
     
-    def get(self) -> Response:
-        return rq.get(self.url, headers=self._headers)
+    def get(self, params: dict = None) -> Response:
+        return rq.get(self.url, headers=self._headers, params=params)
     
     def patch(self, data) -> Response:
         return rq.patch(self.url, headers=self._headers, data=data)

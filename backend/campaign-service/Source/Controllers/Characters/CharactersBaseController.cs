@@ -3,6 +3,7 @@ using MongoDB.Driver;
 using Tdn.Db;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
+using Tdn.Models.Providing;
 
 namespace Tdn.Api.Controllers;
 
@@ -11,7 +12,7 @@ public abstract class CharactersBaseController : GroupsBaseController
     private EntityContext _dbContext;
     private MongoDbContext _mongo;
 
-    protected CharactersBaseController(EntityContext context, MongoDbContext mongo, GroupContext groupContext) : base(groupContext)
+    protected CharactersBaseController(EntityContext context, MongoDbContext mongo, GroupContext groupContext, GroupAccessHelper accessHelper) : base(groupContext, accessHelper)
     {
         _dbContext = context;
         _mongo = mongo;

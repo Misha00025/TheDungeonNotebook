@@ -10,20 +10,24 @@ namespace Tdn.Api.Controllers;
 public class GroupAttributesController : BaseController
 {
     private AttributesProvider _provider;
+    private GroupAccessHelper _accessHelper;
     
     public struct PostData
     {
         public List<AttributePostData> attributes { get; set; }
     }
 
-    public GroupAttributesController(AttributesProvider attributesProvider)
+    public GroupAttributesController(AttributesProvider attributesProvider, GroupAccessHelper accessHelper)
     {
         _provider = attributesProvider;
+        _accessHelper = accessHelper;
     }
     
     [HttpGet]
-    public ActionResult GetAttributes(int groupId)
+    public ActionResult GetAttributes(int groupId, [FromQuery] int? userId = null)
     {
+        if (userId != null && !_accessHelper.HasGroupAccess(groupId, userId.Value))
+            return NotFound("Group not found");
         var attributes = _provider.GetAttributes(groupId);
         return Ok(new 
         {

@@ -27,6 +27,7 @@ builder.Services.AddDbContext<PolicesContext>(config.ConfigDbConnections);
 builder.Services.AddScoped(_ => new MongoDbContext(config.GetMongoDbSettings()));
 
 // Providers
+builder.Services.AddScoped<GroupAccessHelper, GroupAccessHelper>();
 builder.Services.AddScoped<AttributesProvider, AttributesProvider>();
 builder.Services.AddScoped<SkillsProvider, SkillsProvider>();
 builder.Services.AddScoped<ItemsProvider, ItemsProvider>();

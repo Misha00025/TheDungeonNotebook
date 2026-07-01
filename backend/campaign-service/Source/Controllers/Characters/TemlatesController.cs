@@ -4,6 +4,7 @@ using Tdn.Db;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 using Tdn.Models.Conversions;
+using Tdn.Models.Providing;
 
 namespace Tdn.Api.Controllers;
 
@@ -33,7 +34,7 @@ public class TemplatesController : GroupsBaseController
     private EntityContext _dbContext;
     private MongoDbContext _mongo;
 
-    public TemplatesController(EntityContext context, MongoDbContext mongo, GroupContext groupContext) : base(groupContext)
+    public TemplatesController(EntityContext context, MongoDbContext mongo, GroupContext groupContext, GroupAccessHelper accessHelper) : base(groupContext, accessHelper)
     {
         _dbContext = context;
         _mongo = mongo;

@@ -11,11 +11,13 @@ public class GroupSkillsController : BaseController
 {
     private SkillsProvider _provider;
     private AttributesProvider _attributesProvider;
+    private GroupAccessHelper _accessHelper;
 
-    public GroupSkillsController(SkillsProvider skillsProvider, AttributesProvider attributesProvider)
+    public GroupSkillsController(SkillsProvider skillsProvider, AttributesProvider attributesProvider, GroupAccessHelper accessHelper)
     {
         _provider = skillsProvider;
         _attributesProvider = attributesProvider;
+        _accessHelper = accessHelper;
     }
 
     private void UpdateGroupAttributes(int groupId, Skill skill)
@@ -60,8 +62,10 @@ public class GroupSkillsController : BaseController
     private IEnumerable<Skill> ApplyFilters(IEnumerable<Skill> skills, Dictionary<string, string> filters) => _provider.ApplyFilters(skills, filters);
 
     [HttpGet]
-    public ActionResult GetSkills(int groupId, [FromQuery] bool withSecrets = false, [FromQuery] Dictionary<string, string>? filters = null)
+    public ActionResult GetSkills(int groupId, [FromQuery] bool withSecrets = false, [FromQuery] Dictionary<string, string>? filters = null, [FromQuery] int? userId = null)
     {
+        if (!CheckAccess(groupId, userId))
+            return NotFound("Group not found");
         var skills = _provider.GetSkills(groupId);
         if (withSecrets == false)
             skills = skills.Where(e => e.IsSecret == false).ToList();
@@ -75,8 +79,10 @@ public class GroupSkillsController : BaseController
     }
 
     [HttpGet("{skillId}")]
-    public ActionResult GetSkill(int groupId, int skillId)
+    public ActionResult GetSkill(int groupId, int skillId, [FromQuery] int? userId = null)
     {
+        if (!CheckAccess(groupId, userId))
+            return NotFound("Group not found");
         var skill = _provider.GetSkill(groupId, skillId);
         if (skill == null)
             return NotFound();
@@ -142,7 +148,7 @@ public class GroupSkillsController : BaseController
         else
             return BadRequest("Unknown error");
     }
-
+    
     [HttpDelete("{skillId}")]
     public ActionResult DeleteSkill(int groupId, int skillId)
     {
@@ -152,5 +158,10 @@ public class GroupSkillsController : BaseController
             return BadRequest("Unknown error");
     }
     
-    
+    private bool CheckAccess(int groupId, int? userId)
+    {
+        if (userId == null)
+            return true;
+        return _accessHelper.HasGroupAccess(groupId, userId.Value);
+    }
 }
