@@ -35,7 +35,7 @@ namespace Tdn.Api.Controllers
                 ValidateAudience = false,
                 ValidateIssuer = false,
                 ValidateLifetime = true,
-                ClockSkew = TimeSpan.FromHours(4)
+                ClockSkew = TimeSpan.FromMinutes(5)
             };
         }
         
