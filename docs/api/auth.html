@@ -14,87 +14,10 @@
     <h1 class="page-title">🔐 Аутентификация</h1>
     <p class="page-subtitle">Регистрация, вход и обновление JWT-токенов.</p>
 
-    <section id="post-auth-register" class="endpoint-card">
-      <div class="card-header">
-        <span class="method-badge method-post">POST</span>
-        <code class="endpoint-url">/auth/register</code>
-        <span class="auth-badge auth-none">no auth</span>
-      </div>
-      <div class="card-body">
-        <p class="description">Регистрация нового пользователя.</p>
-        <div class="request-body">
-          <h3>Тело запроса</h3>
-          <pre class="json-schema">{
-  "username": "string",
-  "password": "string"
-}</pre>
-        </div>
-        <div class="response-block">
-          <h3>Ответ</h3>
-          <pre class="json-schema">{
-  "id": "int"
-}</pre>
-          <div class="status-codes">
-            <span class="status status-2xx">201 Created</span>
-            <span class="status status-4xx">409 Conflict</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="post-auth-login" class="endpoint-card">
-      <div class="card-header">
-        <span class="method-badge method-post">POST</span>
-        <code class="endpoint-url">/auth/login</code>
-        <span class="auth-badge auth-none">no auth</span>
-      </div>
-      <div class="card-body">
-        <p class="description">Вход в систему.</p>
-        <div class="request-body">
-          <h3>Тело запроса</h3>
-          <pre class="json-schema">{
-  "username": "string",
-  "password": "string"
-}</pre>
-        </div>
-        <div class="response-block">
-          <h3>Ответ</h3>
-          <pre class="json-schema">{
-  "token": "&lt;JWT&gt;"
-}</pre>
-          <div class="status-codes">
-            <span class="status status-2xx">200 OK</span>
-            <span class="status status-4xx">401 Unauthorized</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="post-auth-refresh" class="endpoint-card">
-      <div class="card-header">
-        <span class="method-badge method-post">POST</span>
-        <code class="endpoint-url">/auth/refresh</code>
-        <span class="auth-badge auth-none">no auth</span>
-      </div>
-      <div class="special-badges">
-        <span class="special-badge">⚙️ handler: auth_refresh</span>
-      </div>
-      <div class="card-body">
-        <p class="description">Обновление JWT-токена. Требуется заголовок Refresh-Token.</p>
-        <div class="response-block">
-          <h3>Ответ</h3>
-          <pre class="json-schema">{
-  "accessToken": "&lt;JWT&gt;"
-}</pre>
-          <div class="status-codes">
-            <span class="status status-2xx">200 OK</span>
-            <span class="status status-4xx">401 Unauthorized</span>
-          </div>
-        </div>
-      </div>
-    </section>
+    <div id="endpoints-container" data-page="auth.html"></div>
   </main>
   <script src="js/data.js"></script>
   <script src="js/sidebar.js"></script>
+  <script src="js/renderer.js"></script>
 </body>
 </html>
