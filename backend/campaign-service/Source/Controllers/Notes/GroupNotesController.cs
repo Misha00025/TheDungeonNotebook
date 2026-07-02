@@ -17,7 +17,7 @@ public class GroupNotesController : BaseController
     }
 
     [HttpGet]
-    public ActionResult GetAll(int groupId)
+    public ActionResult GetAll(int groupId, [FromQuery] string? userId = null)
     {
         var notes = _provider.GetGroupNotes(groupId);
         return Ok(notes.Select(n => n.ToResponse()));

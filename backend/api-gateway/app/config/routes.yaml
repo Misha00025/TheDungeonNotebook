@@ -208,9 +208,12 @@ routes:
           service: campaign
           path: /groups/{group_id}/notes
         auth: required
-        access: group_admin
+        access: group_member
         response:
           wrap: notes
+        params:
+          query:
+            userId: "{jwt.userId}"
       POST:
         proxy:
           service: campaign
