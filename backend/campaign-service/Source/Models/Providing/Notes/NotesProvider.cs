@@ -27,7 +27,8 @@ public class NotesProvider
         return _sql.Notes
             .Where(e => e.GroupId == groupId && e.CharacterId == null)
             .Include(e => e.Group)
-            .AsEnumerable()
+            .Include(e => e.Keywords)
+            .ToList()
             .Select(ToNoteWithoutBody)
             .ToList();
     }
@@ -37,7 +38,8 @@ public class NotesProvider
         return _sql.Notes
             .Where(e => e.GroupId == groupId && e.CharacterId == characterId)
             .Include(e => e.Group)
-            .AsEnumerable()
+            .Include(e => e.Keywords)
+            .ToList()
             .Select(ToNoteWithoutBody)
             .ToList();
     }
@@ -47,6 +49,7 @@ public class NotesProvider
         var data = _sql.Notes
             .Where(e => e.GroupId == groupId && e.Id == noteId && e.CharacterId == null)
             .Include(e => e.Group)
+            .Include(e => e.Keywords)
             .FirstOrDefault();
         if (data == null) return null;
         return ToNoteWithBody(data);
@@ -57,6 +60,7 @@ public class NotesProvider
         var data = _sql.Notes
             .Where(e => e.GroupId == groupId && e.CharacterId == characterId && e.Id == noteId)
             .Include(e => e.Group)
+            .Include(e => e.Keywords)
             .FirstOrDefault();
         if (data == null) return null;
         return ToNoteWithBody(data);
@@ -276,7 +280,7 @@ public class NotesProvider
             ShortDescription = data.ShortDescription,
             CreatedAt = data.AdditionDate,
             UpdatedAt = data.ModifyDate,
-            Keywords = GetKeywords(data.Id)
+            Keywords = data.Keywords?.Select(k => k.Keyword).ToList() ?? new List<string>()
         };
     }
 
