@@ -42,7 +42,7 @@ def execute_pipeline(
             from app.status import unauthorized
             return unauthorized("Authorization header is required")
 
-        ok, payload = _validate_jwt(raw_token, ctx.services)
+        ok, payload = _validate_jwt(raw_token, ctx.services, ctx)
         if not ok:
             from app.status import unauthorized
             return unauthorized("Invalid or expired token")
@@ -82,6 +82,7 @@ def execute_pipeline(
 def _validate_jwt(
     raw_token: str,
     services: ServiceRegistry,
+    ctx: RouteContext,
 ) -> tuple[bool, dict | None]:
     """
     Проверяет JWT через auth-service и возвращает payload.
@@ -97,13 +98,18 @@ def _validate_jwt(
     if token.startswith("Bearer "):
         token = token[7:]
 
+    if not raw_token.startswith("Bearer "):
+        import logging
+        logging.warning("Deprecated: Authorization header without 'Bearer' prefix. Client: %s, Path: %s",
+                        ctx.request.remote_addr, ctx.request.path)
+
     # Проверяем токен через auth-service
     auth_client = services.get_client("auth")
     if auth_client is None:
         return False, None
 
     try:
-        resp = auth_client.get("/auth/check", params={"accessToken": token})
+        resp = auth_client.get("/auth/check", headers={"Authorization": f"Bearer {token}"})
         if not resp.ok:
             return False, None
     except Exception:

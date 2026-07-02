@@ -61,7 +61,8 @@ Body: `{ "access": int, "years": int? }`
 ### Проверка токена
 
 ```
-GET /auth/check?accessToken={token}
+GET /auth/check
+Header: Authorization: Bearer {token}
 ```
 
 - `200` — OK

@@ -43,11 +43,11 @@ def with_auth_service_scenario():
         Test(request="auth/token/refresh", method="POST", data=valid_refresh_token_request, requirement=OK),
         Test(request="auth/token/refresh", method="POST", data=invalid_refresh_token_request, requirement=NOT_AUTH),
 
-        Test(request="auth/check?accessToken={steps.3.token}", method="GET", requirement=OK),
-        Test(request="auth/check?accessToken={steps.5.accessToken}", method="GET", requirement=OK),
+        Test(request="auth/check", headers={**h, "Authorization": "Bearer {steps.3.token}"}, method="GET", requirement=OK),
+        Test(request="auth/check", headers={**h, "Authorization": "Bearer {steps.5.accessToken}"}, method="GET", requirement=OK),
 
         Test(request="auth/groups/1/service-token/generate", method="POST", data={"access":3, "years":5}, requirement=OK),
-        Test(request="auth/check?accessToken={steps.-1.token}", method="GET", requirement=OK),
+        Test(request="auth/check", headers={**h, "Authorization": "Bearer {steps.-1.token}"}, method="GET", requirement=OK),
 
         # Test(request="auth/logout", method="DELETE", requirement=OK),
         # Test(request="auth/logout", method="DELETE", requirement=NOT_AUTH),
