@@ -9,6 +9,7 @@ from scenarios.character_lifecycle import register_character_lifecycle_scenario,
 from scenarios.group_skills import register_group_skills_scenario, scenarios as gs_scenarios
 from scenarios.character_skills import register_character_skills_scenario, scenarios as cs_scenarios
 from scenarios.export_import import register_export_import_scenario, scenarios as ei_scenarios
+from scenarios.notes import register_notes_scenario, scenarios as notes_scenarios
 
 if __name__ == "__main__":
     import argparse
@@ -46,6 +47,8 @@ if __name__ == "__main__":
                 register_character_skills_scenario()
             elif scenario == "ExportImport":
                 register_export_import_scenario()
+            elif scenario == "Notes":
+                register_notes_scenario()
     else:
         register_gateway_main()
         register_user_profile_scenario()
@@ -54,6 +57,7 @@ if __name__ == "__main__":
         register_group_skills_scenario()
         register_character_skills_scenario()
         register_export_import_scenario()
+        register_notes_scenario()
 
-    all_scenarios = gw_scenarios + up_scenarios + gi_scenarios + cl_scenarios + gs_scenarios + cs_scenarios + ei_scenarios
+    all_scenarios = gw_scenarios + up_scenarios + gi_scenarios + cl_scenarios + gs_scenarios + cs_scenarios + ei_scenarios + notes_scenarios
     main_test.start(all_scenarios)

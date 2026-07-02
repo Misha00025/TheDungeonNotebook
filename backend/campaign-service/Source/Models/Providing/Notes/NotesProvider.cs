@@ -261,14 +261,6 @@ public class NotesProvider
         }
     }
 
-    private List<string> GetKeywords(int noteId)
-    {
-        return _sql.NoteKeywords
-            .Where(e => e.NoteId == noteId)
-            .Select(e => e.Keyword)
-            .ToList();
-    }
-
     private Note ToNoteWithoutBody(NoteData data)
     {
         return new Note

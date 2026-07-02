@@ -5,3 +5,4 @@ from . import character_lifecycle
 from . import group_skills
 from . import character_skills
 from . import export_import
+from . import notes

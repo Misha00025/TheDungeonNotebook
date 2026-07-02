@@ -139,6 +139,5 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
         builder.HasKey(e => new { e.NoteId, e.Keyword });
         builder.Property(e => e.NoteId).HasColumnName("note_id");
         builder.Property(e => e.Keyword).HasColumnName("keyword").HasMaxLength(100);
-        builder.HasOne(e => e.Note).WithMany().HasForeignKey(e => e.NoteId);
     }
 }
