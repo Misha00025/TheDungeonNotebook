@@ -4,11 +4,13 @@ using Tdn.Db.Entities;
 
 namespace Tdn.Db.Contexts;
 
-public class EntityContext : BaseDbContext<EntityContext>
+	public class EntityContext : BaseDbContext<EntityContext>
 {
 	public EntityContext(DbContextOptions<EntityContext> options, IEntityBuildersConfigurer configurer) : base(options, configurer)
 	{
 	}
+	
+	public DbSet<NoteData> Notes { get; set; }
 	
 	protected override void OnModelCreating(ModelBuilder builder)
 	{
@@ -19,6 +21,7 @@ public class EntityContext : BaseDbContext<EntityContext>
 		Configurer.ConfigureModel(builder.Entity<SkillData>());
 		Configurer.ConfigureModel(builder.Entity<CharacterSkillData>());
 		Configurer.ConfigureModel(builder.Entity<CharacterItemData>());
+		Configurer.ConfigureModel(builder.Entity<NoteData>());
 		base.OnModelCreating(builder);
 	}
 }

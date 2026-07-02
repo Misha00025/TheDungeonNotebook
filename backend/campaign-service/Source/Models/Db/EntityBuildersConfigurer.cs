@@ -15,6 +15,7 @@ public interface IEntityBuildersConfigurer
 	void ConfigureModel(EntityTypeBuilder<CharacterItemData> builder);
 	void ConfigureModel(EntityTypeBuilder<UserGroupData> builder);
 	void ConfigureModel(EntityTypeBuilder<UserCharacterData> builder);
+	void ConfigureModel(EntityTypeBuilder<NoteData> builder);
 }
 
 public class EntityBuildersConfigurer : IEntityBuildersConfigurer
@@ -112,5 +113,21 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
         builder.Property(e => e.CharacterId).HasColumnName("character_id");
         builder.Property(e => e.CanWrite).HasColumnName("can_write");
         builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => new {e.UserId, e.GroupId});
+    }
+
+    public void ConfigureModel(EntityTypeBuilder<NoteData> builder)
+    {
+        builder.ToTable("note");
+        builder.HasKey(e => e.Id);
+        builder.Property(e => e.Id).HasColumnName("note_id");
+        builder.Property(e => e.GroupId).HasColumnName("group_id");
+        builder.Property(e => e.UUID).HasColumnName("uuid");
+        builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
+        builder.Property(e => e.CharacterId).HasColumnName("character_id");
+        builder.HasOne(e => e.Character).WithMany().HasForeignKey(e => e.CharacterId).IsRequired(false).OnDelete(DeleteBehavior.Cascade);
+        builder.Property(e => e.Header).HasColumnName("header");
+        builder.Property(e => e.ShortDescription).HasColumnName("short_description");
+        builder.Property(e => e.AdditionDate).HasColumnName("addition_date");
+        builder.Property(e => e.ModifyDate).HasColumnName("modified_date");
     }
 }
