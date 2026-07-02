@@ -2,16 +2,16 @@ namespace Tdn.Db.Entities;
 
 public class UserGroupData
 {
-    public int UserId;
-    public int GroupId;
-    public bool IsAdmin; 
+    public int UserId { get; set; }
+    public int GroupId { get; set; }
+    public bool IsAdmin { get; set; } 
 }
 
 public class UserCharacterData
 {
-    public int UserId;
-    public int GroupId;
-    public int CharacterId;
-    public bool CanWrite;
-    public UserGroupData? Group;
+    public int UserId { get; set; }
+    public int GroupId { get; set; }
+    public int CharacterId { get; set; }
+    public bool CanWrite { get; set; }
+    public UserGroupData? Group { get; set; }
 }
