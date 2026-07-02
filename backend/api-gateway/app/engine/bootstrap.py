@@ -22,7 +22,6 @@ from app.engine.registry import ServiceRegistry
 def bootstrap(
     flask_app: Flask,
     config_path: Optional[str] = None,
-    url_prefix: str = "/v2",
     import_handlers: bool = True,
 ) -> GatewayConfig:
     """
@@ -31,7 +30,6 @@ def bootstrap(
     Args:
         flask_app: Flask-приложение.
         config_path: Путь к YAML-файлу. Если None — ищет по умолчанию.
-        url_prefix: Префикс URL для всех маршрутов (по умолчанию /v2).
         import_handlers: Автоматически импортировать хендлеры.
 
     Returns:
@@ -62,7 +60,7 @@ def bootstrap(
 
     # Создаём Blueprint
     bp_name = "engine_api"
-    bp = Blueprint(bp_name, __name__, url_prefix=url_prefix)
+    bp = Blueprint(bp_name, __name__, url_prefix=config.base_path or None)
 
     # Регистрируем каждый маршрут
     for route in config.routes:
@@ -70,7 +68,7 @@ def bootstrap(
 
     # Регистрируем Blueprint в приложении
     flask_app.register_blueprint(bp)
-    print(f"[Engine] Blueprint '{bp_name}' registered at '{url_prefix}'")
+    print(f"[Engine] Blueprint '{bp_name}' registered at '{config.base_path or '/'}'")
 
     return config
 

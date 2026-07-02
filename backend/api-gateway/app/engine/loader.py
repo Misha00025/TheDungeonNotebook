@@ -48,6 +48,7 @@ def load_config(path: Optional[str] = None) -> GatewayConfig:
 
 def _parse_config(raw: dict) -> GatewayConfig:
     """Парсит сырой YAML-словарь в GatewayConfig."""
+    base_path = raw.get("base_path", "/v2") or ""
     services_raw = raw.get("services", {}) or {}
     routes_raw = raw.get("routes", []) or []
 
@@ -63,7 +64,7 @@ def _parse_config(raw: dict) -> GatewayConfig:
         parsed_routes = _parse_route(route_def)
         routes.extend(parsed_routes)
 
-    return GatewayConfig(services=services, routes=routes)
+    return GatewayConfig(base_path=base_path, services=services, routes=routes)
 
 
 def _parse_route(route_def: dict) -> list[RouteConfig]:
