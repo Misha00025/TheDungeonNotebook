@@ -30,6 +30,39 @@ docker-compose logs | grep -v "mongo-db-gateway-test  " | grep -v "mysql-db-gate
 docker-compose logs | grep "mongo-db-gateway-test  " > logs/db.log
 docker-compose logs | grep "mysql-db-gateway-test  " >> logs/db.log
 
+# Сводка результатов
+echo ""
+echo "╔═══════════════════════════════════════╗"
+echo "║         Сводка тестирования           ║"
+echo "╚═══════════════════════════════════════╝"
+echo ""
+
+echo "=== Всего запросов ==="
+grep -c "REQUEST" logs/test.log
+
+echo ""
+echo "=== Распределение статусов ==="
+grep "REQUEST" logs/test.log | grep -oP ' \d{3}:' | sort | uniq -c | sort -rn
+
+echo ""
+echo "=== Ошибок в тестах ==="
+grep -c "ERROR:" logs/test.log
+
+echo ""
+echo "=== Стартовые логи Gateway ==="
+grep "\[Engine\]" logs/server.log 2>/dev/null | head -10
+
+echo ""
+echo "=== Any 501? ==="
+if grep -qE '\b501\b' logs/test.log; then
+    echo "⚠️  ЕСТЬ 501!"
+    grep "501" logs/test.log | head -5
+else
+    echo "✅ Нет"
+fi
+
+echo ""
+
 # Завершаем работу
 docker-compose down
 echo "Тестирование завершено!"

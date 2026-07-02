@@ -25,6 +25,8 @@ def _default_status(code):
             return {_error: "Conflict"}
         case 501:
             return {_error: "Not Implemented"}
+        case 502:
+            return {_error: "Bad Gateway"}
         case _:
             return {_error: "Unknown response code"}
 
@@ -71,3 +73,8 @@ def unauthorized(response=None):
 
 def conflict(response=None):
     return answer(409, response)
+
+
+def bad_gateway(response=None):
+    """502 Bad Gateway — ошибка при обращении к вышестоящему сервису."""
+    return answer(502, response)
