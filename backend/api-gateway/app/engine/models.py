@@ -100,6 +100,8 @@ class ServiceConfig:
 @dataclass
 class GatewayConfig:
     """Корневая конфигурация API Gateway."""
+    base_path: str = "/v2"
+    """Префикс URL для всех маршрутов (например, /v2 или пустая строка /)."""
     services: dict[str, ServiceConfig] = field(default_factory=dict)
     """Словарь бэкенд-сервисов {имя: конфиг}."""
     routes: list[RouteConfig] = field(default_factory=list)

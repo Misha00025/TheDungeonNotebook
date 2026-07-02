@@ -6,6 +6,11 @@
 # в app/handlers/access.py.
 # ============================================================
 
+# Префикс URL для всех маршрутов.
+# Пустая строка "" — маршруты прямо на /groups/..., /auth/... и т.д.
+# "/v2" — маршруты на /v2/groups/..., /v2/auth/... и т.д.
+base_path: ""
+
 # ------ Сервисы ------
 services:
   auth:      { base_url: "http://auth-service:8080" }
@@ -89,7 +94,6 @@ routes:
           service: campaign
           path: /groups
         auth: required
-        access: authenticated
         params:
           query:
             userId: "{jwt.userId}"
@@ -98,7 +102,6 @@ routes:
           service: campaign
           path: /groups
         auth: required
-        access: authenticated
         params:
           query:
             userId: "{jwt.userId}"
@@ -110,7 +113,6 @@ routes:
           service: campaign
           path: /groups/{group_id}
         auth: required
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
@@ -138,7 +140,7 @@ routes:
         auth: required
         access: group_admin
         params:
-          query:
+          body:
             groupId: "{path.group_id}"
             userId: "{path.user_id}"
       DELETE:
@@ -162,7 +164,6 @@ routes:
           service: campaign
           path: /groups/{group_id}/items
         auth: required
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
@@ -180,7 +181,6 @@ routes:
           service: campaign
           path: /groups/{group_id}/items/{item_id}
         auth: required
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
@@ -246,7 +246,6 @@ routes:
           service: campaign
           path: /groups/{group_id}/skills/attributes
         auth: required
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
@@ -264,7 +263,6 @@ routes:
           service: campaign
           path: /groups/{group_id}/skills
         auth: required
-        access: group_member
         params:
           query: "*"
       POST:
@@ -281,7 +279,6 @@ routes:
           service: campaign
           path: /groups/{group_id}/skills/{skill_id}
         auth: required
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
@@ -308,7 +305,6 @@ routes:
           service: campaign
           path: /schemas/groups/{group_id}/items
         auth: required
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
@@ -326,7 +322,6 @@ routes:
           service: campaign
           path: /schemas/groups/{group_id}/skills
         auth: required
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
@@ -344,7 +339,6 @@ routes:
           service: campaign
           path: /schemas/groups/{group_id}/template
         auth: required
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
@@ -380,7 +374,6 @@ routes:
           service: campaign
           path: /groups/{group_id}/characters
         auth: required
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
@@ -398,7 +391,6 @@ routes:
           service: campaign
           path: /groups/{group_id}/characters/{character_id}
         auth: required
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
@@ -432,7 +424,7 @@ routes:
         auth: required
         access: character_admin
         params:
-          query:
+          body:
             groupId: "{path.group_id}"
             userId: "{path.user_id}"
             characterId: "{path.character_id}"
@@ -458,7 +450,6 @@ routes:
           service: campaign
           path: /groups/{group_id}/characters/templates
         auth: required
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
@@ -482,7 +473,6 @@ routes:
           service: campaign
           path: /groups/{group_id}/characters/templates/{template_id}
         auth: required
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
@@ -503,7 +493,6 @@ routes:
           service: campaign
           path: /groups/{group_id}/characters/{character_id}/items
         auth: required
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
@@ -521,7 +510,6 @@ routes:
           service: campaign
           path: /groups/{group_id}/characters/{character_id}/items/{item_id}
         auth: required
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
@@ -586,7 +574,6 @@ routes:
       service: campaign
       path: /groups/{group_id}/characters/{character_id}/skills
     auth: required
-    access: group_member
     params:
       query: "*"
 
