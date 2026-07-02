@@ -209,6 +209,8 @@ routes:
           path: /groups/{group_id}/notes
         auth: required
         access: group_admin
+        response:
+          wrap: notes
       POST:
         proxy:
           service: campaign
@@ -538,6 +540,8 @@ routes:
           path: /groups/{group_id}/characters/{character_id}/notes
         auth: required
         access: character_viewer
+        response:
+          wrap: notes
       POST:
         proxy:
           service: campaign
