@@ -28,6 +28,18 @@ public static class ModelToResponseExtensions
         isSecret = skill.IsSecret
     };
     
+    public static object ToResponse(this Note note) => new
+    {
+        id = note.Id,
+        header = note.Header,
+        short_description = note.ShortDescription,
+        created_at = note.CreatedAt,
+        updated_at = note.UpdatedAt,
+        group_id = note.GroupId,
+        character_id = note.CharacterId,
+        body = note.Body
+    };
+
     public static object ToResponse(this Item item) => item.Amount != null ? new 
     {
         id = item.Id,

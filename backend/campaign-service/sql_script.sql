@@ -62,6 +62,22 @@ CREATE TABLE IF NOT EXISTS `character_skill` (
   FOREIGN KEY (`skill_id`) REFERENCES `skill`(`skill_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE IF NOT EXISTS `note` (
+    `note_id` int NOT NULL AUTO_INCREMENT,
+    `group_id` int NOT NULL,
+    `character_id` int DEFAULT NULL,
+    `uuid` text NOT NULL,
+    `header` text NOT NULL,
+    `short_description` text,
+    `addition_date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `modified_date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`note_id`),
+    KEY `IX_note_group_id` (`group_id`),
+    KEY `IX_note_character_id` (`character_id`),
+    CONSTRAINT `FK_note_group_group_id` FOREIGN KEY (`group_id`) REFERENCES `group` (`group_id`) ON DELETE CASCADE,
+    CONSTRAINT `FK_note_character_character_id` FOREIGN KEY (`character_id`) REFERENCES `character` (`character_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE IF NOT EXISTS `user_group` (
     `user_id` INT NOT NULL,
     `group_id` INT NOT NULL,

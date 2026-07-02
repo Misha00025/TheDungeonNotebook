@@ -16,7 +16,6 @@ services:
   auth:      { base_url: "http://auth-service:8080" }
   users:     { base_url: "http://users-service:8080" }
   campaign:  { base_url: "http://campaign-service:8080" }
-  notes:     { base_url: "http://notes-service:8080" }
 
 # ------ Маршруты ------
 routes:
@@ -206,13 +205,13 @@ routes:
     methods:
       GET:
         proxy:
-          service: notes
+          service: campaign
           path: /groups/{group_id}/notes
         auth: required
         access: group_admin
       POST:
         proxy:
-          service: notes
+          service: campaign
           path: /groups/{group_id}/notes
         auth: required
         access: group_admin
@@ -221,19 +220,19 @@ routes:
     methods:
       GET:
         proxy:
-          service: notes
+          service: campaign
           path: /groups/{group_id}/notes/{note_id}
         auth: required
         access: group_admin
       PUT:
         proxy:
-          service: notes
+          service: campaign
           path: /groups/{group_id}/notes/{note_id}
         auth: required
         access: group_admin
       DELETE:
         proxy:
-          service: notes
+          service: campaign
           path: /groups/{group_id}/notes/{note_id}
         auth: required
         access: group_admin
@@ -535,13 +534,13 @@ routes:
     methods:
       GET:
         proxy:
-          service: notes
+          service: campaign
           path: /groups/{group_id}/characters/{character_id}/notes
         auth: required
         access: character_viewer
       POST:
         proxy:
-          service: notes
+          service: campaign
           path: /groups/{group_id}/characters/{character_id}/notes
         auth: required
         access: character_writer
@@ -550,19 +549,19 @@ routes:
     methods:
       GET:
         proxy:
-          service: notes
+          service: campaign
           path: /groups/{group_id}/characters/{character_id}/notes/{note_id}
         auth: required
         access: character_viewer
       PUT:
         proxy:
-          service: notes
+          service: campaign
           path: /groups/{group_id}/characters/{character_id}/notes/{note_id}
         auth: required
         access: character_writer
       DELETE:
         proxy:
-          service: notes
+          service: campaign
           path: /groups/{group_id}/characters/{character_id}/notes/{note_id}
         auth: required
         access: character_writer
