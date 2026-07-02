@@ -156,8 +156,13 @@ namespace Tdn.Api.Controllers
         }
 
         [HttpGet("check")]
-        public ActionResult CheckToken([FromQuery]string accessToken)
+        public ActionResult CheckToken()
         {
+            var authHeader = Request.Headers.Authorization.ToString();
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+                return Unauthorized(new { error = "Missing or invalid Authorization header" });
+
+            var accessToken = authHeader.Substring("Bearer ".Length).Trim();
             var validationParameters = GetValidationParameters();
 
             var tokenHandler = new JwtSecurityTokenHandler();

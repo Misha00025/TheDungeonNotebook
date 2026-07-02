@@ -99,7 +99,9 @@ public class AuthService : IAuthService
     {
         try
         {
-            var response = await _httpClient.GetAsync($"/auth/check?accessToken={Uri.EscapeDataString(token)}");
+            var request = new HttpRequestMessage(HttpMethod.Get, "/auth/check");
+            request.Headers.Add("Authorization", $"Bearer {token}");
+            var response = await _httpClient.SendAsync(request);
             
             if (response.IsSuccessStatusCode)
             {
