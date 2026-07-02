@@ -391,7 +391,7 @@ const ENDPOINTS = [
     description: "Создание заметки группы.",
     requestBody: '{\n  "header": "string",\n  "body"?: "string",\n  "short_description"?: "string",\n  "keywords"?: ["string"]\n}',
     requestBodyRequired: ["header"],
-    responseSchema: null,
+    responseSchema: '{\n  "id": "int",\n  "header": "string",\n  "short_description": "string",\n  "created_at": "datetime",\n  "updated_at": "datetime",\n  "group_id": "int",\n  "character_id": "null",\n  "body": "string | null",\n  "keywords": ["string"]\n}',
     responseStatuses: ["201 Created", "400 Bad Request"],
     params: null,
     special: null
@@ -425,7 +425,7 @@ const ENDPOINTS = [
     description: "Обновление заметки группы.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: null,
+    responseSchema: '{\n  "id": "int",\n  "header": "string",\n  "short_description": "string",\n  "created_at": "datetime",\n  "updated_at": "datetime",\n  "group_id": "int",\n  "character_id": "int | null",\n  "body": "string | null",\n  "keywords": ["string"]\n}',
     responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"],
     params: null,
     special: null
@@ -459,7 +459,7 @@ const ENDPOINTS = [
     description: "Все уникальные ключевые слова заметок группы.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '["string"]',
+    responseSchema: '{\n  "keywords": ["string"]\n}',
     responseStatuses: ["200 OK"],
     params: null,
     special: null
@@ -476,7 +476,7 @@ const ENDPOINTS = [
     description: "Атрибуты навыков группы.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '[{"key": "string","name": "string","description": "string","knownValues": ["string"],"isFiltered": "bool"}]',
+    responseSchema: '{\n  "attributes": [{"key": "string","name": "string","description": "string","knownValues": ["string"],"isFiltered": "bool"}],\n  "total": "int"\n}',
     responseStatuses: ["200 OK"],
     params: null,
     special: null
@@ -491,7 +491,7 @@ const ENDPOINTS = [
     auth: "required",
     access: "group_admin",
     description: "Обновление атрибутов навыков.",
-    requestBody: '{\n  "attributes": ["Array<Attribute>"]\n}',
+    requestBody: '{\n  "attributes": [{"key": "string","name": "string","description"?: "string","isFiltered"?: "bool"}]\n}',
     requestBodyRequired: null,
     responseSchema: null,
     responseStatuses: ["200 OK", "400 Bad Request"],
@@ -510,7 +510,7 @@ const ENDPOINTS = [
     description: "Список навыков группы.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "skills": [{"id": "int","name": "string","description": "string","attributes": "Array","isSecret": "bool"}]\n}',
+    responseSchema: '{\n  "skills": [{"id": "int","name": "string","description": "string","attributes": [{"key": "string","name": "string","description": "string"}],"isSecret": "bool"}]\n}',
     responseStatuses: ["200 OK"],
     params: [
       { name: "withSecrets", type: "bool", description: "Показывать секреты" },
@@ -530,7 +530,7 @@ const ENDPOINTS = [
     description: "Создание навыка группы.",
     requestBody: '{\n  "name"?: "string",\n  "description"?: "string",\n  "attributes"?: "Array",\n  "isSecret"?: "bool"\n}',
     requestBodyRequired: null,
-    responseSchema: null,
+    responseSchema: '{\n  "id": "int",\n  "name": "string",\n  "description": "string",\n  "attributes": [{"key": "string","name": "string","description": "string","value": "string"}],\n  "isSecret": "bool"\n}',
     responseStatuses: ["201 Created", "400 Bad Request"],
     params: null,
     special: null
@@ -547,7 +547,7 @@ const ENDPOINTS = [
     description: "Получение навыка группы.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "id": "int",\n  "name": "string",\n  "description": "string",\n  "attributes": "Array<ValuedAttribute>",\n  "isSecret": "bool"\n}',
+    responseSchema: '{\n  "id": "int",\n  "name": "string",\n  "description": "string",\n  "attributes": [{"key": "string","name": "string","description": "string","value": "string"}],\n  "isSecret": "bool"\n}',
     responseStatuses: ["200 OK", "404 Not Found"],
     params: null,
     special: null
@@ -564,7 +564,7 @@ const ENDPOINTS = [
     description: "Обновление навыка группы.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: null,
+    responseSchema: '{\n  "id": "int",\n  "name": "string",\n  "description": "string",\n  "attributes": [{"key": "string","name": "string","description": "string","value": "string"}],\n  "isSecret": "bool"\n}',
     responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"],
     params: null,
     special: null
@@ -1046,7 +1046,7 @@ const ENDPOINTS = [
     description: "Список заметок персонажа (без body).",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "notes": [Note]\n}',
+    responseSchema: '{\n  "notes": [{"id": "int","header": "string","short_description": "string","created_at": "datetime","updated_at": "datetime","group_id": "int","character_id": "int","body": "null","keywords": ["string"]}]\n}',
     responseStatuses: ["200 OK"],
     params: null,
     special: null
@@ -1063,7 +1063,7 @@ const ENDPOINTS = [
     description: "Создание заметки персонажа.",
     requestBody: '{\n  "header": "string",\n  "body"?: "string",\n  "short_description"?: "string",\n  "keywords"?: ["string"]\n}',
     requestBodyRequired: ["header"],
-    responseSchema: null,
+    responseSchema: '{\n  "id": "int",\n  "header": "string",\n  "short_description": "string",\n  "created_at": "datetime",\n  "updated_at": "datetime",\n  "group_id": "int",\n  "character_id": "int",\n  "body": "string | null",\n  "keywords": ["string"]\n}',
     responseStatuses: ["201 Created"],
     params: null,
     special: null
@@ -1080,7 +1080,7 @@ const ENDPOINTS = [
     description: "Получение заметки персонажа (с body).",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: null,
+    responseSchema: '{\n  "id": "int",\n  "header": "string",\n  "short_description": "string",\n  "created_at": "datetime",\n  "updated_at": "datetime",\n  "group_id": "int",\n  "character_id": "int",\n  "body": "string | null",\n  "keywords": ["string"]\n}',
     responseStatuses: ["200 OK", "404 Not Found"],
     params: null,
     special: null
@@ -1097,7 +1097,7 @@ const ENDPOINTS = [
     description: "Обновление заметки персонажа.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: null,
+    responseSchema: '{\n  "id": "int",\n  "header": "string",\n  "short_description": "string",\n  "created_at": "datetime",\n  "updated_at": "datetime",\n  "group_id": "int",\n  "character_id": "int",\n  "body": "string | null",\n  "keywords": ["string"]\n}',
     responseStatuses: ["200 OK", "404 Not Found"],
     params: null,
     special: null
@@ -1131,7 +1131,7 @@ const ENDPOINTS = [
     description: "Ключевые слова заметок персонажа.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: null,
+    responseSchema: '{\n  "keywords": ["string"]\n}',
     responseStatuses: ["200 OK"],
     params: null,
     special: null
@@ -1148,7 +1148,7 @@ const ENDPOINTS = [
     description: "Список навыков персонажа.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '[{"id": "int","name": "string","description": "string","attributes": "Array","isSecret": "bool"}]',
+    responseSchema: '[{"id": "int","name": "string","description": "string","attributes": [{"key": "string","name": "string","description": "string"}],"isSecret": "bool"}]',
     responseStatuses: ["200 OK", "404 Not Found"],
     params: [
       { name: "filters", type: "string", description: "Фильтры" }
@@ -1167,8 +1167,8 @@ const ENDPOINTS = [
     description: "Добавить/обновить навык персонажа.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: null,
-    responseStatuses: ["200 OK", "403 Forbidden", "404 Not Found"],
+    responseSchema: '{\n  "id": "int",\n  "name": "string",\n  "description": "string",\n  "attributes": [{"key": "string","name": "string","description": "string","value": "string"}],\n  "isSecret": "bool"\n}',
+    responseStatuses: ["200 OK", "400 Bad Request", "403 Forbidden", "404 Not Found"],
     params: null,
     special: ["↺ без тела"]
   },
@@ -1184,8 +1184,8 @@ const ENDPOINTS = [
     description: "Удалить навык персонажа.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: null,
-    responseStatuses: ["200 OK", "403 Forbidden", "404 Not Found"],
+    responseSchema: '{\n  "id": "int",\n  "name": "string",\n  "description": "string",\n  "attributes": [{"key": "string","name": "string","description": "string","value": "string"}],\n  "isSecret": "bool"\n}',
+    responseStatuses: ["200 OK", "400 Bad Request", "403 Forbidden", "404 Not Found"],
     params: null,
     special: null
   }
