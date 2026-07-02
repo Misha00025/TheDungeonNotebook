@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Экспорт/Импорт — The Dungeon Notebook API</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div id="sidebar-overlay"></div>
+  <button id="sidebar-toggle" aria-label="Открыть меню">☰</button>
+  <nav id="sidebar"></nav>
+  <main id="content">
+    <h1 class="page-title">📦 Экспорт/Импорт</h1>
+    <p class="page-subtitle">Экспорт и импорт данных группы.</p>
+
+    <section id="get-groups-id-export" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-get">GET</span>
+        <code class="endpoint-url">/groups/{id}/export</code>
+        <span class="auth-badge auth-required">auth</span>
+        <span class="access-badge">group_admin</span>
+      </div>
+      <div class="special-badges">
+        <span class="special-badge">⚙️ handler: group_export</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Экспорт данных группы.</p>
+        <table class="params-table">
+          <thead>
+            <tr><th>Параметр</th><th>Тип</th><th>Описание</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>include</td><td>string</td><td>Что включить: templates,characters,items,skills (через запятую)</td></tr>
+          </tbody>
+        </table>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">{
+  "version": "int",
+  "exportedAt": "datetime",
+  "groupId": "int",
+  "templateSchema": { "categories": [...] },
+  "charlists": ["Array"],
+  "characters": ["Array"],
+  "items": ["Array"],
+  "skills": ["Array"],
+  "characterItems": ["Array"],
+  "characterSkills": ["Array"]
+}</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+            <span class="status status-4xx">403 Forbidden</span>
+            <span class="status status-4xx">404 Not Found</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="post-groups-id-import" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-post">POST</span>
+        <code class="endpoint-url">/groups/{id}/import</code>
+        <span class="auth-badge auth-required">auth</span>
+        <span class="access-badge">group_admin</span>
+      </div>
+      <div class="special-badges">
+        <span class="special-badge">⚙️ handler: group_import</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Импорт данных группы.</p>
+        <div class="request-body">
+          <h3>Тело запроса</h3>
+           <pre class="json-schema">{
+  "version": "int",
+  "exportedAt": "datetime",
+  "groupId": "int",
+  "templateSchema": { "categories": [...] },
+  "charlists": ["Array"],
+  "characters": ["Array"],
+  "items": ["Array"],
+  "skills": ["Array"],
+  "characterItems": ["Array"],
+  "characterSkills": ["Array"]
+}</pre>
+        </div>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">{
+  "success": "bool",
+  "imported": {"templates": "int","characters": "int","items": "int","skills": "int"},
+  "errors": []
+}</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+            <span class="status status-4xx">400 Bad Request</span>
+            <span class="status status-4xx">403 Forbidden</span>
+            <span class="status status-4xx">404 Not Found</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="../js/data.js"></script>
+  <script src="../js/sidebar.js"></script>
+</body>
+</html>

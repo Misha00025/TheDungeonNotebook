@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Dungeon Notebook API</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="sidebar-overlay"></div>
+  <button id="sidebar-toggle" aria-label="Открыть меню">☰</button>
+  <nav id="sidebar"></nav>
+  <main id="content">
+    <h1 class="page-title">The Dungeon Notebook API</h1>
+    <p class="page-subtitle">Документация API</p>
+    <p class="index-description">
+      The Dungeon Notebook — это веб-приложение для управления настольными ролевыми играми (D&amp;D, Pathfinder и др.).
+      API предоставляет полный набор endpoint'ов для работы с группами, персонажами, предметами, навыками, заметками и схемами.
+    </p>
+
+    <div class="category-grid">
+      <a href="system.html" class="category-card">
+        <h3>⚙️ Системные</h3>
+        <p>Служебные endpoint'ы для получения информации о состоянии API.</p>
+        <span class="ep-count">2 endpoint'а</span>
+      </a>
+      <a href="auth.html" class="category-card">
+        <h3>🔐 Аутентификация</h3>
+        <p>Регистрация, вход и обновление JWT-токенов.</p>
+        <span class="ep-count">3 endpoint'а</span>
+      </a>
+      <a href="users.html" class="category-card">
+        <h3>👤 Пользователи</h3>
+        <p>Управление профилями пользователей.</p>
+        <span class="ep-count">4 endpoint'а</span>
+      </a>
+      <a href="groups/general.html" class="category-card">
+        <h3>📁 Группы</h3>
+        <p>Управление группами (кампаниями) и их участниками.</p>
+        <span class="ep-count">7 endpoint'ов</span>
+      </a>
+      <a href="groups/items.html" class="category-card">
+        <h3>⚔️ Предметы группы</h3>
+        <p>Управление предметами в группе.</p>
+        <span class="ep-count">5 endpoint'ов</span>
+      </a>
+      <a href="groups/notes.html" class="category-card">
+        <h3>📝 Заметки группы</h3>
+        <p>Управление заметками группы.</p>
+        <span class="ep-count">6 endpoint'ов</span>
+      </a>
+      <a href="groups/skills.html" class="category-card">
+        <h3>🎯 Навыки группы</h3>
+        <p>Управление навыками и атрибутами навыков в группе.</p>
+        <span class="ep-count">7 endpoint'ов</span>
+      </a>
+      <a href="groups/schemas.html" class="category-card">
+        <h3>📐 Схемы группы</h3>
+        <p>Схемы группировки предметов, навыков и шаблонов персонажей.</p>
+        <span class="ep-count">6 endpoint'ов</span>
+      </a>
+      <a href="groups/export-import.html" class="category-card">
+        <h3>📦 Экспорт/Импорт</h3>
+        <p>Экспорт и импорт данных группы.</p>
+        <span class="ep-count">2 endpoint'а</span>
+      </a>
+      <a href="groups/characters/main.html" class="category-card">
+        <h3>🧙 Персонажи</h3>
+        <p>Управление персонажами и их участниками.</p>
+        <span class="ep-count">8 endpoint'ов</span>
+      </a>
+      <a href="groups/characters/templates.html" class="category-card">
+        <h3>📋 Шаблоны персонажей</h3>
+        <p>Управление шаблонами персонажей.</p>
+        <span class="ep-count">5 endpoint'ов</span>
+      </a>
+      <a href="groups/characters/items.html" class="category-card">
+        <h3>🎒 Предметы персонажа</h3>
+        <p>Управление предметами персонажа.</p>
+        <span class="ep-count">5 endpoint'ов</span>
+      </a>
+      <a href="groups/characters/notes.html" class="category-card">
+        <h3>📓 Заметки персонажа</h3>
+        <p>Управление заметками персонажа.</p>
+        <span class="ep-count">6 endpoint'ов</span>
+      </a>
+      <a href="groups/characters/skills.html" class="category-card">
+        <h3>💪 Навыки персонажа</h3>
+        <p>Управление навыками персонажа.</p>
+        <span class="ep-count">3 endpoint'а</span>
+      </a>
+    </div>
+  </main>
+  <script src="js/data.js"></script>
+  <script src="js/sidebar.js"></script>
+</body>
+</html>

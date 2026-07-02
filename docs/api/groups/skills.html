@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Навыки группы — The Dungeon Notebook API</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div id="sidebar-overlay"></div>
+  <button id="sidebar-toggle" aria-label="Открыть меню">☰</button>
+  <nav id="sidebar"></nav>
+  <main id="content">
+    <h1 class="page-title">🎯 Навыки группы</h1>
+    <p class="page-subtitle">Управление навыками и атрибутами навыков в группе.</p>
+
+    <section id="get-groups-id-skills-attributes" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-get">GET</span>
+        <code class="endpoint-url">/groups/{id}/skills/attributes</code>
+        <span class="auth-badge auth-required">auth</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Атрибуты навыков группы.</p>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">[{"key": "string","name": "string","description": "string","knownValues": ["string"],"isFiltered": "bool"}]</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="put-groups-id-skills-attributes" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-put">PUT</span>
+        <code class="endpoint-url">/groups/{id}/skills/attributes</code>
+        <span class="auth-badge auth-required">auth</span>
+        <span class="access-badge">group_admin</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Обновление атрибутов навыков.</p>
+        <div class="request-body">
+          <h3>Тело запроса</h3>
+          <pre class="json-schema">{
+  "attributes": ["Array&lt;Attribute&gt;"]
+}</pre>
+        </div>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">null</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+            <span class="status status-4xx">400 Bad Request</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="get-groups-id-skills" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-get">GET</span>
+        <code class="endpoint-url">/groups/{id}/skills</code>
+        <span class="auth-badge auth-required">auth</span>
+      </div>
+      <div class="special-badges">
+        <span class="special-badge">↕ все query</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Список навыков группы.</p>
+        <table class="params-table">
+          <thead>
+            <tr><th>Параметр</th><th>Тип</th><th>Описание</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>withSecrets</td><td>bool</td><td>Показывать секреты</td></tr>
+            <tr><td>filters</td><td>string</td><td>Фильтры</td></tr>
+          </tbody>
+        </table>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">{
+  "skills": [{"id": "int","name": "string","description": "string","attributes": "Array","isSecret": "bool"}]
+}</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="post-groups-id-skills" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-post">POST</span>
+        <code class="endpoint-url">/groups/{id}/skills</code>
+        <span class="auth-badge auth-required">auth</span>
+        <span class="access-badge">group_admin</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Создание навыка группы.</p>
+        <div class="request-body">
+          <h3>Тело запроса</h3>
+          <pre class="json-schema">{
+  "name"?: "string",
+  "description"?: "string",
+  "attributes"?: "Array",
+  "isSecret"?: "bool"
+}</pre>
+        </div>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">null</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">201 Created</span>
+            <span class="status status-4xx">400 Bad Request</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="get-groups-id-skills-skillId" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-get">GET</span>
+        <code class="endpoint-url">/groups/{id}/skills/{skillId}</code>
+        <span class="auth-badge auth-required">auth</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Получение навыка группы.</p>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">{
+  "id": "int",
+  "name": "string",
+  "description": "string",
+  "attributes": "Array&lt;ValuedAttribute&gt;",
+  "isSecret": "bool"
+}</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+            <span class="status status-4xx">404 Not Found</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="put-groups-id-skills-skillId" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-put">PUT</span>
+        <code class="endpoint-url">/groups/{id}/skills/{skillId}</code>
+        <span class="auth-badge auth-required">auth</span>
+        <span class="access-badge">group_admin</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Обновление навыка группы.</p>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">null</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+            <span class="status status-4xx">400 Bad Request</span>
+            <span class="status status-4xx">404 Not Found</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="delete-groups-id-skills-skillId" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-delete">DELETE</span>
+        <code class="endpoint-url">/groups/{id}/skills/{skillId}</code>
+        <span class="auth-badge auth-required">auth</span>
+        <span class="access-badge">group_admin</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Удаление навыка группы.</p>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">null</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+            <span class="status status-4xx">404 Not Found</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="../js/data.js"></script>
+  <script src="../js/sidebar.js"></script>
+</body>
+</html>

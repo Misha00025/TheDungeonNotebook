@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Предметы группы — The Dungeon Notebook API</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div id="sidebar-overlay"></div>
+  <button id="sidebar-toggle" aria-label="Открыть меню">☰</button>
+  <nav id="sidebar"></nav>
+  <main id="content">
+    <h1 class="page-title">⚔️ Предметы группы</h1>
+    <p class="page-subtitle">Управление предметами в группе.</p>
+
+    <section id="get-groups-id-items" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-get">GET</span>
+        <code class="endpoint-url">/groups/{id}/items</code>
+        <span class="auth-badge auth-required">auth</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Список предметов группы.</p>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">{
+  "items": [{"id": "int","name": "string","description": "string","attributes": "Array","price": "int","amount"?: "int","isSecret": "bool"}]
+}</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="post-groups-id-items" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-post">POST</span>
+        <code class="endpoint-url">/groups/{id}/items</code>
+        <span class="auth-badge auth-required">auth</span>
+        <span class="access-badge">group_admin</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Создать предмет группы.</p>
+        <div class="request-body">
+          <h3>Тело запроса</h3>
+          <pre class="json-schema">{
+  "name": "string",
+  "description": "string",
+  "price"?: "int",
+  "attributes"?: "Array",
+  "isSecret"?: "bool",
+  "amount"?: "int"
+}</pre>
+        </div>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">null</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">201 Created</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="get-groups-id-items-itemId" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-get">GET</span>
+        <code class="endpoint-url">/groups/{id}/items/{itemId}</code>
+        <span class="auth-badge auth-required">auth</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Получение предмета группы.</p>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">{
+  "id": "int",
+  "name": "string",
+  "description": "string",
+  "attributes": "Array",
+  "price": "int",
+  "amount"?: "int",
+  "isSecret": "bool"
+}</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+            <span class="status status-4xx">404 Not Found</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="put-groups-id-items-itemId" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-put">PUT</span>
+        <code class="endpoint-url">/groups/{id}/items/{itemId}</code>
+        <span class="auth-badge auth-required">auth</span>
+        <span class="access-badge">group_admin</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Обновление предмета группы.</p>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">null</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+            <span class="status status-4xx">400 Bad Request</span>
+            <span class="status status-4xx">404 Not Found</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="delete-groups-id-items-itemId" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-delete">DELETE</span>
+        <code class="endpoint-url">/groups/{id}/items/{itemId}</code>
+        <span class="auth-badge auth-required">auth</span>
+        <span class="access-badge">group_admin</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Удаление предмета группы.</p>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">null</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+            <span class="status status-4xx">404 Not Found</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="../js/data.js"></script>
+  <script src="../js/sidebar.js"></script>
+</body>
+</html>

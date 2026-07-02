@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Системные — The Dungeon Notebook API</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="sidebar-overlay"></div>
+  <button id="sidebar-toggle" aria-label="Открыть меню">☰</button>
+  <nav id="sidebar"></nav>
+  <main id="content">
+    <h1 class="page-title">⚙️ Системные</h1>
+    <p class="page-subtitle">Служебные endpoint'ы для получения информации о состоянии API.</p>
+
+    <section id="get-get_api" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-get">GET</span>
+        <code class="endpoint-url">/get_api</code>
+        <span class="auth-badge auth-none">no auth</span>
+      </div>
+      <div class="special-badges">
+        <span class="special-badge">⚙️ handler: get_api</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Возвращает схему всех зарегистрированных API-методов.</p>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">{
+  "api_methods": "Array&lt;object&gt;"
+}</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="get-whoami" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-get">GET</span>
+        <code class="endpoint-url">/whoami</code>
+        <span class="auth-badge auth-required">auth</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Информация о текущем пользователе или группе.</p>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">{
+  "id": "int | null",
+  "type": "'user' | 'group' | 'anonymous'"
+}</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="js/data.js"></script>
+  <script src="js/sidebar.js"></script>
+</body>
+</html>

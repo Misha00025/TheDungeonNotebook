@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Навыки персонажа — The Dungeon Notebook API</title>
+  <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+  <div id="sidebar-overlay"></div>
+  <button id="sidebar-toggle" aria-label="Открыть меню">☰</button>
+  <nav id="sidebar"></nav>
+  <main id="content">
+    <h1 class="page-title">💪 Навыки персонажа</h1>
+    <p class="page-subtitle">Управление навыками персонажа.</p>
+
+    <section id="get-groups-id-characters-charId-skills" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-get">GET</span>
+        <code class="endpoint-url">/groups/{id}/characters/{charId}/skills</code>
+        <span class="auth-badge auth-required">auth</span>
+      </div>
+      <div class="special-badges">
+        <span class="special-badge">↕ все query</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Список навыков персонажа.</p>
+        <table class="params-table">
+          <thead>
+            <tr><th>Параметр</th><th>Тип</th><th>Описание</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>filters</td><td>string</td><td>Фильтры</td></tr>
+          </tbody>
+        </table>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">[{"id": "int","name": "string","description": "string","attributes": "Array","isSecret": "bool"}]</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+            <span class="status status-4xx">404 Not Found</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="put-groups-id-characters-charId-skills-skillId" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-put">PUT</span>
+        <code class="endpoint-url">/groups/{id}/characters/{charId}/skills/{skillId}</code>
+        <span class="auth-badge auth-required">auth</span>
+        <span class="access-badge">character_writer</span>
+      </div>
+      <div class="special-badges">
+        <span class="special-badge">↺ без тела</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Добавить/обновить навык персонажа.</p>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">null</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+            <span class="status status-4xx">403 Forbidden</span>
+            <span class="status status-4xx">404 Not Found</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="delete-groups-id-characters-charId-skills-skillId" class="endpoint-card">
+      <div class="card-header">
+        <span class="method-badge method-delete">DELETE</span>
+        <code class="endpoint-url">/groups/{id}/characters/{charId}/skills/{skillId}</code>
+        <span class="auth-badge auth-required">auth</span>
+        <span class="access-badge">character_writer</span>
+      </div>
+      <div class="card-body">
+        <p class="description">Удалить навык персонажа.</p>
+        <div class="response-block">
+          <h3>Ответ</h3>
+          <pre class="json-schema">null</pre>
+          <div class="status-codes">
+            <span class="status status-2xx">200 OK</span>
+            <span class="status status-4xx">403 Forbidden</span>
+            <span class="status status-4xx">404 Not Found</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="../../js/data.js"></script>
+  <script src="../../js/sidebar.js"></script>
+</body>
+</html>
