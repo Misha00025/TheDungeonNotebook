@@ -62,3 +62,55 @@ docker compose up -d
 ## Мониторинг
 
 Prometheus + Grafana — `cd monitoring && docker compose up -d`
+
+## Документация API
+
+Документация всех API-endpoint'ов находится в `docs/api/`. Это статические HTML-страницы без серверной части — просто открой `docs/api/index.html` в браузере.
+
+### Структура
+
+```
+docs/api/
+├── index.html              # Стартовая страница
+├── css/style.css           # Стили (тёмная тема)
+├── js/
+│   ├── data.js             # Массив ENDPOINTS со всеми 69 endpoint'ами
+│   └── sidebar.js          # Генератор сайдбара, поиск, навигация
+├── system.html             # Системные endpoint'ы
+├── auth.html               # Аутентификация
+├── users.html              # Пользователи
+└── groups/
+    ├── general.html        # Группы (CRUD + участники)
+    ├── items.html          # Предметы группы
+    ├── notes.html          # Заметки группы
+    ├── skills.html         # Навыки группы
+    ├── schemas.html        # Схемы группы
+    ├── export-import.html  # Экспорт/Импорт
+    └── characters/
+        ├── main.html       # Персонажи
+        ├── templates.html  # Шаблоны персонажей
+        ├── items.html      # Предметы персонажа
+        ├── notes.html      # Заметки персонажа
+        └── skills.html     # Навыки персонажа
+```
+
+### Как добавить новый endpoint
+
+1. Открой `docs/api/js/data.js`.
+2. Добавь новый объект в массив `ENDPOINTS` (в соответствующую категорию).
+3. Укажи поля: `id`, `method`, `url`, `category`, `categoryTitle`, `page`, `auth`, `access`, `description`, `requestBody`, `responseSchema`, `responseStatuses`, `params`, `special`.
+4. Откри́ соответствующую HTML-страницу (по полю `page`) и добавь карточку endpoint'а с тем же `id`.
+5. **Важно:** все JSON-схемы должны содержать **фактические поля** из C# моделей, а не устаревшие названия из старых тестов. При изменении моделей на бэкенде — обновляй схемы в `data.js` и HTML.
+
+### Формат JSON-схем
+
+Поля с типом:
+```
+"fieldName": "string"       // обязательное поле
+"fieldName"?: "string"      // опциональное поле
+"fieldName": "int | null"   // nullable
+```
+
+### Если endpoint переехал на другую страницу
+
+Поменяй поле `page` у соответствующего объекта в `data.js` и перенеси HTML-карточку на новую страницу.

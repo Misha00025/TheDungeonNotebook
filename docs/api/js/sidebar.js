@@ -4,30 +4,33 @@
   var sidebar = document.getElementById('sidebar');
   if (!sidebar) return;
 
-  function getApiRelativePath() {
-    var pathname = window.location.pathname;
-    var parts = pathname.split('/');
-    for (var i = parts.length - 1; i >= 0; i--) {
-      if (parts[i] === 'api' && i > 0 && parts[i-1] === 'docs') {
-        return parts.slice(i + 1);
+  function getApiRoot() {
+    var scripts = document.getElementsByTagName('script');
+    for (var i = 0; i < scripts.length; i++) {
+      var src = scripts[i].getAttribute('src');
+      if (src && src.indexOf('sidebar.js') !== -1) {
+        var parts = src.split('/');
+        parts.pop(); // 'sidebar.js'
+        parts.pop(); // 'js'
+        return parts.length > 0 ? parts.join('/') + '/' : '';
       }
     }
-    return [];
+    return '';
   }
 
   function getCurrentPage() {
-    var relative = getApiRelativePath();
-    return relative.join('/') || 'index.html';
+    var root = getApiRoot();
+    if (root) {
+      var depth = root.split('/').filter(function(p) { return p === '..'; }).length;
+      var pathname = window.location.pathname.split('/').filter(Boolean);
+      var relevant = pathname.slice(-(depth + 1));
+      return relevant.join('/');
+    }
+    return window.location.pathname.split('/').pop() || 'index.html';
   }
 
   function getPathPrefix() {
-    var relative = getApiRelativePath();
-    var depth = Math.max(0, relative.length - 1);
-    var prefix = '';
-    for (var d = 0; d < depth; d++) {
-      prefix += '../';
-    }
-    return prefix;
+    return getApiRoot();
   }
 
   var currentPage = getCurrentPage();
