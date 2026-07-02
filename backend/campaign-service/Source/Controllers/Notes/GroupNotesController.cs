@@ -29,7 +29,7 @@ public class GroupNotesController : BaseController
         if (string.IsNullOrEmpty(data.Header))
             return BadRequest(new { error = "Header is required" });
 
-        if (!_provider.TryCreateGroupNote(groupId, data.Header, data.ShortDescription, data.Body, out var note))
+        if (!_provider.TryCreateGroupNote(groupId, data.Header, data.ShortDescription, data.Body, out var note, data.Keywords))
             return BadRequest(new { error = "Failed to create note" });
 
         return Created($"/groups/{groupId}/notes/{note!.Id}", note.ToResponse());
@@ -47,7 +47,7 @@ public class GroupNotesController : BaseController
     [HttpPut("{noteId}")]
     public ActionResult PutNote(int groupId, int noteId, [FromBody] NotePostData data)
     {
-        if (!_provider.TryUpdateGroupNote(groupId, noteId, data.Header, data.ShortDescription, data.Body, out var note))
+        if (!_provider.TryUpdateGroupNote(groupId, noteId, data.Header, data.ShortDescription, data.Body, out var note, data.Keywords))
         {
             if (note == null)
                 return NotFound();
@@ -62,5 +62,12 @@ public class GroupNotesController : BaseController
         if (!_provider.TryDeleteGroupNote(groupId, noteId))
             return NotFound();
         return Ok();
+    }
+
+    [HttpGet("keywords")]
+    public ActionResult GetKeywords(int groupId)
+    {
+        var keywords = _provider.GetGroupKeywords(groupId);
+        return Ok(new { keywords });
     }
 }

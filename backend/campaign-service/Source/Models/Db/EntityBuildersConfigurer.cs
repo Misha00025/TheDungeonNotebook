@@ -16,6 +16,7 @@ public interface IEntityBuildersConfigurer
 	void ConfigureModel(EntityTypeBuilder<UserGroupData> builder);
 	void ConfigureModel(EntityTypeBuilder<UserCharacterData> builder);
 	void ConfigureModel(EntityTypeBuilder<NoteData> builder);
+	void ConfigureModel(EntityTypeBuilder<NoteKeywordData> builder);
 }
 
 public class EntityBuildersConfigurer : IEntityBuildersConfigurer
@@ -129,5 +130,15 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
         builder.Property(e => e.ShortDescription).HasColumnName("short_description");
         builder.Property(e => e.AdditionDate).HasColumnName("addition_date");
         builder.Property(e => e.ModifyDate).HasColumnName("modified_date");
+        builder.HasMany(e => e.Keywords).WithOne(e => e.Note).HasForeignKey(e => e.NoteId);
+    }
+
+    public void ConfigureModel(EntityTypeBuilder<NoteKeywordData> builder)
+    {
+        builder.ToTable("note_keyword");
+        builder.HasKey(e => new { e.NoteId, e.Keyword });
+        builder.Property(e => e.NoteId).HasColumnName("note_id");
+        builder.Property(e => e.Keyword).HasColumnName("keyword").HasMaxLength(100);
+        builder.HasOne(e => e.Note).WithMany().HasForeignKey(e => e.NoteId);
     }
 }

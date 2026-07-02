@@ -57,6 +57,47 @@
 | `PUT` | `/groups/{groupId}/items/{itemId}` | Обновление | `200` / `400` / `404` |
 | `DELETE` | `/groups/{groupId}/items/{itemId}` | Удаление | `200` / `400` / `404` |
 
+### Заметки
+
+Заметки имеют гибридное хранение: метаданные (заголовок, краткое описание, ключевые слова, даты) — в MySQL, содержимое — в MongoDB. Это позволяет получать список заметок без загрузки тяжёлого тела.
+
+**Формат ответа заметки:**
+```json
+{
+  "id": int,
+  "header": string,
+  "short_description": string,
+  "created_at": "2026-07-02T00:00:00Z",
+  "updated_at": "2026-07-02T00:00:00Z",
+  "group_id": int,
+  "character_id": int | null,
+  "body": string | null,
+  "keywords": [string]
+}
+```
+
+При запросе списка (`GET` без `noteId`) поле `body` будет `null`. При запросе конкретной заметки — заполнено.
+
+| Метод | URL | Описание | Ответ |
+|---|---|---|---|
+| `GET` | `/groups/{groupId}/notes` | Список заметок группы (без body) | `200` |
+| `POST` | `/groups/{groupId}/notes` | Создание. Body: `{ "header" (обяз), "body"?, "short_description"?, "keywords"? }` | `201` / `400` |
+| `GET` | `/groups/{groupId}/notes/{noteId}` | Получение (с body) | `200` / `404` |
+| `PUT` | `/groups/{groupId}/notes/{noteId}` | Обновление | `200` / `400` / `404` |
+| `DELETE` | `/groups/{groupId}/notes/{noteId}` | Удаление | `200` / `404` |
+| `GET` | `/groups/{groupId}/notes/keywords` | Все уникальные ключевые слова группы | `200` |
+
+### Заметки персонажа
+
+| Метод | URL | Описание | Ответ |
+|---|---|---|---|
+| `GET` | `/groups/{groupId}/characters/{characterId}/notes` | Список заметок персонажа (без body) | `200` |
+| `POST` | `/groups/{groupId}/characters/{characterId}/notes` | Создание. Body: `{ "header" (обяз), "body"?, "short_description"?, "keywords"? }` | `201` / `400` |
+| `GET` | `/groups/{groupId}/characters/{characterId}/notes/{noteId}` | Получение (с body) | `200` / `404` |
+| `PUT` | `/groups/{groupId}/characters/{characterId}/notes/{noteId}` | Обновление | `200` / `400` / `404` |
+| `DELETE` | `/groups/{groupId}/characters/{characterId}/notes/{noteId}` | Удаление | `200` / `404` |
+| `GET` | `/groups/{groupId}/characters/{characterId}/notes/keywords` | Все уникальные ключевые слова персонажа | `200` |
+
 ### Навыки группы
 
 | Метод | URL | Описание | Ответ |

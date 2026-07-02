@@ -11,6 +11,7 @@ namespace Tdn.Db.Contexts;
 	}
 	
 	public DbSet<NoteData> Notes { get; set; }
+	public DbSet<NoteKeywordData> NoteKeywords { get; set; }
 	
 	protected override void OnModelCreating(ModelBuilder builder)
 	{
@@ -22,6 +23,7 @@ namespace Tdn.Db.Contexts;
 		Configurer.ConfigureModel(builder.Entity<CharacterSkillData>());
 		Configurer.ConfigureModel(builder.Entity<CharacterItemData>());
 		Configurer.ConfigureModel(builder.Entity<NoteData>());
+		Configurer.ConfigureModel(builder.Entity<NoteKeywordData>());
 		base.OnModelCreating(builder);
 	}
 }

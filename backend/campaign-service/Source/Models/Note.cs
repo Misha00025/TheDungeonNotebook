@@ -10,4 +10,5 @@ public class Note
     public string? Body;
     public DateTime CreatedAt;
     public DateTime UpdatedAt;
+    public List<string> Keywords { get; set; } = new();
 }

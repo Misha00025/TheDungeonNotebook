@@ -29,7 +29,7 @@ public class CharacterNotesController : BaseController
         if (string.IsNullOrEmpty(data.Header))
             return BadRequest(new { error = "Header is required" });
 
-        if (!_provider.TryCreateCharacterNote(groupId, characterId, data.Header, data.ShortDescription, data.Body, out var note))
+        if (!_provider.TryCreateCharacterNote(groupId, characterId, data.Header, data.ShortDescription, data.Body, out var note, data.Keywords))
             return BadRequest(new { error = "Failed to create note" });
 
         return Created($"/groups/{groupId}/characters/{characterId}/notes/{note!.Id}", note.ToResponse());
@@ -47,7 +47,7 @@ public class CharacterNotesController : BaseController
     [HttpPut("{noteId}")]
     public ActionResult PutNote(int groupId, int characterId, int noteId, [FromBody] NotePostData data)
     {
-        if (!_provider.TryUpdateCharacterNote(groupId, characterId, noteId, data.Header, data.ShortDescription, data.Body, out var note))
+        if (!_provider.TryUpdateCharacterNote(groupId, characterId, noteId, data.Header, data.ShortDescription, data.Body, out var note, data.Keywords))
         {
             if (note == null)
                 return NotFound();
@@ -62,5 +62,12 @@ public class CharacterNotesController : BaseController
         if (!_provider.TryDeleteCharacterNote(groupId, characterId, noteId))
             return NotFound();
         return Ok();
+    }
+
+    [HttpGet("keywords")]
+    public ActionResult GetKeywords(int groupId, int characterId)
+    {
+        var keywords = _provider.GetCharacterKeywords(groupId, characterId);
+        return Ok(new { keywords });
     }
 }

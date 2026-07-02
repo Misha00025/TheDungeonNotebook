@@ -78,6 +78,13 @@ CREATE TABLE IF NOT EXISTS `note` (
     CONSTRAINT `FK_note_character_character_id` FOREIGN KEY (`character_id`) REFERENCES `character` (`character_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE IF NOT EXISTS `note_keyword` (
+    `note_id` int NOT NULL,
+    `keyword` varchar(100) NOT NULL,
+    PRIMARY KEY (`note_id`, `keyword`),
+    CONSTRAINT `FK_note_keyword_note_note_id` FOREIGN KEY (`note_id`) REFERENCES `note` (`note_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE IF NOT EXISTS `user_group` (
     `user_id` INT NOT NULL,
     `group_id` INT NOT NULL,

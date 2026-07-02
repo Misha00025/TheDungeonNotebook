@@ -37,7 +37,8 @@ public static class ModelToResponseExtensions
         updated_at = note.UpdatedAt,
         group_id = note.GroupId,
         character_id = note.CharacterId,
-        body = note.Body
+        body = note.Body,
+        keywords = note.Keywords
     };
 
     public static object ToResponse(this Item item) => item.Amount != null ? new 

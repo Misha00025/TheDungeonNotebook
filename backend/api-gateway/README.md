@@ -75,7 +75,6 @@ services:
   auth:      { base_url: "http://auth-service:8080" }
   users:     { base_url: "http://users-service:8080" }
   campaign:  { base_url: "http://campaign-service:8080" }
-  notes:     { base_url: "http://notes-service:8080" }
 
 # Маршруты
 routes:
@@ -309,7 +308,6 @@ api-gateway/
 | `AUTH_SERVICE_URL` | URL auth-service | Да |
 | `USERS_SERVICE_URL` | URL users-service | Да |
 | `CAMPAIGN_SERVICE_URL` | URL campaign-service | Да |
-| `NOTES_SERVICE_URL` | URL notes-service | Да |
 
 ---
 
@@ -365,11 +363,12 @@ api-gateway/
 
 | Метод | URL | Auth |
 |---|---|---|
-| `GET` | `/groups/{id}/notes` | Админ |
+| `GET` | `/groups/{id}/notes` | Да |
 | `POST` | `/groups/{id}/notes` | Админ |
-| `GET` | `/groups/{id}/notes/{noteId}` | Админ |
+| `GET` | `/groups/{id}/notes/{noteId}` | Да |
 | `PUT` | `/groups/{id}/notes/{noteId}` | Админ |
 | `DELETE` | `/groups/{id}/notes/{noteId}` | Админ |
+| `GET` | `/groups/{id}/notes/keywords` | Да |
 
 ### Навыки и атрибуты группы
 
@@ -434,6 +433,7 @@ api-gateway/
 | `GET` | `/groups/{id}/characters/{charId}/notes` | character_viewer |
 | `POST` | `/groups/{id}/characters/{charId}/notes` | canWrite |
 | `GET` / `PUT` / `DELETE` | `/groups/{id}/characters/{charId}/notes/{noteId}` | viewer(чтение) / canWrite(запись) |
+| `GET` | `/groups/{id}/characters/{charId}/notes/keywords` | character_viewer |
 | `GET` | `/groups/{id}/characters/{charId}/skills` | Да |
 | `PUT` / `DELETE` | `/groups/{id}/characters/{charId}/skills/{skillId}` | canWrite |
 

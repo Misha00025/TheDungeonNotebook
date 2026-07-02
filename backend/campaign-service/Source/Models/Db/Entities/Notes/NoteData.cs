@@ -11,4 +11,6 @@ public class NoteData : GroupEntityData
     public DateTime ModifyDate;
 
     public CharacterData? Character;
+    
+    public List<NoteKeywordData>? Keywords;
 }

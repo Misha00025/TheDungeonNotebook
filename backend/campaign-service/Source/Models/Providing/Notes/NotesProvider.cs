@@ -62,17 +62,17 @@ public class NotesProvider
         return ToNoteWithBody(data);
     }
 
-    public bool TryCreateGroupNote(int groupId, string header, string? shortDescription, string? body, out Note? note)
+    public bool TryCreateGroupNote(int groupId, string header, string? shortDescription, string? body, out Note? note, List<string>? keywords = null)
     {
-        return TryCreateNote(groupId, null, header, shortDescription, body, out note);
+        return TryCreateNote(groupId, null, header, shortDescription, body, out note, keywords);
     }
 
-    public bool TryCreateCharacterNote(int groupId, int characterId, string header, string? shortDescription, string? body, out Note? note)
+    public bool TryCreateCharacterNote(int groupId, int characterId, string header, string? shortDescription, string? body, out Note? note, List<string>? keywords = null)
     {
-        return TryCreateNote(groupId, characterId, header, shortDescription, body, out note);
+        return TryCreateNote(groupId, characterId, header, shortDescription, body, out note, keywords);
     }
 
-    private bool TryCreateNote(int groupId, int? characterId, string header, string? shortDescription, string? body, out Note? note)
+    private bool TryCreateNote(int groupId, int? characterId, string header, string? shortDescription, string? body, out Note? note, List<string>? keywords = null)
     {
         try
         {
@@ -98,6 +98,15 @@ public class NotesProvider
             _sql.Notes.Add(sqlData);
             _sql.SaveChanges();
 
+            if (keywords != null && keywords.Count > 0)
+            {
+                foreach (var kw in keywords)
+                {
+                    _sql.NoteKeywords.Add(new NoteKeywordData { NoteId = sqlData.Id, Keyword = kw });
+                }
+                _sql.SaveChanges();
+            }
+
             note = new Note
             {
                 Id = sqlData.Id,
@@ -107,7 +116,8 @@ public class NotesProvider
                 ShortDescription = shortDescription ?? "",
                 Body = body,
                 CreatedAt = now,
-                UpdatedAt = now
+                UpdatedAt = now,
+                Keywords = keywords ?? new List<string>()
             };
             return true;
         }
@@ -119,17 +129,17 @@ public class NotesProvider
         }
     }
 
-    public bool TryUpdateGroupNote(int groupId, int noteId, string? header, string? shortDescription, string? body, out Note? note)
+    public bool TryUpdateGroupNote(int groupId, int noteId, string? header, string? shortDescription, string? body, out Note? note, List<string>? keywords = null)
     {
-        return TryUpdateNote(groupId, null, noteId, header, shortDescription, body, out note);
+        return TryUpdateNote(groupId, null, noteId, header, shortDescription, body, out note, keywords);
     }
 
-    public bool TryUpdateCharacterNote(int groupId, int characterId, int noteId, string? header, string? shortDescription, string? body, out Note? note)
+    public bool TryUpdateCharacterNote(int groupId, int characterId, int noteId, string? header, string? shortDescription, string? body, out Note? note, List<string>? keywords = null)
     {
-        return TryUpdateNote(groupId, characterId, noteId, header, shortDescription, body, out note);
+        return TryUpdateNote(groupId, characterId, noteId, header, shortDescription, body, out note, keywords);
     }
 
-    private bool TryUpdateNote(int groupId, int? characterId, int noteId, string? header, string? shortDescription, string? body, out Note? note)
+    private bool TryUpdateNote(int groupId, int? characterId, int noteId, string? header, string? shortDescription, string? body, out Note? note, List<string>? keywords = null)
     {
         try
         {
@@ -167,6 +177,16 @@ public class NotesProvider
                 }
             }
 
+            if (keywords != null)
+            {
+                var oldKeywords = _sql.NoteKeywords.Where(e => e.NoteId == sqlData.Id);
+                _sql.NoteKeywords.RemoveRange(oldKeywords);
+                foreach (var kw in keywords)
+                {
+                    _sql.NoteKeywords.Add(new NoteKeywordData { NoteId = sqlData.Id, Keyword = kw });
+                }
+            }
+
             _sql.SaveChanges();
 
             note = ToNoteWithBody(sqlData);
@@ -178,6 +198,28 @@ public class NotesProvider
             note = null;
             return false;
         }
+    }
+
+    public List<string> GetGroupKeywords(int groupId)
+    {
+        return _sql.NoteKeywords
+            .Include(e => e.Note)
+            .Where(e => e.Note!.GroupId == groupId)
+            .Select(e => e.Keyword)
+            .Distinct()
+            .OrderBy(k => k)
+            .ToList();
+    }
+
+    public List<string> GetCharacterKeywords(int groupId, int characterId)
+    {
+        return _sql.NoteKeywords
+            .Include(e => e.Note)
+            .Where(e => e.Note!.GroupId == groupId && e.Note!.CharacterId == characterId)
+            .Select(e => e.Keyword)
+            .Distinct()
+            .OrderBy(k => k)
+            .ToList();
     }
 
     public bool TryDeleteGroupNote(int groupId, int noteId)
@@ -215,6 +257,14 @@ public class NotesProvider
         }
     }
 
+    private List<string> GetKeywords(int noteId)
+    {
+        return _sql.NoteKeywords
+            .Where(e => e.NoteId == noteId)
+            .Select(e => e.Keyword)
+            .ToList();
+    }
+
     private Note ToNoteWithoutBody(NoteData data)
     {
         return new Note
@@ -225,7 +275,8 @@ public class NotesProvider
             Header = data.Header,
             ShortDescription = data.ShortDescription,
             CreatedAt = data.AdditionDate,
-            UpdatedAt = data.ModifyDate
+            UpdatedAt = data.ModifyDate,
+            Keywords = GetKeywords(data.Id)
         };
     }
 
