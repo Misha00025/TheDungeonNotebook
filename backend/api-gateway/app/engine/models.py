@@ -50,6 +50,15 @@ class ParamsConfig:
 
 
 @dataclass
+class ResponseConfig:
+    """Трансформация ответа перед отправкой клиенту."""
+    wrap: Optional[str] = None
+    """Обернуть JSON-ответ в {"key": <data>} (built-in трансформер)."""
+    handler: Optional[str] = None
+    """Имя кастомного response-трансформера (зарегистрированного через декоратор)."""
+
+
+@dataclass
 class RouteConfig:
     """Конфигурация одного маршрута."""
     path: str
@@ -69,6 +78,8 @@ class RouteConfig:
     """Имя response-хендлера (если тип маршрута — HANDLER)."""
     params: Optional[ParamsConfig] = None
     """Настройки подстановки параметров."""
+    response: Optional[ResponseConfig] = None
+    """Трансформация ответа перед отправкой клиенту."""
     description: Optional[str] = None
     """Описание маршрута (для документации)."""
 

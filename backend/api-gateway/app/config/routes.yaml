@@ -97,6 +97,8 @@ routes:
         params:
           query:
             userId: "{jwt.userId}"
+        response:
+          wrap: groups
       POST:
         proxy:
           service: campaign

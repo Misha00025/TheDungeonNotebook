@@ -136,6 +136,16 @@ def _parse_single_route(path: str, route_def: dict) -> list[RouteConfig]:
             body=params_raw.get("body"),
         )
 
+    # Response transform
+    response = None
+    if "response" in route_def:
+        from app.engine.models import ResponseConfig
+        response_raw = route_def["response"]
+        response = ResponseConfig(
+            wrap=response_raw.get("wrap"),
+            handler=response_raw.get("handler"),
+        )
+
     return [
         RouteConfig(
             path=path,
@@ -145,6 +155,7 @@ def _parse_single_route(path: str, route_def: dict) -> list[RouteConfig]:
             proxy=proxy,
             handler=handler,
             params=params,
+            response=response,
             description=description,
         )
     ]

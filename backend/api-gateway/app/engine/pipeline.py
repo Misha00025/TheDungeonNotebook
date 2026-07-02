@@ -13,7 +13,7 @@ from flask import Response as FlaskResponse
 import jwt as pyjwt
 
 from app.engine.context import RouteContext
-from app.engine.models import RouteConfig
+from app.engine.models import ResponseConfig, RouteConfig
 from app.engine.registry import (
     ServiceRegistry,
     access_handler_registry,
@@ -67,10 +67,16 @@ def execute_pipeline(
         if handler is None:
             from app.status import not_implemented
             return not_implemented(f"Unknown response handler: {route.handler}")
-        return handler(ctx)
+        response = handler(ctx)
+    else:
+        from app.engine.proxy import execute_proxy
+        response = execute_proxy(route, ctx)
 
-    from app.engine.proxy import execute_proxy
-    return execute_proxy(route, ctx)
+    # Step 4: Response Transform
+    if route.response:
+        response = apply_response_transform(route.response, response, ctx)
+
+    return response
 
 
 def _validate_jwt(
@@ -116,3 +122,36 @@ def _default_forbidden() -> FlaskResponse:
     """Возвращает стандартный 403 Forbidden."""
     from app.status import forbidden
     return forbidden()
+
+
+def apply_response_transform(
+    response_cfg: ResponseConfig,
+    response: FlaskResponse,
+    ctx: RouteContext,
+) -> FlaskResponse:
+    from flask import jsonify
+
+    from app.engine.registry import response_transform_registry
+
+    try:
+        data = response.get_json()
+    except Exception:
+        data = None
+
+    if response_cfg.wrap and data is not None:
+        data = {response_cfg.wrap: data}
+
+    if response_cfg.handler:
+        transform_fn = response_transform_registry.get(response_cfg.handler)
+        if transform_fn:
+            data = transform_fn(data, ctx)
+
+    if data is not None:
+        new_response = jsonify(data)
+        new_response.status_code = response.status_code
+        for key, value in response.headers.items():
+            if key.lower() not in ("content-type", "content-length"):
+                new_response.headers[key] = value
+        return new_response
+
+    return response

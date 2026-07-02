@@ -121,10 +121,38 @@ class ResponseHandlerRegistry:
         return self._handlers.get(name)
 
 
+class ResponseTransformRegistry:
+    """
+    Реестр response-трансформеров.
+
+    Трансформер получает данные ответа от бэкенда и возвращает
+    трансформированные данные. Может также использовать ctx
+    для доступа к JWT, параметрам запроса и т.д.
+
+    Сигнатура: transform(data: Any, ctx: RouteContext) -> Any
+    """
+
+    def __init__(self):
+        self._transforms: dict[str, Callable] = {}
+
+    def register(self, name: str):
+        """Декоратор для регистрации response-трансформера."""
+        def decorator(fn):
+            self._transforms[name] = fn
+            return fn
+        return decorator
+
+    def get(self, name: str) -> Optional[Callable]:
+        """Получить трансформер по имени."""
+        return self._transforms.get(name)
+
+
 # Глобальные экземпляры реестров
 access_handler_registry = AccessHandlerRegistry()
 response_handler_registry = ResponseHandlerRegistry()
+response_transform_registry = ResponseTransformRegistry()
 
 # Декораторы для удобного импорта
 register_access_handler = access_handler_registry.register
 register_response_handler = response_handler_registry.register
+register_response_transform = response_transform_registry.register
