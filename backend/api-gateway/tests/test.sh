@@ -23,7 +23,7 @@ rm -r logs
 mkdir logs
 
 # После того, как все контейнеры готовы, запускаем тесты
-./venv/bin/python test.py ${@:2} > logs/test.log
+./venv/bin/python test.py --server http://localhost:5000 ${@:2} > logs/test.log
 
 docker-compose logs | grep "${MAIN_SERVICE}" > logs/server.log
 docker-compose logs | grep -v "mongo-db-gateway-test  " | grep -v "mysql-db-gateway-test  " | grep -v "${MAIN_SERVICE}" > logs/all.log

@@ -24,9 +24,6 @@ if __name__ == "__main__":
 
     if args.server is not None:
         variables.server_url = args.server
-    else:
-        print("Аргумент '--server' не передан.")
-        sys.exit(1)
 
     test_variables.compact = args.compact
     test_variables.debug = args.debug
@@ -49,6 +46,14 @@ if __name__ == "__main__":
                 register_character_skills_scenario()
             elif scenario == "ExportImport":
                 register_export_import_scenario()
+    else:
+        register_gateway_main()
+        register_user_profile_scenario()
+        register_group_items_scenario()
+        register_character_lifecycle_scenario()
+        register_group_skills_scenario()
+        register_character_skills_scenario()
+        register_export_import_scenario()
 
     all_scenarios = gw_scenarios + up_scenarios + gi_scenarios + cl_scenarios + gs_scenarios + cs_scenarios + ei_scenarios
     main_test.start(all_scenarios)
