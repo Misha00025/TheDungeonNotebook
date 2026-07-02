@@ -1,3 +1,20 @@
+var SCHEMAS = {
+  // --- Простейшие ---
+  simpleId: '{\n  "id": "int"\n}',
+  keywordsOnly: '{\n  "keywords": ["string"]\n}',
+
+  // --- Пользователь ---
+  userProfile: '{\n  "id": "int",\n  "nickname": "string",\n  "visibleName": "string",\n  "imageLink": "string"\n}',
+
+  // --- Заметки ---
+  fullNoteChar: '{\n  "id": "int",\n  "header": "string",\n  "short_description": "string",\n  "created_at": "datetime",\n  "updated_at": "datetime",\n  "group_id": "int",\n  "character_id": "int",\n  "body": "string | null",\n  "keywords": ["string"]\n}',
+  fullNoteGroup: '{\n  "id": "int",\n  "header": "string",\n  "short_description": "string",\n  "created_at": "datetime",\n  "updated_at": "datetime",\n  "group_id": "int",\n  "character_id": "int | null",\n  "body": "string | null",\n  "keywords": ["string"]\n}',
+
+  // --- Навыки ---
+  fullSkill: '{\n  "id": "int",\n  "name": "string",\n  "description": "string",\n  "attributes": [{"key": "string","name": "string","description": "string","value": "string"}],\n  "isSecret": "bool"\n}',
+  briefSkillObj: '{"id": "int","name": "string","description": "string","attributes": [{"key": "string","name": "string","description": "string"}],"isSecret": "bool"}'
+};
+
 const ENDPOINTS = [
   {
     id: "get-get_api",
@@ -45,7 +62,7 @@ const ENDPOINTS = [
     description: "Регистрация нового пользователя.",
     requestBody: '{\n  "username": "string",\n  "password": "string"\n}',
     requestBodyRequired: ["username", "password"],
-    responseSchema: '{\n  "id": "int"\n}',
+    responseSchema: SCHEMAS.simpleId,
     responseStatuses: ["201 Created", "409 Conflict"],
     params: null,
     special: null
@@ -116,7 +133,7 @@ const ENDPOINTS = [
     description: "Создание профиля пользователя. ID подставляется из JWT.",
     requestBody: '{\n  "nickname": "string",\n  "visibleName"?: "string",\n  "imageLink"?: "string"\n}',
     requestBodyRequired: ["nickname"],
-    responseSchema: '{\n  "id": "int",\n  "nickname": "string",\n  "visibleName": "string",\n  "imageLink": "string"\n}',
+    responseSchema: SCHEMAS.userProfile,
     responseStatuses: ["201 Created", "400 Bad Request", "409 Conflict"],
     params: null,
     special: ["handler: user_create"]
@@ -133,7 +150,7 @@ const ENDPOINTS = [
     description: "Получение профиля пользователя.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "id": "int",\n  "nickname": "string",\n  "visibleName": "string",\n  "imageLink": "string"\n}',
+    responseSchema: SCHEMAS.userProfile,
     responseStatuses: ["200 OK", "404 Not Found"],
     params: null,
     special: null
@@ -150,7 +167,7 @@ const ENDPOINTS = [
     description: "Обновление профиля (только владелец).",
     requestBody: '{\n  "visibleName"?: "string",\n  "imageLink"?: "string"\n}',
     requestBodyRequired: null,
-    responseSchema: '{\n  "id": "int",\n  "nickname": "string",\n  "visibleName": "string",\n  "imageLink": "string"\n}',
+    responseSchema: SCHEMAS.userProfile,
     responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"],
     params: null,
     special: null
@@ -184,7 +201,7 @@ const ENDPOINTS = [
     description: "Создание группы.",
     requestBody: '{\n  "name": "string",\n  "icon"?: "string"\n}',
     requestBodyRequired: ["name"],
-    responseSchema: '{\n  "id": "int"\n}',
+    responseSchema: SCHEMAS.simpleId,
     responseStatuses: ["201 Created"],
     params: null,
     special: null
@@ -374,7 +391,7 @@ const ENDPOINTS = [
     description: "Список заметок группы (без body).",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "notes": [{"id": "int","header": "string","short_description": "string","created_at": "datetime","updated_at": "datetime","group_id": "int","character_id": "null","body": "null","keywords": ["string"]}]\n}',
+    responseSchema: '{\n  "notes": [' + SCHEMAS.fullNoteGroup + ']\n}',
     responseStatuses: ["200 OK"],
     params: null,
     special: null
@@ -408,7 +425,7 @@ const ENDPOINTS = [
     description: "Получение заметки (с body).",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "id": "int",\n  "header": "string",\n  "short_description": "string",\n  "created_at": "datetime",\n  "updated_at": "datetime",\n  "group_id": "int",\n  "character_id": "int | null",\n  "body": "string | null",\n  "keywords": ["string"]\n}',
+    responseSchema: SCHEMAS.fullNoteGroup,
     responseStatuses: ["200 OK", "404 Not Found"],
     params: null,
     special: null
@@ -425,7 +442,7 @@ const ENDPOINTS = [
     description: "Обновление заметки группы.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "id": "int",\n  "header": "string",\n  "short_description": "string",\n  "created_at": "datetime",\n  "updated_at": "datetime",\n  "group_id": "int",\n  "character_id": "int | null",\n  "body": "string | null",\n  "keywords": ["string"]\n}',
+    responseSchema: SCHEMAS.fullNoteGroup,
     responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"],
     params: null,
     special: null
@@ -459,7 +476,7 @@ const ENDPOINTS = [
     description: "Все уникальные ключевые слова заметок группы.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "keywords": ["string"]\n}',
+    responseSchema: SCHEMAS.keywordsOnly,
     responseStatuses: ["200 OK"],
     params: null,
     special: null
@@ -510,7 +527,7 @@ const ENDPOINTS = [
     description: "Список навыков группы.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "skills": [{"id": "int","name": "string","description": "string","attributes": [{"key": "string","name": "string","description": "string"}],"isSecret": "bool"}]\n}',
+    responseSchema: '{\n  "skills": [' + SCHEMAS.briefSkillObj + ']\n}',
     responseStatuses: ["200 OK"],
     params: [
       { name: "withSecrets", type: "bool", description: "Показывать секреты" },
@@ -530,7 +547,7 @@ const ENDPOINTS = [
     description: "Создание навыка группы.",
     requestBody: '{\n  "name"?: "string",\n  "description"?: "string",\n  "attributes"?: "Array",\n  "isSecret"?: "bool"\n}',
     requestBodyRequired: null,
-    responseSchema: '{\n  "id": "int",\n  "name": "string",\n  "description": "string",\n  "attributes": [{"key": "string","name": "string","description": "string","value": "string"}],\n  "isSecret": "bool"\n}',
+    responseSchema: SCHEMAS.fullSkill,
     responseStatuses: ["201 Created", "400 Bad Request"],
     params: null,
     special: null
@@ -547,7 +564,7 @@ const ENDPOINTS = [
     description: "Получение навыка группы.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "id": "int",\n  "name": "string",\n  "description": "string",\n  "attributes": [{"key": "string","name": "string","description": "string","value": "string"}],\n  "isSecret": "bool"\n}',
+    responseSchema: SCHEMAS.fullSkill,
     responseStatuses: ["200 OK", "404 Not Found"],
     params: null,
     special: null
@@ -564,7 +581,7 @@ const ENDPOINTS = [
     description: "Обновление навыка группы.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "id": "int",\n  "name": "string",\n  "description": "string",\n  "attributes": [{"key": "string","name": "string","description": "string","value": "string"}],\n  "isSecret": "bool"\n}',
+    responseSchema: SCHEMAS.fullSkill,
     responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"],
     params: null,
     special: null
@@ -1046,7 +1063,7 @@ const ENDPOINTS = [
     description: "Список заметок персонажа (без body).",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "notes": [{"id": "int","header": "string","short_description": "string","created_at": "datetime","updated_at": "datetime","group_id": "int","character_id": "int","body": "null","keywords": ["string"]}]\n}',
+    responseSchema: '{\n  "notes": [' + SCHEMAS.fullNoteChar + ']\n}',
     responseStatuses: ["200 OK"],
     params: null,
     special: null
@@ -1063,7 +1080,7 @@ const ENDPOINTS = [
     description: "Создание заметки персонажа.",
     requestBody: '{\n  "header": "string",\n  "body"?: "string",\n  "short_description"?: "string",\n  "keywords"?: ["string"]\n}',
     requestBodyRequired: ["header"],
-    responseSchema: '{\n  "id": "int",\n  "header": "string",\n  "short_description": "string",\n  "created_at": "datetime",\n  "updated_at": "datetime",\n  "group_id": "int",\n  "character_id": "int",\n  "body": "string | null",\n  "keywords": ["string"]\n}',
+    responseSchema: SCHEMAS.fullNoteChar,
     responseStatuses: ["201 Created"],
     params: null,
     special: null
@@ -1080,7 +1097,7 @@ const ENDPOINTS = [
     description: "Получение заметки персонажа (с body).",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "id": "int",\n  "header": "string",\n  "short_description": "string",\n  "created_at": "datetime",\n  "updated_at": "datetime",\n  "group_id": "int",\n  "character_id": "int",\n  "body": "string | null",\n  "keywords": ["string"]\n}',
+    responseSchema: SCHEMAS.fullNoteChar,
     responseStatuses: ["200 OK", "404 Not Found"],
     params: null,
     special: null
@@ -1097,7 +1114,7 @@ const ENDPOINTS = [
     description: "Обновление заметки персонажа.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "id": "int",\n  "header": "string",\n  "short_description": "string",\n  "created_at": "datetime",\n  "updated_at": "datetime",\n  "group_id": "int",\n  "character_id": "int",\n  "body": "string | null",\n  "keywords": ["string"]\n}',
+    responseSchema: SCHEMAS.fullNoteChar,
     responseStatuses: ["200 OK", "404 Not Found"],
     params: null,
     special: null
@@ -1131,7 +1148,7 @@ const ENDPOINTS = [
     description: "Ключевые слова заметок персонажа.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "keywords": ["string"]\n}',
+    responseSchema: SCHEMAS.keywordsOnly,
     responseStatuses: ["200 OK"],
     params: null,
     special: null
@@ -1148,7 +1165,7 @@ const ENDPOINTS = [
     description: "Список навыков персонажа.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '[{"id": "int","name": "string","description": "string","attributes": [{"key": "string","name": "string","description": "string"}],"isSecret": "bool"}]',
+    responseSchema: '[' + SCHEMAS.briefSkillObj + ']',
     responseStatuses: ["200 OK", "404 Not Found"],
     params: [
       { name: "filters", type: "string", description: "Фильтры" }
@@ -1167,7 +1184,7 @@ const ENDPOINTS = [
     description: "Добавить/обновить навык персонажа.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "id": "int",\n  "name": "string",\n  "description": "string",\n  "attributes": [{"key": "string","name": "string","description": "string","value": "string"}],\n  "isSecret": "bool"\n}',
+    responseSchema: SCHEMAS.fullSkill,
     responseStatuses: ["200 OK", "400 Bad Request", "403 Forbidden", "404 Not Found"],
     params: null,
     special: ["↺ без тела"]
@@ -1184,7 +1201,7 @@ const ENDPOINTS = [
     description: "Удалить навык персонажа.",
     requestBody: null,
     requestBodyRequired: null,
-    responseSchema: '{\n  "id": "int",\n  "name": "string",\n  "description": "string",\n  "attributes": [{"key": "string","name": "string","description": "string","value": "string"}],\n  "isSecret": "bool"\n}',
+    responseSchema: SCHEMAS.fullSkill,
     responseStatuses: ["200 OK", "400 Bad Request", "403 Forbidden", "404 Not Found"],
     params: null,
     special: null
