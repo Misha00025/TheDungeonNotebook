@@ -128,6 +128,21 @@ def register_character_lifecycle_scenario():
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.0.id}/characters/{steps.3.id}/users/{uid}", method="DELETE", requirement=FORBID))
 
+    # 21. Create a new character for admin DELETE user test
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/{steps.0.id}/characters", method="POST",
+        data={"name": "DeleteUserTest", "description": "", "templateId": "{steps.2.id}"},
+        requirement=CREATED))
+
+    # 22. Add user to the new character with write access
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/{steps.0.id}/characters/{steps.21.id}/users/{uid}", method="PUT",
+        data={"canWrite": True}, requirement=CREATED))
+
+    # 23. DELETE /.../characters/{charId}/users/{uid} (admin) → 200
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/{steps.0.id}/characters/{steps.21.id}/users/{uid}", method="DELETE", requirement=OK))
+
     steps = [GatewayStep(t) for t in tests]
     scenario = Scenario("CharacterLifecycle", steps, data)
     scenarios.append(scenario)

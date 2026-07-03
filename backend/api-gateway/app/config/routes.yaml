@@ -437,7 +437,7 @@ routes:
       DELETE:
         proxy:
           service: campaign
-          path: /polices/groups/characters
+          path: /polices/groups
         auth: required
         access: character_admin
         params:
