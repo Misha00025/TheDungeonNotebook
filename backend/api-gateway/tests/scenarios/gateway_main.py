@@ -180,6 +180,34 @@ def register_gateway_main():
         request="groups/1/items", method="POST",
         data=new_group_item, requirement=FORBID))
 
+    # === Group management ===
+
+    # PATCH /groups/{id} (admin) → 200
+    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
+        request="groups/1", method="PATCH",
+        data={"name": "UpdatedGroup"}, requirement=OK))
+
+    # PATCH /groups/{id} (user_3, not admin) → 403
+    tests.append(Test(headers={**h, "Authorization": "{steps.9.accessToken}"},
+        request="groups/1", method="PATCH",
+        data={"name": "HackedName"}, requirement=FORBID))
+
+    # GET /groups/{id}/users (admin) → 200
+    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
+        request="groups/1/users", method="GET", requirement=OK))
+
+    # DELETE /groups/{id}/users/{uid} (user_3 tries to delete user_2, not admin) → 403
+    tests.append(Test(headers={**h, "Authorization": "{steps.9.accessToken}"},
+        request="groups/1/users/{steps.2.id}", method="DELETE", requirement=FORBID))
+
+    # DELETE /groups/{id}/users/{uid} (admin deletes user_3) → 200
+    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
+        request="groups/1/users/{steps.5.id}", method="DELETE", requirement=OK))
+
+    # Verify user_3 can no longer see the group → 404
+    tests.append(Test(headers={**h, "Authorization": "{steps.9.accessToken}"},
+        request="groups/1", method="GET", requirement=NOT_FOUND))
+
     steps = [GatewayStep(t) for t in tests]
     scenario = Scenario("GatewayMain", steps)
     scenarios.append(scenario)

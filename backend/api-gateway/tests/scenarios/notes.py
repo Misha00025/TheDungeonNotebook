@@ -153,6 +153,65 @@ def register_notes_scenario():
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.0.id}/characters/{steps.2.id}/notes/{steps.17.id}", method="GET", requirement=NOT_FOUND))
 
+    # === GROUP NOTES — member access ===
+
+    # Admin creates a new group note for member access testing
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/{steps.0.id}/notes", method="POST",
+        data={"header": "MemberNote", "body": "For member testing"}, requirement=CREATED))
+
+    # GET /groups/{id}/notes (user, group_member) → 200 — member может читать
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/{steps.0.id}/notes", method="GET", requirement=OK))
+
+    # GET /groups/{id}/notes/{noteId} (user, not admin) → 403
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/{steps.0.id}/notes/{steps.26.id}", method="GET", requirement=FORBID))
+
+    # PUT /groups/{id}/notes/{noteId} (user, not admin) → 403
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/{steps.0.id}/notes/{steps.26.id}", method="PUT",
+        data={"header": "Stolen"}, requirement=FORBID))
+
+    # DELETE /groups/{id}/notes/{noteId} (user, not admin) → 403
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/{steps.0.id}/notes/{steps.26.id}", method="DELETE", requirement=FORBID))
+
+    # === CHARACTER NOTES — viewer (read-only) access ===
+
+    # Admin creates note on char_2 (viewer has read-only access)
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/{steps.0.id}/characters/{steps.3.id}/notes", method="POST",
+        data={"header": "ViewerNote", "body": "For viewer testing"}, requirement=CREATED))
+
+    # GET /.../characters/{charId}/notes (viewer, read-only) → 200
+    tests.append(Test(headers={**h, "Authorization": "{vt}"},
+        request="groups/{steps.0.id}/characters/{steps.3.id}/notes", method="GET", requirement=OK))
+
+    # GET /.../notes/{noteId} (viewer, read-only) → 200
+    tests.append(Test(headers={**h, "Authorization": "{vt}"},
+        request="groups/{steps.0.id}/characters/{steps.3.id}/notes/{steps.31.id}", method="GET", requirement=OK))
+
+    # PUT /.../notes/{noteId} (viewer, read-only) → 403
+    tests.append(Test(headers={**h, "Authorization": "{vt}"},
+        request="groups/{steps.0.id}/characters/{steps.3.id}/notes/{steps.31.id}", method="PUT",
+        data={"header": "Stolen"}, requirement=FORBID))
+
+    # DELETE /.../notes/{noteId} (viewer, read-only) → 403
+    tests.append(Test(headers={**h, "Authorization": "{vt}"},
+        request="groups/{steps.0.id}/characters/{steps.3.id}/notes/{steps.31.id}", method="DELETE", requirement=FORBID))
+
+    # === CHARACTER NOTES — writer access ===
+
+    # PUT /.../notes/{noteId} (write user on char_1) → 200
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/{steps.0.id}/characters/{steps.2.id}/notes/{steps.18.id}", method="PUT",
+        data={"header": "WriterUpdated"}, requirement=OK))
+
+    # DELETE /.../notes/{noteId} (write user on char_1) → 200
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/{steps.0.id}/characters/{steps.2.id}/notes/{steps.18.id}", method="DELETE", requirement=OK))
+
     steps = [GatewayStep(t) for t in tests]
     scenario = Scenario("Notes", steps, data)
     scenarios.append(scenario)

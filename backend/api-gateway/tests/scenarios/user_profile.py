@@ -46,6 +46,13 @@ def register_user_profile_scenario():
     tests.append(Test(headers=h, request="users", method="POST",
         data={"firstName": "NoAuth", "lastName": "User"}, requirement=NOT_AUTH))
 
+    # 7. GET /users (no token) → 200 (публичный эндпоинт)
+    tests.append(Test(headers=h, request="users", method="GET", requirement=OK))
+
+    # 8. GET /users (with token) → 200
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="users", method="GET", requirement=OK))
+
     steps = [GatewayStep(t) for t in tests]
     scenario = Scenario("UserProfile", steps, data)
     scenarios.append(scenario)

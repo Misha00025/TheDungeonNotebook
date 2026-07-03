@@ -10,6 +10,10 @@ from scenarios.group_skills import register_group_skills_scenario, scenarios as 
 from scenarios.character_skills import register_character_skills_scenario, scenarios as cs_scenarios
 from scenarios.export_import import register_export_import_scenario, scenarios as ei_scenarios
 from scenarios.notes import register_notes_scenario, scenarios as notes_scenarios
+from scenarios.local_endpoints import register_local_endpoints_scenario, scenarios as le_scenarios
+from scenarios.schemas_lifecycle import register_schemas_scenario, scenarios as sl_scenarios
+from scenarios.character_items_access import register_character_items_access_scenario, scenarios as cia_scenarios
+from scenarios.character_full_access import register_character_full_access_scenario, scenarios as cfa_scenarios
 
 if __name__ == "__main__":
     import argparse
@@ -20,7 +24,7 @@ if __name__ == "__main__":
     p.add_argument("-c", "--compact", nargs='?', const=True, default=False)
     p.add_argument("-d", "--debug", nargs='?', const=True, default=False)
     p.add_argument("--server", type=str, help="Адрес сервера")
-    p.add_argument('-S', "--scenario", action='append', help=f'Добавляет сценарий для исполнения. Доступные значения: GatewayMain, UserProfile, GroupItemsLifecycle, CharacterLifecycle, GroupSkills, CharacterSkillsAssignment, ExportImport')
+    p.add_argument('-S', "--scenario", action='append', help=f'Добавляет сценарий для исполнения. Доступные значения: GatewayMain, UserProfile, GroupItemsLifecycle, CharacterLifecycle, GroupSkills, CharacterSkillsAssignment, ExportImport, Notes, LocalEndpoints, SchemasLifecycle, CharacterItemsAccess, CharacterFullAccess')
     args = p.parse_args()
 
     if args.server is not None:
@@ -49,6 +53,14 @@ if __name__ == "__main__":
                 register_export_import_scenario()
             elif scenario == "Notes":
                 register_notes_scenario()
+            elif scenario == "LocalEndpoints":
+                register_local_endpoints_scenario()
+            elif scenario == "SchemasLifecycle":
+                register_schemas_scenario()
+            elif scenario == "CharacterItemsAccess":
+                register_character_items_access_scenario()
+            elif scenario == "CharacterFullAccess":
+                register_character_full_access_scenario()
     else:
         register_gateway_main()
         register_user_profile_scenario()
@@ -58,6 +70,10 @@ if __name__ == "__main__":
         register_character_skills_scenario()
         register_export_import_scenario()
         register_notes_scenario()
+        register_local_endpoints_scenario()
+        register_schemas_scenario()
+        register_character_items_access_scenario()
+        register_character_full_access_scenario()
 
-    all_scenarios = gw_scenarios + up_scenarios + gi_scenarios + cl_scenarios + gs_scenarios + cs_scenarios + ei_scenarios + notes_scenarios
+    all_scenarios = gw_scenarios + up_scenarios + gi_scenarios + cl_scenarios + gs_scenarios + cs_scenarios + ei_scenarios + notes_scenarios + le_scenarios + sl_scenarios + cia_scenarios + cfa_scenarios
     main_test.start(all_scenarios)

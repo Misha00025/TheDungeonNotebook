@@ -67,25 +67,30 @@ def register_character_skills_scenario():
         data={"name": "Perception", "description": "Notice things"},
         requirement=CREATED))
 
-    # 6. PUT /groups/{id}/characters/{charId}/skills/{skillId} (admin) → 200
+    # 6. PUT /groups/{id}/characters/{charId}/skills/{skillId} (admin, assign Stealth) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.0.id}/characters/{steps.3.id}/skills/{steps.6.id}",
         method="PUT", requirement=OK))
 
-    # 7. GET /groups/{id}/characters/{charId}/skills (admin) → 200
+    # 7. PUT /groups/{id}/characters/{charId}/skills/{skillId} (admin, assign Perception) → 200
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/{steps.0.id}/characters/{steps.3.id}/skills/{steps.7.id}",
+        method="PUT", requirement=OK))
+
+    # 8. GET /groups/{id}/characters/{charId}/skills (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.0.id}/characters/{steps.3.id}/skills",
         method="GET", requirement=OK))
 
-    # 8. DELETE /groups/{id}/characters/{charId}/skills/{skillId} (admin) → 200
+    # 9. PUT /groups/{id}/characters/{charId}/skills/{skillId} (user, read-only on Stealth) → 403
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/{steps.0.id}/characters/{steps.3.id}/skills/{steps.6.id}",
+        method="PUT", requirement=FORBID))
+
+    # 10. DELETE /groups/{id}/characters/{charId}/skills/{skillId} (admin, delete Stealth) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.0.id}/characters/{steps.3.id}/skills/{steps.6.id}",
         method="DELETE", requirement=OK))
-
-    # 9. PUT /groups/{id}/characters/{charId}/skills/{skillId} (user, read-only) → 403
-    tests.append(Test(headers={**h, "Authorization": "{ut}"},
-        request="groups/{steps.0.id}/characters/{steps.3.id}/skills/{steps.7.id}",
-        method="PUT", requirement=FORBID))
 
     steps = [GatewayStep(t) for t in tests]
     scenario = Scenario("CharacterSkillsAssignment", steps, data)
