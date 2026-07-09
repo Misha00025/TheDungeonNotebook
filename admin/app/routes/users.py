@@ -1,0 +1,71 @@
+from flask import Blueprint, render_template, request, redirect, url_for
+from app.middleware import login_required
+from app import services
+
+users_bp = Blueprint("users", __name__)
+
+
+@users_bp.route("/users")
+@login_required
+def list_users():
+    search = request.args.get("search", "")
+
+    try:
+        if search:
+            data = services.get_all_users()
+            all_users = data.get("users", [])
+            users = [u for u in all_users if search.lower() in u.get("nickname", "").lower()]
+        else:
+            data = services.get_all_users()
+            users = data.get("users", [])
+    except Exception:
+        users = []
+
+    return render_template("users.html", users=users, search=search)
+
+
+@users_bp.route("/users/<int:user_id>")
+@login_required
+def user_detail(user_id):
+    user = services.get_user(user_id)
+    if user is None:
+        return render_template("user_detail.html", user=None, groups=None)
+
+    try:
+        policies = services.get_group_policies(user_id=user_id)
+        user_groups = policies.get("users", [])
+    except Exception:
+        user_groups = []
+
+    return render_template("user_detail.html", user=user, groups=user_groups)
+
+
+@users_bp.route("/users/<int:user_id>/delete", methods=["POST"])
+@login_required
+def delete_user(user_id):
+    try:
+        services.delete_user(user_id)
+    except Exception:
+        pass
+    return redirect(url_for("users.list_users"))
+
+
+@users_bp.route("/users/<int:user_id>/remove-from-group/<int:group_id>", methods=["POST"])
+@login_required
+def remove_from_group(user_id, group_id):
+    try:
+        services.remove_user_from_group(user_id, group_id)
+    except Exception:
+        pass
+    return redirect(url_for("users.user_detail", user_id=user_id))
+
+
+@users_bp.route("/users/<int:user_id>/toggle-admin/<int:group_id>", methods=["POST"])
+@login_required
+def toggle_group_admin(user_id, group_id):
+    try:
+        current_admin_status = request.form.get("is_admin", "false") == "true"
+        services.set_group_admin(user_id, group_id, not current_admin_status)
+    except Exception:
+        pass
+    return redirect(url_for("users.user_detail", user_id=user_id))

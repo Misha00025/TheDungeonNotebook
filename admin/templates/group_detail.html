@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Group #{{ group.id if group else 'Not Found' }} — TDN Admin{% endblock %}
+{% block content %}
+{% if group %}
+<h1>{{ group.name }}</h1>
+
+<div class="detail-card">
+    <p><strong>ID:</strong> {{ group.id }}</p>
+    <p><strong>Icon:</strong> {{ group.icon or '-' }}</p>
+</div>
+
+<h2>Members ({{ members|length }})</h2>
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>User ID</th>
+            <th>Nickname</th>
+            <th>Admin</th>
+            <th>Characters</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for m in members %}
+        <tr>
+            <td>{{ m.userId }}</td>
+            <td>{{ m.user.nickname if m.user else 'N/A' }}</td>
+            <td>{{ 'Yes' if m.isAdmin else 'No' }}</td>
+            <td>{{ m.characters|length }}</td>
+            <td>
+                <a href="{{ url_for('users.user_detail', user_id=m.userId) }}" class="btn btn-sm">View User</a>
+                {% if not m.isAdmin %}
+                <form method="POST" action="{{ url_for('groups.remove_user', group_id=group.id, user_id=m.userId) }}" style="display:inline"
+                      onsubmit="return confirm('Remove user from group?')">
+                    <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="5" class="empty">No members.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% else %}
+<h1>Group Not Found</h1>
+<p>The requested group does not exist.</p>
+{% endif %}
+<a href="{{ url_for('groups.list_groups') }}" class="btn">← Back to Groups</a>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Users — TDN Admin{% endblock %}
+{% block content %}
+<h1>Users</h1>
+
+<form method="GET" class="search-form">
+    <input type="text" name="search" value="{{ search }}" placeholder="Search by nickname...">
+    <button type="submit" class="btn">Search</button>
+</form>
+
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Nickname</th>
+            <th>Visible Name</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in users %}
+        <tr>
+            <td>{{ user.id }}</td>
+            <td>{{ user.nickname }}</td>
+            <td>{{ user.visibleName or '-' }}</td>
+            <td>
+                <a href="{{ url_for('users.user_detail', user_id=user.id) }}" class="btn btn-sm">View</a>
+                <form method="POST" action="{{ url_for('users.delete_user', user_id=user.id) }}" style="display:inline"
+                      onsubmit="return confirm('Delete user {{ user.nickname }}?')">
+                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="4" class="empty">No users found.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

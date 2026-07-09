@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}User #{{ user.id if user else 'Not Found' }} — TDN Admin{% endblock %}
+{% block content %}
+{% if user %}
+<h1>{{ user.nickname }}</h1>
+
+<div class="detail-card">
+    <p><strong>ID:</strong> {{ user.id }}</p>
+    <p><strong>Visible Name:</strong> {{ user.visibleName or '-' }}</p>
+    <p><strong>Image Link:</strong> {{ user.imageLink or '-' }}</p>
+</div>
+
+<h2>Groups ({{ groups|length }})</h2>
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Group ID</th>
+            <th>Is Admin</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for g in groups %}
+        <tr>
+            <td>{{ g.groupId }}</td>
+            <td>{{ 'Yes' if g.isAdmin else 'No' }}</td>
+            <td>
+                <form method="POST" action="{{ url_for('users.toggle_group_admin', user_id=user.id, group_id=g.groupId) }}" style="display:inline">
+                    <input type="hidden" name="is_admin" value="{{ 'true' if g.isAdmin else 'false' }}">
+                    <button type="submit" class="btn btn-sm">
+                        {{ 'Revoke Admin' if g.isAdmin else 'Make Admin' }}
+                    </button>
+                </form>
+                <form method="POST" action="{{ url_for('users.remove_from_group', user_id=user.id, group_id=g.groupId) }}" style="display:inline"
+                      onsubmit="return confirm('Remove user from group {{ g.groupId }}?')">
+                    <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="3" class="empty">Not a member of any group.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% else %}
+<h1>User Not Found</h1>
+<p>The requested user does not exist.</p>
+{% endif %}
+<a href="{{ url_for('users.list_users') }}" class="btn">← Back to Users</a>
+{% endblock %}

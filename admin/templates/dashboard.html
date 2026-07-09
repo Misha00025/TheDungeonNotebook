@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — TDN Admin{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>Users</h3>
+        <p class="stat-value">{{ total_users }}</p>
+    </div>
+    <div class="stat-card">
+        <h3>Groups</h3>
+        <p class="stat-value">{{ total_groups }}</p>
+    </div>
+</div>
+{% endblock %}
