@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Content Moderation — TDN Admin{% endblock %}
+{% block content %}
+<h1>Content Moderation</h1>
+
+<form method="GET" class="search-form">
+    <label for="group_id">Select Group:</label>
+    <select name="group_id" id="group_id" onchange="this.form.submit()">
+        <option value="">— Select a group —</option>
+        {% for g in groups %}
+        <option value="{{ g.id }}" {{ 'selected' if g.id == selected_group_id }}>{{ g.name }} (ID: {{ g.id }})</option>
+        {% endfor %}
+    </select>
+</form>
+
+{% if selected_group_id %}
+
+<h2>Items ({{ items|length }})</h2>
+<table class="data-table">
+    <thead>
+        <tr><th>ID</th><th>Name</th><th>Secret</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.id }}</td>
+            <td>{{ item.name }}</td>
+            <td>{{ 'Yes' if item.isSecret else 'No' }}</td>
+            <td>
+                <form method="POST" action="{{ url_for('content.delete_item', group_id=selected_group_id, item_id=item.id) }}"
+                      onsubmit="return confirm('Delete item {{ item.name }}?')" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="empty">No items.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Skills ({{ skills|length }})</h2>
+<table class="data-table">
+    <thead>
+        <tr><th>ID</th><th>Name</th><th>Secret</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+        {% for skill in skills %}
+        <tr>
+            <td>{{ skill.id }}</td>
+            <td>{{ skill.name }}</td>
+            <td>{{ 'Yes' if skill.isSecret else 'No' }}</td>
+            <td>
+                <form method="POST" action="{{ url_for('content.delete_skill', group_id=selected_group_id, skill_id=skill.id) }}"
+                      onsubmit="return confirm('Delete skill {{ skill.name }}?')" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="empty">No skills.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Notes ({{ notes|length }})</h2>
+<table class="data-table">
+    <thead>
+        <tr><th>ID</th><th>Header</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+        {% for note in notes %}
+        <tr>
+            <td>{{ note.id }}</td>
+            <td>{{ note.header }}</td>
+            <td>
+                <form method="POST" action="{{ url_for('content.delete_note', group_id=selected_group_id, note_id=note.id) }}"
+                      onsubmit="return confirm('Delete note?')" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="empty">No notes.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>Characters ({{ characters|length }})</h2>
+<table class="data-table">
+    <thead>
+        <tr><th>ID</th><th>Name</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+        {% for character in characters %}
+        <tr>
+            <td>{{ character.id }}</td>
+            <td>{{ character.name or 'Unnamed' }}</td>
+            <td>
+                <form method="POST" action="{{ url_for('content.delete_character', group_id=selected_group_id, character_id=character.id) }}"
+                      onsubmit="return confirm('Delete character {{ character.name }} and all their data?')" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="empty">No characters.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endif %}
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Groups — TDN Admin{% endblock %}
+{% block content %}
+<h1>Groups</h1>
+
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Icon</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for group in groups %}
+        <tr>
+            <td>{{ group.id }}</td>
+            <td>{{ group.name }}</td>
+            <td>{{ group.icon or '-' }}</td>
+            <td>
+                <a href="{{ url_for('groups.group_detail', group_id=group.id) }}" class="btn btn-sm">View</a>
+                <form method="POST" action="{{ url_for('groups.delete_group', group_id=group.id) }}" style="display:inline"
+                      onsubmit="return confirm('Delete group {{ group.name }}? This cannot be undone.')">
+                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="4" class="empty">No groups found.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
