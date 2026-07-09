@@ -1,3 +1,4 @@
+using StackExchange.Redis;
 using Tdn.Configuration;
 using Tdn.Db.Configuers;
 using Tdn.Db.Contexts;
@@ -12,6 +13,11 @@ Log.Logger = new LoggerConfiguration()
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog();
 var config = new ConfigParser();
+
+var redisConnectionString = Environment.GetEnvironmentVariable("REDIS_CONNECTION_STRING")
+    ?? throw new InvalidOperationException("REDIS_CONNECTION_STRING is missing");
+var redis = ConnectionMultiplexer.Connect(redisConnectionString);
+builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
 
 // General
 builder.Services.AddMvc();

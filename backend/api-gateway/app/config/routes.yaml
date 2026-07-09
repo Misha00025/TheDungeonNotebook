@@ -55,6 +55,13 @@ routes:
     handler: auth_refresh
     auth: none
 
+  - path: /auth/reset-password/confirm
+    methods: [POST]
+    proxy:
+      service: auth
+      path: /auth/reset-password/confirm
+    auth: none
+
   # ============================================================
   # Users
   # ============================================================

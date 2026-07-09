@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
+using StackExchange.Redis;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 using System.Security.Cryptography;
@@ -17,12 +18,14 @@ namespace Tdn.Api.Controllers
         private readonly IConfiguration _configuration;
         private readonly LoginContext _dbContext;
         private readonly Configs _configs;
+        private readonly IConnectionMultiplexer _redis;
         
-        public AuthController(IConfiguration configuration, LoginContext context, Configs configs)
+        public AuthController(IConfiguration configuration, LoginContext context, Configs configs, IConnectionMultiplexer redis)
         {
             _configuration = configuration;
             _dbContext = context;
             _configs = configs;
+            _redis = redis;
         }
         
         private TokenValidationParameters GetValidationParameters()
@@ -155,6 +158,37 @@ namespace Tdn.Api.Controllers
             return Ok(new { token = tokenString });
         }
 
+        [HttpPost("reset-password/request/{userId}")]
+        public ActionResult ResetPasswordRequest([FromRoute] int userId)
+        {
+            var query = Guid.NewGuid().ToString("N");
+            var db = _redis.GetDatabase();
+            db.StringSet($"reset:{query}", userId.ToString(), TimeSpan.FromMinutes(15));
+            return Ok(new { query, expires_in = 900 });
+        }
+
+        [HttpPost("reset-password/confirm")]
+        public ActionResult ResetPasswordConfirm([FromQuery] string query, [FromBody] ResetPasswordData data)
+        {
+            var db = _redis.GetDatabase();
+            var userIdStr = db.StringGet($"reset:{query}");
+            
+            if (!userIdStr.HasValue)
+                return NotFound(new { error = "Query not found or expired" });
+            
+            db.KeyDelete($"reset:{query}");
+            
+            var userId = int.Parse(userIdStr!);
+            var user = _dbContext.Users.Where(e => e.Id == userId).FirstOrDefault();
+            if (user == null)
+                return NotFound(new { error = "User not found" });
+            
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(data.NewPassword);
+            _dbContext.SaveChanges();
+            
+            return Ok(new { message = "Password reset successful" });
+        }
+
         [HttpGet("check")]
         public ActionResult CheckToken()
         {
@@ -208,5 +242,10 @@ namespace Tdn.Api.Controllers
     {
         public int Access { get; set; }
         public int? Years { get; set; }
+    }
+
+    public struct ResetPasswordData
+    {
+        public string NewPassword { get; set; }
     }
 }

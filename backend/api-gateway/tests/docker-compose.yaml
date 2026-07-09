@@ -48,6 +48,18 @@ services:
       retries: 5
       start_period: 60s
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache-gateway-test
+    restart: always
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   auth-service:
     <<: *common_resources
     build:
@@ -55,6 +67,8 @@ services:
     container_name: auth-service-gateway-test
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - backend-network
@@ -66,6 +80,7 @@ services:
       - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
       - PRIVATE_KEY_PATH=/certs/private.pem
       - PUBLIC_KEY_PATH=/certs/public.pem
+      - REDIS_CONNECTION_STRING=redis:6379
 
   users-service:
     <<: *common_resources

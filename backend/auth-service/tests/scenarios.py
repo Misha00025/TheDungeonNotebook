@@ -49,6 +49,17 @@ def with_auth_service_scenario():
         Test(request="auth/groups/1/service-token/generate", method="POST", data={"access":3, "years":5}, requirement=OK),
         Test(request="auth/check", headers={**h, "Authorization": "Bearer {steps.-1.token}"}, method="GET", requirement=OK),
 
+        # Reset-password tests
+        reset_confirm_data = {"newPassword": "newsecurepassword"}
+
+        tests.extend([
+            Test(request="auth/reset-password/request/1", method="POST", data={}, requirement=OK),
+            Test(request="auth/reset-password/confirm", method="POST", params={"query": "{steps.11.query}"}, data=reset_confirm_data, requirement=OK),
+            Test(request="auth/reset-password/confirm", method="POST", params={"query": "nonexistent"}, data={"newPassword": "newpass"}, requirement=NOT_FOUND),
+            Test(request="auth/login", method="POST", data={"username": "newuser", "password": "newsecurepassword"}, requirement=OK),
+            Test(request="auth/login", method="POST", data={"username": "newuser", "password": "securepassword"}, requirement=NOT_AUTH),
+        ])
+
         # Test(request="auth/logout", method="DELETE", requirement=OK),
         # Test(request="auth/logout", method="DELETE", requirement=NOT_AUTH),
     ])
