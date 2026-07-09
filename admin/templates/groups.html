@@ -3,6 +3,10 @@
 {% block content %}
 <h1>Groups</h1>
 
+<div class="toolbar">
+    <a href="{{ url_for('groups.create_group') }}" class="btn">+ Create Group</a>
+</div>
+
 <table class="data-table">
     <thead>
         <tr>

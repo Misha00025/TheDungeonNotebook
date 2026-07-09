@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Create Group — TDN Admin{% endblock %}
+{% block content %}
+<h1>Create Group</h1>
+
+<form method="POST" class="create-form">
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+
+    <div class="form-group">
+        <label for="name">Group Name</label>
+        <input type="text" id="name" name="name" required autofocus>
+    </div>
+
+    <div class="form-group">
+        <label for="icon">Icon (optional)</label>
+        <input type="text" id="icon" name="icon" placeholder="Icon URL or name">
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Create</button>
+        <a href="{{ url_for('groups.list_groups') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %}

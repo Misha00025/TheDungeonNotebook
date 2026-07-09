@@ -5,6 +5,27 @@ from app import services
 users_bp = Blueprint("users", __name__)
 
 
+@users_bp.route("/users/create", methods=["GET", "POST"])
+@login_required
+def create_user():
+    if request.method == "GET":
+        return render_template("user_create.html", error=None)
+
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
+    nickname = request.form.get("nickname", "").strip()
+
+    if not username or not password or not nickname:
+        return render_template("user_create.html", error="All fields are required")
+
+    try:
+        services.register_user(username, password, nickname)
+    except Exception as e:
+        return render_template("user_create.html", error=str(e))
+
+    return redirect(url_for("users.list_users"))
+
+
 @users_bp.route("/users")
 @login_required
 def list_users():
