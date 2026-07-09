@@ -1,19 +1,12 @@
 using Microsoft.AspNetCore.HttpOverrides;
 using Prometheus;
 using Tdn.UploadService.Services;
-using Serilog;
-
-Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Information()
-    .WriteTo.File("/logs/uploads-service-.log", rollingInterval: RollingInterval.Day)
-    .CreateLogger();
-
 var builder = WebApplication.CreateBuilder(args);
-builder.Host.UseSerilog();
 
 // General
 builder.Services.AddMvc();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddLogging(e => e.AddConsole());
 
 
 builder.Services.AddHttpClient<IAuthService, AuthService>(client =>

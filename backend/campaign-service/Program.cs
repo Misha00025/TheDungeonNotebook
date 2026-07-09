@@ -7,20 +7,14 @@ using Tdn.Models.Providing;
 using Tdn.Models.Schemas.Items;
 using Tdn.Models.Schemas.Templates;
 using Prometheus;
-using Serilog;
-
-Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Information()
-    .WriteTo.File("/logs/campaign-service-.log", rollingInterval: RollingInterval.Day)
-    .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Host.UseSerilog();
 var config = new ConfigParser();
 
 // General
 builder.Services.AddMvc();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddLogging(e => e.AddConsole());
 
 // DataBase Contexts
 builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
