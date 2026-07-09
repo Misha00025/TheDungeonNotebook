@@ -48,9 +48,10 @@ def group_detail(group_id):
     except Exception:
         members = []
 
-    user_ids = [m["userId"] for m in members]
+    member_ids = {m["userId"] for m in members}
+
     try:
-        users_data = services.get_users_by_ids(user_ids)
+        users_data = services.get_users_by_ids(list(member_ids))
         user_map = {u["id"]: u for u in users_data}
     except Exception:
         user_map = {}
@@ -58,7 +59,13 @@ def group_detail(group_id):
     for m in members:
         m["user"] = user_map.get(m["userId"])
 
-    return render_template("group_detail.html", group=group, members=members)
+    try:
+        all_users = services.get_all_users()
+        available_users = [u for u in all_users.get("users", []) if u["id"] not in member_ids]
+    except Exception:
+        available_users = []
+
+    return render_template("group_detail.html", group=group, members=members, available_users=available_users)
 
 
 @groups_bp.route("/groups/<int:group_id>/delete", methods=["POST"])
@@ -69,6 +76,19 @@ def delete_group(group_id):
     except Exception:
         pass
     return redirect(url_for("groups.list_groups"))
+
+
+@groups_bp.route("/groups/<int:group_id>/add-user", methods=["POST"])
+@login_required
+def add_user(group_id):
+    user_id = request.form.get("user_id", type=int)
+    if not user_id:
+        return redirect(url_for("groups.group_detail", group_id=group_id))
+    try:
+        services.set_group_admin(user_id, group_id, is_admin=False)
+    except Exception:
+        pass
+    return redirect(url_for("groups.group_detail", group_id=group_id))
 
 
 @groups_bp.route("/groups/<int:group_id>/remove-user/<int:user_id>", methods=["POST"])
