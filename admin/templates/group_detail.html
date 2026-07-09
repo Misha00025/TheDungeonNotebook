@@ -9,6 +9,19 @@
     <p><strong>Icon:</strong> {{ group.icon or '-' }}</p>
 </div>
 
+<div class="toolbar">
+    <form method="POST" action="{{ url_for('groups.add_user', group_id=group.id) }}" class="inline-form">
+        <label for="user_id">Add user:</label>
+        <select id="user_id" name="user_id" required>
+            <option value="">— Select a user —</option>
+            {% for u in available_users %}
+            <option value="{{ u.id }}">{{ u.nickname }} (ID: {{ u.id }})</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-sm">Add to Group</button>
+    </form>
+</div>
+
 <h2>Members ({{ members|length }})</h2>
 <table class="data-table">
     <thead>
