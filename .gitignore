@@ -10,3 +10,10 @@
 
 **/__pycache__/
 memory-bank/**
+
+
+**/bin/
+**/obj/
+**/[Dd]ebug/
+**/[Rr]elease/
+**/net*.*/
