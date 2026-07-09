@@ -235,6 +235,33 @@ body {
     font-weight: 500;
 }
 
+.token-result {
+    margin-top: 30px;
+}
+
+.token-result h2 {
+    margin-bottom: 15px;
+}
+
+.token-textarea {
+    width: 100%;
+    max-width: 700px;
+    padding: 12px;
+    font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+    font-size: 13px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #f8f9fa;
+    resize: none;
+    cursor: pointer;
+}
+
+.token-hint {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #888;
+}
+
 .toolbar {
     margin-bottom: 20px;
 }

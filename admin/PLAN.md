@@ -21,6 +21,7 @@
 |---|--------|----------|
 | 11 | Создание пользователя | Страница `/admin/users/create` с формой (username, password, nickname). Два вызова: (1) `POST auth-service:8080/auth/register` → `{id}`, (2) `POST users-service:8080/users` с `{id, nickname}`. Функция `register_user()` в `services.py`. Шаблон `user_create.html`. Кнопка «+ Create User» на странице списка. | ✓ |
 | 12 | Создание группы | Страница `/admin/groups/create` с формой (name, icon). Вызов `POST campaign-service:8080/groups` с `{name, icon}`. Функция `create_group()` в `services.py`. Шаблон `group_create.html`. Кнопка «+ Create Group» на странице списка. | ✓ |
+| 13 | Вкладка Bots / Service Tokens | Страница `/admin/bots` с выбором группы + сроком жизни. Вызов `POST auth-service:8080/auth/groups/{groupId}/service-token/generate`. Функция `generate_service_token()` в `services.py`. Шаблон `bots.html`. Ссылка в сайдбаре. | ✓ |
 
 ## 3. Не реализуется
 
