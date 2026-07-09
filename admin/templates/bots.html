@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Bots — TDN Admin{% endblock %}
+{% block content %}
+<h1>Bots / Service Tokens</h1>
+
+<form method="POST" class="create-form">
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+
+    <div class="form-group">
+        <label for="group_id">Group</label>
+        <select id="group_id" name="group_id" required>
+            <option value="">— Select a group —</option>
+            {% for g in groups %}
+            <option value="{{ g.id }}" {{ 'selected' if g.id == selected_group_id }}>{{ g.name }} (ID: {{ g.id }})</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="years">Lifetime (years)</label>
+        <input type="number" id="years" name="years" min="1" value="{{ years }}" required>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Generate Token</button>
+</form>
+
+{% if token %}
+<div class="token-result">
+    <h2>Generated Token</h2>
+    <textarea class="token-textarea" readonly rows="4" onclick="this.select()">{{ token }}</textarea>
+    <p class="token-hint">Click the token to select all, then copy (Ctrl+C / Cmd+C).</p>
+</div>
+{% endif %}
+{% endblock %}

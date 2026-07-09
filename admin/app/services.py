@@ -84,6 +84,16 @@ def delete_group(group_id: int) -> dict:
     return resp.json()
 
 
+def generate_service_token(group_id: int, years: int = 1) -> str:
+    url = f"{current_app.config['AUTH_SERVICE_URL']}/auth/groups/{group_id}/service-token/generate"
+    resp = requests.post(url, json={
+        "access": 3,
+        "years": years,
+    }, timeout=10)
+    resp.raise_for_status()
+    return resp.json()["token"]
+
+
 def get_group_policies(group_id: int = None, user_id: int = None) -> dict:
     url = f"{current_app.config['CAMPAIGN_SERVICE_URL']}/polices/groups"
     params = {}

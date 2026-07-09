@@ -3,6 +3,7 @@ from app.routes.dashboard import dashboard_bp
 from app.routes.users import users_bp
 from app.routes.groups import groups_bp
 from app.routes.content import content_bp
+from app.routes.bots import bots_bp
 
 
 def register_routes(app):
@@ -11,6 +12,7 @@ def register_routes(app):
     app.register_blueprint(users_bp, url_prefix="/admin")
     app.register_blueprint(groups_bp, url_prefix="/admin")
     app.register_blueprint(content_bp, url_prefix="/admin")
+    app.register_blueprint(bots_bp, url_prefix="/admin")
 
     @app.route("/")
     def index():
