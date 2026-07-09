@@ -17,3 +17,4 @@ memory-bank/**
 **/[Dd]ebug/
 **/[Rr]elease/
 **/net*.*/
+**/logs/
