@@ -26,6 +26,24 @@ def get_users_by_ids(ids: list[int]) -> list[dict]:
     return resp.json().get("users", [])
 
 
+def register_user(username: str, password: str, nickname: str) -> int:
+    auth_url = f"{current_app.config['AUTH_SERVICE_URL']}/auth/register"
+    resp = requests.post(auth_url, json={
+        "username": username,
+        "password": password,
+    }, timeout=10)
+    resp.raise_for_status()
+    user_id = resp.json()["id"]
+
+    users_url = f"{current_app.config['USERS_SERVICE_URL']}/users"
+    requests.post(users_url, json={
+        "id": user_id,
+        "nickname": nickname,
+    }, timeout=10).raise_for_status()
+
+    return user_id
+
+
 def delete_user(user_id: int) -> dict:
     url = f"{current_app.config['USERS_SERVICE_URL']}/users/{user_id}"
     resp = requests.delete(url, timeout=10)
@@ -45,6 +63,16 @@ def get_group(group_id: int) -> dict | None:
     resp = requests.get(url, timeout=10)
     if resp.status_code == 404:
         return None
+    resp.raise_for_status()
+    return resp.json()
+
+
+def create_group(name: str, icon: str = "") -> dict:
+    url = f"{current_app.config['CAMPAIGN_SERVICE_URL']}/groups"
+    body = {"name": name}
+    if icon:
+        body["icon"] = icon
+    resp = requests.post(url, json=body, timeout=10)
     resp.raise_for_status()
     return resp.json()
 

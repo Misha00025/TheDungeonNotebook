@@ -1,8 +1,28 @@
-from flask import Blueprint, render_template, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for
 from app.middleware import login_required
 from app import services
 
 groups_bp = Blueprint("groups", __name__)
+
+
+@groups_bp.route("/groups/create", methods=["GET", "POST"])
+@login_required
+def create_group():
+    if request.method == "GET":
+        return render_template("group_create.html", error=None)
+
+    name = request.form.get("name", "").strip()
+    icon = request.form.get("icon", "").strip()
+
+    if not name:
+        return render_template("group_create.html", error="Group name is required")
+
+    try:
+        services.create_group(name, icon)
+    except Exception as e:
+        return render_template("group_create.html", error=str(e))
+
+    return redirect(url_for("groups.list_groups"))
 
 
 @groups_bp.route("/groups")

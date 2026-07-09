@@ -3,6 +3,10 @@
 {% block content %}
 <h1>Users</h1>
 
+<div class="toolbar">
+    <a href="{{ url_for('users.create_user') }}" class="btn">+ Create User</a>
+</div>
+
 <form method="GET" class="search-form">
     <input type="text" name="search" value="{{ search }}" placeholder="Search by nickname...">
     <button type="submit" class="btn">Search</button>
