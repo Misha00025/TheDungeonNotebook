@@ -29,6 +29,9 @@
             <td>{{ user.visibleName or '-' }}</td>
             <td>
                 <a href="{{ url_for('users.user_detail', user_id=user.id) }}" class="btn btn-sm">View</a>
+                <form method="POST" action="{{ url_for('users.reset_password', user_id=user.id) }}" style="display:inline">
+                    <button type="submit" class="btn btn-sm">Reset PW</button>
+                </form>
                 <form method="POST" action="{{ url_for('users.delete_user', user_id=user.id) }}" style="display:inline"
                       onsubmit="return confirm('Delete user {{ user.nickname }}?')">
                     <button type="submit" class="btn btn-sm btn-danger">Delete</button>

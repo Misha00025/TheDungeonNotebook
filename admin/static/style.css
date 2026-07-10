@@ -291,3 +291,57 @@ body {
     gap: 10px;
     margin-top: 25px;
 }
+
+/* ===== Modal Overlay ===== */
+.modal-overlay {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60vh;
+}
+
+.modal-content {
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border, #ddd);
+    border-radius: 8px;
+    padding: 2rem;
+    max-width: 600px;
+    width: 100%;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.modal-content h2 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+}
+
+.modal-info {
+    color: #666;
+    margin-bottom: 1rem;
+}
+
+.modal-link-wrapper {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.modal-link-input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid var(--border, #ddd);
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+.modal-copy-msg {
+    color: #28a745;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.modal-actions {
+    margin-top: 1rem;
+    text-align: right;
+}

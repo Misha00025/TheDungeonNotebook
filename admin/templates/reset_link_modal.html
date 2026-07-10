@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Reset Password — TDN Admin{% endblock %}
+{% block content %}
+<div class="modal-overlay" id="resetModal">
+    <div class="modal-content">
+        <h2>Password Reset Link</h2>
+        <p class="modal-info">Copy this link and send it to the user. The link expires in 15 minutes.</p>
+        <div class="modal-link-wrapper">
+            <input type="text" id="resetLinkInput" value="{{ reset_link }}" readonly class="modal-link-input">
+            <button class="btn" onclick="copyLink()">Copy</button>
+        </div>
+        <div id="copyMessage" class="modal-copy-msg" style="display:none;">Copied!</div>
+        <div class="modal-actions">
+            <a href="{{ url_for('users.user_detail', user_id=user_id) }}" class="btn">Close</a>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyLink() {
+    var input = document.getElementById('resetLinkInput');
+    input.select();
+    input.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(input.value).then(function() {
+        var msg = document.getElementById('copyMessage');
+        msg.style.display = 'block';
+        setTimeout(function() { msg.style.display = 'none'; }, 2000);
+    });
+}
+</script>
+{% endblock %}

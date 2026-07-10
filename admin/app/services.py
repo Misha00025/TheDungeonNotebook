@@ -2,6 +2,13 @@ import requests
 from flask import current_app
 
 
+def request_password_reset(user_id: int) -> dict:
+    url = f"{current_app.config['AUTH_SERVICE_URL']}/auth/reset-password/request/{user_id}"
+    resp = requests.post(url, timeout=10)
+    resp.raise_for_status()
+    return resp.json()
+
+
 def get_all_users() -> dict:
     url = f"{current_app.config['USERS_SERVICE_URL']}/users"
     resp = requests.get(url, timeout=10)

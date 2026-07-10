@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, current_app
 from app.middleware import login_required
 from app import services
 
@@ -90,3 +90,14 @@ def toggle_group_admin(user_id, group_id):
     except Exception:
         pass
     return redirect(url_for("users.user_detail", user_id=user_id))
+
+
+@users_bp.route("/users/<int:user_id>/reset-password", methods=["POST"])
+@login_required
+def reset_password(user_id):
+    try:
+        result = services.request_password_reset(user_id)
+        link = f"{current_app.config['PASSWORD_RESET_LINK_TEMPLATE']}{result['query']}"
+        return render_template("reset_link_modal.html", reset_link=link, user_id=user_id)
+    except Exception as e:
+        return render_template("user_detail.html", user=None, error=f"Failed to generate reset link: {e}")

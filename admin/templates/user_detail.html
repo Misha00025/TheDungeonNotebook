@@ -50,4 +50,9 @@
 <p>The requested user does not exist.</p>
 {% endif %}
 <a href="{{ url_for('users.list_users') }}" class="btn">← Back to Users</a>
+{% if user %}
+<form method="POST" action="{{ url_for('users.reset_password', user_id=user.id) }}" style="display:inline">
+    <button type="submit" class="btn btn-sm">Reset Password</button>
+</form>
+{% endif %}
 {% endblock %}
