@@ -1,96 +1,115 @@
 from tests.templates import Test, Scenario, GatewayStep
 from tests.test_variables import *
-from .auth_helper import register_or_auth
+from .jwt_helper import generate_token
 
 h = {"Content-Type": "application/json; charset=utf-8"}
 scenarios: list[Scenario] = []
 
 
 def register_character_items_access_scenario():
-    admin = register_or_auth("citems_admin", "Pass123")
-    reader = register_or_auth("citems_reader", "Pass456")
-    writer = register_or_auth("citems_writer", "Pass789")
+    admin_id = 10001
+    reader_id = 10002
+    writer_id = 10003
+
+    admin_token = generate_token(admin_id)
+    reader_token = generate_token(reader_id)
+    writer_token = generate_token(writer_id)
 
     data = {
-        "at": admin["accessToken"],
-        "aid": admin["id"],
-        "rt": reader["accessToken"],
-        "rid": reader["id"],
-        "wt": writer["accessToken"],
-        "wid": writer["id"],
+        "at": admin_token,
+        "aid": admin_id,
+        "rt": reader_token,
+        "rid": reader_id,
+        "wt": writer_token,
+        "wid": writer_id,
     }
 
     tests = []
 
-    # 0. Create group
+    # 0. Create admin user
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="users", method="POST",
+        data={"firstName": "Admin", "lastName": "User", "nickname": "citems_admin"}, requirement=CREATED))
+
+    # 1. Create reader
+    tests.append(Test(headers={**h, "Authorization": "{rt}"},
+        request="users", method="POST",
+        data={"firstName": "Reader", "lastName": "User", "nickname": "citems_reader"}, requirement=CREATED))
+
+    # 2. Create writer
+    tests.append(Test(headers={**h, "Authorization": "{wt}"},
+        request="users", method="POST",
+        data={"firstName": "Writer", "lastName": "User", "nickname": "citems_writer"}, requirement=CREATED))
+
+    # 3. Create group
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups", method="POST",
         data={"name": "CharItemsGroup"}, requirement=CREATED))
 
-    # 1. Create template
+    # 4. Create template
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.0.id}/characters/templates", method="POST",
+        request="groups/{steps.3.id}/characters/templates", method="POST",
         data={"name": "Hero", "description": "Template for items testing",
               "fields": {"str": {"name": "Strength", "description": "", "value": 10}}},
         requirement=CREATED))
 
-    # 2. Create character
+    # 5. Create character
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.0.id}/characters", method="POST",
-        data={"name": "ItemTestChar", "description": "", "templateId": "{steps.1.id}"},
+        request="groups/{steps.3.id}/characters", method="POST",
+        data={"name": "ItemTestChar", "description": "", "templateId": "{steps.4.id}"},
         requirement=CREATED))
 
-    # 3. Add reader to group
+    # 6. Add reader to group
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.0.id}/users/{rid}", method="PUT",
+        request="groups/{steps.3.id}/users/{rid}", method="PUT",
         data={"isAdmin": False}, requirement=CREATED))
 
-    # 4. Add writer to group
+    # 7. Add writer to group
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.0.id}/users/{wid}", method="PUT",
+        request="groups/{steps.3.id}/users/{wid}", method="PUT",
         data={"isAdmin": False}, requirement=CREATED))
 
-    # 5. Give reader read-only access to character
+    # 8. Give reader read-only access to character
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.0.id}/characters/{steps.2.id}/users/{rid}", method="PUT",
+        request="groups/{steps.3.id}/characters/{steps.5.id}/users/{rid}", method="PUT",
         data={"canWrite": False}, requirement=CREATED))
 
-    # 6. Give writer write access to character
+    # 9. Give writer write access to character
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.0.id}/characters/{steps.2.id}/users/{wid}", method="PUT",
+        request="groups/{steps.3.id}/characters/{steps.5.id}/users/{wid}", method="PUT",
         data={"canWrite": True}, requirement=CREATED))
 
-    # 7. POST item (reader, read-only) → 403
+    # 10. POST item (reader, read-only) → 403
     tests.append(Test(headers={**h, "Authorization": "{rt}"},
-        request="groups/{steps.0.id}/characters/{steps.2.id}/items", method="POST",
+        request="groups/{steps.3.id}/characters/{steps.5.id}/items", method="POST",
         data={"name": "StolenItem", "description": "", "amount": 1}, requirement=FORBID))
 
-    # 8. POST item (writer, write access) → 201
+    # 11. POST item (writer, write access) → 201
     tests.append(Test(headers={**h, "Authorization": "{wt}"},
-        request="groups/{steps.0.id}/characters/{steps.2.id}/items", method="POST",
+        request="groups/{steps.3.id}/characters/{steps.5.id}/items", method="POST",
         data={"name": "LegitItem", "description": "Writer's item", "amount": 5}, requirement=CREATED))
 
-    # 9. GET item by id (reader, read-only) → 200 (чтение разрешено всем)
+    # 12. GET item by id (reader, read-only) → 200
     tests.append(Test(headers={**h, "Authorization": "{rt}"},
-        request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.8.id}", method="GET", requirement=OK))
+        request="groups/{steps.3.id}/characters/{steps.5.id}/items/{steps.11.id}", method="GET", requirement=OK))
 
-    # 10. PUT item (reader, read-only) → 403
+    # 13. PUT item (reader, read-only) → 403
     tests.append(Test(headers={**h, "Authorization": "{rt}"},
-        request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.8.id}", method="PUT",
+        request="groups/{steps.3.id}/characters/{steps.5.id}/items/{steps.11.id}", method="PUT",
         data={"name": "HackedItem", "amount": 999}, requirement=FORBID))
 
-    # 11. PUT item (writer, write access) → 200
+    # 14. PUT item (writer, write access) → 200
     tests.append(Test(headers={**h, "Authorization": "{wt}"},
-        request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.8.id}", method="PUT",
+        request="groups/{steps.3.id}/characters/{steps.5.id}/items/{steps.11.id}", method="PUT",
         data={"name": "UpdatedItem", "description": "Updated description", "amount": 10}, requirement=OK))
 
-    # 12. DELETE item (reader, read-only) → 403
+    # 15. DELETE item (reader, read-only) → 403
     tests.append(Test(headers={**h, "Authorization": "{rt}"},
-        request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.8.id}", method="DELETE", requirement=FORBID))
+        request="groups/{steps.3.id}/characters/{steps.5.id}/items/{steps.11.id}", method="DELETE", requirement=FORBID))
 
-    # 13. DELETE item (writer, write access) → 200
+    # 16. DELETE item (writer, write access) → 200
     tests.append(Test(headers={**h, "Authorization": "{wt}"},
-        request="groups/{steps.0.id}/characters/{steps.2.id}/items/{steps.8.id}", method="DELETE", requirement=OK))
+        request="groups/{steps.3.id}/characters/{steps.5.id}/items/{steps.11.id}", method="DELETE", requirement=OK))
 
     steps = [GatewayStep(t) for t in tests]
     scenario = Scenario("CharacterItemsAccess", steps, data)

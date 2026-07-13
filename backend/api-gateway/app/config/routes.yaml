@@ -34,35 +34,6 @@ routes:
     auth: required
 
   # ============================================================
-  # Auth
-  # ============================================================
-  - path: /auth/register
-    methods: [POST]
-    proxy:
-      service: auth
-      path: /auth/register
-    auth: none
-
-  - path: /auth/login
-    methods: [POST]
-    proxy:
-      service: auth
-      path: /auth/login
-    auth: none
-
-  - path: /auth/refresh
-    methods: [POST]
-    handler: auth_refresh
-    auth: none
-
-  - path: /auth/reset-password/confirm
-    methods: [POST]
-    proxy:
-      service: auth
-      path: /auth/reset-password/confirm
-    auth: none
-
-  # ============================================================
   # Users
   # ============================================================
   - path: /users

@@ -1,35 +1,37 @@
 from tests.templates import Test, Scenario, GatewayStep
 from tests.test_variables import *
+from .jwt_helper import generate_token
 
 h = {"Content-Type": "application/json; charset=utf-8"}
 scenarios: list[Scenario] = []
 
 
 def register_local_endpoints_scenario():
+    user_id = 12001
+    token = generate_token(user_id)
+
+    data = {
+        "at": token,
+        "aid": user_id,
+    }
+
     tests = []
 
-    # 0. Register user
-    tests.append(Test(headers=h, request="auth/register", method="POST",
-        data={"username": "local_tester", "password": "Pass123"}, requirement=CREATED))
+    # Create user
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="users", method="POST",
+        data={"firstName": "Local", "lastName": "Tester", "nickname": "local_tester"}, requirement=CREATED))
 
-    # 1. Login
-    tests.append(Test(headers=h, request="auth/login", method="POST",
-        data={"username": "local_tester", "password": "Pass123"}, requirement=OK))
-
-    # 2. Refresh to get accessToken
-    tests.append(Test(headers={**h, "Refresh-Token": "{steps.1.token}"},
-        request="auth/refresh", method="POST", requirement=OK))
-
-    # 3. GET /get_api (no auth) → 200
+    # GET /get_api (no auth) → 200
     tests.append(Test(headers=h, request="get_api", method="GET", requirement=OK))
 
-    # 4. GET /whoami (with auth) → 200
-    tests.append(Test(headers={**h, "Authorization": "{steps.2.accessToken}"},
+    # GET /whoami (with auth) → 200
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="whoami", method="GET", requirement=OK))
 
-    # 5. GET /whoami (no auth) → 401
+    # GET /whoami (no auth) → 401
     tests.append(Test(headers=h, request="whoami", method="GET", requirement=NOT_AUTH))
 
     steps = [GatewayStep(t) for t in tests]
-    scenario = Scenario("LocalEndpoints", steps)
+    scenario = Scenario("LocalEndpoints", steps, data)
     scenarios.append(scenario)

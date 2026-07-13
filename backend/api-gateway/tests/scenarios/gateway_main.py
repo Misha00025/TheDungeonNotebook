@@ -1,5 +1,6 @@
 from tests.templates import Test, Scenario, GatewayStep
 from tests.test_variables import *
+from .jwt_helper import generate_token
 
 h = {"Content-Type": "application/json; charset=utf-8"}
 
@@ -22,194 +23,190 @@ new_note = {"header": "Test", "body": "Test Test"}
 new_character_item = {"name": "TestItem", "description": "Test", "amount": 5}
 new_group_item = {"name": "TestItem", "description": "Test", "price": 10}
 
-
 scenarios: list[Scenario] = []
 
 
 def register_gateway_main():
+    admin_id = 2001
+    user_id = 2002
+    evil_id = 2003
+
+    admin_token = generate_token(admin_id)
+    user_token = generate_token(user_id)
+    evil_token = generate_token(evil_id)
+
+    data = {
+        "at": admin_token,
+        "aid": admin_id,
+        "ut": user_token,
+        "uid": user_id,
+        "et": evil_token,
+        "eid": evil_id,
+    }
+
     tests = []
 
-    # Registration & Login
-    tests.append(Test(headers=h, request="auth/register", method="POST",
-        data={"username": "adminTester", "password": "TestPass"}, requirement=CREATED))
+    # Create admin user
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="users", method="POST",
+        data={"firstName": "Admin", "lastName": "Tester", "nickname": "gate_admin"}, requirement=CREATED))
 
-    tests.append(Test(headers=h, request="auth/login", method="POST",
-        data={"username": "adminTester", "password": "TestPass"}, requirement=OK))
+    # Create user
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="users", method="POST",
+        data={"firstName": "User", "lastName": "Tester", "nickname": "gate_user"}, requirement=CREATED))
 
-    tests.append(Test(headers=h, request="auth/register", method="POST",
-        data={"username": "userTester", "password": "TestUserPass"}, requirement=CREATED))
-
-    tests.append(Test(headers=h, request="auth/login", method="POST",
-        data={"username": "userTester", "password": "TestUserPass"}, requirement=OK))
-
-    # user_3 login before registration → 401
-    tests.append(Test(headers=h, request="auth/login", method="POST",
-        data={"username": "evilTester", "password": "iTryBrakeAll"}, requirement=NOT_AUTH))
-
-    tests.append(Test(headers=h, request="auth/register", method="POST",
-        data={"username": "evilTester", "password": "iTryBrakeAll"}, requirement=CREATED))
-
-    tests.append(Test(headers=h, request="auth/login", method="POST",
-        data={"username": "evilTester", "password": "iTryBrakeAll"}, requirement=OK))
-
-    # Refresh tokens
-    tests.append(Test(headers={**h, "Refresh-Token": "{steps.1.token}"},
-        request="auth/refresh", method="POST", requirement=OK))
-
-    tests.append(Test(headers={**h, "Refresh-Token": "{steps.3.token}"},
-        request="auth/refresh", method="POST", requirement=OK))
-
-    tests.append(Test(headers={**h, "Refresh-Token": "{steps.6.token}"},
-        request="auth/refresh", method="POST", requirement=OK))
+    # Create evil user
+    tests.append(Test(headers={**h, "Authorization": "{et}"},
+        request="users", method="POST",
+        data={"firstName": "Evil", "lastName": "Tester", "nickname": "gate_evil"}, requirement=CREATED))
 
     # Group creation
-    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups", method="POST",
         data={"name": "TestGroup", "description": "TestDescription"}, requirement=CREATED))
 
     # Check group access
-    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/1", method="GET", requirement=OK))
 
-    tests.append(Test(headers={**h, "Authorization": "{steps.8.accessToken}"},
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/1", method="GET", requirement=NOT_FOUND))
 
-    # user_3 tries to add self to group (not admin) → 403
-    tests.append(Test(headers={**h, "Authorization": "{steps.9.accessToken}"},
-        request="groups/1/users/{steps.5.id}", method="PUT",
+    # evil tries to add self to group (not admin) → 403
+    tests.append(Test(headers={**h, "Authorization": "{et}"},
+        request="groups/1/users/{eid}", method="PUT",
         data={"isAdmin": False}, requirement=FORBID))
 
-    # user_1 adds user_2 to group
-    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
-        request="groups/1/users/{steps.2.id}", method="PUT",
+    # admin adds user to group
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/1/users/{uid}", method="PUT",
         data={"isAdmin": False}, requirement=CREATED))
 
-    # Check group access after user_2 added
-    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
+    # Check group access after user added
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/1", method="GET", requirement=OK))
 
-    tests.append(Test(headers={**h, "Authorization": "{steps.8.accessToken}"},
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/1", method="GET", requirement=OK))
 
-    tests.append(Test(headers={**h, "Authorization": "{steps.9.accessToken}"},
+    tests.append(Test(headers={**h, "Authorization": "{et}"},
         request="groups/1", method="GET", requirement=NOT_FOUND))
 
-    # user_1 adds user_3 to group
-    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
-        request="groups/1/users/{steps.5.id}", method="PUT",
+    # admin adds evil to group
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/1/users/{eid}", method="PUT",
         data={"isAdmin": False}, requirement=CREATED))
 
-    # user_3 tries to make self admin → 403
-    tests.append(Test(headers={**h, "Authorization": "{steps.9.accessToken}"},
-        request="groups/1/users/{steps.5.id}", method="PUT",
+    # evil tries to make self admin → 403
+    tests.append(Test(headers={**h, "Authorization": "{et}"},
+        request="groups/1/users/{eid}", method="PUT",
         data={"isAdmin": True}, requirement=FORBID))
 
-    # user_3 can now see the group
-    tests.append(Test(headers={**h, "Authorization": "{steps.9.accessToken}"},
+    # evil can now see the group
+    tests.append(Test(headers={**h, "Authorization": "{et}"},
         request="groups/1", method="GET", requirement=OK))
 
-    # user_3 tries to create template (not admin) → 403
-    tests.append(Test(headers={**h, "Authorization": "{steps.9.accessToken}"},
+    # evil tries to create template (not admin) → 403
+    tests.append(Test(headers={**h, "Authorization": "{et}"},
         request="groups/1/characters/templates", method="POST",
         data=new_template, requirement=FORBID))
 
-    # user_1 creates template
-    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
+    # admin creates template
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/1/characters/templates", method="POST",
         data=new_template, requirement=CREATED))
 
-    # user_1 edits template
-    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
-        request="groups/1/characters/templates/{steps.22.id}", method="PUT",
+    # admin edits template
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/1/characters/templates/{steps.15.id}", method="PUT",
         data=edited_template, requirement=OK))
 
     # Create 4 characters
     for i in range(1, 5):
-        tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
+        tests.append(Test(headers={**h, "Authorization": "{at}"},
             request="groups/1/characters", method="POST",
-            data={"name": f"Test Character {i}", "description": "", "templateId": "{steps.22.id}"},
+            data={"name": f"Test Character {i}", "description": "", "templateId": "{steps.15.id}"},
             requirement=CREATED))
 
-    # user_1 gives user_2 write access to char_2 (step 25)
-    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
-        request="groups/1/characters/{steps.25.id}/users/{steps.2.id}", method="PUT",
+    # admin gives user write access to char_2 (step 18)
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/1/characters/{steps.18.id}/users/{uid}", method="PUT",
         data={"canWrite": True}, requirement=CREATED))
 
-    # user_1 gives user_3 read-only access to char_3 (step 26)
-    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
-        request="groups/1/characters/{steps.26.id}/users/{steps.5.id}", method="PUT",
+    # admin gives evil read-only access to char_3 (step 19)
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/1/characters/{steps.19.id}/users/{eid}", method="PUT",
         data={"canWrite": False}, requirement=CREATED))
 
-    # user_1 adds note to char_1 → 201
-    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
-        request="groups/1/characters/{steps.24.id}/notes", method="POST",
+    # admin adds note to char_1 → 201
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/1/characters/{steps.17.id}/notes", method="POST",
         data=new_note, requirement=CREATED))
 
-    # user_2 adds note to char_2 (can_write=True) → 201
-    tests.append(Test(headers={**h, "Authorization": "{steps.8.accessToken}"},
-        request="groups/1/characters/{steps.25.id}/notes", method="POST",
+    # user adds note to char_2 (can_write=True) → 201
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/1/characters/{steps.18.id}/notes", method="POST",
         data=new_note, requirement=CREATED))
 
-    # user_3 adds note to char_3 (read-only) → 403
-    tests.append(Test(headers={**h, "Authorization": "{steps.9.accessToken}"},
-        request="groups/1/characters/{steps.26.id}/notes", method="POST",
+    # evil adds note to char_3 (read-only) → 403
+    tests.append(Test(headers={**h, "Authorization": "{et}"},
+        request="groups/1/characters/{steps.19.id}/notes", method="POST",
         data=new_note, requirement=FORBID))
 
-    # user_1 adds item to char_1 → 201
-    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
-        request="groups/1/characters/{steps.24.id}/items", method="POST",
+    # admin adds item to char_1 → 201
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/1/characters/{steps.17.id}/items", method="POST",
         data=new_character_item, requirement=CREATED))
 
-    # user_2 adds item to char_2 (can_write=True) → 201
-    tests.append(Test(headers={**h, "Authorization": "{steps.8.accessToken}"},
-        request="groups/1/characters/{steps.25.id}/items", method="POST",
+    # user adds item to char_2 (can_write=True) → 201
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/1/characters/{steps.18.id}/items", method="POST",
         data=new_character_item, requirement=CREATED))
 
-    # user_3 adds item to char_3 (read-only) → 403
-    tests.append(Test(headers={**h, "Authorization": "{steps.9.accessToken}"},
-        request="groups/1/characters/{steps.26.id}/items", method="POST",
+    # evil adds item to char_3 (read-only) → 403
+    tests.append(Test(headers={**h, "Authorization": "{et}"},
+        request="groups/1/characters/{steps.19.id}/items", method="POST",
         data=new_character_item, requirement=FORBID))
 
-    # user_1 creates group item → 201
-    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
+    # admin creates group item → 201
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/1/items", method="POST",
         data=new_group_item, requirement=CREATED))
 
-    # user_3 creates group item (not admin) → 403
-    tests.append(Test(headers={**h, "Authorization": "{steps.9.accessToken}"},
+    # evil creates group item (not admin) → 403
+    tests.append(Test(headers={**h, "Authorization": "{et}"},
         request="groups/1/items", method="POST",
         data=new_group_item, requirement=FORBID))
 
-    # === Group management ===
-
     # PATCH /groups/{id} (admin) → 200
-    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/1", method="PATCH",
         data={"name": "UpdatedGroup"}, requirement=OK))
 
-    # PATCH /groups/{id} (user_3, not admin) → 403
-    tests.append(Test(headers={**h, "Authorization": "{steps.9.accessToken}"},
+    # PATCH /groups/{id} (evil, not admin) → 403
+    tests.append(Test(headers={**h, "Authorization": "{et}"},
         request="groups/1", method="PATCH",
         data={"name": "HackedName"}, requirement=FORBID))
 
     # GET /groups/{id}/users (admin) → 200
-    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/1/users", method="GET", requirement=OK))
 
-    # DELETE /groups/{id}/users/{uid} (user_3 tries to delete user_2, not admin) → 403
-    tests.append(Test(headers={**h, "Authorization": "{steps.9.accessToken}"},
-        request="groups/1/users/{steps.2.id}", method="DELETE", requirement=FORBID))
+    # DELETE /groups/{id}/users/{uid} (evil tries to delete user, not admin) → 403
+    tests.append(Test(headers={**h, "Authorization": "{et}"},
+        request="groups/1/users/{uid}", method="DELETE", requirement=FORBID))
 
-    # DELETE /groups/{id}/users/{uid} (admin deletes user_3) → 200
-    tests.append(Test(headers={**h, "Authorization": "{steps.7.accessToken}"},
-        request="groups/1/users/{steps.5.id}", method="DELETE", requirement=OK))
+    # DELETE /groups/{id}/users/{eid} (admin deletes evil) → 200
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/1/users/{eid}", method="DELETE", requirement=OK))
 
-    # Verify user_3 can no longer see the group → 404
-    tests.append(Test(headers={**h, "Authorization": "{steps.9.accessToken}"},
+    # Verify evil can no longer see the group → 404
+    tests.append(Test(headers={**h, "Authorization": "{et}"},
         request="groups/1", method="GET", requirement=NOT_FOUND))
 
     steps = [GatewayStep(t) for t in tests]
-    scenario = Scenario("GatewayMain", steps)
+    scenario = Scenario("GatewayMain", steps, data)
     scenarios.append(scenario)
 
 

@@ -20,10 +20,12 @@ tests/
 ## Test Execution
 ```bash
 cd backend/api-gateway/tests
-./test.sh 30                     # Wait 30s, run all tests
-./test.sh 30 -S GatewayMain      # Run only GatewayMain scenario
+./test.sh 15                     # Wait 15s, run all tests
+./test.sh 15 -S GatewayMain      # Run only GatewayMain scenario
 ./venv/bin/python test.py        # Direct run (requires running stack)
 ```
+10 seconds is optimal time.
+
 
 ## test.sh Flow
 1. Clean mongo_data/ and mysql_data/

@@ -1,28 +1,36 @@
 from tests.templates import Test, Scenario, GatewayStep
 from tests.test_variables import *
-from .auth_helper import register_or_auth
+from .jwt_helper import generate_token
 
 h = {"Content-Type": "application/json; charset=utf-8"}
 scenarios: list[Scenario] = []
 
 
 def register_user_profile_scenario():
-    admin = register_or_auth("profile_admin", "Pass123")
-    stranger = register_or_auth("profile_stranger", "Pass456")
+    admin_id = 3001
+    stranger_id = 3002
+
+    admin_token = generate_token(admin_id)
+    stranger_token = generate_token(stranger_id)
 
     data = {
-        "at": admin["accessToken"],
-        "aid": admin["id"],
-        "st": stranger["accessToken"],
-        "sid": stranger["id"],
+        "at": admin_token,
+        "aid": admin_id,
+        "st": stranger_token,
+        "sid": stranger_id,
     }
 
     tests = []
 
-    # 1. POST /users (with admin token) → 201
+    # 0. POST /users (admin) → 201
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="users", method="POST",
-        data={"firstName": "Admin", "lastName": "Tester", "nickname": "AdminTester"}, requirement=CREATED))
+        data={"firstName": "Admin", "lastName": "Tester", "nickname": "profile_admin"}, requirement=CREATED))
+
+    # 1. POST /users (stranger) → 201
+    tests.append(Test(headers={**h, "Authorization": "{st}"},
+        request="users", method="POST",
+        data={"firstName": "Stranger", "lastName": "Tester", "nickname": "profile_stranger"}, requirement=CREATED))
 
     # 2. GET /users/{aid} (own profile) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
@@ -46,7 +54,7 @@ def register_user_profile_scenario():
     tests.append(Test(headers=h, request="users", method="POST",
         data={"firstName": "NoAuth", "lastName": "User"}, requirement=NOT_AUTH))
 
-    # 7. GET /users (no token) → 200 (публичный эндпоинт)
+    # 7. GET /users (no token) → 200
     tests.append(Test(headers=h, request="users", method="GET", requirement=OK))
 
     # 8. GET /users (with token) → 200
