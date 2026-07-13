@@ -18,6 +18,8 @@ if __name__ == "__main__":
             match scenario:
                 case "auth":
                     with_auth_service_scenario()
+                case "port-protection":
+                    with_internal_endpoint_protection_scenario()
 
     test_variables.compact = args.compact
     test_variables.debug = args.debug

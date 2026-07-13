@@ -130,7 +130,7 @@ namespace Tdn.Api.Controllers
                     new ClaimsIdentity(claims),
                     expireTime
                 );
-                return Ok(new {accessToken = tokenString});
+                return Ok(new {token = tokenString});
             }
             catch (SecurityTokenExpiredException)
             {
