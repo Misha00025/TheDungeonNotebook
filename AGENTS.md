@@ -38,6 +38,25 @@ docker compose up -d
 3. api-gateway
 4. uploads-service runs separately
 
+## Gateway действий для агентов
+
+Прежде чем выполнять действие, прочитай соответствующий rule-файл. Не угадывай.
+
+| Действие | Читать |
+|----------|--------|
+| Запустить тесты | `rules/tech-testing.md` |
+| Собрать / запустить docker-compose | `rules/tech-docker.md` |
+| Изменить Python-сервис | `rules/tech-python.md` + `<service>/rules.md` |
+| Изменить C# сервис | `rules/tech-csharp.md` + `<service>/rules.md` |
+| Изменить api-gateway | `backend/api-gateway/rules.md` |
+| Изменить auth-service | `backend/auth-service/rules.md` |
+| Изменить users-service | `backend/users-service/rules.md` |
+| Изменить campaign-service | `backend/campaign-service/rules.md` |
+| Изменить uploads-service | `backend/uploads-service/rules.md` |
+| Просмотреть / актуализировать документацию API | `rules/service-docs.md` |
+| Настроить мониторинг | `rules/service-monitoring.md` |
+| Что-то с админ-панелью | `admin/rules.md` |
+
 ## Rule Files Reference
 
 ### General (`rules/`)

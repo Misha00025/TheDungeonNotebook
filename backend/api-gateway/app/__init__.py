@@ -15,6 +15,13 @@ USERS_SERVICE_URL = os.environ.get("USERS_SERVICE_URL")
 CAMPAIGN_SERVICE_URL = os.environ.get("CAMPAIGN_SERVICE_URL")
 NOTES_SERVICE_URL = os.environ.get("NOTES_SERVICE_URL")
 
+PUBLIC_KEY_PATH = os.environ.get("PUBLIC_KEY_PATH", "certs/public.pem")
+try:
+    with open(PUBLIC_KEY_PATH, "rb") as f:
+        PUBLIC_KEY = f.read()
+except FileNotFoundError:
+    raise RuntimeError(f"Public key not found at {PUBLIC_KEY_PATH}")
+
 # import app.api  # заблокировано: engine управляет всеми маршрутами
 
 from flask import request as _flask_request
