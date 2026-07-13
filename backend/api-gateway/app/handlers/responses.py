@@ -10,7 +10,7 @@ from flask import jsonify
 
 from app.engine.context import RouteContext
 from app.engine.registry import register_response_handler
-from app.status import ok, unauthorized
+from app.status import ok
 
 
 # ============================================================
@@ -45,26 +45,6 @@ def handle_whoami(ctx: RouteContext):
         "id": int(res_id) if res_id is not None else None,
         "type": access_type,
     })
-
-
-# ============================================================
-# Auth endpoints
-# ============================================================
-
-@register_response_handler("auth_refresh")
-def handle_auth_refresh(ctx: RouteContext):
-    """
-    Извлекает Refresh-Token из заголовка и отправляет в auth-service.
-    """
-    from app import services as svc
-
-    refresh_token = ctx.request.headers.get("Refresh-Token")
-    if refresh_token is None:
-        return unauthorized("Refresh-Token not found")
-
-    result = svc.auth(ctx.request.headers).refresh(refresh_token)
-    from app.api_controller import make_response
-    return make_response(result)
 
 
 # ============================================================
