@@ -31,5 +31,6 @@ builder.Services.AddControllers();
 var app = builder.Build();
 app.UseHttpMetrics();
 app.MapMetrics();
+app.UseMiddleware<Tdn.Api.Middleware.InternalPortProtectionMiddleware>();
 app.MapControllers();
 app.Run();

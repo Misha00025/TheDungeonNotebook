@@ -1,27 +1,10 @@
 import json
 from flask import Request
 import jwt
-from app.services import auth
 
-
-
-def extract_tokens(rq: Request) ->  tuple[str | None, str | None] :
-    '''
-    returns:
-    refresh_token, access_token
-    '''
-    access_token = rq.headers.get('Authorization')
-    refresh_token = rq.headers.get('Refresh-Token')
-    return refresh_token, access_token
-
-def check_token(token: str | None) -> bool:
-    from app import services
-    res = services.auth({}).check(token)
-    return res.ok
 
 def extract_ids(token: str) -> tuple[str | None, str | None]:
     payload = jwt.decode(token, options={"verify_signature": False})
-            
     return payload.get("userId"), payload.get("groupId")
 
 def get_user_accesses(user_id) -> list[dict]:
@@ -35,22 +18,6 @@ def get_user_accesses(user_id) -> list[dict]:
             user_accesses.append({"groupId": data["groupId"], "isAdmin": data["isAdmin"], "characters": data["characters"]})
         return user_accesses
 
-
-def check_auth(rq: Request)  -> tuple[bool, int, int, object]:
-    '''
-        return: status, user_id, group_id, response
-    '''
-    from app.status import unauthorized
-    _, at = extract_tokens(rq)
-    if at is None:
-        return False, None, None, unauthorized()
-    res = auth(rq.headers).check(at)
-    if not res.ok:
-        return False, None, None, unauthorized()
-    uid, gid = extract_ids(at)
-    if uid is None and gid is None:
-        return False, None, None, unauthorized()
-    return True, uid, gid, None
 
 def check_access_to_group_by_jwt(
     group_id: int,
@@ -133,29 +100,4 @@ def check_access_to_character_by_jwt(
         return True, False, bool(character_access["canWrite"]), None
 
 
-def check_access_to_group(group_id, rq, characters=None):
-    """Legacy wrapper. Extracts JWT from request and delegates to check_access_to_group_by_jwt."""
-    _, uid, gid, response = check_auth(rq)
-    if uid is None and gid is None:
-        return False, False, response
-    jwt_payload = {}
-    if uid:
-        jwt_payload["userId"] = uid
-    if gid:
-        jwt_payload["groupId"] = gid
-    return check_access_to_group_by_jwt(group_id, jwt_payload, characters)
-
-
-def check_access_to_character(group_id, character_id, rq):
-    """Legacy wrapper. Extracts JWT from request and delegates to check_access_to_character_by_jwt."""
-    _, uid, gid, response = check_auth(rq)
-    if uid is None and gid is None:
-        return False, False, False, response
-    jwt_payload = {}
-    if uid:
-        jwt_payload["userId"] = uid
-    if gid:
-        jwt_payload["groupId"] = gid
-    return check_access_to_character_by_jwt(group_id, character_id, jwt_payload)
-    
      

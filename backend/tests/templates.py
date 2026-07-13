@@ -38,7 +38,8 @@ class Test:
 				 requirement: int = 200,
 				 debug: bool = False,
 				 is_valid: callable = None,
-				 check_access: bool = False
+				 check_access: bool = False,
+				 internal: bool = False
 				 ) -> None:
 		self.request = request
 		self.params = params.copy()
@@ -48,6 +49,7 @@ class Test:
 		self.method = method
 		self.data = data
 		self.check_access = check_access
+		self.internal = internal
 
 		self.requirement = requirement
 		self.message = "Nothing"
@@ -136,22 +138,22 @@ class Step:
 	def execute(self, _data):
 		test = self.test
 		res: rq.Response
-		headers = test.headers
+		headers = {k: replace_placeholders(v, _data) for k, v in test.headers.items()}
 		url = replace_placeholders(self.test.request, _data)
-		params = test.params
+		params = {k: replace_placeholders(str(v), _data) for k, v in test.params.items()}
 		data = prepare_data(test.data, _data)
 		test.data = data
 		match test.method:
 			case "GET":
-				res = get_test(headers, params, url)
+				res = get_test(headers, params, url, internal=test.internal)
 			case "PUT":
-				res = put_test(headers, params, url, data)
+				res = put_test(headers, params, url, data, internal=test.internal)
 			case "POST":
-				res = post_test(headers, params, url, data)
+				res = post_test(headers, params, url, data, internal=test.internal)
 			case "PATCH":
-				res = patch_test(headers, params, url, data)
+				res = patch_test(headers, params, url, data, internal=test.internal)
 			case "DELETE":
-				res = delete_test(headers, params, url)
+				res = delete_test(headers, params, url, internal=test.internal)
 		self.ok = test.check(res)
 		self.message = get_text(res, url, test.method, params=test.params)
 		return res

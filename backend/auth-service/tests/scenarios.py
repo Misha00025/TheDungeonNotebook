@@ -44,24 +44,62 @@ def with_auth_service_scenario():
         Test(request="auth/token/refresh", method="POST", data=invalid_refresh_token_request, requirement=NOT_AUTH),
 
         Test(request="auth/check", headers={**h, "Authorization": "Bearer {steps.3.token}"}, method="GET", requirement=OK),
-        Test(request="auth/check", headers={**h, "Authorization": "Bearer {steps.5.accessToken}"}, method="GET", requirement=OK),
+        Test(request="auth/check", headers={**h, "Authorization": "Bearer {steps.5.token}"}, method="GET", requirement=OK),
 
-        Test(request="auth/groups/1/service-token/generate", method="POST", data={"access":3, "years":5}, requirement=OK),
+        Test(request="auth/groups/1/service-token/generate", method="POST", data={"access":3, "years":5}, requirement=OK, internal=True),
         Test(request="auth/check", headers={**h, "Authorization": "Bearer {steps.-1.token}"}, method="GET", requirement=OK),
 
-        # Reset-password tests
-        reset_confirm_data = {"newPassword": "newsecurepassword"}
-
-        tests.extend([
-            Test(request="auth/reset-password/request/1", method="POST", data={}, requirement=OK),
-            Test(request="auth/reset-password/confirm", method="POST", params={"query": "{steps.11.query}"}, data=reset_confirm_data, requirement=OK),
-            Test(request="auth/reset-password/confirm", method="POST", params={"query": "nonexistent"}, data={"newPassword": "newpass"}, requirement=NOT_FOUND),
-            Test(request="auth/login", method="POST", data={"username": "newuser", "password": "newsecurepassword"}, requirement=OK),
-            Test(request="auth/login", method="POST", data={"username": "newuser", "password": "securepassword"}, requirement=NOT_AUTH),
-        ])
-
-        # Test(request="auth/logout", method="DELETE", requirement=OK),
-        # Test(request="auth/logout", method="DELETE", requirement=NOT_AUTH),
     ])
 
+    # Reset-password tests
+    reset_confirm_data = {"newPassword": "newsecurepassword"}
+    tests.extend([
+        Test(request="auth/reset-password/request/1", method="POST", data={}, requirement=OK, internal=True),
+        Test(request="auth/reset-password/confirm", method="POST", params={"query": "{steps.11.query}"}, data=reset_confirm_data, requirement=OK),
+        Test(request="auth/reset-password/confirm", method="POST", params={"query": "nonexistent"}, data={"newPassword": "newpass"}, requirement=NOT_FOUND),
+        Test(request="auth/login", method="POST", data={"username": "newuser", "password": "newsecurepassword"}, requirement=OK),
+        Test(request="auth/login", method="POST", data={"username": "newuser", "password": "securepassword"}, requirement=NOT_AUTH),
+    ])
+
+    # Test(request="auth/logout", method="DELETE", requirement=OK),
+    # Test(request="auth/logout", method="DELETE", requirement=NOT_AUTH),
+
     create_scenario("Auth Service Scenarios", tests)
+
+
+def with_internal_endpoint_protection_scenario():
+    tests = []
+
+    # Сначала регистрируем пользователя через публичный порт (нормально)
+    reg_data = {"username": "porttestuser", "password": "testpass123"}
+    login_data = {"username": "porttestuser", "password": "testpass123"}
+
+    tests.extend([
+        Test(request="auth/register", method="POST", data=reg_data, requirement=CREATED),
+
+        Test(request="auth/login", method="POST", data=login_data, requirement=OK),
+
+        # /auth/check — доступен на обоих портах
+        Test(request="auth/check", method="GET",
+             headers={**h, "Authorization": "Bearer {steps.1.token}"},
+             requirement=OK),
+        Test(request="auth/check", method="GET",
+             headers={**h, "Authorization": "Bearer {steps.1.token}"},
+             requirement=OK, internal=True),
+
+        # /auth/reset-password/request — internal-only: блокируется на public порту
+        Test(request="auth/reset-password/request/1", method="POST",
+             data={}, requirement=FORBID),
+
+        # /auth/reset-password/request — работает на internal порту
+        Test(request="auth/reset-password/request/1", method="POST",
+             data={}, requirement=OK, internal=True),
+
+        # /auth/groups/1/service-token/generate — internal-only
+        Test(request="auth/groups/1/service-token/generate", method="POST",
+             data={"access": 3, "years": 1}, requirement=FORBID),
+        Test(request="auth/groups/1/service-token/generate", method="POST",
+             data={"access": 3, "years": 1}, requirement=OK, internal=True),
+    ])
+
+    create_scenario("Internal Endpoint Protection", tests)

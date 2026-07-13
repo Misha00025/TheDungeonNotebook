@@ -27,15 +27,42 @@ auth-service/
 - Keys mounted from `backend/certs/` at `/certs` in container
 - `RsaSecurityKey` with `RSA.Create().ImportFromPem()`
 
+## Two-Port Architecture
+
+Auth-service слушает на двух портах:
+
+| Порт | Назначение | Доступ |
+|------|-----------|--------|
+| `8080` | Публичный (через nginx) | register, login, refresh, check, reset-password/confirm |
+| `8081` | Внутренний (docker-network) | Все endpoint'ы |
+
+Защита реализована в `InternalPortProtectionMiddleware` — на порту 8080 отклоняются (403) запросы к internal-only endpoint'ам.
+
+В `Program.cs` два порта задаются через `app.Run("http://0.0.0.0:8080;http://0.0.0.0:8081")`.
+
 ## AuthController Endpoints
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/auth/register` | Register with Username + Password |
-| POST | `/auth/login` | Login → returns JWT token |
-| POST | `/auth/token/refresh` | Refresh expired token |
-| POST | `/auth/groups/{groupId}/service-token/generate` | Generate service token for group |
-| GET | `/auth/check` | Validate Bearer token |
+| Method | Path | Public (:8080) | Internal (:8081) | Purpose |
+|--------|------|----------------|------------------|---------|
+| POST | `/auth/register` | ✅ | ✅ | Register with Username + Password |
+| POST | `/auth/login` | ✅ | ✅ | Login → returns `{token}` |
+| POST | `/auth/token/refresh` | ✅ | ✅ | Refresh expired token → returns `{token}` |
+| GET | `/auth/check` | ✅ | ✅ | Validate Bearer token |
+| POST | `/auth/reset-password/confirm` | ✅ | ✅ | Confirm password reset |
+| POST | `/auth/reset-password/request/{userId}` | ❌ 403 | ✅ | Request password reset (internal) |
+| POST | `/auth/groups/{groupId}/service-token/generate` | ❌ 403 | ✅ | Generate service token for group (internal) |
+
+## Internal Port Protection
+
+Файл: `Source/InternalPortProtectionMiddleware.cs`
+
+Проверяет `HttpContext.Connection.LocalPort`. Если порт ≠ 8081 и путь начинается с internal-only префикса — возвращает 403.
+
+```csharp
+// Internal-only prefixes
+"/auth/groups/"
+"/auth/reset-password/request/"
+```
 
 ## Program.cs specifics
 - `Configs` registered as **singleton** (token expiry from config)

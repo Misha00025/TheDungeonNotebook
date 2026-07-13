@@ -44,11 +44,13 @@ services:
       - backend-network
     ports:
       - "5077:8080"
+      - "5078:8081"
     volumes:
       - ./certs:/certs:r
     env_file:
       - ./.env
     environment:
+      - ASPNETCORE_URLS=http://0.0.0.0:8080;http://0.0.0.0:8081
       - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
       - PRIVATE_KEY_PATH=/certs/private.pem
       - PUBLIC_KEY_PATH=/certs/public.pem
