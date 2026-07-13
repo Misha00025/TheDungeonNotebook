@@ -12,10 +12,10 @@ from __future__ import annotations
 from flask import Response as FlaskResponse
 import jwt as pyjwt
 
+from app import PUBLIC_KEY
 from app.engine.context import RouteContext
 from app.engine.models import ResponseConfig, RouteConfig
 from app.engine.registry import (
-    ServiceRegistry,
     access_handler_registry,
     response_handler_registry,
 )
@@ -42,7 +42,7 @@ def execute_pipeline(
             from app.status import unauthorized
             return unauthorized("Authorization header is required")
 
-        ok, payload = _validate_jwt(raw_token, ctx.services, ctx)
+        ok, payload = _validate_jwt(raw_token)
         if not ok:
             from app.status import unauthorized
             return unauthorized("Invalid or expired token")
@@ -79,46 +79,17 @@ def execute_pipeline(
     return response
 
 
-def _validate_jwt(
-    raw_token: str,
-    services: ServiceRegistry,
-    ctx: RouteContext,
-) -> tuple[bool, dict | None]:
-    """
-    Проверяет JWT через auth-service и возвращает payload.
-
-    Args:
-        raw_token: Значение заголовка Authorization (с "Bearer " или без).
-        services: Реестр сервисов.
-
-    Returns:
-        (True, payload) если токен валиден, (False, None) если нет.
-    """
+def _validate_jwt(raw_token: str) -> tuple[bool, dict | None]:
+    """Проверяет JWT локально через RSA public key и возвращает payload."""
     token = raw_token
     if token.startswith("Bearer "):
         token = token[7:]
 
-    if not raw_token.startswith("Bearer "):
-        import logging
-        logging.warning("Deprecated: Authorization header without 'Bearer' prefix. Client: %s, Path: %s",
-                        ctx.request.remote_addr, ctx.request.path)
-
-    # Проверяем токен через auth-service
-    auth_client = services.get_client("auth")
-    if auth_client is None:
-        return False, None
+    if not PUBLIC_KEY:
+        raise RuntimeError("PUBLIC_KEY is not loaded")
 
     try:
-        resp = auth_client.get("/auth/check", headers={"Authorization": f"Bearer {token}"})
-        if not resp.ok:
-            return False, None
-    except Exception:
-        return False, None
-
-    # Декодируем payload без проверки подписи
-    # (auth-service уже подтвердил валидность токена)
-    try:
-        payload = pyjwt.decode(token, options={"verify_signature": False})
+        payload = pyjwt.decode(token, PUBLIC_KEY, algorithms=["RS256"])
         return True, payload
     except pyjwt.PyJWTError:
         return False, None
