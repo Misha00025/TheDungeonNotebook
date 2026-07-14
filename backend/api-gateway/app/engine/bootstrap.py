@@ -29,7 +29,7 @@ def bootstrap(
 
     Args:
         flask_app: Flask-приложение.
-        config_path: Путь к YAML-файлу. Если None — ищет по умолчанию.
+        config_path: Путь к YAML-файлу. Если None — ищет routes.yaml в корне сервиса.
         import_handlers: Автоматически импортировать хендлеры.
 
     Returns:
