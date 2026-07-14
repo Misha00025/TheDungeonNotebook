@@ -93,11 +93,37 @@ services:
       - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
       - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
+  auth-service:
+    <<: *common_resources
+    build:
+      context: ../../auth-service
+    container_name: auth-service-gateway-test
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend-network
+    volumes:
+      - ./certs:/certs:r
+    env_file:
+      - ./.env
+    environment:
+      - ASPNETCORE_URLS=http://0.0.0.0:8080;http://0.0.0.0:8081
+      - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+      - PRIVATE_KEY_PATH=/certs/private.pem
+      - PUBLIC_KEY_PATH=/certs/public.pem
+      - REDIS_CONNECTION_STRING=redis:6379
+      - OIDC_ISSUER_URL=http://auth-service:8080
+
   api-gateway:
     build: 
       context: ../
     container_name: api-gateway
     depends_on:
+      auth-service:
+        condition: service_started
       campaign-service:
         condition: service_started
       users-service:
