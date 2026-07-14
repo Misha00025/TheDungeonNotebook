@@ -50,12 +50,7 @@ services:
     env_file:
       - ./.env
     environment:
-      - ASPNETCORE_URLS=http://0.0.0.0:8080;http://0.0.0.0:8081
       - MYSQL_CONNECTION_STRING=server=mysql;database=$MYSQL_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
-      - PRIVATE_KEY_PATH=/certs/private.pem
-      - PUBLIC_KEY_PATH=/certs/public.pem
-      - REDIS_CONNECTION_STRING=redis:6379
-      - OIDC_ISSUER_URL=http://auth-service:8080
 
 networks:
   backend-network:
