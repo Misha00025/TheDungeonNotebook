@@ -14,9 +14,10 @@ api-gateway/
 │   │   ├── loader.py             # Parse routes.yaml
 │   │   ├── pipeline.py           # validate → access → proxy/respond
 │   │   └── proxy.py              # Forward request to backend
-│   ├── handlers/
-│   │   ├── access.py             # @register_access_handler("group_member"), etc.
-│   │   └── responses.py          # @register_response_handler("handler_name")
+├── handlers/                     # Любой .py файл здесь авто-импортируется при старте
+│   ├── __init__.py               # Авто-импорт через pkgutil
+│   ├── access.py                 # @register_access_handler("group_member"), etc.
+│   └── responses.py              # @register_response_handler("handler_name")
 │   ├── security/                 # JWT validation helpers
 │   └── services/                 # Legacy HTTP clients (engine overrides these)
 ├── wsgi.py                       # Gunicorn entrypoint
@@ -45,6 +46,9 @@ routes:
 
 ## Handler Registries
 ```python
+Любой `.py` файл в `handlers/` автоматически импортируется при старте через `pkgutil.iter_modules`. Не нужно вручную добавлять импорты в bootstrap.
+
+```python
 from app.engine.registry import (
     register_access_handler,
     register_response_handler,
@@ -57,6 +61,8 @@ def check_group_admin(ctx: RouteContext) -> bool: ...
 @register_response_handler("get_api")
 def handle_get_api(ctx: RouteContext): ...
 ```
+
+> **Примечание:** `app.` imports внутри хендлеров (например `from app.engine.context`) работают, т.к. корень проекта (`api-gateway/`) находится в `sys.path`.
 
 ## RouteContext
 ```python
@@ -83,7 +89,7 @@ ctx.services.campaign
 
 ## Boot Order
 1. `app/engine/` modules loaded
-2. Handlers imported (access.py, responses.py)
+2. `handlers/` imported (авто-импорт через `import handlers`)
 3. `routes.yaml` parsed
 4. Blueprint created and registered on Flask app
 
