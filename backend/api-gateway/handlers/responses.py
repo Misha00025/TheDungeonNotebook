@@ -11,7 +11,7 @@ from flask import jsonify
 from app.engine.context import RouteContext
 from app.security import get_user_id
 from app.engine.registry import register_response_handler
-from app.status import ok
+from app.status import ok, unauthorized
 
 
 # ============================================================
@@ -201,3 +201,21 @@ def handle_user_create(ctx: RouteContext):
 
     from app.api_controller import make_response
     return make_response(result)
+
+
+# ============================================================
+# Auth endpoints
+# ============================================================
+
+@register_response_handler("auth_refresh")
+def handle_auth_refresh(ctx: RouteContext):
+    """
+    Извлекает Refresh-Token из заголовка и отправляет в auth-service.
+    """
+    refresh_token = ctx.request.headers.get("Refresh-Token")
+    if refresh_token is None:
+        return unauthorized("Refresh-Token not found")
+
+    resp = ctx.services.auth.post("/auth/token/refresh", json={"RefreshToken": refresh_token})
+    from app.api_controller import make_response
+    return make_response(resp)
