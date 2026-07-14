@@ -55,6 +55,7 @@ services:
       - PRIVATE_KEY_PATH=/certs/private.pem
       - PUBLIC_KEY_PATH=/certs/public.pem
       - REDIS_CONNECTION_STRING=redis:6379
+      - OIDC_ISSUER_URL=http://auth-service:8080
 
 networks:
   backend-network:

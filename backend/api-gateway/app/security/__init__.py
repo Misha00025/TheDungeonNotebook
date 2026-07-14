@@ -3,6 +3,20 @@ from flask import Request
 import jwt
 
 
+def get_user_id(jwt_payload: dict | None) -> str | None:
+    """Извлекает userId из JWT payload с fallback на sub (OIDC)."""
+    if jwt_payload is None:
+        return None
+    return jwt_payload.get("userId") or jwt_payload.get("sub")
+
+
+def get_group_id(jwt_payload: dict | None) -> str | None:
+    """Извлекает groupId из JWT payload."""
+    if jwt_payload is None:
+        return None
+    return jwt_payload.get("groupId")
+
+
 def extract_ids(token: str) -> tuple[str | None, str | None]:
     payload = jwt.decode(token, options={"verify_signature": False})
     return payload.get("userId"), payload.get("groupId")
@@ -38,8 +52,8 @@ def check_access_to_group_by_jwt(
     """
     from app.status import unauthorized, forbidden
     
-    uid = jwt_payload.get("userId") if jwt_payload else None
-    gid = jwt_payload.get("groupId") if jwt_payload else None
+    uid = get_user_id(jwt_payload)
+    gid = get_group_id(jwt_payload)
     
     if uid is None and gid is None:
         return False, False, unauthorized()

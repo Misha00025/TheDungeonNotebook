@@ -20,6 +20,8 @@ if __name__ == "__main__":
                     with_auth_service_scenario()
                 case "port-protection":
                     with_internal_endpoint_protection_scenario()
+                case "oidc":
+                    with_oidc_scenario()
 
     test_variables.compact = args.compact
     test_variables.debug = args.debug

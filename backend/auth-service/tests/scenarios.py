@@ -67,6 +67,58 @@ def with_auth_service_scenario():
     create_scenario("Auth Service Scenarios", tests)
 
 
+def with_oidc_scenario():
+    tests = []
+
+    # 1. OpenID Configuration
+    tests.append(Test(
+        request=".well-known/openid-configuration",
+        method="GET",
+        requirement=OK))
+
+    # 2. JWKS
+    tests.append(Test(
+        request=".well-known/jwks.json",
+        method="GET",
+        requirement=OK))
+
+    # 3. Userinfo without token → 401
+    tests.append(Test(
+        request="userinfo",
+        method="GET",
+        requirement=NOT_AUTH))
+
+    # 4. Register + login → get token with OIDC claims
+    reg_data = {"username": "oidcuser", "password": "oidcpass123"}
+    login_data = {"username": "oidcuser", "password": "oidcpass123"}
+    tests.append(Test(
+        request="auth/register",
+        method="POST",
+        data=reg_data,
+        requirement=CREATED))
+    tests.append(Test(
+        request="auth/login",
+        method="POST",
+        data=login_data,
+        requirement=OK))
+
+    # 5. Userinfo with valid token → should have sub + preferred_username
+    tests.append(Test(
+        request="userinfo",
+        method="GET",
+        headers={**h, "Authorization": "Bearer {steps.3.token}"},
+        requirement=OK))
+
+    # 6. Check token has sub claim
+    tests.append(Test(
+        request="auth/check",
+        method="GET",
+        headers={**h, "Authorization": "Bearer {steps.3.token}"},
+        requirement=OK))
+
+    create_scenario("OIDC Endpoints", tests)
+
+
 def with_internal_endpoint_protection_scenario():
     tests = []
 

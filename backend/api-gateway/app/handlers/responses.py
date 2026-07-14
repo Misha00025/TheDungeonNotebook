@@ -9,6 +9,7 @@
 from flask import jsonify
 
 from app.engine.context import RouteContext
+from app.security import get_user_id
 from app.engine.registry import register_response_handler
 from app.status import ok
 
@@ -31,7 +32,7 @@ def handle_whoami(ctx: RouteContext):
     """
     Декодирует JWT и возвращает информацию о текущем пользователе/группе.
     """
-    uid = ctx.jwt.get("userId") if ctx.jwt else None
+    uid = get_user_id(ctx.jwt)
     gid = ctx.jwt.get("groupId") if ctx.jwt else None
 
     res_id = uid or gid
@@ -44,6 +45,9 @@ def handle_whoami(ctx: RouteContext):
     return ok({
         "id": int(res_id) if res_id is not None else None,
         "type": access_type,
+        "userId": uid,
+        "sub": uid,
+        "groupId": gid,
     })
 
 
@@ -127,7 +131,7 @@ def handle_group_export(ctx: RouteContext):
 
     group_id = ctx.path_params["group_id"]
     include = ctx.request.args.get("include", "templates,characters,items,skills")
-    uid = ctx.jwt.get("userId") if ctx.jwt else None
+    uid = get_user_id(ctx.jwt)
 
     params = {"include": include}
     if uid:
@@ -156,7 +160,7 @@ def handle_group_import(ctx: RouteContext):
 
     group_id = ctx.path_params["group_id"]
     include = ctx.request.args.get("include", "templates,characters,items,skills")
-    uid = ctx.jwt.get("userId") if ctx.jwt else None
+    uid = get_user_id(ctx.jwt)
 
     params = {"include": include}
     if uid:
@@ -184,7 +188,7 @@ def handle_user_create(ctx: RouteContext):
     """
     from app import services as svc
 
-    uid = ctx.jwt.get("userId") if ctx.jwt else None
+    uid = get_user_id(ctx.jwt)
     if uid is None:
         from app.status import forbidden
         return forbidden()

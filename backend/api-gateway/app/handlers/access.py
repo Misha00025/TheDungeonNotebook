@@ -10,7 +10,7 @@ isAdmin, canWrite — всё это определено здесь.
 
 from app.engine.context import RouteContext
 from app.engine.registry import register_access_handler
-from app.security import check_access_to_group_by_jwt, check_access_to_character_by_jwt
+from app.security import check_access_to_group_by_jwt, check_access_to_character_by_jwt, get_user_id
 from app.status import forbidden
 
 
@@ -120,7 +120,7 @@ def check_self_only(ctx: RouteContext):
     Используется для PATCH /users/{user_id}.
     """
     user_id = ctx.path_params.get("user_id")
-    jwt_user_id = ctx.jwt.get("userId") if ctx.jwt else None
+    jwt_user_id = get_user_id(ctx.jwt)
 
     if user_id is None or jwt_user_id is None:
         return ctx.deny(forbidden())
