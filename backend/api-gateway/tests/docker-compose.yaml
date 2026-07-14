@@ -114,6 +114,7 @@ services:
       - USERS_SERVICE_URL=http://users-service:8080
       - CAMPAIGN_SERVICE_URL=http://campaign-service:8080
       - PUBLIC_KEY_PATH=/certs/public.pem
+      - OIDC_ISSUER=http://auth-service:8080
     command: ["python", "main.py"]
 
 networks:

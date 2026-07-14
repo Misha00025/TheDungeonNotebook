@@ -2,6 +2,7 @@ using StackExchange.Redis;
 using Tdn.Configuration;
 using Tdn.Db.Configuers;
 using Tdn.Db.Contexts;
+using Tdn.Services;
 using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +24,8 @@ builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigurer>();
 builder.Services.AddSingleton<Configs, Configs>((_) => config.GetConfigs());
+builder.Services.AddSingleton<OidcConfig>();
+builder.Services.AddSingleton<ClientStore>();
 builder.Services.AddDbContext<LoginContext>(config.ConfigDbConnections);
 
 // General

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
@@ -8,6 +9,8 @@ using Tdn.Db.Entities;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Tdn.Configuration;
+using Tdn.Security;
+using Tdn.Services;
 
 namespace Tdn.Api.Controllers
 {
@@ -19,13 +22,17 @@ namespace Tdn.Api.Controllers
         private readonly LoginContext _dbContext;
         private readonly Configs _configs;
         private readonly IConnectionMultiplexer _redis;
+        private readonly OidcConfig _oidcConfig;
+        private readonly ClientStore _clientStore;
         
-        public AuthController(IConfiguration configuration, LoginContext context, Configs configs, IConnectionMultiplexer redis)
+        public AuthController(IConfiguration configuration, LoginContext context, Configs configs, IConnectionMultiplexer redis, OidcConfig oidcConfig, ClientStore clientStore)
         {
             _configuration = configuration;
             _dbContext = context;
             _configs = configs;
             _redis = redis;
+            _oidcConfig = oidcConfig;
+            _clientStore = clientStore;
         }
         
         private TokenValidationParameters GetValidationParameters()
@@ -88,8 +95,20 @@ namespace Tdn.Api.Controllers
             {
                 Subject = subject,
                 Expires = expires,
+                Issuer = _oidcConfig.Issuer,
+                AdditionalHeaderClaims = new Dictionary<string, object>
+                {
+                    ["kid"] = RsaKeyHelper.GetKeyId(privateKey),
+                    ["typ"] = "JWT"
+                },
                 SigningCredentials = new SigningCredentials(privateKey, SecurityAlgorithms.RsaSha256)
             };
+            
+            var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            if (!subject.Claims.Any(c => c.Type == "iat"))
+                subject.AddClaim(new Claim("iat", now.ToString()));
+            if (!subject.Claims.Any(c => c.Type == "auth_time"))
+                subject.AddClaim(new Claim("auth_time", now.ToString()));
             
             var token = tokenHandler.CreateToken(tokenDescriptor);
             string tokenString = tokenHandler.WriteToken(token);
@@ -108,7 +127,7 @@ namespace Tdn.Api.Controllers
             var expireTime = DateTime.UtcNow.AddDays(_configs.RefreshTokenExpire.Days);
             expireTime = expireTime.AddMinutes(_configs.RefreshTokenExpire.Minutes);
             var tokenString = GenerateTokenString(
-                new ClaimsIdentity(new Claim[]{ new Claim("userId", user!.Id.ToString()),}), expireTime      
+                new ClaimsIdentity(new Claim[]{ new Claim("sub", user!.Id.ToString())}), expireTime      
             );
             return Ok(new { token = tokenString });
         }
@@ -123,9 +142,21 @@ namespace Tdn.Api.Controllers
             try
             {
                 var p = tokenHandler.ValidateToken(model.RefreshToken, validationParameters, out var validatedToken);
-                var claims = p.Claims.Where(e => e.Type != "exp" && e.Type != "nbf" && e.Type != "iat");
+                var claims = p.Claims.Where(e => e.Type != "exp" && e.Type != "nbf" && e.Type != "iat").ToList();
                 var expireTime = DateTime.UtcNow.AddDays(_configs.AccessTokenExpire.Days);
                 expireTime = expireTime.AddMinutes(_configs.AccessTokenExpire.Minutes);
+                
+                if (!claims.Any(c => c.Type == "sub"))
+                {
+                    var userIdClaim = claims.FirstOrDefault(c => c.Type == "userId");
+                    if (userIdClaim != null)
+                        claims.Add(new Claim("sub", userIdClaim.Value));
+                }
+                if (!claims.Any(c => c.Type == "iss"))
+                    claims.Add(new Claim("iss", _oidcConfig.Issuer));
+                if (!claims.Any(c => c.Type == "auth_time"))
+                    claims.Add(new Claim("auth_time", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()));
+                
                 var tokenString = GenerateTokenString(
                     new ClaimsIdentity(claims),
                     expireTime
@@ -152,10 +183,38 @@ namespace Tdn.Api.Controllers
             if (model.Years == null || model.Years <= 0)
                 model.Years = 1;
             var tokenString = GenerateTokenString(
-                new ClaimsIdentity(new Claim[]{new Claim("groupId", groupId.ToString())}),
+                new ClaimsIdentity(new Claim[]{new Claim("sub", groupId.ToString()), new Claim("groupId", groupId.ToString())}),
                 DateTime.UtcNow.AddYears((int)model.Years)
             );
             return Ok(new { token = tokenString });
+        }
+
+        [HttpPost("oauth/token")]
+        [AllowAnonymous]
+        public ActionResult OAuthToken([FromForm] OAuthTokenRequest request)
+        {
+            if (request.GrantType != "client_credentials")
+                return BadRequest(new { error = "unsupported_grant_type" });
+
+            var client = _clientStore.Validate(request.ClientId, request.ClientSecret);
+            if (client == null)
+                return Unauthorized(new { error = "invalid_client" });
+
+            var groupId = client.AllowedGroupIds.FirstOrDefault();
+            var claims = new List<Claim> {
+                new("sub", groupId.ToString()),
+                new("groupId", groupId.ToString()),
+            };
+            var expireTime = DateTime.UtcNow.AddYears(1);
+            var tokenString = GenerateTokenString(
+                new ClaimsIdentity(claims), expireTime
+            );
+            return Ok(new {
+                access_token = tokenString,
+                token_type = "Bearer",
+                expires_in = 31536000,
+                scope = "openid profile"
+            });
         }
 
         [HttpPost("reset-password/request/{userId}")]
@@ -247,5 +306,12 @@ namespace Tdn.Api.Controllers
     public struct ResetPasswordData
     {
         public string NewPassword { get; set; }
+    }
+
+    public struct OAuthTokenRequest
+    {
+        public string GrantType { get; set; }
+        public string ClientId { get; set; }
+        public string ClientSecret { get; set; }
     }
 }

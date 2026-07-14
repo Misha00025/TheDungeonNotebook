@@ -14,6 +14,7 @@ import requests as http_requests
 
 from app.engine.context import RouteContext
 from app.engine.models import ParamsConfig, ProxyConfig, RouteConfig
+from app.security import get_user_id
 
 
 def execute_proxy(route: RouteConfig, ctx: RouteContext) -> FlaskResponse:
@@ -108,8 +109,8 @@ def _build_query_params(route: RouteConfig, ctx: RouteContext) -> dict[str, Any]
     if params_cfg.query == "*":
         # Форвард всех входящих + userId из JWT
         result = dict(ctx.request.args)
-        if ctx.jwt and ctx.jwt.get("userId"):
-            result["userId"] = ctx.jwt["userId"]
+        if ctx.jwt and get_user_id(ctx.jwt):
+            result["userId"] = get_user_id(ctx.jwt)
         return result
 
     if isinstance(params_cfg.query, dict):
@@ -157,7 +158,8 @@ def _resolve_source(expr: str, ctx: RouteContext) -> Any:
             source, key = inner.split(".", 1)
             if source == "jwt":
                 raw = ctx.jwt.get(key) if ctx.jwt else None
-                # Преобразуем int в int
+                if raw is None and key == "userId":
+                    raw = ctx.jwt.get("sub") if ctx.jwt else None
                 return raw
             elif source == "path":
                 return ctx.path_params.get(key)

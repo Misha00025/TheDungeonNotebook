@@ -80,7 +80,10 @@ def execute_pipeline(
 
 
 def _validate_jwt(raw_token: str) -> tuple[bool, dict | None]:
-    """Проверяет JWT локально через RSA public key и возвращает payload."""
+    """Проверяет JWT локально через RSA public key и возвращает payload.
+
+    Опционально проверяет iss, если OIDC_ISSUER задан.
+    """
     token = raw_token
     if token.startswith("Bearer "):
         token = token[7:]
@@ -89,7 +92,19 @@ def _validate_jwt(raw_token: str) -> tuple[bool, dict | None]:
         raise RuntimeError("PUBLIC_KEY is not loaded")
 
     try:
-        payload = pyjwt.decode(token, PUBLIC_KEY, algorithms=["RS256"])
+        options = {"verify_signature": True, "verify_exp": True}
+
+        payload = pyjwt.decode(
+            token,
+            PUBLIC_KEY,
+            algorithms=["RS256"],
+            options=options,
+        )
+
+        from app import OIDC_ISSUER
+        if OIDC_ISSUER and payload.get("iss") and payload["iss"] != OIDC_ISSUER:
+            return False, None
+
         return True, payload
     except pyjwt.PyJWTError:
         return False, None

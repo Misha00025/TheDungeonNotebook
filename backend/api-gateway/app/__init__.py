@@ -20,6 +20,8 @@ try:
 except FileNotFoundError:
     raise RuntimeError(f"Public key not found at {PUBLIC_KEY_PATH}")
 
+OIDC_ISSUER = os.environ.get("OIDC_ISSUER")
+
 # import app.api  # заблокировано: engine управляет всеми маршрутами
 
 from flask import request as _flask_request
