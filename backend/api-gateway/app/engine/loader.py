@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Any, Optional
 
 import yaml
@@ -28,22 +29,39 @@ def load_config(path: Optional[str] = None) -> GatewayConfig:
     Загружает и парсит YAML-конфигурацию маршрутов.
 
     Args:
-        path: Путь к YAML-файлу. Если None, ищет config/routes.yaml
-              относительно директории модуля.
+        path: Путь к YAML-файлу. Если None — ищет routes.yaml в корне сервиса.
 
     Returns:
         GatewayConfig с распарсенными сервисами и маршрутами.
     """
     if path is None:
-        path = os.path.join(
-            os.path.dirname(__file__),
-            "..", "config", "routes.yaml"
-        )
+        # Дефолтный путь — routes.yaml в корне сервиса,
+        # работает из CWD (WORKDIR /app в Dockerfile, или корень
+        # api-gateway при локальной разработке).
+        path = "routes.yaml"
 
     with open(path) as f:
         raw = yaml.safe_load(f)
 
     return _parse_config(raw)
+
+
+def _resolve_env_vars(value: str) -> str:
+    """Подставляет переменные окружения формата ${VAR} или ${VAR:-default}."""
+    def _replace(match):
+        var_name = match.group(1)
+        raw_default = match.group(2)
+        default = raw_default.lstrip("-") if raw_default else None
+        val = os.environ.get(var_name)
+        if val is None:
+            if default is not None:
+                return default
+            raise ValueError(
+                f"Environment variable '{var_name}' is required "
+                f"but not set (in routes.yaml service base_url)"
+            )
+        return val
+    return re.sub(r'\$\{([^:}]+)(?::([^}]*))?\}', _replace, value)
 
 
 def _parse_config(raw: dict) -> GatewayConfig:
@@ -55,7 +73,7 @@ def _parse_config(raw: dict) -> GatewayConfig:
     services = {}
     for name, cfg in services_raw.items():
         services[name] = ServiceConfig(
-            base_url=cfg["base_url"],
+            base_url=_resolve_env_vars(cfg["base_url"]),
             timeout=cfg.get("timeout", 30),
         )
 

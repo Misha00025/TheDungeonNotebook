@@ -10,9 +10,6 @@ metrics = PrometheusMetrics(application)
 from flask import json
 json.provider.DefaultJSONProvider.ensure_ascii = False
 
-USERS_SERVICE_URL = os.environ.get("USERS_SERVICE_URL")
-CAMPAIGN_SERVICE_URL = os.environ.get("CAMPAIGN_SERVICE_URL")
-
 PUBLIC_KEY_PATH = os.environ.get("PUBLIC_KEY_PATH", "certs/public.pem")
 try:
     with open(PUBLIC_KEY_PATH, "rb") as f:
@@ -46,11 +43,8 @@ def _sanitize_user_params():
 # ============================================================
 # Bootstrap декларативного engine
 # ============================================================
-# Загружает config/routes.yaml и регистрирует маршруты.
+# Загружает routes.yaml из корня сервиса и регистрирует маршруты.
 # base_path задаётся в YAML (секция base_path).
-# Параллельно с существующими @route-декораторами.
-# Для полной замены: указать base_path: "" в routes.yaml
-# и удалить старые app/api/*.py файлы.
 # ============================================================
 from app.engine.bootstrap import bootstrap
 _config = bootstrap(

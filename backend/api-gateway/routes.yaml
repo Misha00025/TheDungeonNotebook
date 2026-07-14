@@ -11,11 +11,14 @@
 # "/v2" — маршруты на /v2/groups/..., /v2/auth/... и т.д.
 base_path: ""
 
+# URL'ы сервисов задаются через переменные окружения ${VAR}.
+# Значения по умолчанию можно указать через ${VAR:-http://host:port}.
+# См. docker-compose.yaml — секция api-gateway → environment.
 # ------ Сервисы ------
 services:
-  auth:      { base_url: "http://auth-service:8080" }
-  users:     { base_url: "http://users-service:8080" }
-  campaign:  { base_url: "http://campaign-service:8080" }
+  auth:      { base_url: "${AUTH_SERVICE_URL}" }
+  users:     { base_url: "${USERS_SERVICE_URL}" }
+  campaign:  { base_url: "${CAMPAIGN_SERVICE_URL}" }
 
 # ------ Маршруты ------
 routes:

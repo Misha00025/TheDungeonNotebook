@@ -5,8 +5,7 @@
 api-gateway/
 ├── app/
 │   ├── __init__.py               # Flask app, PrometheusMetrics, engine bootstrap
-│   ├── config/
-│   │   └── routes.yaml           # ~67 declarative endpoints
+│   ├── routes.yaml               # ~67 declarative endpoints (корень сервиса)
 │   ├── engine/
 │   │   ├── bootstrap.py          # Load YAML → create Blueprint → register routes
 │   │   ├── models.py             # RouteConfig, GatewayConfig dataclasses
@@ -28,9 +27,10 @@ api-gateway/
 ```
 
 ## Declarative Engine
-- **All new routes must go into `routes.yaml`** — do NOT add `@route` decorators
+- **All new routes must go into `routes.yaml`** (корень сервиса) — do NOT add `@route` decorators
 - Engine creates a Flask `Blueprint` with `base_path` from YAML (default `/v2/`)
 - Pipeline per route: `validate → access → proxy` (or `response` for custom handlers)
+- `base_url` сервисов поддерживает подстановку `${ENV_VAR}` и `${ENV_VAR:-default}`
 
 ## RouteConfig fields (in routes.yaml)
 ```yaml
