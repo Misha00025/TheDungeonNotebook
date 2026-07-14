@@ -42,9 +42,8 @@ def bootstrap(
     # Импортируем хендлеры (чтобы декораторы сработали)
     if import_handlers:
         try:
-            import app.handlers.access  # noqa: F401
-            import app.handlers.responses  # noqa: F401
-            print("[Engine] Handlers imported")
+            import handlers  # noqa: F401
+            print("[Engine] Handlers imported from handlers/ directory")
         except ImportError as e:
             print(f"[Engine] Warning: handlers not available: {e}")
 
