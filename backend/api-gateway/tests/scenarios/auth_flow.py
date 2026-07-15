@@ -24,26 +24,26 @@ def register_auth_flow_scenario():
         data={"username": "{username}", "password": "{password}"},
         requirement=CREATED))
 
-    # Login with correct credentials -> 200
+    # Login with correct credentials via /auth/token (OAuth 2.0)
     tests.append(Test(headers=h,
-        request="auth/login", method="POST",
-        data={"username": "{username}", "password": "{password}"},
+        request="auth/token", method="POST",
+        data={"grant_type": "password", "username": "{username}", "password": "{password}"},
         requirement=OK))
 
     # Login with wrong password -> 401
     tests.append(Test(headers=h,
-        request="auth/login", method="POST",
-        data={"username": "{username}", "password": "wrongpass"},
+        request="auth/token", method="POST",
+        data={"grant_type": "password", "username": "{username}", "password": "wrongpass"},
         requirement=NOT_AUTH))
 
     # Login with wrong username -> 401
     tests.append(Test(headers=h,
-        request="auth/login", method="POST",
-        data={"username": "nonexistent", "password": "whatever"},
+        request="auth/token", method="POST",
+        data={"grant_type": "password", "username": "nonexistent", "password": "whatever"},
         requirement=NOT_AUTH))
 
     # Check token from login -> 200
-    tests.append(Test(headers={**h, "Authorization": "Bearer {steps.1.token}"},
+    tests.append(Test(headers={**h, "Authorization": "Bearer {steps.1.access_token}"},
         request="auth/check", method="GET",
         requirement=OK))
 
@@ -53,8 +53,9 @@ def register_auth_flow_scenario():
         requirement=NOT_AUTH))
 
     # Refresh token -> 200
-    tests.append(Test(headers={**h, "Refresh-Token": "{steps.1.token}"},
-        request="auth/refresh", method="POST",
+    tests.append(Test(headers=h,
+        request="auth/token", method="POST",
+        data={"grant_type": "refresh_token", "refresh_token": "{steps.1.access_token}"},
         requirement=OK))
 
     # Register duplicate username -> 409

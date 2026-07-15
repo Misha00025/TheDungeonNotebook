@@ -10,7 +10,7 @@ if __name__ == "__main__":
                     epilog='Good testings')
     p.add_argument("-c", "--compact", nargs='?', const=True, default=False)
     p.add_argument("-d", "--debug", nargs='?', const=True, default=False)
-    p.add_argument('-S', action='append', help='Добавляет сценарий для исполнения из списка: users, groups, user-group, templates')
+    p.add_argument('-S', action='append', help='Добавляет сценарий для исполнения из списка: auth, port-protection')
     args = p.parse_args()
 
     if args.S:
@@ -20,8 +20,9 @@ if __name__ == "__main__":
                     with_auth_service_scenario()
                 case "port-protection":
                     with_internal_endpoint_protection_scenario()
-                case "oidc":
-                    with_oidc_scenario()
+    else:
+        with_auth_service_scenario()
+        with_internal_endpoint_protection_scenario()
 
     test_variables.compact = args.compact
     test_variables.debug = args.debug

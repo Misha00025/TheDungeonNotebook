@@ -89,14 +89,16 @@ def _register_route(
             )
             return execute_pipeline(rc, ctx)
         # Даём функции имя для Flask
-        view_func.__name__ = f"engine_{rc.path.replace('/', '_').replace('<', '').replace('>', '')}"
+        view_func.__name__ = f"engine_{rc.path.replace('/', '_').replace('<', '').replace('>', '').replace('.', '_')}"
         return view_func
 
     for method in route.methods:
         view_func = make_view_func(route, registry)
+        endpoint_name = f"{route.path}_{method}"
+        endpoint_name = endpoint_name.replace(".", "_")
         bp.add_url_rule(
             route.path,
-            endpoint=f"{route.path}_{method}",
+            endpoint=endpoint_name,
             view_func=view_func,
             methods=[method],
         )
