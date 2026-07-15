@@ -9,7 +9,6 @@ public class InternalPortProtectionMiddleware
     {
         "/auth/groups/",
         "/auth/reset-password/request/",
-        "/auth/clients",
     };
     private const int InternalPort = 8081;
 

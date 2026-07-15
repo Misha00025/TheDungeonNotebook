@@ -43,33 +43,35 @@ routes:
     methods: [POST]
     proxy:
       service: auth
-      path: /auth/register
-    auth: none
-
-  - path: /auth/login
-    methods: [POST]
-    proxy:
-      service: auth
-      path: /auth/login
-    auth: none
-
-  - path: /auth/refresh
-    methods: [POST]
-    handler: auth_refresh
+      path: /register
     auth: none
 
   - path: /auth/check
     methods: [GET]
     proxy:
       service: auth
-      path: /auth/check
+      path: /check
     auth: none
 
   - path: /auth/reset-password/confirm
     methods: [POST]
     proxy:
       service: auth
-      path: /auth/reset-password/confirm
+      path: /reset-password/confirm
+    auth: none
+
+  - path: /auth/token
+    methods: [POST]
+    proxy:
+      service: auth
+      path: /token
+    auth: none
+
+  - path: /.well-known/jwks.json
+    methods: [GET]
+    proxy:
+      service: auth
+      path: /.well-known/jwks.json
     auth: none
 
   # ============================================================

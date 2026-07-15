@@ -10,6 +10,7 @@ with open(CERT_DIR / "private.pem", "rb") as f:
 def generate_token(user_id: int, expires_in: int = 3600, oidc: bool = False) -> str:
     payload = {
         "userId": user_id,
+        "aud": "api-gateway",
         "iat": int(time.time()),
         "exp": int(time.time()) + expires_in,
     }

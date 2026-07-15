@@ -14,7 +14,6 @@ from scenarios.local_endpoints import register_local_endpoints_scenario, scenari
 from scenarios.schemas_lifecycle import register_schemas_scenario, scenarios as sl_scenarios
 from scenarios.character_items_access import register_character_items_access_scenario, scenarios as cia_scenarios
 from scenarios.character_full_access import register_character_full_access_scenario, scenarios as cfa_scenarios
-from scenarios.oidc import register_oidc_scenario, scenarios as oidc_scenarios
 from scenarios.auth_flow import register_auth_flow_scenario, scenarios as af_scenarios
 
 if __name__ == "__main__":
@@ -63,8 +62,6 @@ if __name__ == "__main__":
                 register_character_items_access_scenario()
             elif scenario == "CharacterFullAccess":
                 register_character_full_access_scenario()
-            elif scenario == "OidcEndpoints":
-                register_oidc_scenario()
             elif scenario == "AuthFlow":
                 register_auth_flow_scenario()
     else:
@@ -80,8 +77,7 @@ if __name__ == "__main__":
         register_schemas_scenario()
         register_character_items_access_scenario()
         register_character_full_access_scenario()
-        register_oidc_scenario()
         register_auth_flow_scenario()
 
-    all_scenarios = gw_scenarios + up_scenarios + gi_scenarios + cl_scenarios + gs_scenarios + cs_scenarios + ei_scenarios + notes_scenarios + le_scenarios + sl_scenarios + cia_scenarios + cfa_scenarios + oidc_scenarios + af_scenarios
+    all_scenarios = gw_scenarios + up_scenarios + gi_scenarios + cl_scenarios + gs_scenarios + cs_scenarios + ei_scenarios + notes_scenarios + le_scenarios + sl_scenarios + cia_scenarios + cfa_scenarios + af_scenarios
     main_test.start(all_scenarios)

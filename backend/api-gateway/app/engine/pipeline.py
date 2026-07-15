@@ -92,7 +92,7 @@ def _validate_jwt(raw_token: str) -> tuple[bool, dict | None]:
         raise RuntimeError("PUBLIC_KEY is not loaded")
 
     try:
-        options = {"verify_signature": True, "verify_exp": True}
+        options = {"verify_signature": True, "verify_exp": True, "verify_aud": False}
 
         payload = pyjwt.decode(
             token,

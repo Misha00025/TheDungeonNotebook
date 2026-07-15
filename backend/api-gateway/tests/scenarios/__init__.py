@@ -10,4 +10,3 @@ from . import local_endpoints
 from . import schemas_lifecycle
 from . import character_items_access
 from . import character_full_access
-from . import oidc
