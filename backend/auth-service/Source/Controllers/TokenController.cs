@@ -149,9 +149,14 @@ public class TokenController : ControllerBase
             .AddMinutes(_configs.AccessTokenExpire.Minutes);
         var accessToken = GenerateTokenString(new ClaimsIdentity(claims), accessExpire);
 
+        var refreshExpire = DateTime.UtcNow.AddDays(_configs.RefreshTokenExpire.Days)
+            .AddMinutes(_configs.RefreshTokenExpire.Minutes);
+        var refreshToken = GenerateTokenString(new ClaimsIdentity(claims), refreshExpire);
+
         var result = new Dictionary<string, object>
         {
             ["access_token"] = accessToken,
+            ["refresh_token"] = refreshToken,
             ["token_type"] = "Bearer",
             ["expires_in"] = _configs.AccessTokenExpire.Days * 86400 + _configs.AccessTokenExpire.Minutes * 60,
             ["scope"] = scope
@@ -182,9 +187,14 @@ public class TokenController : ControllerBase
                 .AddMinutes(_configs.AccessTokenExpire.Minutes);
             var accessToken = GenerateTokenString(new ClaimsIdentity(claims), accessExpire);
 
+            var refreshExpire = DateTime.UtcNow.AddDays(_configs.RefreshTokenExpire.Days)
+                .AddMinutes(_configs.RefreshTokenExpire.Minutes);
+            var newRefreshToken = GenerateTokenString(new ClaimsIdentity(claims), refreshExpire);
+
             var result = new Dictionary<string, object>
             {
                 ["access_token"] = accessToken,
+                ["refresh_token"] = newRefreshToken,
                 ["token_type"] = "Bearer",
                 ["expires_in"] = _configs.AccessTokenExpire.Days * 86400 + _configs.AccessTokenExpire.Minutes * 60,
                 ["scope"] = scope
