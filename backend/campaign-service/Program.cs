@@ -6,6 +6,7 @@ using Tdn.Db;
 using Tdn.Models.Providing;
 using Tdn.Models.Schemas.Items;
 using Tdn.Models.Schemas.Templates;
+using Tdn.Models.Schemas.Characters;
 using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -36,6 +37,8 @@ builder.Services.AddScoped<GroupSchemasProvider, GroupSchemasProvider>();
 builder.Services.AddScoped<CharacterTemplateSchemaProvider, CharacterTemplateSchemaProvider>();
 builder.Services.AddScoped<ExportImportProvider, ExportImportProvider>();
 builder.Services.AddScoped<NotesProvider, NotesProvider>();
+builder.Services.AddScoped<CharacterResourcesSchemaProvider, CharacterResourcesSchemaProvider>();
+builder.Services.AddScoped<CharacterEquipmentProvider, CharacterEquipmentProvider>();
 
 // General
 builder.Services.AddEndpointsApiExplorer();

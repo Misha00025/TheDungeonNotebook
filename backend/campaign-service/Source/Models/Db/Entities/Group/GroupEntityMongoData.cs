@@ -130,6 +130,10 @@ public class CharacterMongoData : CharlistMongoData
 {
 	[BsonElement("items")]
 	public List<AmountedItemMongoData> Items = new();
+
+	[BsonElement("equipment")]
+	[BsonIgnoreIfNull]
+	public List<int>? Equipment;
 }
 
 [BsonIgnoreExtraElements]

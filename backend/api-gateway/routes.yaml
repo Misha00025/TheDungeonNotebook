@@ -374,6 +374,23 @@ routes:
         auth: required
         access: group_admin
 
+  - path: /groups/<int:group_id>/schemas/characters/resources
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /schemas/groups/{group_id}/characters/resources
+        auth: required
+        params:
+          query:
+            userId: "{jwt.userId}"
+      PUT:
+        proxy:
+          service: campaign
+          path: /schemas/groups/{group_id}/characters/resources
+        auth: required
+        access: group_admin
+
   # ============================================================
   # Export / Import
   # ============================================================
@@ -617,5 +634,31 @@ routes:
         proxy:
           service: campaign
           path: /groups/{group_id}/characters/{character_id}/skills/{skill_id}
+        auth: required
+        access: character_writer
+
+  # ============================================================
+  # Character Equipment
+  # ============================================================
+  - path: /groups/<int:group_id>/characters/<int:character_id>/equipment
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/{character_id}/equipment
+        auth: required
+        params:
+          query:
+            userId: "{jwt.userId}"
+      PATCH:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/{character_id}/equipment
+        auth: required
+        access: character_writer
+      PUT:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/characters/{character_id}/equipment
         auth: required
         access: character_writer
