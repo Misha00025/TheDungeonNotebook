@@ -89,6 +89,15 @@ public class TokenController : ControllerBase
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
+    private List<Claim> GetUserClaims(string userId)
+    {
+        return new List<Claim>
+        {
+            new("sub", userId),
+            new("userId", userId)
+        };
+    }
+
     [HttpGet(".well-known/jwks.json")]
     public ActionResult Jwks()
     {
@@ -139,11 +148,7 @@ public class TokenController : ControllerBase
         if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
             return Unauthorized(new { error = "invalid_grant", error_description = "Invalid credentials" });
 
-        var claims = new List<Claim>
-        {
-            new("sub", user.Id.ToString()),
-            new("userId", user.Id.ToString())
-        };
+        var claims = GetUserClaims(user.Id.ToString());
 
         var accessExpire = DateTime.UtcNow.AddDays(_configs.AccessTokenExpire.Days)
             .AddMinutes(_configs.AccessTokenExpire.Minutes);
@@ -179,9 +184,12 @@ public class TokenController : ControllerBase
         try
         {
             var principal = tokenHandler.ValidateToken(refreshToken, validationParameters, out _);
-            var claims = principal.Claims
-                .Where(c => c.Type != "exp" && c.Type != "nbf" && c.Type != "iat")
-                .ToList();
+            var userId = principal.FindFirstValue("sub")
+                      ?? principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null)
+                return Task.FromResult<ActionResult>(Unauthorized(new { error = "invalid_token", error_description = "User identifier not found in token." }));
+
+            var claims = GetUserClaims(userId);
 
             var accessExpire = DateTime.UtcNow.AddDays(_configs.AccessTokenExpire.Days)
                 .AddMinutes(_configs.AccessTokenExpire.Minutes);
