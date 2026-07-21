@@ -15,6 +15,7 @@ from scenarios.schemas_lifecycle import register_schemas_scenario, scenarios as 
 from scenarios.character_items_access import register_character_items_access_scenario, scenarios as cia_scenarios
 from scenarios.character_full_access import register_character_full_access_scenario, scenarios as cfa_scenarios
 from scenarios.auth_flow import register_auth_flow_scenario, scenarios as af_scenarios
+from scenarios.dashboard_config import register_dashboard_config_scenario, scenarios as dc_scenarios
 
 if __name__ == "__main__":
     import argparse
@@ -64,6 +65,8 @@ if __name__ == "__main__":
                 register_character_full_access_scenario()
             elif scenario == "AuthFlow":
                 register_auth_flow_scenario()
+            elif scenario == "DashboardConfig":
+                register_dashboard_config_scenario()
     else:
         register_gateway_main()
         register_user_profile_scenario()
@@ -78,6 +81,7 @@ if __name__ == "__main__":
         register_character_items_access_scenario()
         register_character_full_access_scenario()
         register_auth_flow_scenario()
+        register_dashboard_config_scenario()
 
-    all_scenarios = gw_scenarios + up_scenarios + gi_scenarios + cl_scenarios + gs_scenarios + cs_scenarios + ei_scenarios + notes_scenarios + le_scenarios + sl_scenarios + cia_scenarios + cfa_scenarios + af_scenarios
+    all_scenarios = gw_scenarios + up_scenarios + gi_scenarios + cl_scenarios + gs_scenarios + cs_scenarios + ei_scenarios + notes_scenarios + le_scenarios + sl_scenarios + cia_scenarios + cfa_scenarios + af_scenarios + dc_scenarios
     main_test.start(all_scenarios)
