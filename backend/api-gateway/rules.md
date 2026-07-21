@@ -84,6 +84,8 @@ ctx.services.campaign
 ## Security
 - Client params `userId` and `access` are **stripped** from incoming requests (`_sanitize_user_params` in `__init__.py`)
 - JWT validated **locally** via RSA public key (`PUBLIC_KEY`) in `pipeline.py:_validate_jwt` — no call to auth-service
+- CORS is **disabled by default**. Set `CORS_ENABLED=1` (or `true`/`yes`) to enable.  
+  Allowed origins are configured via `CORS_ORIGINS` (default `*`).
 - Service URL env vars: `USERS_SERVICE_URL`, `CAMPAIGN_SERVICE_URL`
 - `AUTH_SERVICE_URL` is removed — gateway does not communicate with auth-service directly
 

@@ -1,10 +1,16 @@
 import os
 from flask import Flask
-from prometheus_flask_exporter import PrometheusMetrics 
+from prometheus_flask_exporter import PrometheusMetrics
+from flask_cors import CORS
 
 application = Flask(__name__)
 application.config['JSON_AS_ASCII'] = False
 metrics = PrometheusMetrics(application)
+
+# CORS support — enable via environment variable
+if os.environ.get("CORS_ENABLED", "").lower() in ("1", "true", "yes"):
+    origins = os.environ.get("CORS_ORIGINS", "*")
+    CORS(application, origins=origins)
 
 
 from flask import json

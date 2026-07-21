@@ -3,7 +3,7 @@ from flask import current_app
 
 
 def request_password_reset(user_id: int) -> dict:
-    url = f"{current_app.config['AUTH_SERVICE_URL']}/auth/reset-password/request/{user_id}"
+    url = f"{current_app.config['AUTH_SERVICE_URL']}/reset-password/request/{user_id}"
     resp = requests.post(url, timeout=10)
     resp.raise_for_status()
     return resp.json()
@@ -34,7 +34,7 @@ def get_users_by_ids(ids: list[int]) -> list[dict]:
 
 
 def register_user(username: str, password: str, nickname: str) -> int:
-    auth_url = f"{current_app.config['AUTH_SERVICE_URL']}/auth/register"
+    auth_url = f"{current_app.config['AUTH_SERVICE_URL']}/register"
     resp = requests.post(auth_url, json={
         "username": username,
         "password": password,
@@ -92,7 +92,7 @@ def delete_group(group_id: int) -> dict:
 
 
 def generate_service_token(group_id: int, years: int = 1) -> str:
-    url = f"{current_app.config['AUTH_SERVICE_URL']}/auth/groups/{group_id}/service-token/generate"
+    url = f"{current_app.config['AUTH_SERVICE_URL']}/groups/{group_id}/service-token/generate"
     resp = requests.post(url, json={
         "access": 3,
         "years": years,
