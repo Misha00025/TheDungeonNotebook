@@ -86,7 +86,8 @@ public class CharacterItemsController : CharactersBaseController
             if (item == null)
                 return NotFound("Item not found");
 
-            var oldAmount = item.Amount ?? 0;
+            var charItem = _provider.GetItem(groupId, itemId, characterId);
+            var oldAmount = charItem?.Amount ?? 0;
             var newAmount = data.Amount != null ? (int)data.Amount : oldAmount;
             item.Amount = newAmount;
             _provider.TrySetItemToCharacter(item, characterId, newAmount);

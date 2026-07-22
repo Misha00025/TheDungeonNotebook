@@ -84,9 +84,9 @@ def register_character_log_scenario():
             len(res.json().get("entries", [])) >= 1 and
             res.json()["entries"][0]["actionType"] == "field_change" and
             res.json()["entries"][0]["details"]["key"] == "hp" and
-            res.json()["entries"][0]["details"]["oldValue"] == 0 and
-            res.json()["entries"][0]["details"]["delta"] == 90,
-            f"Expected field_change hp: old=0, delta=90, got {res.json()}"
+            res.json()["entries"][0]["details"]["oldValue"] == 100 and
+            res.json()["entries"][0]["details"]["delta"] == -10,
+            f"Expected field_change hp: old=100, delta=-10, got {res.json()}"
         )))
 
     # 9. PATCH character field (admin increases MP by 20)
@@ -106,9 +106,9 @@ def register_character_log_scenario():
             len(res.json().get("entries", [])) >= 2 and
             res.json()["entries"][0]["actionType"] == "field_change" and
             res.json()["entries"][0]["details"]["key"] == "mp" and
-            res.json()["entries"][0]["details"]["oldValue"] == 0 and
-            res.json()["entries"][0]["details"]["delta"] == 70,
-            f"Expected field_change mp: old=0, delta=70 at entries[0], got {res.json()}"
+            res.json()["entries"][0]["details"]["oldValue"] == 50 and
+            res.json()["entries"][0]["details"]["delta"] == 20,
+            f"Expected field_change mp: old=50, delta=20 at entries[0], got {res.json()}"
         )))
 
     # --- item_change test ---
