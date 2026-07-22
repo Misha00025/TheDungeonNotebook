@@ -16,6 +16,15 @@ pip install --break-system-packages --ignore-installed -r ../../api-gateway/req.
 # 2. Build and start stack
 docker compose up -d --build
 
+# 2.1 Connect act runner container to compose network
+# Inside `act` we need to connect to compose network and use container name
+if [ -n "$ACT" ]; then
+    docker network connect tests_backend-network $(hostname) 2>/dev/null || true
+    SERVER_URL=http://api-gateway:5000
+else
+    SERVER_URL=http://localhost:5000
+fi
+
 # 3. Wait for api-gateway container
 echo "Waiting for api-gateway..."
 for i in $(seq 1 20); do
@@ -30,7 +39,7 @@ sleep 15
 
 # 4. Run tests (stdout + tee to log file)
 mkdir -p logs
-python test.py --server http://localhost:5000 "$@" 2>&1 | tee logs/test.log
+python test.py --server "$SERVER_URL" "$@" 2>&1 | tee logs/test.log
 TEST_EXIT=${PIPESTATUS[0]}
 
 # 5. Print summary
