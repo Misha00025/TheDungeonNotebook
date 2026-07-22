@@ -442,6 +442,9 @@ routes:
           path: /groups/{group_id}/characters/{character_id}
         auth: required
         access: character_writer
+        params:
+          query:
+            userId: "{jwt.userId}"
       DELETE:
         proxy:
           service: campaign
@@ -544,6 +547,9 @@ routes:
           path: /groups/{group_id}/characters/{character_id}/items
         auth: required
         access: character_writer
+        params:
+          query:
+            userId: "{jwt.userId}"
 
   - path: /groups/<int:group_id>/characters/<int:character_id>/items/<int:item_id>
     methods:
@@ -561,12 +567,18 @@ routes:
           path: /groups/{group_id}/characters/{character_id}/items/{item_id}
         auth: required
         access: character_writer
+        params:
+          query:
+            userId: "{jwt.userId}"
       DELETE:
         proxy:
           service: campaign
           path: /groups/{group_id}/characters/{character_id}/items/{item_id}
         auth: required
         access: character_writer
+        params:
+          query:
+            userId: "{jwt.userId}"
 
   # ============================================================
   # Character Notes (notes-service)
@@ -630,12 +642,18 @@ routes:
           skip_body: true
         auth: required
         access: character_writer
+        params:
+          query:
+            userId: "{jwt.userId}"
       DELETE:
         proxy:
           service: campaign
           path: /groups/{group_id}/characters/{character_id}/skills/{skill_id}
         auth: required
         access: character_writer
+        params:
+          query:
+            userId: "{jwt.userId}"
 
   # ============================================================
   # Character Equipment
@@ -656,9 +674,29 @@ routes:
           path: /groups/{group_id}/characters/{character_id}/equipment
         auth: required
         access: character_writer
+        params:
+          query:
+            userId: "{jwt.userId}"
       PUT:
         proxy:
           service: campaign
           path: /groups/{group_id}/characters/{character_id}/equipment
         auth: required
         access: character_writer
+        params:
+          query:
+            userId: "{jwt.userId}"
+
+  # ============================================================
+  # Character Log
+  # ============================================================
+  - path: /groups/<int:group_id>/characters/<int:character_id>/log
+    methods: [GET]
+    proxy:
+      service: campaign
+      path: /groups/{group_id}/characters/{character_id}/log
+    auth: required
+    access: character_viewer
+    params:
+      query:
+        userId: "{jwt.userId}"

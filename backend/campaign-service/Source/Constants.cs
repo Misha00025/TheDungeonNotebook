@@ -27,4 +27,5 @@ public static class MongoCollections
 	public const string Skills = "skills";
 	public const string SkillsAttributes = "skills_attributes";
 	public const string Notes = "notes";
+	public const string CharacterLogs = "character_logs";
 }

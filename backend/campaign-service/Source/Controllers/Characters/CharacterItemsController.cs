@@ -15,10 +15,12 @@ public class CharacterItemsController : CharactersBaseController
 {
 
     private ItemsProvider _provider;
+    private CharacterLogProvider _logProvider;
 
-    public CharacterItemsController(EntityContext context, MongoDbContext mongo, GroupContext groupContext, ItemsProvider itemsProvider, GroupAccessHelper accessHelper) : base(context, mongo, groupContext, accessHelper)
+    public CharacterItemsController(EntityContext context, MongoDbContext mongo, GroupContext groupContext, ItemsProvider itemsProvider, GroupAccessHelper accessHelper, CharacterLogProvider logProvider) : base(context, mongo, groupContext, accessHelper)
     {
             _provider = itemsProvider;
+            _logProvider = logProvider;
     }
     
     [HttpGet]
@@ -47,7 +49,11 @@ public class CharacterItemsController : CharactersBaseController
             if (_provider.TryCreateItem(groupId, item))
             {
                 if (_provider.TrySetItemToCharacter(item, characterId, item.Amount ?? 0))
-                return Created($"groups/{groupId}/characters/{characterId}/items/{item.Id}", item.ToResponse());
+                {
+                    if (userId != null && item.Amount != null)
+                        _logProvider.LogItemChange(characterId, groupId, userId.Value, item.Id, 0, item.Amount ?? 0);
+                    return Created($"groups/{groupId}/characters/{characterId}/items/{item.Id}", item.ToResponse());
+                }
             }
             return BadRequest();
         }
@@ -79,22 +85,39 @@ public class CharacterItemsController : CharactersBaseController
             var item = _provider.GetItem(groupId, itemId);
             if (item == null)
                 return NotFound("Item not found");
-            item.Amount = data.Amount != null ? (int)data.Amount : item.Amount;
-            _provider.TrySetItemToCharacter(item, characterId, item.Amount ?? 0);
+
+            var oldAmount = item.Amount ?? 0;
+            var newAmount = data.Amount != null ? (int)data.Amount : oldAmount;
+            item.Amount = newAmount;
+            _provider.TrySetItemToCharacter(item, characterId, newAmount);
+
+            if (userId != null)
+            {
+                var delta = newAmount - oldAmount;
+                if (delta != 0)
+                    _logProvider.LogItemChange(characterId, groupId, userId.Value, itemId, oldAmount, delta);
+            }
+
             return Ok(item.ToResponse());
         }
         return NotFound("Character not found");
     }
     
     [HttpDelete("{itemId}")]
-    public ActionResult DeleteItem(int groupId, int characterId, int itemId)
+    public ActionResult DeleteItem(int groupId, int characterId, int itemId, [FromQuery] int? userId = null)
     {
         if (TryGetCharacter(groupId, characterId, out var _, out var character))
         {
             var item = _provider.GetItem(groupId, itemId, characterId);
             if (item == null)
                 return NotFound("Item not found");
+
+            var oldAmount = item.Amount ?? 0;
             _provider.TryRemoveItemFromCharacter(item, characterId);
+
+            if (userId != null && oldAmount > 0)
+                _logProvider.LogItemChange(characterId, groupId, userId.Value, itemId, oldAmount, -oldAmount);
+
             return Ok(item.ToResponse());
         }
         return NotFound("Character not found");

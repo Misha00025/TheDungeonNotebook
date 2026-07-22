@@ -39,6 +39,7 @@ builder.Services.AddScoped<ExportImportProvider, ExportImportProvider>();
 builder.Services.AddScoped<NotesProvider, NotesProvider>();
 builder.Services.AddScoped<CharacterResourcesSchemaProvider, CharacterResourcesSchemaProvider>();
 builder.Services.AddScoped<CharacterEquipmentProvider, CharacterEquipmentProvider>();
+builder.Services.AddScoped<CharacterLogProvider, CharacterLogProvider>();
 
 // General
 builder.Services.AddEndpointsApiExplorer();
