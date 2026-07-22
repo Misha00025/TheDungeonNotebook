@@ -211,16 +211,6 @@ public class CharactersController : CharactersBaseController
             return Forbidden();
         if (TryGetCharacter(groupId, characterId, out var characterData, out var character))
         {
-            var oldFieldValues = new Dictionary<string, int>();
-            if (data.Fields != null)
-            {
-                foreach (var field in data.Fields)
-                {
-                    if (character.Fields.ContainsKey(field.Key) && field.Value?.Value != null)
-                        oldFieldValues[field.Key] = character.Fields[field.Key].Value;
-                }
-            }
-
             var anythingChanged = false;
             anythingChanged = anythingChanged || TryChangeProperties(character, data);
             var charlistSet = DbContext.Set<CharlistData>();
@@ -230,6 +220,19 @@ public class CharactersController : CharactersBaseController
             var charlist = Mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, charlistData.UUID);
             if (charlist == null)
                 return NotFound("Template document not found");
+
+            var oldFieldValues = new Dictionary<string, int>();
+            if (data.Fields != null)
+            {
+                foreach (var field in data.Fields)
+                {
+                    if (field.Value?.Value == null) continue;
+                    if (character.Fields.ContainsKey(field.Key))
+                        oldFieldValues[field.Key] = character.Fields[field.Key].Value;
+                    else if (charlist.Fields.ContainsKey(field.Key))
+                        oldFieldValues[field.Key] = charlist.Fields[field.Key].Value;
+                }
+            }
             var fieldsChanged = TryChangeFields(character, charlist, data, out var errors);
             anythingChanged = (anythingChanged && data.Fields == null) || fieldsChanged;
             if (anythingChanged)
