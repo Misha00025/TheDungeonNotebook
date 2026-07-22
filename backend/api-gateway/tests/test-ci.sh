@@ -1,7 +1,10 @@
 #!/bin/bash
 
+# 0. Create .env from template if missing
+cp -n template.env .env 2>/dev/null || true
+
 # 1. Install test dependencies
-pip install -r ../../api-gateway/req.txt -q
+pip install --break-system-packages -r ../../api-gateway/req.txt -q
 
 # 2. Build and start stack
 docker compose up -d --build
