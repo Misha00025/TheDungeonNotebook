@@ -40,3 +40,27 @@ cd backend/api-gateway/tests
 2. Define `register_<feature>()` function that adds test cases to global `scenarios` list
 3. In `test.py`: import and call the register function
 4. Add scenario name to argparse help and the if-elif chain
+
+## CI/CD Integration
+
+GitHub Actions workflow: `.github/workflows/tests.yml`
+CI script: `backend/api-gateway/tests/test-ci.sh`
+
+### Trigger
+- Pull request to `main` branch
+
+### How it works
+1. Checkout code
+2. Setup Python 3.13
+3. Run `test-ci.sh` which:
+   - Installs Python dependencies
+   - Builds and starts all services via Docker Compose
+   - Waits for api-gateway readiness
+   - Runs all test scenarios
+   - Prints summary and last gateway logs
+   - Stops all containers
+4. On failure: uploads test logs as a GitHub Actions artifact
+
+### Local vs CI
+- **Local:** `./test.sh 15` — uses venv, sudo rm, colored summary
+- **CI:** `bash test-ci.sh` — no sudo, no venv, stdout output, exit code
