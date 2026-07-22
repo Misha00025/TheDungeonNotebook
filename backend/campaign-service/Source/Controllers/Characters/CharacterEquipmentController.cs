@@ -12,16 +12,19 @@ namespace Tdn.Api.Controllers;
 public class CharacterEquipmentController : CharactersBaseController
 {
     private CharacterEquipmentProvider _provider;
+    private CharacterLogProvider _logProvider;
 
     public CharacterEquipmentController(
         EntityContext context,
         MongoDbContext mongo,
         GroupContext groupContext,
         GroupAccessHelper accessHelper,
-        CharacterEquipmentProvider provider)
+        CharacterEquipmentProvider provider,
+        CharacterLogProvider logProvider)
         : base(context, mongo, groupContext, accessHelper)
     {
         _provider = provider;
+        _logProvider = logProvider;
     }
 
     [HttpGet]
@@ -48,6 +51,14 @@ public class CharacterEquipmentController : CharactersBaseController
 
         if (!ok)
             return BadRequest("Failed to update equipment");
+
+        if (userId != null)
+        {
+            int delta = data.Action == "add" ? 1 : -1;
+            int oldValue = data.Action == "add" ? 0 : 1;
+            _logProvider.LogEquipmentChange(characterId, groupId, userId.Value, data.ItemId, oldValue, delta);
+        }
+
         var equipment = _provider.GetEquipment(groupId, characterId);
         return Ok(new { items = equipment });
     }

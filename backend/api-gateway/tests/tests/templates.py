@@ -4,6 +4,7 @@ from .test_variables import DEBUG, default_debug
 import re
 import tests.test_variables as tv
 from .request_tests import get_test, patch_test, put_test, post_test, delete_test, rq, get_text
+import traceback
 
 
 def get_http_status_message(status_code):
@@ -185,7 +186,9 @@ class Scenario:
 			try:
 				res = step.execute(data)
 			except Exception as e:
+				tb = traceback.format_tb(e.__traceback__)
 				print("ERROR:", e)
+				print("Traceback:\n", "".join(tb))
 			try:
 				data["steps"].append(res.json())
 			except:
@@ -197,5 +200,5 @@ class Scenario:
 			if not step.ok:
 				print("ERROR:", step.message, "\n   |- Headers:", test.headers, "\n   |- Data:", test.data, "\n   |- Message:", test.message, "\n   |- Req. status:", test.requirement)
 				self.ok = False
-			elif test_variables.debug:
+			else:
 				print(step.message)

@@ -37,8 +37,11 @@ public class CharactersController : CharactersBaseController
         public Dictionary<string, FieldPatchData?>? Fields { get; set; }
     }
 
-    public CharactersController(EntityContext context, MongoDbContext mongo, GroupContext groupContext, GroupAccessHelper accessHelper) : base(context, mongo, groupContext, accessHelper)
+    private CharacterLogProvider _logProvider;
+
+    public CharactersController(EntityContext context, MongoDbContext mongo, GroupContext groupContext, GroupAccessHelper accessHelper, CharacterLogProvider logProvider) : base(context, mongo, groupContext, accessHelper)
     {
+        _logProvider = logProvider;
     }
     
     [HttpGet]
@@ -191,11 +194,33 @@ public class CharactersController : CharactersBaseController
         return doSomething;
     }
           
-    [HttpPatch("{characterId}")]
-    public ActionResult PatchCharacter(int groupId, int characterId, CharacterPatchData data, [FromQuery] bool witEmptyFields = true)
+    [HttpGet("{characterId}/log")]
+    public ActionResult GetCharacterLog(int groupId, int characterId, [FromQuery] int limit = 50, [FromQuery] int offset = 0, [FromQuery] int? userId = null)
     {
+        if (userId != null && !AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
+            return NotFound("Character not found");
+
+        var (entries, total) = _logProvider.GetLog(characterId, limit, offset);
+        return Ok(new { entries, total });
+    }
+
+    [HttpPatch("{characterId}")]
+    public ActionResult PatchCharacter(int groupId, int characterId, CharacterPatchData data, [FromQuery] bool witEmptyFields = true, [FromQuery] int? userId = null)
+    {
+        if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+            return Forbidden();
         if (TryGetCharacter(groupId, characterId, out var characterData, out var character))
         {
+            var oldFieldValues = new Dictionary<string, int>();
+            if (data.Fields != null)
+            {
+                foreach (var field in data.Fields)
+                {
+                    if (character.Fields.ContainsKey(field.Key) && field.Value?.Value != null)
+                        oldFieldValues[field.Key] = character.Fields[field.Key].Value;
+                }
+            }
+
             var anythingChanged = false;
             anythingChanged = anythingChanged || TryChangeProperties(character, data);
             var charlistSet = DbContext.Set<CharlistData>();
@@ -212,6 +237,29 @@ public class CharactersController : CharactersBaseController
                 var filter = Builders<CharacterMongoData>.Filter.Eq("_id", character.Id);
                 GetCollection().ReplaceOne(filter, character);
                 DbContext.SaveChanges();
+
+                if (data.Fields != null && userId != null)
+                {
+                    foreach (var kvp in data.Fields)
+                    {
+                        if (!kvp.Value.HasValue) continue;
+                        var patch = kvp.Value.Value;
+                        if (patch.Value == null) continue;
+                        int newValue = patch.Value.Value;
+                        var oldVal = oldFieldValues.GetValueOrDefault(kvp.Key);
+                        if (oldFieldValues.ContainsKey(kvp.Key))
+                        {
+                            var delta = newValue - oldVal;
+                            if (delta != 0)
+                                _logProvider.LogFieldChange(characterId, groupId, userId.Value, kvp.Key, oldVal, delta);
+                        }
+                        else
+                        {
+                            _logProvider.LogFieldChange(characterId, groupId, userId.Value, kvp.Key, 0, newValue);
+                        }
+                    }
+                }
+
                 if (witEmptyFields)
                     character = AsCharacterWithTemplate(characterData, character);
                 FormulaCalculator.CalculateFields(character);

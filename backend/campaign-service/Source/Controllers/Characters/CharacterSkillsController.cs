@@ -11,11 +11,13 @@ public class CharacterSkillsController : BaseController
 {
     private SkillsProvider _provider;
     private GroupAccessHelper _accessHelper;
+    private CharacterLogProvider _logProvider;
 
-    public CharacterSkillsController(SkillsProvider skillsProvider, GroupAccessHelper accessHelper)
+    public CharacterSkillsController(SkillsProvider skillsProvider, GroupAccessHelper accessHelper, CharacterLogProvider logProvider)
     {
         _provider = skillsProvider;
         _accessHelper = accessHelper;
+        _logProvider = logProvider;
     }
     
     private IEnumerable<Skill> ApplyFilters(IEnumerable<Skill> skills, Dictionary<string, string> filters) => _provider.ApplyFilters(skills, filters);
@@ -46,7 +48,11 @@ public class CharacterSkillsController : BaseController
         if (skill == null)
             return NotFound(new { error = $"Skill with id {skillId} not found in group {groupId}" });
         if (_provider.TryAddSkillToCharacter(skill, characterId))
+        {
+            if (userId != null)
+                _logProvider.LogSkillChange(characterId, groupId, userId.Value, skillId, 0, 1);
             return Ok(skill.ToResponse());
+        }
         else
             return BadRequest("Unknown error");
     }
@@ -61,7 +67,11 @@ public class CharacterSkillsController : BaseController
         if (skill == null)
             return NotFound(new { error = $"Skill with id {skillId} not found in group {groupId}" });
         if (_provider.TryRemoveSkillFromCharacter(skill, characterId))
+        {
+            if (userId != null)
+                _logProvider.LogSkillChange(characterId, groupId, userId.Value, skillId, 1, -1);
             return Ok(skill.ToResponse());
+        }
         else
             return BadRequest("Unknown error");
     }
