@@ -9,6 +9,10 @@ mkdir -p certs
 openssl genrsa -out certs/private.pem 2048 2>/dev/null
 openssl rsa -in certs/private.pem -pubout -out certs/public.pem 2>/dev/null
 
+# 0.2 Clear db's data
+rm -rf mongo_data mysql_data
+mkdir -p mongo_data mysql_data
+
 # 1. Install test dependencies
 pip install --break-system-packages --ignore-installed -r requirements.txt -q
 
