@@ -7,9 +7,12 @@ MAIN_SERVICE="api-gateway"
 if [ ! -d "venv" ]; then
     echo "Создаю виртуальное окружение..."
     python3 -m venv venv
-    ./venv/bin/pip install --ignore-installed -r requirements.txt -q
     echo "Готово"
 fi
+
+echo "Устанавливаю зависимости..."
+./venv/bin/pip install --ignore-installed -r requirements.txt -q
+echo "Готово"
 
 # Очистка данных БД между запусками
 sudo rm -rf mongo_data/*
