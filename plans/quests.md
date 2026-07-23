@@ -194,7 +194,7 @@ Route: `/groups/{groupId}/quests`
 | GET | `/groups/{groupId}/quests/{questId}` | group_member | Один квест |
 | PUT | `/groups/{groupId}/quests/{questId}` | group_admin | Обновить квест |
 | DELETE | `/groups/{groupId}/quests/{questId}` | group_admin | Удалить квест |
-| PUT | `/groups/{groupId}/quests/{questId}/objectives/{key}/status` | character_writer | Отметить цель |
+| PATCH | `/groups/{groupId}/quests/{questId}` | character_writer | Частичное обновление квеста (header, description, reward, status, assignedCharacters, objectives) |
 
 ---
 

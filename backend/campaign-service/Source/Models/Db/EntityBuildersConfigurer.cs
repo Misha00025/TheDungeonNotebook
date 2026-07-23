@@ -17,6 +17,8 @@ public interface IEntityBuildersConfigurer
 	void ConfigureModel(EntityTypeBuilder<UserCharacterData> builder);
 	void ConfigureModel(EntityTypeBuilder<NoteData> builder);
 	void ConfigureModel(EntityTypeBuilder<NoteKeywordData> builder);
+	void ConfigureModel(EntityTypeBuilder<QuestData> builder);
+	void ConfigureModel(EntityTypeBuilder<QuestAssignmentData> builder);
 }
 
 public class EntityBuildersConfigurer : IEntityBuildersConfigurer
@@ -139,5 +141,27 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
         builder.HasKey(e => new { e.NoteId, e.Keyword });
         builder.Property(e => e.NoteId).HasColumnName("note_id");
         builder.Property(e => e.Keyword).HasColumnName("keyword").HasMaxLength(100);
+    }
+
+    public void ConfigureModel(EntityTypeBuilder<QuestData> builder)
+    {
+        builder.ToTable("quest");
+        builder.HasKey(e => e.Id);
+        builder.Property(e => e.Id).HasColumnName("quest_id");
+        builder.Property(e => e.GroupId).HasColumnName("group_id");
+        builder.Property(e => e.UUID).HasColumnName("uuid");
+        builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
+        builder.Property(e => e.Header).HasColumnName("header");
+        builder.Property(e => e.Status).HasColumnName("status");
+    }
+
+    public void ConfigureModel(EntityTypeBuilder<QuestAssignmentData> builder)
+    {
+        builder.ToTable("quest_assignment");
+        builder.HasKey(e => new { e.QuestId, e.CharacterId });
+        builder.Property(e => e.QuestId).HasColumnName("quest_id");
+        builder.Property(e => e.CharacterId).HasColumnName("character_id");
+        builder.HasOne(e => e.Quest).WithMany().HasForeignKey(e => e.QuestId);
+        builder.HasOne(e => e.Character).WithMany().HasForeignKey(e => e.CharacterId);
     }
 }

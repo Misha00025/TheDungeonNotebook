@@ -12,6 +12,8 @@ namespace Tdn.Db.Contexts;
 	
 	public DbSet<NoteData> Notes { get; set; }
 	public DbSet<NoteKeywordData> NoteKeywords { get; set; }
+	public DbSet<QuestData> Quests { get; set; }
+	public DbSet<QuestAssignmentData> QuestAssignments { get; set; }
 	
 	protected override void OnModelCreating(ModelBuilder builder)
 	{
@@ -24,6 +26,8 @@ namespace Tdn.Db.Contexts;
 		Configurer.ConfigureModel(builder.Entity<CharacterItemData>());
 		Configurer.ConfigureModel(builder.Entity<NoteData>());
 		Configurer.ConfigureModel(builder.Entity<NoteKeywordData>());
+		Configurer.ConfigureModel(builder.Entity<QuestData>());
+		Configurer.ConfigureModel(builder.Entity<QuestAssignmentData>());
 		base.OnModelCreating(builder);
 	}
 }

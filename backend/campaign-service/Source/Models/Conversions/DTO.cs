@@ -25,4 +25,23 @@ public static class DTO
             IsSecret = data.IsSecret ?? false
         };
     }
+
+    public static Quest AsQuest(this QuestPostData data, int groupId)
+    {
+        return new Quest(new Group { Id = groupId })
+        {
+            Header = data.Header,
+            Description = data.Description ?? "",
+            Reward = data.Reward ?? new List<string>(),
+            Status = data.Status ?? "active",
+            Objectives = (data.Objectives ?? new List<ObjectivePostData>())
+                .Select(o => new Objective
+                {
+                    Key = o.Key,
+                    Description = o.Description,
+                    Status = o.Status ?? "pending"
+                }).ToList(),
+            AssignedCharacters = data.AssignedCharacters ?? new List<int>()
+        };
+    }
 }
