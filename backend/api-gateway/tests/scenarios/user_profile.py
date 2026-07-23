@@ -7,11 +7,8 @@ scenarios: list[Scenario] = []
 
 
 def register_user_profile_scenario():
-    admin_id = 3001
-    stranger_id = 3002
-
-    admin_token = generate_token(admin_id)
-    stranger_token = generate_token(stranger_id)
+    admin_token, admin_id = generate_token()
+    stranger_token, stranger_id = generate_token()
 
     data = {
         "at": admin_token,

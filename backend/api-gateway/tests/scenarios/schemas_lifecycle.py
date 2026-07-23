@@ -7,11 +7,8 @@ scenarios: list[Scenario] = []
 
 
 def register_schemas_scenario():
-    admin_id = 9001
-    user_id = 9002
-
-    admin_token = generate_token(admin_id)
-    user_token = generate_token(user_id)
+    admin_token, admin_id = generate_token()
+    user_token, user_id = generate_token()
 
     data = {
         "at": admin_token,

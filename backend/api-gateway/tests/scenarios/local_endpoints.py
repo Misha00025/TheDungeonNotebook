@@ -7,8 +7,7 @@ scenarios: list[Scenario] = []
 
 
 def register_local_endpoints_scenario():
-    user_id = 12001
-    token = generate_token(user_id)
+    token, user_id = generate_token()
 
     data = {
         "at": token,

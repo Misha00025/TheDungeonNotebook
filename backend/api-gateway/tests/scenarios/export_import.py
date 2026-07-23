@@ -7,8 +7,7 @@ scenarios: list[Scenario] = []
 
 
 def register_export_import_scenario():
-    admin_id = 13001
-    admin_token = generate_token(admin_id)
+    admin_token, admin_id = generate_token()
 
     data = {
         "at": admin_token,

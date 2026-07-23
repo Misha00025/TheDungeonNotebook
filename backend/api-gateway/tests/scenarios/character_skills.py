@@ -7,11 +7,8 @@ scenarios: list[Scenario] = []
 
 
 def register_character_skills_scenario():
-    admin_id = 7001
-    user_id = 7002
-
-    admin_token = generate_token(admin_id)
-    user_token = generate_token(user_id)
+    admin_token, admin_id = generate_token()
+    user_token, user_id = generate_token()
 
     data = {
         "at": admin_token,

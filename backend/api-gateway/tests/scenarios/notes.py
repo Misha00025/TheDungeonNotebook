@@ -7,13 +7,9 @@ scenarios: list[Scenario] = []
 
 
 def register_notes_scenario():
-    admin_id = 8001
-    user_id = 8002
-    viewer_id = 8003
-
-    admin_token = generate_token(admin_id)
-    user_token = generate_token(user_id)
-    viewer_token = generate_token(viewer_id)
+    admin_token, admin_id = generate_token()
+    user_token, user_id = generate_token()
+    viewer_token, viewer_id = generate_token()
 
     data = {
         "at": admin_token,

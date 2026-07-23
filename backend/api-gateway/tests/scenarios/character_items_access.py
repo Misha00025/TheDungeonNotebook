@@ -7,13 +7,9 @@ scenarios: list[Scenario] = []
 
 
 def register_character_items_access_scenario():
-    admin_id = 10001
-    reader_id = 10002
-    writer_id = 10003
-
-    admin_token = generate_token(admin_id)
-    reader_token = generate_token(reader_id)
-    writer_token = generate_token(writer_id)
+    admin_token, admin_id = generate_token()
+    reader_token, reader_id = generate_token()
+    writer_token, writer_id = generate_token()
 
     data = {
         "at": admin_token,
