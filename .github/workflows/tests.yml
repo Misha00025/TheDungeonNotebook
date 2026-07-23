@@ -17,7 +17,24 @@ on:
       - 'backend/campaign-service/**'
 
 jobs:
+  dotnet-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - auth-service
+          - users-service
+          - campaign-service
+          - uploads-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet build backend/${{ matrix.service }}
+
   integration-tests:
+    needs: [dotnet-build]
     runs-on: ubuntu-latest
 
     steps:
