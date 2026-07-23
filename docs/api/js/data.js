@@ -12,7 +12,10 @@ var SCHEMAS = {
 
   // --- Навыки ---
   fullSkill: '{\n  "id": "int",\n  "name": "string",\n  "description": "string",\n  "attributes": [{"key": "string","name": "string","description": "string","value": "string"}],\n  "isSecret": "bool"\n}',
-  briefSkillObj: '{"id": "int","name": "string","description": "string","attributes": [{"key": "string","name": "string","description": "string"}],"isSecret": "bool"}'
+  briefSkillObj: '{"id": "int","name": "string","description": "string","attributes": [{"key": "string","name": "string","description": "string"}],"isSecret": "bool"}',
+
+  // --- Квесты ---
+  fullQuest: '{\n  "id": "int",\n  "header": "string",\n  "description": "string",\n  "reward": ["string"],\n  "status": ""active"" | ""completed"" | ""failed"" | ""cancelled"",\n  "objectives": [{"key": "string","description": "string","status": ""pending"" | ""completed"" | ""failed"" | ""cancelled""}],\n  "assignedCharacters": ["int"]\n}'
 };
 
 const ENDPOINTS = [
@@ -1205,5 +1208,144 @@ const ENDPOINTS = [
     responseStatuses: ["200 OK", "400 Bad Request", "403 Forbidden", "404 Not Found"],
     params: null,
     special: null
+  },
+  {
+    id: "get-groups-id-quests",
+    method: "GET",
+    url: "/groups/{id}/quests",
+    category: "group-quests",
+    categoryTitle: "Квесты группы",
+    page: "groups/quests.html",
+    auth: "required",
+    access: null,
+    description: "Список квестов группы с фильтрацией. Если параметры не указаны — все квесты группы.",
+    requestBody: null,
+    requestBodyRequired: null,
+    responseSchema: '{\n  "quests": [' + SCHEMAS.fullQuest + ']\n}',
+    responseStatuses: ["200 OK"],
+    params: [
+      { name: "userId", type: "int", description: "Квесты, доступные пользователю" },
+      { name: "characterId", type: "int", description: "Квесты конкретного персонажа" }
+    ],
+    special: null
+  },
+  {
+    id: "post-groups-id-quests",
+    method: "POST",
+    url: "/groups/{id}/quests",
+    category: "group-quests",
+    categoryTitle: "Квесты группы",
+    page: "groups/quests.html",
+    auth: "required",
+    access: "group_admin",
+    description: "Создание квеста группы.",
+    requestBody: '{\n  "header": "string",\n  "description"?: "string",\n  "reward"?: ["string"],\n  "status"?: ""active"" | ""completed"" | ""failed"" | ""cancelled"",\n  "objectives"?: [{"key": "string","description": "string","status"?: ""pending"" | ""completed"" | ""failed"" | ""cancelled""}],\n  "assignedCharacters"?: ["int"]\n}',
+    requestBodyRequired: ["header"],
+    responseSchema: SCHEMAS.fullQuest,
+    responseStatuses: ["201 Created", "400 Bad Request"],
+    params: null,
+    special: null
+  },
+  {
+    id: "get-groups-id-quests-questId",
+    method: "GET",
+    url: "/groups/{id}/quests/{questId}",
+    category: "group-quests",
+    categoryTitle: "Квесты группы",
+    page: "groups/quests.html",
+    auth: "required",
+    access: null,
+    description: "Получение одного квеста.",
+    requestBody: null,
+    requestBodyRequired: null,
+    responseSchema: SCHEMAS.fullQuest,
+    responseStatuses: ["200 OK", "404 Not Found"],
+    params: null,
+    special: null
+  },
+  {
+    id: "put-groups-id-quests-questId",
+    method: "PUT",
+    url: "/groups/{id}/quests/{questId}",
+    category: "group-quests",
+    categoryTitle: "Квесты группы",
+    page: "groups/quests.html",
+    auth: "required",
+    access: "quest_writer",
+    description: "Полное обновление квеста. Требует write-доступ хотя бы к одному назначенному персонажу.",
+    requestBody: '{\n  "header": "string",\n  "description": "string",\n  "reward": ["string"],\n  "status": ""active"" | ""completed"" | ""failed"" | ""cancelled"",\n  "objectives": [{"key": "string","description": "string","status": ""pending"" | ""completed"" | ""failed"" | ""cancelled""}],\n  "assignedCharacters": ["int"]\n}',
+    requestBodyRequired: ["header"],
+    responseSchema: SCHEMAS.fullQuest,
+    responseStatuses: ["200 OK", "400 Bad Request", "403 Forbidden", "404 Not Found"],
+    params: null,
+    special: null
+  },
+  {
+    id: "patch-groups-id-quests-questId",
+    method: "PATCH",
+    url: "/groups/{id}/quests/{questId}",
+    category: "group-quests",
+    categoryTitle: "Квесты группы",
+    page: "groups/quests.html",
+    auth: "required",
+    access: "quest_writer",
+    description: "Частичное обновление квеста. Можно обновить только нужные поля. Objectives обновляются по ключу (merge).",
+    requestBody: '{\n  "header"?: "string",\n  "description"?: "string",\n  "reward"?: ["string"],\n  "status"?: ""active"" | ""completed"" | ""failed"" | ""cancelled"",\n  "objectives"?: [{"key": "string","description"?: "string","status"?: ""pending"" | ""completed"" | ""failed"" | ""cancelled""}],\n  "assignedCharacters"?: ["int"]\n}',
+    requestBodyRequired: null,
+    responseSchema: '{\n  "updated": "bool"\n}',
+    responseStatuses: ["200 OK", "400 Bad Request", "403 Forbidden", "404 Not Found"],
+    params: null,
+    special: null
+  },
+  {
+    id: "delete-groups-id-quests-questId",
+    method: "DELETE",
+    url: "/groups/{id}/quests/{questId}",
+    category: "group-quests",
+    categoryTitle: "Квесты группы",
+    page: "groups/quests.html",
+    auth: "required",
+    access: "group_admin",
+    description: "Удаление квеста.",
+    requestBody: null,
+    requestBodyRequired: null,
+    responseSchema: '{\n  "deleted": "bool"\n}',
+    responseStatuses: ["200 OK", "403 Forbidden", "404 Not Found"],
+    params: null,
+    special: null
+  },
+  {
+    id: "get-groups-id-characters-charId-quests",
+    method: "GET",
+    url: "/groups/{id}/characters/{charId}/quests",
+    category: "group-quests",
+    categoryTitle: "Квесты группы",
+    page: "groups/quests.html",
+    auth: "required",
+    access: "character_viewer",
+    description: "Список квестов персонажа.",
+    requestBody: null,
+    requestBodyRequired: null,
+    responseSchema: '{\n  "quests": [' + SCHEMAS.fullQuest + ']\n}',
+    responseStatuses: ["200 OK"],
+    params: null,
+    special: null
+  },
+  {
+    id: "post-groups-id-characters-charId-quests",
+    method: "POST",
+    url: "/groups/{id}/characters/{charId}/quests",
+    category: "group-quests",
+    categoryTitle: "Квесты группы",
+    page: "groups/quests.html",
+    auth: "required",
+    access: "character_writer",
+    description: "Создание квеста для персонажа. Поле assignedCharacters подставляется автоматически.",
+    requestBody: '{\n  "header": "string",\n  "description"?: "string",\n  "reward"?: ["string"],\n  "status"?: ""active"" | ""completed"" | ""failed"" | ""cancelled"",\n  "objectives"?: [{"key": "string","description": "string","status"?: ""pending"" | ""completed"" | ""failed"" | ""cancelled""}]\n}',
+    requestBodyRequired: ["header"],
+    responseSchema: SCHEMAS.fullQuest,
+    responseStatuses: ["201 Created", "400 Bad Request", "403 Forbidden"],
+    params: null,
+    special: ["handler: quest_create_for_character"]
   }
 ];

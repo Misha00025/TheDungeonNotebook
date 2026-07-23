@@ -43,6 +43,7 @@
       key: 'groups', title: 'Группы', icon: '📁', children: [
         { key: 'groups-main', title: 'Группы', page: 'groups/general.html', icon: '📁' },
         { key: 'group-items', title: 'Предметы', page: 'groups/items.html', icon: '⚔️' },
+        { key: 'group-quests', title: 'Квесты', page: 'groups/quests.html', icon: '⚔️' },
         { key: 'group-notes', title: 'Заметки', page: 'groups/notes.html', icon: '📝' },
         { key: 'group-skills', title: 'Навыки', page: 'groups/skills.html', icon: '🎯' },
         { key: 'group-schemas', title: 'Схемы', page: 'groups/schemas.html', icon: '📐' },
