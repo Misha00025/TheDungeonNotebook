@@ -3,11 +3,21 @@ name: Integration Tests
 on:
   push:
     branches: [master]
+    paths:
+      - 'backend/api-gateway/**'
+      - 'backend/auth-service/**'
+      - 'backend/users-service/**'
+      - 'backend/campaign-service/**'
   pull_request:
     branches: [master]
+    paths:
+      - 'backend/api-gateway/**'
+      - 'backend/auth-service/**'
+      - 'backend/users-service/**'
+      - 'backend/campaign-service/**'
 
 jobs:
-  test:
+  integration-tests:
     runs-on: ubuntu-latest
 
     steps:
