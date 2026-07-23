@@ -129,3 +129,57 @@ def check_self_only(ctx: RouteContext):
         return ctx.deny(forbidden())
 
     return ctx.allow()
+
+
+# ============================================================
+# Доступ к квесту
+# ============================================================
+
+@register_access_handler("quest_writer")
+def check_quest_writer(ctx: RouteContext):
+    """
+    Проверяет, что пользователь может редактировать квест.
+
+    Разрешено если:
+    - пользователь — админ группы, ИЛИ
+    - пользователь имеет write-доступ хотя бы к одному персонажу, назначенному на квест
+    """
+    group_id = ctx.path_params.get("group_id")
+    quest_id = ctx.path_params.get("quest_id")
+
+    if group_id is None or quest_id is None:
+        return ctx.deny(forbidden())
+
+    user_id = get_user_id(ctx.jwt)
+    if user_id is None:
+        return ctx.deny(forbidden())
+
+    try:
+        quest_resp = ctx.services.campaign.get(f"/groups/{group_id}/quests/{quest_id}")
+        if not quest_resp.ok:
+            return ctx.deny(forbidden())
+        quest_data = quest_resp.json()
+        assigned_characters = quest_data.get("assignedCharacters", [])
+    except Exception:
+        return ctx.deny(forbidden())
+
+    if not assigned_characters:
+        ok, is_admin, response = check_access_to_group_by_jwt(group_id, ctx.jwt)
+        if not ok or not is_admin:
+            return ctx.deny(response or forbidden())
+        return ctx.allow()
+
+    characters = []
+    ok, is_admin, response = check_access_to_group_by_jwt(group_id, ctx.jwt, characters)
+    if not ok:
+        return ctx.deny(response)
+
+    if is_admin:
+        return ctx.allow()
+
+    assigned_set = set(int(c) for c in assigned_characters)
+    for char_access in characters:
+        if int(char_access["characterId"]) in assigned_set and char_access.get("canWrite"):
+            return ctx.allow()
+
+    return ctx.deny(forbidden())

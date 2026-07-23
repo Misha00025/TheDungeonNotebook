@@ -141,10 +141,12 @@ def register_quests_scenario():
             f"Expected header 'Find the Amulet (Updated)', got {res.json().get('header')}"
         )))
 
-    # 14. PUT objective status (user, character_writer)
+    # 14. PATCH objective status via quest patch (user, character_writer)
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
-        request="groups/{steps.2.id}/quests/{steps.9.id}/objectives/find_temple/status",
-        method="PUT", data={"status": "completed"},
+        request="groups/{steps.2.id}/quests/{steps.9.id}",
+        method="PATCH", data={
+            "objectives": [{"key": "find_temple", "status": "completed"}]
+        },
         requirement=OK))
 
     # 15. GET quest after objective update (admin)
@@ -188,6 +190,63 @@ def register_quests_scenario():
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/quests/{steps.9.id}", method="GET",
         requirement=NOT_FOUND, is_valid=is_error()))
+
+    # 22. User creates quest for own character (via character endpoint) → 201
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/{steps.2.id}/characters/{steps.5.id}/quests", method="POST",
+        data={
+            "header": "User's Own Quest",
+            "description": "Created by user for their character",
+            "reward": ["50 XP"],
+            "status": "active",
+            "objectives": [{"key": "do_something", "description": "Do something", "status": "pending"}]
+        }, requirement=CREATED, is_valid=has_id()))
+
+    # 23. Stranger tries to create quest → 403
+    tests.append(Test(headers={**h, "Authorization": "{st}"},
+        request="groups/{steps.2.id}/quests", method="POST",
+        data={
+            "header": "Stranger Quest",
+            "description": "",
+            "reward": [],
+            "status": "active",
+            "objectives": [],
+            "assignedCharacters": ["{steps.5.id}"]
+        }, requirement=FORBID))
+
+    # 24. Stranger tries to create quest for character → 403
+    tests.append(Test(headers={**h, "Authorization": "{st}"},
+        request="groups/{steps.2.id}/characters/{steps.5.id}/quests", method="POST",
+        data={
+            "header": "Hacked Quest",
+            "description": "",
+            "reward": [],
+            "status": "active",
+            "objectives": []
+        }, requirement=FORBID))
+
+    # 25. Stranger tries to update quest → 403
+    tests.append(Test(headers={**h, "Authorization": "{st}"},
+        request="groups/{steps.2.id}/quests/{steps.9.id}", method="PUT",
+        data={
+            "header": "Hacked!",
+            "description": "",
+            "reward": [],
+            "status": "active",
+            "objectives": [],
+            "assignedCharacters": ["{steps.5.id}"]
+        }, requirement=FORBID))
+
+    # 26. Stranger tries to patch quest → 403
+    tests.append(Test(headers={**h, "Authorization": "{st}"},
+        request="groups/{steps.2.id}/quests/{steps.9.id}", method="PATCH",
+        data={"header": "Hacked!"},
+        requirement=FORBID))
+
+    # 27. DELETE user's quest (admin) → 200
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/{steps.2.id}/quests/{steps.22.id}", method="DELETE",
+        requirement=OK))
 
     steps = [DeepGatewayStep(t) for t in tests]
     scenario = Scenario("Quests", steps, data)

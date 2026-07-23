@@ -59,5 +59,23 @@ public static class ModelToResponseExtensions
         price = item.Price,
         isSecret = item.IsSecret
     };
+
+    public static object ToResponse(this Quest quest) => new
+    {
+        id = quest.Id,
+        header = quest.Header,
+        description = quest.Description,
+        reward = quest.Reward,
+        status = quest.Status,
+        objectives = quest.Objectives.Select(o => o.ToResponse()),
+        assignedCharacters = quest.AssignedCharacters
+    };
+
+    public static object ToResponse(this Objective objective) => new
+    {
+        key = objective.Key,
+        description = objective.Description,
+        status = objective.Status
+    };
     
 }

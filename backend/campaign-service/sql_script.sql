@@ -100,3 +100,21 @@ CREATE TABLE IF NOT EXISTS `user_character` (
     PRIMARY KEY (`user_id`, `group_id`, `character_id`),
     FOREIGN KEY (`user_id`, `group_id`) REFERENCES `user_group` (`user_id`, `group_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS quest (
+    quest_id INT AUTO_INCREMENT PRIMARY KEY,
+    group_id INT NOT NULL,
+    uuid VARCHAR(36) NOT NULL,
+    header VARCHAR(255) NOT NULL,
+    status ENUM('active', 'completed', 'failed', 'cancelled') NOT NULL DEFAULT 'active',
+    FOREIGN KEY (group_id) REFERENCES `group`(group_id) ON DELETE CASCADE,
+    UNIQUE KEY (uuid)
+);
+
+CREATE TABLE IF NOT EXISTS quest_assignment (
+    quest_id INT NOT NULL,
+    character_id INT NOT NULL,
+    PRIMARY KEY (quest_id, character_id),
+    FOREIGN KEY (quest_id) REFERENCES quest(quest_id) ON DELETE CASCADE,
+    FOREIGN KEY (character_id) REFERENCES `character`(character_id) ON DELETE CASCADE
+);

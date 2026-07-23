@@ -203,3 +203,25 @@ def handle_user_create(ctx: RouteContext):
     return make_response(result)
 
 
+@register_response_handler("quest_create_for_character")
+def handle_quest_create_for_character(ctx: RouteContext):
+    group_id = ctx.path_params.get("group_id")
+    character_id = ctx.path_params.get("character_id")
+
+    if group_id is None or character_id is None:
+        from app.status import forbidden
+        return forbidden()
+
+    data = ctx.request.get_json(silent=True) or {}
+    data["assignedCharacters"] = [int(character_id)]
+
+    resp = ctx.services.campaign.post(
+        f"/groups/{group_id}/quests",
+        json=data,
+        params={"userId": get_user_id(ctx.jwt)},
+    )
+
+    from app.api_controller import make_response
+    return make_response(resp)
+
+

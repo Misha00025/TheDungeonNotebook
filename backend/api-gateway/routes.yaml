@@ -407,6 +407,72 @@ routes:
     access: group_admin
 
   # ============================================================
+  # Group Quests
+  # ============================================================
+  - path: /groups/<int:group_id>/quests
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/quests
+        auth: required
+        params:
+          query:
+            userId: "{jwt.userId}"
+      POST:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/quests
+        auth: required
+        access: group_admin
+
+  - path: /groups/<int:group_id>/quests/<int:quest_id>
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/quests/{quest_id}
+        auth: required
+      PUT:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/quests/{quest_id}
+        auth: required
+        access: quest_writer
+      PATCH:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/quests/{quest_id}
+        auth: required
+        access: quest_writer
+        params:
+          query:
+            userId: "{jwt.userId}"
+      DELETE:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/quests/{quest_id}
+        auth: required
+        access: group_admin
+
+  - path: /groups/<int:group_id>/characters/<int:character_id>/quests
+    methods:
+      GET:
+        proxy:
+          service: campaign
+          path: /groups/{group_id}/quests
+        auth: required
+        access: character_viewer
+        params:
+          query:
+            userId: "{jwt.userId}"
+            characterId: "{path.character_id}"
+      POST:
+        handler: quest_create_for_character
+        auth: required
+        access: character_writer
+
+  # ============================================================
   # Characters
   # ============================================================
   - path: /groups/<int:group_id>/characters
