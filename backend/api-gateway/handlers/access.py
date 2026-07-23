@@ -177,6 +177,12 @@ def check_quest_writer(ctx: RouteContext):
     if is_admin:
         return ctx.allow()
 
+    # Non-admin can't change assignedCharacters via PATCH
+    if ctx.request.method == "PATCH":
+        body = ctx.request.get_json(silent=True) or {}
+        if "assignedCharacters" in body:
+            return ctx.deny(forbidden())
+
     assigned_set = set(int(c) for c in assigned_characters)
     for char_access in characters:
         if int(char_access["characterId"]) in assigned_set and char_access.get("canWrite"):

@@ -202,7 +202,39 @@ def register_quests_scenario():
             "objectives": [{"key": "do_something", "description": "Do something", "status": "pending"}]
         }, requirement=CREATED, is_valid=has_id()))
 
-    # 23. Stranger tries to create quest → 403
+    # 23. User tries PUT on their own quest → 403 (PUT is group_admin only)
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/{steps.2.id}/quests/{steps.22.id}", method="PUT",
+        data={
+            "header": "Should not work",
+            "description": "",
+            "reward": [],
+            "status": "active",
+            "objectives": [],
+            "assignedCharacters": ["{steps.5.id}"]
+        }, requirement=FORBID))
+
+    # 24. User tries PATCH on their own quest WITH assignedCharacters → 403
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/{steps.2.id}/quests/{steps.22.id}", method="PATCH",
+        data={
+            "header": "Ok",
+            "assignedCharacters": ["{steps.5.id}"]
+        }, requirement=FORBID))
+
+    # 25. User tries abstract POST (not via character endpoint) → 403
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/{steps.2.id}/quests", method="POST",
+        data={
+            "header": "Abstract Quest",
+            "description": "",
+            "reward": [],
+            "status": "active",
+            "objectives": [],
+            "assignedCharacters": ["{steps.5.id}"]
+        }, requirement=FORBID))
+
+    # 26. Stranger tries to create quest → 403
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{steps.2.id}/quests", method="POST",
         data={
@@ -214,7 +246,7 @@ def register_quests_scenario():
             "assignedCharacters": ["{steps.5.id}"]
         }, requirement=FORBID))
 
-    # 24. Stranger tries to create quest for character → 403
+    # 27. Stranger tries to create quest for character → 403
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/quests", method="POST",
         data={
@@ -225,7 +257,7 @@ def register_quests_scenario():
             "objectives": []
         }, requirement=FORBID))
 
-    # 25. Stranger tries to update quest → 403
+    # 28. Stranger tries to update quest → 403
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{steps.2.id}/quests/{steps.9.id}", method="PUT",
         data={
@@ -237,13 +269,13 @@ def register_quests_scenario():
             "assignedCharacters": ["{steps.5.id}"]
         }, requirement=FORBID))
 
-    # 26. Stranger tries to patch quest → 403
+    # 29. Stranger tries to patch quest → 403
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{steps.2.id}/quests/{steps.9.id}", method="PATCH",
         data={"header": "Hacked!"},
         requirement=FORBID))
 
-    # 27. DELETE user's quest (admin) → 200
+    # 30. DELETE user's quest (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/quests/{steps.22.id}", method="DELETE",
         requirement=OK))

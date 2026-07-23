@@ -438,7 +438,7 @@ routes:
           service: campaign
           path: /groups/{group_id}/quests/{quest_id}
         auth: required
-        access: quest_writer
+        access: group_admin
       PATCH:
         proxy:
           service: campaign

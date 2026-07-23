@@ -284,6 +284,16 @@ public class QuestsProvider
                         if (objPatch.Status != null)
                             target.Status = objPatch.Status;
                     }
+                    else
+                    {
+                        // Create new objective if key not found
+                        mongoData.Objectives.Add(new ObjectiveMongoData
+                        {
+                            Key = objPatch.Key,
+                            Description = objPatch.Description ?? "",
+                            Status = objPatch.Status ?? "pending"
+                        });
+                    }
                 }
                 
                 // Mark for replacement
