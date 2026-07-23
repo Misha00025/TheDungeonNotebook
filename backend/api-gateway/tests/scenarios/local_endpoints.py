@@ -1,5 +1,6 @@
 from tests.templates import Test, Scenario, GatewayStep
 from tests.test_variables import *
+from tests.validators import has_keys, is_error
 from .jwt_helper import generate_token
 
 h = {"Content-Type": "application/json; charset=utf-8"}
@@ -22,14 +23,17 @@ def register_local_endpoints_scenario():
         data={"firstName": "Local", "lastName": "Tester", "nickname": "local_tester"}, requirement=CREATED))
 
     # GET /get_api (no auth) → 200
-    tests.append(Test(headers=h, request="get_api", method="GET", requirement=OK))
+    tests.append(Test(headers=h, request="get_api", method="GET", requirement=OK,
+        is_valid=has_keys("api_methods")))
 
     # GET /whoami (with auth) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="whoami", method="GET", requirement=OK))
+        request="whoami", method="GET", requirement=OK,
+        is_valid=has_keys("id", "type", "userId")))
 
     # GET /whoami (no auth) → 401
-    tests.append(Test(headers=h, request="whoami", method="GET", requirement=NOT_AUTH))
+    tests.append(Test(headers=h, request="whoami", method="GET", requirement=NOT_AUTH,
+        is_valid=is_error()))
 
     steps = [GatewayStep(t) for t in tests]
     scenario = Scenario("LocalEndpoints", steps, data)

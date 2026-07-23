@@ -1,5 +1,6 @@
 from tests.templates import Test, Scenario, GatewayStep
 from tests.test_variables import *
+from tests.validators import has_id, has_fields, is_error
 from .jwt_helper import generate_token
 
 h = {"Content-Type": "application/json; charset=utf-8"}
@@ -84,24 +85,29 @@ def register_character_full_access_scenario():
     # 11. PATCH char 1 (reader, read-only) → 403
     tests.append(Test(headers={**h, "Authorization": "{rt}"},
         request="groups/{steps.3.id}/characters/{steps.5.id}", method="PATCH",
-        data={"name": "HackedName"}, requirement=FORBID))
+        data={"name": "HackedName"}, requirement=FORBID,
+        is_valid=is_error()))
 
     # 12. PATCH char 2 (writer, write access) → 200
     tests.append(Test(headers={**h, "Authorization": "{wt}"},
         request="groups/{steps.3.id}/characters/{steps.6.id}", method="PATCH",
-        data={"name": "UpdatedName"}, requirement=OK))
+        data={"name": "UpdatedName"}, requirement=OK,
+        is_valid=has_fields(name="UpdatedName")))
 
     # 13. DELETE char 1 (reader, read-only) → 403
     tests.append(Test(headers={**h, "Authorization": "{rt}"},
-        request="groups/{steps.3.id}/characters/{steps.5.id}", method="DELETE", requirement=FORBID))
+        request="groups/{steps.3.id}/characters/{steps.5.id}", method="DELETE", requirement=FORBID,
+        is_valid=is_error()))
 
     # 14. DELETE char 2 (writer, write access) → 200
     tests.append(Test(headers={**h, "Authorization": "{wt}"},
-        request="groups/{steps.3.id}/characters/{steps.6.id}", method="DELETE", requirement=OK))
+        request="groups/{steps.3.id}/characters/{steps.6.id}", method="DELETE", requirement=OK,
+        is_valid=has_id()))
 
     # 15. Verify char 2 is gone
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.3.id}/characters/{steps.6.id}", method="GET", requirement=NOT_FOUND))
+        request="groups/{steps.3.id}/characters/{steps.6.id}", method="GET", requirement=NOT_FOUND,
+        is_valid=is_error()))
 
     steps = [GatewayStep(t) for t in tests]
     scenario = Scenario("CharacterFullAccess", steps, data)

@@ -26,6 +26,40 @@ cd backend/api-gateway/tests
 ```
 10 seconds is optimal time.
 
+## Response Validation
+
+Все тесты должны проверять не только HTTP-статус (`requirement`), но и содержимое ответа через `is_valid`.
+
+### Validators (`tests/validators.py`)
+
+Каждый валидатор — factory-функция, возвращающая `(bool, str)`:
+
+| Функция | Назначение |
+|---------|-----------|
+| `has_id()` | `id` присутствует и является int |
+| `has_fields(**expected)` | Поля соответствуют ожидаемым значениям |
+| `has_list(key)` | Ключ содержит список |
+| `has_keys(*keys)` | Ключи присутствуют (без проверки значений) |
+| `has_item_in_list(key, item)` | Элемент входит в список |
+| `has_list_empty(key)` | Список пуст |
+| `has_list_eq(key, expected)` | Список равен ожидаемому |
+| `is_error()` | Тело содержит `error`/`title`/текст ошибки |
+| `is_success_with_keys(*keys)` | Нет ошибки + ключи присутствуют |
+
+Все валидаторы безопасно обрабатывают пустые и текстовые ответы (без JSON).
+
+### Правила
+
+- **Create** → `has_id()` (как минимум)
+- **Update** → `has_fields(поле=новое_значение)` (проверить что изменилось)
+- **List** → `has_list("items")` или `has_list("notes")` и т.п.
+- **Delete** → `has_id()` или без проверки (если тело пустое)
+- **Error (4xx)** → `is_error()`
+- **Auth** → `has_keys("access_token", "refresh_token")`
+- **GET single** → `has_id()`
+
+Для глубокой вложенности (например, записи лога) допускается прямая lambda в `is_valid`.
+
 
 ## test.sh Flow
 1. Clean mongo_data/ and mysql_data/

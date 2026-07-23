@@ -1,5 +1,6 @@
 from tests.templates import Test, Scenario, GatewayStep
 from tests.test_variables import *
+from tests.validators import has_id, has_keys, has_fields, has_list, is_error
 from .jwt_helper import generate_token
 
 h = {"Content-Type": "application/json; charset=utf-8"}
@@ -22,17 +23,20 @@ def register_character_lifecycle_scenario():
     # 0. Create admin user
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="users", method="POST",
-        data={"firstName": "Admin", "lastName": "User", "nickname": "char_admin"}, requirement=CREATED))
+        data={"firstName": "Admin", "lastName": "User", "nickname": "char_admin"}, requirement=CREATED,
+        is_valid=has_id()))
 
     # 1. Create regular user
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="users", method="POST",
-        data={"firstName": "Regular", "lastName": "User", "nickname": "char_user"}, requirement=CREATED))
+        data={"firstName": "Regular", "lastName": "User", "nickname": "char_user"}, requirement=CREATED,
+        is_valid=has_id()))
 
     # 2. Create group
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups", method="POST",
-        data={"name": "CharGroup"}, requirement=CREATED))
+        data={"name": "CharGroup"}, requirement=CREATED,
+        is_valid=has_id()))
 
     # 3. Add user to group
     tests.append(Test(headers={**h, "Authorization": "{at}"},
@@ -53,40 +57,48 @@ def register_character_lifecycle_scenario():
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters", method="POST",
         data={"name": "Conan", "description": "Barbarian", "templateId": "{steps.4.id}"},
-        requirement=CREATED))
+        requirement=CREATED,
+        is_valid=has_id()))
 
     # 6. GET /groups/{id}/characters (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/characters", method="GET", requirement=OK))
+        request="groups/{steps.2.id}/characters", method="GET", requirement=OK,
+        is_valid=has_keys()))
 
     # 7. GET /groups/{id}/characters/{charId} (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/characters/{steps.5.id}", method="GET", requirement=OK))
+        request="groups/{steps.2.id}/characters/{steps.5.id}", method="GET", requirement=OK,
+        is_valid=has_id()))
 
     # 8. PATCH /groups/{id}/characters/{charId} (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}", method="PATCH",
-        data={"name": "Conan the Barbarian"}, requirement=OK))
+        data={"name": "Conan the Barbarian"}, requirement=OK,
+        is_valid=has_fields(name="Conan the Barbarian")))
 
     # 9. Create second character for deletion
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters", method="POST",
         data={"name": "DeleteMe", "description": "To be deleted", "templateId": "{steps.4.id}"},
-        requirement=CREATED))
+        requirement=CREATED,
+        is_valid=has_id()))
 
     # 10. DELETE /groups/{id}/characters/{charId} (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/characters/{steps.9.id}", method="DELETE", requirement=OK))
+        request="groups/{steps.2.id}/characters/{steps.9.id}", method="DELETE", requirement=OK,
+        is_valid=has_id()))
 
     # 11. GET /groups/{id}/characters/{charId} (after delete) → 404
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/characters/{steps.9.id}", method="GET", requirement=NOT_FOUND))
+        request="groups/{steps.2.id}/characters/{steps.9.id}", method="GET", requirement=NOT_FOUND,
+        is_valid=is_error()))
 
     # 12. POST /groups/{id}/characters (user, not admin) → 403
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/characters", method="POST",
         data={"name": "Unauthorized", "description": "Should fail", "templateId": "{steps.4.id}"},
-        requirement=FORBID))
+        requirement=FORBID,
+        is_valid=is_error()))
 
     # === Character access control ===
 
@@ -94,13 +106,15 @@ def register_character_lifecycle_scenario():
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters", method="POST",
         data={"name": "WriteTestChar", "description": "", "templateId": "{steps.4.id}"},
-        requirement=CREATED))
+        requirement=CREATED,
+        is_valid=has_id()))
 
     # 14. Create another character for read-only testing
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters", method="POST",
         data={"name": "ReadOnlyTestChar", "description": "", "templateId": "{steps.4.id}"},
-        requirement=CREATED))
+        requirement=CREATED,
+        is_valid=has_id()))
 
     # 15. Add user to group on char_3 (write access)
     tests.append(Test(headers={**h, "Authorization": "{at}"},
@@ -115,16 +129,19 @@ def register_character_lifecycle_scenario():
     # 17. PATCH char_4 (user, read-only) → 403
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/characters/{steps.14.id}", method="PATCH",
-        data={"name": "Hacked"}, requirement=FORBID))
+        data={"name": "Hacked"}, requirement=FORBID,
+        is_valid=is_error()))
 
     # 18. PATCH char_3 (user, write access) → 200
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/characters/{steps.13.id}", method="PATCH",
-        data={"name": "UpdatedByUser"}, requirement=OK))
+        data={"name": "UpdatedByUser"}, requirement=OK,
+        is_valid=has_fields(name="UpdatedByUser")))
 
     # 19. DELETE char_4 (user, read-only) → 403
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
-        request="groups/{steps.2.id}/characters/{steps.14.id}", method="DELETE", requirement=FORBID))
+        request="groups/{steps.2.id}/characters/{steps.14.id}", method="DELETE", requirement=FORBID,
+        is_valid=is_error()))
 
     # 20. DELETE char_3 (user, write access) → 200
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
@@ -132,17 +149,20 @@ def register_character_lifecycle_scenario():
 
     # 21. GET /groups/{id}/characters/{charId}/users (composite handler) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/characters/{steps.5.id}/users", method="GET", requirement=OK))
+        request="groups/{steps.2.id}/characters/{steps.5.id}/users", method="GET", requirement=OK,
+        is_valid=has_list("users")))
 
     # 22. DELETE /.../characters/{charId}/users/{uid} (user, not admin) → 403
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
-        request="groups/{steps.2.id}/characters/{steps.5.id}/users/{uid}", method="DELETE", requirement=FORBID))
+        request="groups/{steps.2.id}/characters/{steps.5.id}/users/{uid}", method="DELETE", requirement=FORBID,
+        is_valid=is_error()))
 
     # 23. Create a new character for admin DELETE user test
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters", method="POST",
         data={"name": "DeleteUserTest", "description": "", "templateId": "{steps.4.id}"},
-        requirement=CREATED))
+        requirement=CREATED,
+        is_valid=has_id()))
 
     # 24. Add user to the new character with write access
     tests.append(Test(headers={**h, "Authorization": "{at}"},

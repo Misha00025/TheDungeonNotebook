@@ -1,5 +1,6 @@
 from tests.templates import Test, Scenario, GatewayStep
 from tests.test_variables import *
+from tests.validators import has_id, has_fields, is_error
 from .jwt_helper import generate_token
 
 h = {"Content-Type": "application/json; charset=utf-8"}
@@ -78,34 +79,41 @@ def register_character_items_access_scenario():
     # 10. POST item (reader, read-only) → 403
     tests.append(Test(headers={**h, "Authorization": "{rt}"},
         request="groups/{steps.3.id}/characters/{steps.5.id}/items", method="POST",
-        data={"name": "StolenItem", "description": "", "amount": 1}, requirement=FORBID))
+        data={"name": "StolenItem", "description": "", "amount": 1}, requirement=FORBID,
+        is_valid=is_error()))
 
     # 11. POST item (writer, write access) → 201
     tests.append(Test(headers={**h, "Authorization": "{wt}"},
         request="groups/{steps.3.id}/characters/{steps.5.id}/items", method="POST",
-        data={"name": "LegitItem", "description": "Writer's item", "amount": 5}, requirement=CREATED))
+        data={"name": "LegitItem", "description": "Writer's item", "amount": 5}, requirement=CREATED,
+        is_valid=has_id()))
 
     # 12. GET item by id (reader, read-only) → 200
     tests.append(Test(headers={**h, "Authorization": "{rt}"},
-        request="groups/{steps.3.id}/characters/{steps.5.id}/items/{steps.11.id}", method="GET", requirement=OK))
+        request="groups/{steps.3.id}/characters/{steps.5.id}/items/{steps.11.id}", method="GET", requirement=OK,
+        is_valid=has_id()))
 
     # 13. PUT item (reader, read-only) → 403
     tests.append(Test(headers={**h, "Authorization": "{rt}"},
         request="groups/{steps.3.id}/characters/{steps.5.id}/items/{steps.11.id}", method="PUT",
-        data={"name": "HackedItem", "amount": 999}, requirement=FORBID))
+        data={"name": "HackedItem", "amount": 999}, requirement=FORBID,
+        is_valid=is_error()))
 
     # 14. PUT item (writer, write access) → 200
     tests.append(Test(headers={**h, "Authorization": "{wt}"},
         request="groups/{steps.3.id}/characters/{steps.5.id}/items/{steps.11.id}", method="PUT",
-        data={"name": "UpdatedItem", "description": "Updated description", "amount": 10}, requirement=OK))
+        data={"name": "UpdatedItem", "description": "Updated description", "amount": 10}, requirement=OK,
+        is_valid=has_fields(amount=10)))
 
     # 15. DELETE item (reader, read-only) → 403
     tests.append(Test(headers={**h, "Authorization": "{rt}"},
-        request="groups/{steps.3.id}/characters/{steps.5.id}/items/{steps.11.id}", method="DELETE", requirement=FORBID))
+        request="groups/{steps.3.id}/characters/{steps.5.id}/items/{steps.11.id}", method="DELETE", requirement=FORBID,
+        is_valid=is_error()))
 
     # 16. DELETE item (writer, write access) → 200
     tests.append(Test(headers={**h, "Authorization": "{wt}"},
-        request="groups/{steps.3.id}/characters/{steps.5.id}/items/{steps.11.id}", method="DELETE", requirement=OK))
+        request="groups/{steps.3.id}/characters/{steps.5.id}/items/{steps.11.id}", method="DELETE", requirement=OK,
+        is_valid=has_id()))
 
     steps = [GatewayStep(t) for t in tests]
     scenario = Scenario("CharacterItemsAccess", steps, data)

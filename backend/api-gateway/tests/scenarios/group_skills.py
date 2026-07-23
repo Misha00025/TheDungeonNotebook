@@ -1,5 +1,6 @@
 from tests.templates import Test, Scenario, GatewayStep
 from tests.test_variables import *
+from tests.validators import has_id, has_keys, has_list, has_fields, is_error
 from .jwt_helper import generate_token
 
 h = {"Content-Type": "application/json; charset=utf-8"}
@@ -47,26 +48,31 @@ def register_group_skills_scenario():
 
     # 5. GET /groups/{id}/skills/attributes → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/skills/attributes", method="GET", requirement=OK))
+        request="groups/{steps.2.id}/skills/attributes", method="GET", requirement=OK,
+        is_valid=has_keys("attributes", "total")))
 
     # 6. POST /groups/{id}/skills (admin) → 201
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/skills", method="POST",
         data={"name": "Athletics", "description": "Climb, jump, swim"},
-        requirement=CREATED))
+        requirement=CREATED,
+        is_valid=has_id()))
 
     # 7. GET /groups/{id}/skills → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/skills", method="GET", requirement=OK))
+        request="groups/{steps.2.id}/skills", method="GET", requirement=OK,
+        is_valid=has_list("skills")))
 
     # 8. GET /groups/{id}/skills/{skillId} → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/skills/{steps.6.id}", method="GET", requirement=OK))
+        request="groups/{steps.2.id}/skills/{steps.6.id}", method="GET", requirement=OK,
+        is_valid=has_id()))
 
     # 9. PUT /groups/{id}/skills/{skillId} (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/skills/{steps.6.id}", method="PUT",
-        data={"name": "Athletics (Improved)"}, requirement=OK))
+        data={"name": "Athletics (Improved)"}, requirement=OK,
+        is_valid=has_fields(name="Athletics (Improved)")))
 
     # 10. DELETE /groups/{id}/skills/{skillId} (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
@@ -75,12 +81,14 @@ def register_group_skills_scenario():
     # 11. POST /groups/{id}/skills (user, not admin) → 403
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/skills", method="POST",
-        data={"name": "Illegal Skill"}, requirement=FORBID))
+        data={"name": "Illegal Skill"}, requirement=FORBID,
+        is_valid=is_error()))
 
     # 12. PUT /groups/{id}/skills/attributes (user, not admin) → 403
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/skills/attributes", method="PUT",
-        data={"attributes": [{"key": "strength", "name": "STR"}]}, requirement=FORBID))
+        data={"attributes": [{"key": "strength", "name": "STR"}]}, requirement=FORBID,
+        is_valid=is_error()))
 
     steps = [GatewayStep(t) for t in tests]
     scenario = Scenario("GroupSkills", steps, data)

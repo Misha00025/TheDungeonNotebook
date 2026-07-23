@@ -1,5 +1,6 @@
 from tests.templates import Test, Scenario, GatewayStep
 from tests.test_variables import *
+from tests.validators import has_id, has_list, is_error
 from .jwt_helper import generate_token
 
 h = {"Content-Type": "application/json; charset=utf-8"}
@@ -47,13 +48,15 @@ def register_character_skills_scenario():
     }
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters/templates", method="POST",
-        data=template, requirement=CREATED))
+        data=template, requirement=CREATED,
+        is_valid=has_id()))
 
     # 5. Create character
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters", method="POST",
         data={"name": "Shadow", "description": "Rogue", "templateId": "{steps.4.id}"},
-        requirement=CREATED))
+        requirement=CREATED,
+        is_valid=has_id()))
 
     # 6. Add user to character with read-only access
     tests.append(Test(headers={**h, "Authorization": "{at}"},
@@ -70,37 +73,44 @@ def register_character_skills_scenario():
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/skills", method="POST",
         data={"name": "Stealth", "description": "Move silently"},
-        requirement=CREATED))
+        requirement=CREATED,
+        is_valid=has_id()))
 
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/skills", method="POST",
         data={"name": "Perception", "description": "Notice things"},
-        requirement=CREATED))
+        requirement=CREATED,
+        is_valid=has_id()))
 
     # 9. PUT /groups/{id}/characters/{charId}/skills/{skillId} (admin, assign Stealth) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/skills/{steps.8.id}",
-        method="PUT", requirement=OK))
+        method="PUT", requirement=OK,
+        is_valid=has_id()))
 
     # 10. PUT /groups/{id}/characters/{charId}/skills/{skillId} (admin, assign Perception) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/skills/{steps.9.id}",
-        method="PUT", requirement=OK))
+        method="PUT", requirement=OK,
+        is_valid=has_id()))
 
     # 11. GET /groups/{id}/characters/{charId}/skills (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/skills",
-        method="GET", requirement=OK))
+        method="GET", requirement=OK,
+        is_valid=has_list("skills")))
 
     # 12. PUT /groups/{id}/characters/{charId}/skills/{skillId} (user, read-only on Stealth) → 403
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/skills/{steps.8.id}",
-        method="PUT", requirement=FORBID))
+        method="PUT", requirement=FORBID,
+        is_valid=is_error()))
 
     # 13. DELETE /groups/{id}/characters/{charId}/skills/{skillId} (admin, delete Stealth) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/skills/{steps.8.id}",
-        method="DELETE", requirement=OK))
+        method="DELETE", requirement=OK,
+        is_valid=has_id()))
 
     steps = [GatewayStep(t) for t in tests]
     scenario = Scenario("CharacterSkillsAssignment", steps, data)

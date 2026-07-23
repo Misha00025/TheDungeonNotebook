@@ -1,5 +1,6 @@
 from tests.templates import Test, Scenario, GatewayStep
 from tests.test_variables import *
+from tests.validators import has_id, has_fields, has_list, is_error
 from .jwt_helper import generate_token
 
 h = {"Content-Type": "application/json; charset=utf-8"}
@@ -22,41 +23,50 @@ def register_user_profile_scenario():
     # 0. POST /users (admin) → 201
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="users", method="POST",
-        data={"firstName": "Admin", "lastName": "Tester", "nickname": "profile_admin"}, requirement=CREATED))
+        data={"firstName": "Admin", "lastName": "Tester", "nickname": "profile_admin"}, requirement=CREATED,
+        is_valid=has_id()))
 
     # 1. POST /users (stranger) → 201
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="users", method="POST",
-        data={"firstName": "Stranger", "lastName": "Tester", "nickname": "profile_stranger"}, requirement=CREATED))
+        data={"firstName": "Stranger", "lastName": "Tester", "nickname": "profile_stranger"}, requirement=CREATED,
+        is_valid=has_id()))
 
     # 2. GET /users/{aid} (own profile) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="users/{aid}", method="GET", requirement=OK))
+        request="users/{aid}", method="GET", requirement=OK,
+        is_valid=has_id()))
 
     # 3. PATCH /users/{aid} (own, firstName) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="users/{aid}", method="PATCH",
-        data={"firstName": "UpdatedAdmin", "visibleName": "UpdatedAdmin"}, requirement=OK))
+        data={"firstName": "UpdatedAdmin", "visibleName": "UpdatedAdmin"}, requirement=OK,
+        is_valid=has_fields(visibleName="UpdatedAdmin")))
 
     # 4. GET /users/{aid} verify name changed → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="users/{aid}", method="GET", requirement=OK))
+        request="users/{aid}", method="GET", requirement=OK,
+        is_valid=has_fields(visibleName="UpdatedAdmin")))
 
     # 5. PATCH /users/{aid} (stranger token) → 403
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="users/{aid}", method="PATCH",
-        data={"firstName": "Hacked"}, requirement=FORBID))
+        data={"firstName": "Hacked"}, requirement=FORBID,
+        is_valid=is_error()))
 
     # 6. POST /users (no token) → 401
     tests.append(Test(headers=h, request="users", method="POST",
-        data={"firstName": "NoAuth", "lastName": "User"}, requirement=NOT_AUTH))
+        data={"firstName": "NoAuth", "lastName": "User"}, requirement=NOT_AUTH,
+        is_valid=is_error()))
 
     # 7. GET /users (no token) → 200
-    tests.append(Test(headers=h, request="users", method="GET", requirement=OK))
+    tests.append(Test(headers=h, request="users", method="GET", requirement=OK,
+        is_valid=has_list("users")))
 
     # 8. GET /users (with token) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="users", method="GET", requirement=OK))
+        request="users", method="GET", requirement=OK,
+        is_valid=has_list("users")))
 
     steps = [GatewayStep(t) for t in tests]
     scenario = Scenario("UserProfile", steps, data)

@@ -1,5 +1,6 @@
 from tests.templates import Test, Scenario, GatewayStep
 from tests.test_variables import *
+from tests.validators import has_keys, is_error
 from .jwt_helper import generate_token
 
 h = {"Content-Type": "application/json; charset=utf-8"}
@@ -46,44 +47,53 @@ def register_schemas_scenario():
     # 4. PUT /groups/{id}/schemas/items (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/schemas/items", method="PUT",
-        data=schema_items, requirement=OK))
+        data=schema_items, requirement=OK,
+        is_valid=has_keys("type")))
 
     # 5. GET /groups/{id}/schemas/items → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/schemas/items", method="GET", requirement=OK))
+        request="groups/{steps.2.id}/schemas/items", method="GET", requirement=OK,
+        is_valid=has_keys("type")))
 
     # 6. PUT /groups/{id}/schemas/skills (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/schemas/skills", method="PUT",
-        data=schema_skills, requirement=OK))
+        data=schema_skills, requirement=OK,
+        is_valid=has_keys("type")))
 
     # 7. GET /groups/{id}/schemas/skills → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/schemas/skills", method="GET", requirement=OK))
+        request="groups/{steps.2.id}/schemas/skills", method="GET", requirement=OK,
+        is_valid=has_keys("type")))
 
     # 8. PUT /groups/{id}/schemas/template (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/schemas/template", method="PUT",
-        data=schema_template, requirement=OK))
+        data=schema_template, requirement=OK,
+        is_valid=has_keys("type")))
 
     # 9. GET /groups/{id}/schemas/template → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/schemas/template", method="GET", requirement=OK))
+        request="groups/{steps.2.id}/schemas/template", method="GET", requirement=OK,
+        is_valid=has_keys("type")))
 
     # 10. PUT /groups/{id}/schemas/items (user, not admin) → 403
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/schemas/items", method="PUT",
-        data=schema_items, requirement=FORBID))
+        data=schema_items, requirement=FORBID,
+        is_valid=is_error()))
 
     # 11. PUT /groups/{id}/schemas/skills (user, not admin) → 403
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/schemas/skills", method="PUT",
-        data=schema_skills, requirement=FORBID))
+        data=schema_skills, requirement=FORBID,
+        is_valid=is_error()))
 
     # 12. PUT /groups/{id}/schemas/template (user, not admin) → 403
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/schemas/template", method="PUT",
-        data=schema_template, requirement=FORBID))
+        data=schema_template, requirement=FORBID,
+        is_valid=is_error()))
 
     steps = [GatewayStep(t) for t in tests]
     scenario = Scenario("SchemasLifecycle", steps, data)

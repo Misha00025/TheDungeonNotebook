@@ -1,5 +1,6 @@
 from tests.templates import Test, Scenario, GatewayStep
 from tests.test_variables import *
+from tests.validators import has_fields, has_list_empty, has_item_in_list, has_list_eq, is_error
 from .jwt_helper import generate_token
 
 h = {"Content-Type": "application/json; charset=utf-8"}
@@ -49,7 +50,7 @@ def register_dashboard_config_scenario():
     # 5. GET /groups/{id}/schemas/characters/resources → 200, check fields
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/schemas/characters/resources", method="GET", requirement=OK,
-        is_valid=lambda test, res: (res.json().get("fields") == schema_fields, f"Expected fields={schema_fields}, got {res.json().get('fields')}")))
+        is_valid=has_fields(fields=schema_fields)))
 
     # 6. PUT /groups/{id}/schemas/characters/resources (user, not admin) → 403
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
@@ -77,7 +78,7 @@ def register_dashboard_config_scenario():
     # 10. GET equipment (empty) → 200, items = []
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/characters/{steps.8.id}/equipment", method="GET", requirement=OK,
-        is_valid=lambda test, res: (res.json().get("items") == [], f"Expected empty items, got {res.json().get('items')}")))
+        is_valid=has_list_empty("items")))
 
     # 11. PATCH equipment add → 200
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
@@ -87,7 +88,7 @@ def register_dashboard_config_scenario():
     # 12. GET equipment → 200, contains 42
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/characters/{steps.8.id}/equipment", method="GET", requirement=OK,
-        is_valid=lambda test, res: (42 in res.json().get("items", []), f"Expected items to contain 42, got {res.json().get('items')}")))
+        is_valid=has_item_in_list("items", 42)))
 
     # 13. PATCH equipment remove → 200
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
@@ -97,7 +98,7 @@ def register_dashboard_config_scenario():
     # 14. GET equipment → 200, empty again
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/characters/{steps.8.id}/equipment", method="GET", requirement=OK,
-        is_valid=lambda test, res: (res.json().get("items") == [], f"Expected empty items after remove, got {res.json().get('items')}")))
+        is_valid=has_list_empty("items")))
 
     # 15. PUT equipment (full replace) → 200
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
@@ -107,7 +108,7 @@ def register_dashboard_config_scenario():
     # 16. GET equipment → 200, contains [7, 3, 5]
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/characters/{steps.8.id}/equipment", method="GET", requirement=OK,
-        is_valid=lambda test, res: (res.json().get("items") == [7, 3, 5], f"Expected [7,3,5], got {res.json().get('items')}")))
+        is_valid=has_list_eq("items", [7, 3, 5])))
 
     # 17. PUT equipment (admin, as admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
@@ -117,7 +118,7 @@ def register_dashboard_config_scenario():
     # 18. GET equipment (user, check cleared) → 200, items = []
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/characters/{steps.8.id}/equipment", method="GET", requirement=OK,
-        is_valid=lambda test, res: (res.json().get("items") == [], f"Expected empty items after admin clear, got {res.json().get('items')}")))
+        is_valid=has_list_empty("items")))
 
     steps = [GatewayStep(t) for t in tests]
     scenario = Scenario("DashboardConfig", steps, data)
