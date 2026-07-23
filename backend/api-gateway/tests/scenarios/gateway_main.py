@@ -27,13 +27,9 @@ scenarios: list[Scenario] = []
 
 
 def register_gateway_main():
-    admin_id = 2001
-    user_id = 2002
-    evil_id = 2003
-
-    admin_token = generate_token(admin_id)
-    user_token = generate_token(user_id)
-    evil_token = generate_token(evil_id)
+    admin_token, admin_id = generate_token()
+    user_token, user_id = generate_token()
+    evil_token, evil_id = generate_token()
 
     data = {
         "at": admin_token,

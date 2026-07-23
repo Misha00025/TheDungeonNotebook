@@ -1,0 +1,22 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run integration tests
+        run: cd backend/api-gateway/tests && bash test-ci.sh -c
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: backend/api-gateway/tests/logs/
