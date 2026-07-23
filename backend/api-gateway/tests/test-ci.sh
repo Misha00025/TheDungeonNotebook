@@ -10,7 +10,7 @@ openssl genrsa -out certs/private.pem 2048 2>/dev/null
 openssl rsa -in certs/private.pem -pubout -out certs/public.pem 2>/dev/null
 
 # 1. Install test dependencies
-pip install --break-system-packages --ignore-installed -r ../../api-gateway/req.txt -q
+pip install --break-system-packages --ignore-installed -r requirements.txt -q
 
 # 2. Build and start stack
 docker compose up -d --build

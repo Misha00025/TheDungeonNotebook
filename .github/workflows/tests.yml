@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run integration tests
-        run: cd backend/api-gateway/tests && bash test-ci.sh
+        run: cd backend/api-gateway/tests && bash test-ci.sh -c
 
       - name: Upload logs on failure
         if: failure()

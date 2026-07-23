@@ -3,6 +3,14 @@
 # Имя контейнера, состояние которого нужно отслеживать
 MAIN_SERVICE="api-gateway"
 
+# Проверка и создание виртуального окружения
+if [ ! -d "venv" ]; then
+    echo "Создаю виртуальное окружение..."
+    python3 -m venv venv
+    ./venv/bin/pip install --ignore-installed -r requirements.txt -q
+    echo "Готово"
+fi
+
 # Очистка данных БД между запусками
 sudo rm -rf mongo_data/*
 sudo rm -rf mysql_data/*
