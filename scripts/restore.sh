@@ -50,7 +50,7 @@ restore_service() {
         -e "CREATE DATABASE IF NOT EXISTS \`$db_name\`"
 
     echo "Restoring $sql_file -> $db_name ..."
-    docker compose -f "$COMPOSE_FILE" exec -i mysql \
+    docker compose -f "$COMPOSE_FILE" exec -T mysql \
         mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$db_name" \
         < "$sql_file"
 
