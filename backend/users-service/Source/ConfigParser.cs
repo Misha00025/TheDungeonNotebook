@@ -20,6 +20,13 @@ public class ConfigParser
 	public ConfigParser(){
 		_mysqlConnectionString = Environment.GetEnvironmentVariable("MYSQL_CONNECTION_STRING");
 		_databaseName = Environment.GetEnvironmentVariable("MYSQL_DATABASE");
+
+		// Логируем строку подключения (без пароля)
+		var maskedConn = _mysqlConnectionString != null 
+			? System.Text.RegularExpressions.Regex.Replace(_mysqlConnectionString, "password=[^;]+", "password=***")
+			: "null";
+		Console.WriteLine($"[Config] MYSQL_CONNECTION_STRING: {maskedConn}");
+
 		if (_mysqlConnectionString == null || _databaseName == null)
 		{
 			
