@@ -5,7 +5,6 @@ namespace Tdn.Configuration;
 
 public class ConfigParser
 {	
-	private string? _databaseName;
 	private string? _mysqlConnectionString;
 	
 	private string? _connection = null;
@@ -19,7 +18,6 @@ public class ConfigParser
 
 	public ConfigParser(){
 		_mysqlConnectionString = Environment.GetEnvironmentVariable("MYSQL_CONNECTION_STRING");
-		_databaseName = Environment.GetEnvironmentVariable("MYSQL_DATABASE");
 
 		// Логируем строку подключения (без пароля)
 		var maskedConn = _mysqlConnectionString != null 
@@ -27,12 +25,10 @@ public class ConfigParser
 			: "null";
 		Console.WriteLine($"[Config] MYSQL_CONNECTION_STRING: {maskedConn}");
 
-		if (_mysqlConnectionString == null || _databaseName == null)
+		if (_mysqlConnectionString == null)
 		{
-			
 			throw new Exception($"Can't find information to connect to databases:\n"+
-									$" |-mysql:{_mysqlConnectionString}\n"+
-									$" |-dbname: {_databaseName}"
+									$" |-mysql:{_mysqlConnectionString}"
 								);
 		}
 	}

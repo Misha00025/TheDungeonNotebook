@@ -34,16 +34,15 @@ public class ConfigParser
 			: "null";
 		Console.WriteLine($"[Config] MYSQL_CONNECTION_STRING: {maskedConn}");
 
-		if (_mongoConnectionString == null || _mysqlConnectionString == null || _databaseName == null)
+		if (_mongoConnectionString == null || _mysqlConnectionString == null)
 		{
 			throw new Exception($"Can't find information to connect to databases:\n"+
 									$" |-mongo:{_mongoConnectionString}\n"+
-									$" |-mysql:{_mysqlConnectionString}\n"+
-									$" |-dbname: {_databaseName}"
+									$" |-mysql:{_mysqlConnectionString}"
 								);
 		}
 		if (_mongoDBName == null)
-			_mongoDBName = _databaseName;
+			_mongoDBName = _databaseName ?? "tdn";
 		if (_schemasMongoDBName == null)
 			_schemasMongoDBName = "tdn-schemas";
 	}
