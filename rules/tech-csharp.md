@@ -52,6 +52,67 @@ public abstract class BaseController : ControllerBase
 - Use `Where(e => ...).FirstOrDefault()`, not `Find()`
 - Entity → dict via `ToDict()` extension methods
 
+### Migrations (EF Core)
+- Schema is managed via EF Core Migrations (`Database.Migrate()`), NOT `EnsureCreated()`.
+- Each service has its own `DesignTimeDbContextFactory<TContext>` in `Db/Contexts/`.
+- Generate migrations from the service directory with the `MYSQL_CONNECTION_STRING` env var set:
+  ```bash
+  export MYSQL_CONNECTION_STRING="server=mysql;database=<db>;user=<user>;password=<pwd>"
+  dotnet ef migrations add <Name>
+  ```
+- `Program.cs` applies migrations on startup with retry:
+  ```csharp
+  using (var scope = app.Services.CreateScope())
+  {
+      var ctx = scope.ServiceProvider.GetRequiredService<XContext>();
+      for (int i = 0; i < 10; i++)
+      {
+          try
+          {
+              ctx.Database.Migrate();
+              Console.WriteLine("[Init] Migrations applied successfully");
+              break;
+          }
+          catch
+          {
+              Thread.Sleep(3000);
+          }
+      }
+  }
+  ```
+- Migration naming convention: `InitialCreate` for first migration, descriptive names for subsequent ones.
+- To generate idempotent SQL script:
+  ```bash
+  dotnet ef migrations script --idempotent -o migrate.sql
+  ```
+
+### DesignTimeDbContextFactory Template
+```csharp
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Design;
+using Tdn.Configuration;
+using Tdn.Db.Configuers;
+
+namespace Tdn.Db.Contexts;
+
+public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<XContext>
+{
+    public XContext CreateDbContext(string[] args)
+    {
+        var config = new ConfigParser();
+        var configurer = new EntityBuildersConfigurer();
+        var optionsBuilder = new DbContextOptionsBuilder<XContext>();
+        config.ConfigDbConnections(optionsBuilder);
+        return new XContext(optionsBuilder.Options, configurer);
+    }
+}
+```
+
+### Campaign Service (multiple contexts)
+- If a service has multiple DbContexts sharing the same database (e.g. campaign-service), designate ONE "master" context (usually `CampaignContext`) for migrations.
+- The other contexts query the same tables — no separate migration needed.
+- All contexts continue to be registered in DI for query use.
+
 ## Program.cs Pattern
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
@@ -65,6 +126,29 @@ app.UseHttpMetrics();
 app.MapMetrics();
 app.MapControllers();
 app.Run();
+```
+
+### Startup DB Migration Pattern
+On startup, apply pending migrations with a retry loop (waiting for MySQL readiness):
+
+```csharp
+using (var scope = app.Services.CreateScope())
+{
+    var ctx = scope.ServiceProvider.GetRequiredService<XContext>();
+    for (int i = 0; i < 10; i++)
+    {
+        try
+        {
+            ctx.Database.Migrate();
+            Console.WriteLine("[Init] Migrations applied successfully");
+            break;
+        }
+        catch
+        {
+            Thread.Sleep(3000);
+        }
+    }
+}
 ```
 
 ## Prometheus Metrics
