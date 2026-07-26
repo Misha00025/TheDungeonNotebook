@@ -43,9 +43,11 @@
 | `MONGO_INITDB_ROOT_USERNAME` | MongoDB user |
 | `MONGO_INITDB_ROOT_PASSWORD` | MongoDB password |
 | `MYSQL_ROOT_PASSWORD` | MySQL root |
-| `MYSQL_DATABASE` | MySQL database name |
 | `MYSQL_USER` | MySQL app user |
 | `MYSQL_PASSWORD` | MySQL app password |
+| `AUTH_DATABASE` | MySQL database name for auth-service |
+| `USERS_DATABASE` | MySQL database name for users-service |
+| `CAMPAIGN_DATABASE` | MySQL database name for campaign-service |
 | `SERVICE_TOKEN` | Internal service auth token |
 
 ## Certificates
@@ -72,3 +74,32 @@ Multi-stage build with `dotnet publish`.
 - Separate compose: `monitoring/docker-compose.yaml`
 - Network: `backend_backend-network` (external: true)
 - Prometheus :9090, Grafana :3000
+
+## Backup & Migration Scripts
+
+### backup.sh
+- File: `scripts/backup.sh`
+- Usage: `cd backend && ../scripts/backup.sh -f docker-compose.yaml [-o <backup-dir>]`
+- Creates dumps per-service (AUTH_DATABASE, USERS_DATABASE, CAMPAIGN_DATABASE — if they exist) + full dump of all databases
+- Skips databases that don't exist yet (works both before and after migration)
+- Requires `.env` in the current directory
+
+### split-dump.sh
+- File: `scripts/split-dump.sh`
+- Usage: `cd backend && ../scripts/split-dump.sh -f docker-compose.yaml [-o <output-dir>]`
+- Takes a full MySQL dump (via docker compose exec mysqldump) and splits it into three SQL files:
+  - `auth.sql` (table: auth_data)
+  - `users.sql` (tables: user, linked_services)
+  - `campaign.sql` (tables: group, charlist_template, character, item, character_item, skill, character_skill, note, note_keyword, user_group, user_character, quest, quest_assignment)
+- Output files contain table schemas and data only (no CREATE DATABASE / USE — use restore.sh)
+- Designed for migrating from a single shared database to per-service databases
+- Requires `.env` in the current directory
+- Also saves `full_dump.sql` — raw full MySQL dump for verification purposes
+
+### restore.sh
+- File: `scripts/restore.sh`
+- Usage: `cd backend && ../scripts/restore.sh -f docker-compose.yaml -d <dump-dir>`
+- Creates per-service databases (AUTH_DATABASE, USERS_DATABASE, CAMPAIGN_DATABASE) and restores data from split dump files
+- Expects `<dump-dir>/auth.sql`, `<dump-dir>/users.sql`, `<dump-dir>/campaign.sql`
+- Uses `.env` variables for database names
+- Requires `.env` in the current directory

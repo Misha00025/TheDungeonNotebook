@@ -27,16 +27,22 @@ public class ConfigParser
 		_databaseName = Environment.GetEnvironmentVariable("MYSQL_DATABASE");
 		_mongoDBName = Environment.GetEnvironmentVariable("MONGO_DATABASE");
 		_schemasMongoDBName = Environment.GetEnvironmentVariable("MONGO_SCHEMAS_DATABASE");
-		if (_mongoConnectionString == null || _mysqlConnectionString == null || _databaseName == null)
+
+		// Логируем строку подключения (без пароля)
+		var maskedConn = _mysqlConnectionString != null 
+			? System.Text.RegularExpressions.Regex.Replace(_mysqlConnectionString, "password=[^;]+", "password=***")
+			: "null";
+		Console.WriteLine($"[Config] MYSQL_CONNECTION_STRING: {maskedConn}");
+
+		if (_mongoConnectionString == null || _mysqlConnectionString == null)
 		{
 			throw new Exception($"Can't find information to connect to databases:\n"+
 									$" |-mongo:{_mongoConnectionString}\n"+
-									$" |-mysql:{_mysqlConnectionString}\n"+
-									$" |-dbname: {_databaseName}"
+									$" |-mysql:{_mysqlConnectionString}"
 								);
 		}
 		if (_mongoDBName == null)
-			_mongoDBName = _databaseName;
+			_mongoDBName = _databaseName ?? "tdn";
 		if (_schemasMongoDBName == null)
 			_schemasMongoDBName = "tdn-schemas";
 	}
