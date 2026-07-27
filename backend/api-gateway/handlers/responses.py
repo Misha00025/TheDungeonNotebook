@@ -1,37 +1,22 @@
-"""
-Кастомные response-хендлеры для endpoint'ов, которые не являются
-простым HTTP-прокси (композитные, локальные, со特殊ной логикой).
-
-Каждый хендлер регистрируется через @register_response_handler("name")
-и может быть использован в routes.yaml по имени.
-"""
-
-from flask import jsonify
-
 from app.engine.context import RouteContext
-from app.security import get_user_id
 from app.engine.registry import register_response_handler
-from app.status import ok, unauthorized
+from app.engine.status import ok, unauthorized, forbidden, not_found
+from starlette.responses import Response
 
 
-# ============================================================
-# Локальные эндпоинты
-# ============================================================
+def get_user_id(jwt_payload: dict | None) -> str | None:
+    if jwt_payload is None:
+        return None
+    return jwt_payload.get("userId") or jwt_payload.get("sub")
+
 
 @register_response_handler("get_api")
-def handle_get_api(ctx: RouteContext):
-    """
-    Возвращает схему всех зарегистрированных API-методов.
-    """
-    from app.api_controller import get_routers_info
-    return ok({"api_methods": get_routers_info()})
+async def handle_get_api(ctx: RouteContext):
+    return ok({"message": "PyApiGate"})
 
 
 @register_response_handler("whoami")
-def handle_whoami(ctx: RouteContext):
-    """
-    Декодирует JWT и возвращает информацию о текущем пользователе/группе.
-    """
+async def handle_whoami(ctx: RouteContext):
     uid = get_user_id(ctx.jwt)
     gid = ctx.jwt.get("groupId") if ctx.jwt else None
 
@@ -51,28 +36,16 @@ def handle_whoami(ctx: RouteContext):
     })
 
 
-# ============================================================
-# Composite endpoints — оркестрация нескольких сервисов
-# ============================================================
-
 @register_response_handler("group_users")
-def handle_group_users(ctx: RouteContext):
-    """
-    Собирает список пользователей группы из двух сервисов:
-    1. policy-service — список userId с правами
-    2. users-service — профили пользователей
-
-    Возвращает агрегированный список {user, isAdmin}.
-    """
+async def handle_group_users(ctx: RouteContext):
     group_id = ctx.path_params["group_id"]
 
-    # Запрос к policy-service
     pres = ctx.services.campaign.get(
         "/polices/groups",
         params={"groupId": group_id}
     )
     if not pres.ok:
-        return jsonify({"error": "Not found"}), 404
+        return not_found({"error": "Not found"})
 
     group_users = []
     for entry in pres.json().get("users", []):
@@ -87,18 +60,10 @@ def handle_group_users(ctx: RouteContext):
 
 
 @register_response_handler("character_users")
-def handle_character_users(ctx: RouteContext):
-    """
-    Собирает список пользователей персонажа из двух сервисов:
-    1. policy-service — список userId с character-правами
-    2. users-service — профили пользователей
-
-    Возвращает агрегированный список {user, canWrite}.
-    """
+async def handle_character_users(ctx: RouteContext):
     group_id = ctx.path_params["group_id"]
     character_id = ctx.path_params["character_id"]
 
-    # Запрос к policy-service
     pres = ctx.services.campaign.get(
         "/polices/groups/characters",
         params={
@@ -107,7 +72,7 @@ def handle_character_users(ctx: RouteContext):
         }
     )
     if not pres.ok:
-        return jsonify({"error": "Not found"}), 404
+        return not_found({"error": "Not found"})
 
     character_users = []
     for entry in pres.json().get("users", []):
@@ -122,106 +87,83 @@ def handle_character_users(ctx: RouteContext):
 
 
 @register_response_handler("group_export")
-def handle_group_export(ctx: RouteContext):
-    """
-    Экспорт данных группы.
-    Проксирует запрос в campaign-service с дополнительными параметрами.
-    """
-    from app.api_controller import make_response
-
+async def handle_group_export(ctx: RouteContext):
     group_id = ctx.path_params["group_id"]
-    include = ctx.request.args.get("include", "templates,characters,items,skills")
+    include = ctx.request.query_params.get("include", "templates,characters,items,skills")
     uid = get_user_id(ctx.jwt)
 
     params = {"include": include}
     if uid:
         params["userId"] = str(uid)
 
-    # Используем существующий сервис-клиент для совместимости
-    from app import services as svc
-    result = svc.groups(ctx.request.headers, group_id).export(
+    result = ctx.services.campaign.get(
+        f"/groups/{group_id}/export",
         params=params,
-        headers=ctx.request.headers,
     )
 
+    resp = ok(result.json() if result.ok else {})
     try:
-        return result.json(), result.status_code
+        return Response(content=result.content, status_code=result.status_code, media_type="application/json")
     except Exception:
-        return result.content, result.status_code
+        return Response(content=result.content, status_code=result.status_code)
 
 
 @register_response_handler("group_import")
-def handle_group_import(ctx: RouteContext):
-    """
-    Импорт данных группы.
-    Проксирует запрос в campaign-service с дополнительными параметрами.
-    """
-    from app.api_controller import make_response
-
+async def handle_group_import(ctx: RouteContext):
     group_id = ctx.path_params["group_id"]
-    include = ctx.request.args.get("include", "templates,characters,items,skills")
+    include = ctx.request.query_params.get("include", "templates,characters,items,skills")
     uid = get_user_id(ctx.jwt)
 
     params = {"include": include}
     if uid:
         params["userId"] = str(uid)
 
-    from app import services as svc
-    result = svc.groups(ctx.request.headers, group_id).import_data(
-        data=ctx.request.data,
+    body = await ctx.request.body()
+
+    result = ctx.services.campaign.post(
+        f"/groups/{group_id}/import",
+        data=body,
         params=params,
-        headers=ctx.request.headers,
     )
 
-    try:
-        return result.json(), result.status_code
-    except Exception:
-        return result.content, result.status_code
+    return Response(content=result.content, status_code=result.status_code, media_type="application/json")
 
 
 @register_response_handler("user_create")
-def handle_user_create(ctx: RouteContext):
-    """
-    Создание пользователя.
-    Принудительно подставляет id из JWT в тело запроса,
-    чтобы пользователь не мог указать чужой id.
-    """
-    from app import services as svc
-
+async def handle_user_create(ctx: RouteContext):
     uid = get_user_id(ctx.jwt)
     if uid is None:
-        from app.status import forbidden
         return forbidden()
 
-    data = ctx.request.get_json() or {}
+    try:
+        data = await ctx.request.json()
+    except Exception:
+        data = {}
     data["id"] = int(uid)
 
-    user_svc = svc.users(ctx.request.headers)
-    result = user_svc.post(json=data)
+    result = ctx.services.users.post("/users", json=data)
 
-    from app.api_controller import make_response
-    return make_response(result)
+    return Response(content=result.content, status_code=result.status_code, media_type="application/json")
 
 
 @register_response_handler("quest_create_for_character")
-def handle_quest_create_for_character(ctx: RouteContext):
+async def handle_quest_create_for_character(ctx: RouteContext):
     group_id = ctx.path_params.get("group_id")
     character_id = ctx.path_params.get("character_id")
 
     if group_id is None or character_id is None:
-        from app.status import forbidden
         return forbidden()
 
-    data = ctx.request.get_json(silent=True) or {}
+    try:
+        data = await ctx.request.json()
+    except Exception:
+        data = {}
     data["assignedCharacters"] = [int(character_id)]
 
-    resp = ctx.services.campaign.post(
+    result = ctx.services.campaign.post(
         f"/groups/{group_id}/quests",
         json=data,
         params={"userId": get_user_id(ctx.jwt)},
     )
 
-    from app.api_controller import make_response
-    return make_response(resp)
-
-
+    return Response(content=result.content, status_code=result.status_code, media_type="application/json")

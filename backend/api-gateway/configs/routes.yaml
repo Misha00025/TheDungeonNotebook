@@ -3,24 +3,21 @@
 # ============================================================
 # Движок не знает бизнес-логики. Все access-хендлеры (group_member,
 # group_admin, character_writer и т.д.) — кастомные, определены
-# в app/handlers/access.py.
+# в handlers/access.py.
 # ============================================================
 
-# Префикс URL для всех маршрутов.
-# Пустая строка "" — маршруты прямо на /groups/..., /auth/... и т.д.
-# "/v2" — маршруты на /v2/groups/..., /v2/auth/... и т.д.
 base_path: ""
 
-# URL'ы сервисов задаются через переменные окружения ${VAR}.
-# Значения по умолчанию можно указать через ${VAR:-http://host:port}.
-# См. docker-compose.yaml — секция api-gateway → environment.
-# ------ Сервисы ------
+auth:
+  strategy: oauth2_jwt
+  jwks_url: "${AUTH_SERVICE_URL}/.well-known/jwks.json"
+  expected_issuer: "${OIDC_ISSUER}"
+
 services:
   auth:      { base_url: "${AUTH_SERVICE_URL}" }
   users:     { base_url: "${USERS_SERVICE_URL}" }
   campaign:  { base_url: "${CAMPAIGN_SERVICE_URL}" }
 
-# ------ Маршруты ------
 routes:
 
   # ============================================================
@@ -88,7 +85,7 @@ routes:
         handler: user_create
         auth: required
 
-  - path: /users/<int:user_id>
+  - path: /users/{user_id}
     methods:
       GET:
         proxy:
@@ -126,7 +123,7 @@ routes:
           query:
             userId: "{jwt.userId}"
 
-  - path: /groups/<int:group_id>
+  - path: /groups/{group_id}
     methods:
       GET:
         proxy:
@@ -146,12 +143,12 @@ routes:
   # ============================================================
   # Group Users (composite)
   # ============================================================
-  - path: /groups/<int:group_id>/users
+  - path: /groups/{group_id}/users
     methods: [GET]
     handler: group_users
     auth: required
 
-  - path: /groups/<int:group_id>/users/<int:user_id>
+  - path: /groups/{group_id}/users/{user_id}
     methods:
       PUT:
         proxy:
@@ -177,7 +174,7 @@ routes:
   # ============================================================
   # Group Items
   # ============================================================
-  - path: /groups/<int:group_id>/items
+  - path: /groups/{group_id}/items
     methods:
       GET:
         proxy:
@@ -194,7 +191,7 @@ routes:
         auth: required
         access: group_admin
 
-  - path: /groups/<int:group_id>/items/<int:item_id>
+  - path: /groups/{group_id}/items/{item_id}
     methods:
       GET:
         proxy:
@@ -218,9 +215,9 @@ routes:
         access: group_admin
 
   # ============================================================
-  # Group Notes (notes-service)
+  # Group Notes
   # ============================================================
-  - path: /groups/<int:group_id>/notes
+  - path: /groups/{group_id}/notes
     methods:
       GET:
         proxy:
@@ -240,7 +237,7 @@ routes:
         auth: required
         access: group_admin
 
-  - path: /groups/<int:group_id>/notes/<int:note_id>
+  - path: /groups/{group_id}/notes/{note_id}
     methods:
       GET:
         proxy:
@@ -264,7 +261,7 @@ routes:
   # ============================================================
   # Group Skills
   # ============================================================
-  - path: /groups/<int:group_id>/skills/attributes
+  - path: /groups/{group_id}/skills/attributes
     methods:
       GET:
         proxy:
@@ -281,7 +278,7 @@ routes:
         auth: required
         access: group_admin
 
-  - path: /groups/<int:group_id>/skills
+  - path: /groups/{group_id}/skills
     methods:
       GET:
         proxy:
@@ -297,7 +294,7 @@ routes:
         auth: required
         access: group_admin
 
-  - path: /groups/<int:group_id>/skills/<int:skill_id>
+  - path: /groups/{group_id}/skills/{skill_id}
     methods:
       GET:
         proxy:
@@ -323,7 +320,7 @@ routes:
   # ============================================================
   # Group Schemas
   # ============================================================
-  - path: /groups/<int:group_id>/schemas/items
+  - path: /groups/{group_id}/schemas/items
     methods:
       GET:
         proxy:
@@ -340,7 +337,7 @@ routes:
         auth: required
         access: group_admin
 
-  - path: /groups/<int:group_id>/schemas/skills
+  - path: /groups/{group_id}/schemas/skills
     methods:
       GET:
         proxy:
@@ -357,7 +354,7 @@ routes:
         auth: required
         access: group_admin
 
-  - path: /groups/<int:group_id>/schemas/template
+  - path: /groups/{group_id}/schemas/template
     methods:
       GET:
         proxy:
@@ -374,7 +371,7 @@ routes:
         auth: required
         access: group_admin
 
-  - path: /groups/<int:group_id>/schemas/characters/resources
+  - path: /groups/{group_id}/schemas/characters/resources
     methods:
       GET:
         proxy:
@@ -394,13 +391,13 @@ routes:
   # ============================================================
   # Export / Import
   # ============================================================
-  - path: /groups/<int:group_id>/export
+  - path: /groups/{group_id}/export
     methods: [GET]
     handler: group_export
     auth: required
     access: group_admin
 
-  - path: /groups/<int:group_id>/import
+  - path: /groups/{group_id}/import
     methods: [POST]
     handler: group_import
     auth: required
@@ -409,7 +406,7 @@ routes:
   # ============================================================
   # Group Quests
   # ============================================================
-  - path: /groups/<int:group_id>/quests
+  - path: /groups/{group_id}/quests
     methods:
       GET:
         proxy:
@@ -426,7 +423,7 @@ routes:
         auth: required
         access: group_admin
 
-  - path: /groups/<int:group_id>/quests/<int:quest_id>
+  - path: /groups/{group_id}/quests/{quest_id}
     methods:
       GET:
         proxy:
@@ -455,7 +452,7 @@ routes:
         auth: required
         access: group_admin
 
-  - path: /groups/<int:group_id>/characters/<int:character_id>/quests
+  - path: /groups/{group_id}/characters/{character_id}/quests
     methods:
       GET:
         proxy:
@@ -475,7 +472,7 @@ routes:
   # ============================================================
   # Characters
   # ============================================================
-  - path: /groups/<int:group_id>/characters
+  - path: /groups/{group_id}/characters
     methods:
       GET:
         proxy:
@@ -492,7 +489,7 @@ routes:
         auth: required
         access: group_admin
 
-  - path: /groups/<int:group_id>/characters/<int:character_id>
+  - path: /groups/{group_id}/characters/{character_id}
     methods:
       GET:
         proxy:
@@ -521,12 +518,12 @@ routes:
   # ============================================================
   # Character Users (composite)
   # ============================================================
-  - path: /groups/<int:group_id>/characters/<int:character_id>/users
+  - path: /groups/{group_id}/characters/{character_id}/users
     methods: [GET]
     handler: character_users
     auth: required
 
-  - path: /groups/<int:group_id>/characters/<int:character_id>/users/<int:user_id>
+  - path: /groups/{group_id}/characters/{character_id}/users/{user_id}
     methods:
       PUT:
         proxy:
@@ -554,7 +551,7 @@ routes:
   # ============================================================
   # Character Templates
   # ============================================================
-  - path: /groups/<int:group_id>/characters/templates
+  - path: /groups/{group_id}/characters/templates
     methods:
       GET:
         proxy:
@@ -577,7 +574,7 @@ routes:
         auth: required
         access: group_admin
 
-  - path: /groups/<int:group_id>/characters/templates/<int:template_id>
+  - path: /groups/{group_id}/characters/templates/{template_id}
     methods:
       GET:
         proxy:
@@ -595,9 +592,9 @@ routes:
         access: group_admin
 
   # ============================================================
-  # Character Items (campaign-service)
+  # Character Items
   # ============================================================
-  - path: /groups/<int:group_id>/characters/<int:character_id>/items
+  - path: /groups/{group_id}/characters/{character_id}/items
     methods:
       GET:
         proxy:
@@ -617,7 +614,7 @@ routes:
           query:
             userId: "{jwt.userId}"
 
-  - path: /groups/<int:group_id>/characters/<int:character_id>/items/<int:item_id>
+  - path: /groups/{group_id}/characters/{character_id}/items/{item_id}
     methods:
       GET:
         proxy:
@@ -647,9 +644,9 @@ routes:
             userId: "{jwt.userId}"
 
   # ============================================================
-  # Character Notes (notes-service)
+  # Character Notes
   # ============================================================
-  - path: /groups/<int:group_id>/characters/<int:character_id>/notes
+  - path: /groups/{group_id}/characters/{character_id}/notes
     methods:
       GET:
         proxy:
@@ -666,7 +663,7 @@ routes:
         auth: required
         access: character_writer
 
-  - path: /groups/<int:group_id>/characters/<int:character_id>/notes/<int:note_id>
+  - path: /groups/{group_id}/characters/{character_id}/notes/{note_id}
     methods:
       GET:
         proxy:
@@ -690,7 +687,7 @@ routes:
   # ============================================================
   # Character Skills
   # ============================================================
-  - path: /groups/<int:group_id>/characters/<int:character_id>/skills
+  - path: /groups/{group_id}/characters/{character_id}/skills
     methods: [GET]
     proxy:
       service: campaign
@@ -699,7 +696,7 @@ routes:
     params:
       query: "*"
 
-  - path: /groups/<int:group_id>/characters/<int:character_id>/skills/<int:skill_id>
+  - path: /groups/{group_id}/characters/{character_id}/skills/{skill_id}
     methods:
       PUT:
         proxy:
@@ -724,7 +721,7 @@ routes:
   # ============================================================
   # Character Equipment
   # ============================================================
-  - path: /groups/<int:group_id>/characters/<int:character_id>/equipment
+  - path: /groups/{group_id}/characters/{character_id}/equipment
     methods:
       GET:
         proxy:
@@ -756,7 +753,7 @@ routes:
   # ============================================================
   # Character Log
   # ============================================================
-  - path: /groups/<int:group_id>/characters/<int:character_id>/log
+  - path: /groups/{group_id}/characters/{character_id}/log
     methods: [GET]
     proxy:
       service: campaign

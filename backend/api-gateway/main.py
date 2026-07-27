@@ -1,5 +1,7 @@
-from app import application
+import handlers  # noqa: F401 — register custom handlers
+from app import create_app
+import os
 
-
-if __name__ == "__main__":
-    application.run(host="0.0.0.0", port=5000, debug=True)
+app = create_app(
+    config_path=os.environ.get("CONFIG_PATH"),
+)

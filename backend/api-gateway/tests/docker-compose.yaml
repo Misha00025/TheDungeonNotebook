@@ -113,8 +113,7 @@ services:
       - MYSQL_CONNECTION_STRING=server=mysql;database=$AUTH_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
   api-gateway:
-    build: 
-      context: ../
+    image: ghcr.io/misha00025/pyapi-gate:latest
     container_name: api-gateway
     depends_on:
       auth-service:
@@ -129,9 +128,14 @@ services:
       - "5000:5000"
     env_file:
       - ./.env
+    environment:
+      - CONFIG_PATH=/app/configs/routes.yaml
     volumes:
-      - ./certs/public.pem:/certs/public.pem
-    command: ["python", "main.py"]
+      - ../configs:/app/configs:ro
+      - ../handlers:/app/handlers:ro
+      - ../main.py:/app/main.py:ro
+      - ./certs:/certs:ro
+    command: uvicorn main:app --host 0.0.0.0 --port 5000
 
 networks:
   backend-network:
