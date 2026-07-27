@@ -130,8 +130,8 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
         builder.HasOne(e => e.Character).WithMany().HasForeignKey(e => e.CharacterId).IsRequired(false).OnDelete(DeleteBehavior.Cascade);
         builder.Property(e => e.Header).HasColumnName("header");
         builder.Property(e => e.ShortDescription).HasColumnName("short_description").IsRequired(false);
-        builder.Property(e => e.AdditionDate).HasColumnName("addition_date").HasDefaultValueSql("CURRENT_TIMESTAMP");
-        builder.Property(e => e.ModifyDate).HasColumnName("modified_date").HasDefaultValueSql("CURRENT_TIMESTAMP").ValueGeneratedOnAddOrUpdate();
+        builder.Property(e => e.AdditionDate).HasColumnName("addition_date").HasColumnType("datetime").HasDefaultValueSql("CURRENT_TIMESTAMP");
+        builder.Property(e => e.ModifyDate).HasColumnName("modified_date").HasColumnType("datetime").HasDefaultValueSql("CURRENT_TIMESTAMP").ValueGeneratedOnAddOrUpdate();
         builder.HasMany(e => e.Keywords).WithOne(e => e.Note).HasForeignKey(e => e.NoteId);
     }
 

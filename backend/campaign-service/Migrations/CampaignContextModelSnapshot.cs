@@ -180,7 +180,7 @@ namespace backend_cs.Migrations
 
                     b.Property<DateTime>("AdditionDate")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime(6)")
+                        .HasColumnType("datetime")
                         .HasColumnName("addition_date")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
@@ -199,7 +199,7 @@ namespace backend_cs.Migrations
 
                     b.Property<DateTime>("ModifyDate")
                         .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("datetime(6)")
+                        .HasColumnType("datetime")
                         .HasColumnName("modified_date")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 

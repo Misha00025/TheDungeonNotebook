@@ -12,7 +12,7 @@ using Tdn.Db.Contexts;
 namespace backend_cs.Migrations
 {
     [DbContext(typeof(CampaignContext))]
-    [Migration("20260727094734_InitialCreate")]
+    [Migration("20260727103217_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -183,7 +183,7 @@ namespace backend_cs.Migrations
 
                     b.Property<DateTime>("AdditionDate")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime(6)")
+                        .HasColumnType("datetime")
                         .HasColumnName("addition_date")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
@@ -202,7 +202,7 @@ namespace backend_cs.Migrations
 
                     b.Property<DateTime>("ModifyDate")
                         .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("datetime(6)")
+                        .HasColumnType("datetime")
                         .HasColumnName("modified_date")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
