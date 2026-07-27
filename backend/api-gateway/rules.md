@@ -72,8 +72,8 @@ ctx.services.campaign # http://campaign-service:8080
 ```
 
 ## Security
-- JWT validation — **OAuth2 JWT via JWKS endpoint** (`oauth2_jwt` strategy)
-- JWKS fetched from `AUTH_SERVICE_URL/.well-known/jwks.json`
+- JWT validation — **RSA JWT via public key** (`rsa_jwt` strategy)
+- Public key path from `PUBLIC_KEY_PATH` env var (default `/certs/public.pem`)
 - Issuer validation via `OIDC_ISSUER` env var
 - CORS настраивается в переменных окружения gateway
 

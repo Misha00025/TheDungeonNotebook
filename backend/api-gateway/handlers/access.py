@@ -47,7 +47,7 @@ def check_access_to_group_by_jwt(
             return False, False, forbidden()
         group_access = None
         for access in accesses:
-            if access["groupId"] == group_id:
+            if access["groupId"] == int(group_id):
                 group_access = access
                 break
         if group_access is None:
@@ -78,7 +78,7 @@ def check_access_to_character_by_jwt(
 
     character_access = None
     for access in characters:
-        if int(access["characterId"]) == character_id:
+        if int(access["characterId"]) == int(character_id):
             character_access = access
             break
 
@@ -93,6 +93,7 @@ def check_group_member(ctx: RouteContext):
     group_id = ctx.path_params.get("group_id")
     if group_id is None:
         return ctx.deny(forbidden())
+    group_id = int(group_id)
 
     ok, is_admin, response = check_access_to_group_by_jwt(ctx, group_id, ctx.jwt)
     if not ok:
@@ -107,6 +108,7 @@ def check_group_admin(ctx: RouteContext):
     group_id = ctx.path_params.get("group_id")
     if group_id is None:
         return ctx.deny(forbidden())
+    group_id = int(group_id)
 
     ok, is_admin, response = check_access_to_group_by_jwt(ctx, group_id, ctx.jwt)
     if not ok or not is_admin:
@@ -121,6 +123,8 @@ def check_character_viewer(ctx: RouteContext):
     character_id = ctx.path_params.get("character_id")
     if group_id is None or character_id is None:
         return ctx.deny(forbidden())
+    group_id = int(group_id)
+    character_id = int(character_id)
 
     ok, is_admin, can_write, response = check_access_to_character_by_jwt(
         ctx, group_id, character_id, ctx.jwt
@@ -139,6 +143,8 @@ def check_character_writer(ctx: RouteContext):
     character_id = ctx.path_params.get("character_id")
     if group_id is None or character_id is None:
         return ctx.deny(forbidden())
+    group_id = int(group_id)
+    character_id = int(character_id)
 
     ok, is_admin, can_write, response = check_access_to_character_by_jwt(
         ctx, group_id, character_id, ctx.jwt
@@ -157,6 +163,8 @@ def check_character_admin(ctx: RouteContext):
     character_id = ctx.path_params.get("character_id")
     if group_id is None or character_id is None:
         return ctx.deny(forbidden())
+    group_id = int(group_id)
+    character_id = int(character_id)
 
     ok, is_admin, _, response = check_access_to_character_by_jwt(
         ctx, group_id, character_id, ctx.jwt
@@ -188,6 +196,7 @@ def check_quest_writer(ctx: RouteContext):
 
     if group_id is None or quest_id is None:
         return ctx.deny(forbidden())
+    group_id = int(group_id)
 
     user_id = get_user_id(ctx.jwt)
     if user_id is None:
@@ -215,6 +224,12 @@ def check_quest_writer(ctx: RouteContext):
 
     if is_admin:
         return ctx.allow()
+
+    # Non-admin can't change assignedCharacters via PATCH
+    if ctx.request.method == "PATCH":
+        body = ctx.state.get("body", {}) or {}
+        if "assignedCharacters" in body:
+            return ctx.deny(forbidden())
 
     assigned_set = set(int(c) for c in assigned_characters)
     for char_access in characters:

@@ -12,7 +12,10 @@ def get_user_id(jwt_payload: dict | None) -> str | None:
 
 @register_response_handler("get_api")
 async def handle_get_api(ctx: RouteContext):
-    return ok({"message": "PyApiGate"})
+    return ok({
+        "message": "PyApiGate",
+        "api_methods": []
+    })
 
 
 @register_response_handler("whoami")
@@ -118,11 +121,14 @@ async def handle_group_import(ctx: RouteContext):
     if uid:
         params["userId"] = str(uid)
 
-    body = await ctx.request.body()
+    try:
+        body_data = await ctx.request.json()
+    except Exception:
+        body_data = {}
 
     result = ctx.services.campaign.post(
         f"/groups/{group_id}/import",
-        data=body,
+        json=body_data,
         params=params,
     )
 

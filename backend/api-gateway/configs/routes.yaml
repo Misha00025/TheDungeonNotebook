@@ -9,8 +9,8 @@
 base_path: ""
 
 auth:
-  strategy: oauth2_jwt
-  jwks_url: "${AUTH_SERVICE_URL}/.well-known/jwks.json"
+  strategy: rsa_jwt
+  public_key_path: ${PUBLIC_KEY_PATH:-/certs/public.pem}
   expected_issuer: "${OIDC_ISSUER}"
 
 services:
