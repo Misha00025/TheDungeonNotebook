@@ -30,7 +30,7 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
 		builder.Property(e => e.Id).HasColumnName("group_id");
 		builder.HasKey(e => e.Id);
 		builder.Property(e => e.Name).HasColumnName("name");
-		builder.Property(e => e.Icon).HasColumnName("photo_link");
+		builder.Property(e => e.Icon).HasColumnName("photo_link").HasMaxLength(200);
 	}
 
 	public void ConfigureModel(EntityTypeBuilder<ItemData> builder)
@@ -80,7 +80,7 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
 	public void ConfigureModel(EntityTypeBuilder<CharacterSkillData> builder)
 	{
 		builder.ToTable("character_skill");
-		builder.HasKey(e => new { e.SkillId, e.CharacterId });
+		builder.HasKey(e => new { e.CharacterId, e.SkillId });
 		builder.Property(e => e.SkillId).HasColumnName("skill_id");
 		builder.Property(e => e.CharacterId).HasColumnName("character_id");
 		builder.HasOne(e => e.Character).WithMany().HasForeignKey(e => e.CharacterId);		
@@ -90,7 +90,7 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
     public void ConfigureModel(EntityTypeBuilder<CharacterItemData> builder)
     {
         builder.ToTable("character_item");
-		builder.HasKey(e => new { e.ItemId, e.CharacterId });
+		builder.HasKey(e => new { e.CharacterId, e.ItemId });
 		builder.Property(e => e.ItemId).HasColumnName("item_id");
 		builder.Property(e => e.CharacterId).HasColumnName("character_id");
 		builder.Property(e => e.Amount).HasColumnName("amount");
@@ -104,7 +104,7 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
         builder.HasKey(e => new {e.UserId, e.GroupId});
         builder.Property(e => e.UserId).HasColumnName("user_id");
         builder.Property(e => e.GroupId).HasColumnName("group_id");
-        builder.Property(e => e.IsAdmin).HasColumnName("is_admin");
+        builder.Property(e => e.IsAdmin).HasColumnName("is_admin").IsRequired(false);
     }
 
     public void ConfigureModel(EntityTypeBuilder<UserCharacterData> builder)
@@ -114,7 +114,7 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
         builder.Property(l => l.UserId).HasColumnName("user_id");
         builder.Property(e => e.GroupId).HasColumnName("group_id");
         builder.Property(e => e.CharacterId).HasColumnName("character_id");
-        builder.Property(e => e.CanWrite).HasColumnName("can_write");
+        builder.Property(e => e.CanWrite).HasColumnName("can_write").IsRequired(false);
         builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => new {e.UserId, e.GroupId});
     }
 
@@ -129,9 +129,9 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
         builder.Property(e => e.CharacterId).HasColumnName("character_id");
         builder.HasOne(e => e.Character).WithMany().HasForeignKey(e => e.CharacterId).IsRequired(false).OnDelete(DeleteBehavior.Cascade);
         builder.Property(e => e.Header).HasColumnName("header");
-        builder.Property(e => e.ShortDescription).HasColumnName("short_description");
-        builder.Property(e => e.AdditionDate).HasColumnName("addition_date");
-        builder.Property(e => e.ModifyDate).HasColumnName("modified_date");
+        builder.Property(e => e.ShortDescription).HasColumnName("short_description").IsRequired(false);
+        builder.Property(e => e.AdditionDate).HasColumnName("addition_date").HasColumnType("datetime").HasDefaultValueSql("CURRENT_TIMESTAMP");
+        builder.Property(e => e.ModifyDate).HasColumnName("modified_date").HasColumnType("datetime").HasDefaultValueSql("CURRENT_TIMESTAMP").ValueGeneratedOnAddOrUpdate();
         builder.HasMany(e => e.Keywords).WithOne(e => e.Note).HasForeignKey(e => e.NoteId);
     }
 
@@ -149,10 +149,11 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
         builder.HasKey(e => e.Id);
         builder.Property(e => e.Id).HasColumnName("quest_id");
         builder.Property(e => e.GroupId).HasColumnName("group_id");
-        builder.Property(e => e.UUID).HasColumnName("uuid");
+        builder.Property(e => e.UUID).HasColumnName("uuid").HasMaxLength(36);
         builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
-        builder.Property(e => e.Header).HasColumnName("header");
+        builder.Property(e => e.Header).HasColumnName("header").HasMaxLength(255);
         builder.Property(e => e.Status).HasColumnName("status");
+        builder.HasIndex(e => e.UUID).IsUnique();
     }
 
     public void ConfigureModel(EntityTypeBuilder<QuestAssignmentData> builder)

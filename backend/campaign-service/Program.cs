@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Tdn.Configuration;
 using Tdn.Db.Configuers;
 using Tdn.Db.Contexts;
@@ -49,7 +50,7 @@ builder.Services.AddControllers();
 
 var app = builder.Build();
 
-// Auto-create tables with retry (wait for MySQL to be ready)
+// Apply pending migrations with retry (wait for MySQL to be ready)
 using (var scope = app.Services.CreateScope())
 {
     var ctx = scope.ServiceProvider.GetRequiredService<CampaignContext>();
@@ -57,8 +58,8 @@ using (var scope = app.Services.CreateScope())
     {
         try
         {
-            ctx.Database.EnsureCreated();
-            Console.WriteLine("[Init] Tables created/verified successfully");
+            ctx.Database.Migrate();
+            Console.WriteLine("[Init] Migrations applied successfully");
             break;
         }
         catch (Exception ex)

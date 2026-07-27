@@ -8,8 +8,8 @@ public class IndexedData
 public class UserData : IndexedData
 {
     public string Nickname = "";
-    public string VisibleName = "";
-    public string Image = "";
+    public string? VisibleName;
+    public string? Image;
 }
 
 public class LinkedServicesData

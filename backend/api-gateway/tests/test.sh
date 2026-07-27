@@ -30,15 +30,25 @@ sudo rm -rf mysql_data
 docker compose build
 docker compose up -d
 
-# Ждём, пока контейнер перейдёт в состояние Running
-until [[ "$(docker inspect -f "{{.State.Running}}" ${MAIN_SERVICE})" = "true" ]]; do
+# Ждём, пока контейнер перейдёт в состояние Running (максимум 120 сек)
+MAX_RETRIES=24  # 24 * 5 = 120 секунд
+RETRY_COUNT=0
+until [[ "$(docker inspect -f "{{.State.Running}}" ${MAIN_SERVICE} 2>/dev/null)" = "true" ]]; do
+    if [[ $RETRY_COUNT -ge $MAX_RETRIES ]]; then
+        echo "Ошибка: контейнер $MAIN_SERVICE не запустился за $((MAX_RETRIES * 5)) секунд."
+        echo "Логи контейнера:"
+        docker logs ${MAIN_SERVICE} 2>/dev/null || echo "(контейнер не найден)"
+        docker compose down -v
+        exit 1
+    fi
     sleep 5
-    echo "Ожидаем старт контейнера $MAIN_SERVICE..."
+    ((RETRY_COUNT++))
+    echo "Ожидаем старт контейнера $MAIN_SERVICE... (попытка $RETRY_COUNT/$MAX_RETRIES)"
 done
 
 sleep $1
 
-rm -r logs 
+rm -rf logs 
 mkdir logs
 
 # После того, как все контейнеры готовы, запускаем тесты
