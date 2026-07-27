@@ -19,3 +19,4 @@ memory-bank/**
 **/[Rr]elease/
 **/net*.*/
 **/logs/
+**/backups/

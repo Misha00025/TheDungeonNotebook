@@ -33,6 +33,8 @@ AUTH_DB="${AUTH_DATABASE:-tdn_auth}"
 USERS_DB="${USERS_DATABASE:-tdn_users}"
 CAMPAIGN_DB="${CAMPAIGN_DATABASE:-tdn_campaign}"
 DBS="$AUTH_DB $USERS_DB $CAMPAIGN_DB"
+MONGO_USER="${MONGO_INITDB_ROOT_USERNAME:-root}"
+MONGO_PASS="${MONGO_INITDB_ROOT_PASSWORD:-}"
 
 # Дамп только данных — для восстановления в новую схему
 echo "Backing up data-only dump ..."
@@ -48,6 +50,16 @@ docker compose -f "$COMPOSE_FILE" exec -T mysql mysqldump \
     -u root -p"$MYSQL_ROOT_PASSWORD" \
     --routines --triggers \
     --databases $DBS > "$BACKUP_DIR/all_databases_with_schema.sql"
+
+# MongoDB dump через mongodump
+echo "Backing up MongoDB ..."
+docker compose -f "$COMPOSE_FILE" exec -T mongo mongodump \
+    --username="$MONGO_USER" \
+    --password="$MONGO_PASS" \
+    --authenticationDatabase=admin \
+    --archive > "$BACKUP_DIR/mongo.archive" || {
+        echo "WARNING: MongoDB backup failed (mongodump exit code $?)" >&2
+    }
 
 echo "Backup saved to $BACKUP_DIR"
 ls -lh "$BACKUP_DIR"

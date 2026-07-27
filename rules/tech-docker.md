@@ -81,6 +81,7 @@ Multi-stage build with `dotnet publish`.
 - File: `scripts/backup.sh`
 - Usage: `cd backend && ../scripts/backup.sh -f docker-compose.yaml [-o <backup-dir>]`
 - Creates dumps per-service (AUTH_DATABASE, USERS_DATABASE, CAMPAIGN_DATABASE — if they exist) + full dump of all databases
+- Creates `mongo.archive` via `mongodump --archive` for MongoDB backup
 - Skips databases that don't exist yet (works both before and after migration)
 - Requires `.env` in the current directory
 
@@ -98,8 +99,9 @@ Multi-stage build with `dotnet publish`.
 
 ### restore.sh
 - File: `scripts/restore.sh`
-- Usage: `cd backend && ../scripts/restore.sh -f docker-compose.yaml -d <dump-dir>`
-- Creates per-service databases (AUTH_DATABASE, USERS_DATABASE, CAMPAIGN_DATABASE) and restores data from split dump files
-- Expects `<dump-dir>/auth.sql`, `<dump-dir>/users.sql`, `<dump-dir>/campaign.sql`
-- Uses `.env` variables for database names
+- Usage: `cd backend && ../scripts/restore.sh -f docker-compose.yaml -d <dump-file>`
+- Usage (full backup): `cd backend && ../scripts/restore.sh -f docker-compose.yaml -b <backup-dir>`
+- `-d <dump-file>`: restores a single MySQL SQL dump file (legacy mode)
+- `-b <backup-dir>`: restores both MySQL (`all_databases.sql`) and MongoDB (`mongo.archive`) from a backup directory
+- Uses `.env` variables for database names and credentials
 - Requires `.env` in the current directory
