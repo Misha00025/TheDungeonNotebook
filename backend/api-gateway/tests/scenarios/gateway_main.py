@@ -73,7 +73,7 @@ def register_gateway_main():
         is_valid=has_id()))
 
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
-        request="groups/1", method="GET", requirement=NOT_FOUND,
+        request="groups/1", method="GET", requirement=FORBID,
         is_valid=is_error()))
 
     # evil tries to add self to group (not admin) → 403
@@ -97,7 +97,7 @@ def register_gateway_main():
         is_valid=has_id()))
 
     tests.append(Test(headers={**h, "Authorization": "{et}"},
-        request="groups/1", method="GET", requirement=NOT_FOUND,
+        request="groups/1", method="GET", requirement=FORBID,
         is_valid=is_error()))
 
     # admin adds evil to group
@@ -226,9 +226,9 @@ def register_gateway_main():
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/1/users/{eid}", method="DELETE", requirement=OK))
 
-    # Verify evil can no longer see the group → 404
+    # Verify evil can no longer see the group → 403
     tests.append(Test(headers={**h, "Authorization": "{et}"},
-        request="groups/1", method="GET", requirement=NOT_FOUND,
+        request="groups/1", method="GET", requirement=FORBID,
         is_valid=is_error()))
 
     steps = [GatewayStep(t) for t in tests]

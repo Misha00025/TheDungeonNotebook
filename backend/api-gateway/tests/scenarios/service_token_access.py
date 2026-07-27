@@ -100,7 +100,7 @@ def register_service_token_scenario():
     # Test 5: POST /groups/{groupId}/characters
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{sgid}/characters", method="POST",
-        data={"name": "ST Char", "description": "", "templateId": "{steps.3.id}"},
+        data={"name": "ST Char", "description": "", "templateId": 1},
         requirement=CREATED,
         is_valid=has_id()))
 
