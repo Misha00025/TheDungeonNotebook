@@ -48,7 +48,7 @@ done
 
 sleep $1
 
-rm -rf logs 
+sudo rm -rf logs 
 mkdir logs
 
 # После того, как все контейнеры готовы, запускаем тесты

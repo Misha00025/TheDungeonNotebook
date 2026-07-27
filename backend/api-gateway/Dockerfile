@@ -1,21 +1,5 @@
-FROM python:3.13
+FROM ghcr.io/misha00025/pyapi-gate:0.1.1
 
-LABEL maintainer="Misha00025<misha00025@mail.ru>"
-
-ENV TZ=Europe/Moscow
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-WORKDIR /app
-
-# Копируем все файлы из текущей директории в контейнер
-COPY ./req.txt ./req.txt
-
-# Создаем виртуальное окружение и устанавливаем зависимости
-# RUN /bin/python3 -m venv venv
-RUN pip install -r req.txt \
-	&& pip install gunicorn
-
-COPY . .
-
-EXPOSE 5000
-
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "-w", "4", "wsgi:application"]
+COPY configs/ /app/configs/
+COPY handlers/ /app/handlers/
+COPY main.py /app/main.py

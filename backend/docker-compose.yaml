@@ -107,8 +107,7 @@ services:
       - MYSQL_CONNECTION_STRING=server=mysql;database=$CAMPAIGN_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
   api-gateway:
-    build: 
-      context: ./api-gateway
+    build: ./api-gateway
     container_name: api-gateway
     depends_on:
       campaign-service:
@@ -121,8 +120,11 @@ services:
       - "5000:5000"
     env_file:
       - ./.env
+    environment:
+      - CONFIG_PATH=/app/configs/routes.yaml
     volumes:
-      - ./certs/public.pem:/certs/public.pem
+      - ./certs:/certs:ro
+    command: uvicorn main:app --host 0.0.0.0 --port 5000
 
 networks:
   backend-network:

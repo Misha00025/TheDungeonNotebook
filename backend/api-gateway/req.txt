@@ -1,8 +1,0 @@
-Flask==3.0.1
-Flask-Cors==4.0.0
-requests==2.31.0
-cryptography==43.0.0
-prometheus_flask_exporter==0.23.2
-PyJWT
-
-PyYAML==6.0.2

@@ -3,72 +3,62 @@
 ## Project Structure
 ```
 api-gateway/
-├── app/
-│   ├── __init__.py               # Flask app, PrometheusMetrics, engine bootstrap
-│   ├── routes.yaml               # ~67 declarative endpoints (корень сервиса)
-│   ├── engine/
-│   │   ├── bootstrap.py          # Load YAML → create Blueprint → register routes
-│   │   ├── models.py             # RouteConfig, GatewayConfig dataclasses
-│   │   ├── context.py            # RouteContext: request, jwt, services, path_params
-│   │   ├── registry.py           # ServiceRegistry + 3 handler registries
-│   │   ├── loader.py             # Parse routes.yaml
-│   │   ├── pipeline.py           # validate → access → proxy/respond
-│   │   └── proxy.py              # Forward request to backend
-├── handlers/                     # Любой .py файл здесь авто-импортируется при старте
-│   ├── __init__.py               # Авто-импорт через pkgutil
+├── configs/
+│   └── routes.yaml               # ~67 declarative endpoints (корень сервиса)
+├── handlers/                     # Кастомные хендлеры
+│   ├── __init__.py               # Явный импорт access + responses
 │   ├── access.py                 # @register_access_handler("group_member"), etc.
-│   └── responses.py              # @register_response_handler("handler_name")
-│   ├── security/                 # JWT validation helpers
-│   └── services/                 # Legacy HTTP clients (engine overrides these)
-├── wsgi.py                       # Gunicorn entrypoint
-├── main.py                       # Dev server (debug=True)
-├── Dockerfile                    # python:3.13, gunicorn, port 5000
-├── req.txt
-└── tests/                        # Integration tests (see rules/tech-testing.md)
+│   └── responses.py              # @register_response_handler("handler_name") — async
+├── main.py                       # Uvicorn entrypoint (import handlers, create_app())
+└── tests/                        # Integration tests (см. rules/tech-testing.md)
 ```
 
+## Overview
+API Gateway теперь основан на **PyApiGate** — внешнем FastAPI-сервисе (образ `ghcr.io/misha00025/pyapi-gate:latest`).
+Движок и вся инфраструктура живут в образе. В этом репозитории — только кастомный код:
+- `configs/routes.yaml` — декларативная конфигурация маршрутов
+- `handlers/` — кастомные access и response хендлеры
+- `main.py` — точка входа для uvicorn
+
 ## Declarative Engine
-- **All new routes must go into `routes.yaml`** (корень сервиса) — do NOT add `@route` decorators
-- Engine creates a Flask `Blueprint` with `base_path` from YAML (default `/v2/`)
-- Pipeline per route: `validate → access → proxy` (or `response` for custom handlers)
+- **Все новые маршруты — в `configs/routes.yaml`**
+- Pipeline на маршрут: `auth → access → proxy` (или `response` для кастомных хендлеров)
 - `base_url` сервисов поддерживает подстановку `${ENV_VAR}` и `${ENV_VAR:-default}`
+- URL-паттерны: `{group_id}` (FastAPI-style), а не `<int:group_id>` (Flask-style)
 
 ## RouteConfig fields (in routes.yaml)
 ```yaml
 routes:
-  - path: "/groups/{groupId}"
+  - path: "/groups/{group_id}"
     methods: ["GET"]
-    service: campaign
-    access: ["group_member"]
-    response: null           # null = proxy to backend
-    transform: null          # optional post-proxy transform
+    proxy:
+      service: campaign
+      path: /groups/{group_id}
+    auth: required
+    access: group_member
 ```
 
 ## Handler Registries
 ```python
-Любой `.py` файл в `handlers/` автоматически импортируется при старте через `pkgutil.iter_modules`. Не нужно вручную добавлять импорты в bootstrap.
-
-```python
 from app.engine.registry import (
     register_access_handler,
     register_response_handler,
-    register_response_transform,
 )
 
 @register_access_handler("group_admin")
-def check_group_admin(ctx: RouteContext) -> bool: ...
+def check_group_admin(ctx: RouteContext) -> AccessResult: ...
 
 @register_response_handler("get_api")
-def handle_get_api(ctx: RouteContext): ...
+async def handle_get_api(ctx: RouteContext) -> Response: ...
 ```
 
-> **Примечание:** `app.` imports внутри хендлеров (например `from app.engine.context`) работают, т.к. корень проекта (`api-gateway/`) находится в `sys.path`.
+> **Примечание:** `app.` импорты внутри хендлеров (`from app.engine.context`) работают, т.к. образ содержит PyApiGate в `sys.path`.
 
 ## RouteContext
 ```python
-ctx.request      # Flask request
+ctx.request      # FastAPI Request (не Flask!)
 ctx.jwt          # Decoded JWT payload (dict) or None
-ctx.path_params  # URL path params {groupId: "123"}
+ctx.path_params  # URL path params {group_id: "123"}
 ctx.services     # ServiceRegistry instance
 ctx.services.campaign.get("/groups/1")
 ctx.services.campaign.post("/groups", json={...})
@@ -76,24 +66,28 @@ ctx.services.campaign.post("/groups", json={...})
 
 ## ServiceRegistry
 ```python
-ctx.services.auth
-ctx.services.users
-ctx.services.campaign
+ctx.services.auth     # http://auth-service:8080
+ctx.services.users    # http://users-service:8080
+ctx.services.campaign # http://campaign-service:8080
 ```
 
 ## Security
-- Client params `userId` and `access` are **stripped** from incoming requests (`_sanitize_user_params` in `__init__.py`)
-- JWT validated **locally** via RSA public key (`PUBLIC_KEY`) in `pipeline.py:_validate_jwt` — no call to auth-service
-- CORS is **disabled by default**. Set `CORS_ENABLED=1` (or `true`/`yes`) to enable.  
-  Allowed origins are configured via `CORS_ORIGINS` (default `*`).
-- Service URL env vars: `USERS_SERVICE_URL`, `CAMPAIGN_SERVICE_URL`
-- `AUTH_SERVICE_URL` is removed — gateway does not communicate with auth-service directly
+- JWT validation — **RSA JWT via public key** (`rsa_jwt` strategy)
+- Public key path from `PUBLIC_KEY_PATH` env var (default `/certs/public.pem`)
+- Issuer validation via `OIDC_ISSUER` env var
+- CORS настраивается в переменных окружения gateway
 
-## Boot Order
-1. `app/engine/` modules loaded
-2. `handlers/` imported (авто-импорт через `import handlers`)
-3. `routes.yaml` parsed
-4. Blueprint created and registered on Flask app
+## Key Differences from Old Flask Gateway
+| Old (Flask) | New (FastAPI/PyApiGate) |
+|---|---|
+| `<int:group_id>` в URL | `{group_id}` в URL |
+| `ctx.request.args` | `ctx.request.query_params` |
+| `ctx.request.get_json()` | `await ctx.request.json()` (response handlers) |
+| `from app.status import ok` | `from app.engine.status import ok` |
+| Access handlers — любые | Access handlers — **синхронные** |
+| Response handlers — синхронные | Response handlers — **async** |
+| `build: context: ./api-gateway` | `image: ghcr.io/misha00025/pyapi-gate:latest` |
+| Свой `app/` (engine, security) | Engine в образе, только кастомный код в `handlers/` |
 
 ## Dependencies
-Flask 3.x, Gunicorn, prometheus-flask-exporter, requests, PyYAML, PyJWT
+PyApiGate (внешний образ) — FastAPI, uvicorn, PyJWT, httptools, requests, PyYAML, starlette
