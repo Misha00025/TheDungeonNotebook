@@ -18,6 +18,7 @@ from scenarios.auth_flow import register_auth_flow_scenario, scenarios as af_sce
 from scenarios.dashboard_config import register_dashboard_config_scenario, scenarios as dc_scenarios
 from scenarios.character_log import register_character_log_scenario, scenarios as cl_log_scenarios
 from scenarios.quests import register_quests_scenario, scenarios as q_scenarios
+from scenarios.service_token_access import register_service_token_scenario, scenarios as sta_scenarios
 
 if __name__ == "__main__":
     import argparse
@@ -28,7 +29,7 @@ if __name__ == "__main__":
     p.add_argument("-c", "--compact", nargs='?', const=True, default=False)
     p.add_argument("-d", "--debug", nargs='?', const=True, default=False)
     p.add_argument("--server", type=str, help="Адрес сервера")
-    p.add_argument('-S', "--scenario", action='append', help=f'Добавляет сценарий для исполнения. Доступные значения: GatewayMain, UserProfile, GroupItemsLifecycle, CharacterLifecycle, GroupSkills, CharacterSkillsAssignment, ExportImport, Notes, LocalEndpoints, SchemasLifecycle, CharacterItemsAccess, CharacterFullAccess, OidcEndpoints, AuthFlow, DashboardConfig, CharacterLog, Quests')
+    p.add_argument('-S', "--scenario", action='append', help=f'Добавляет сценарий для исполнения. Доступные значения: GatewayMain, UserProfile, GroupItemsLifecycle, CharacterLifecycle, GroupSkills, CharacterSkillsAssignment, ExportImport, Notes, LocalEndpoints, SchemasLifecycle, CharacterItemsAccess, CharacterFullAccess, OidcEndpoints, AuthFlow, DashboardConfig, CharacterLog, Quests, ServiceTokenAccess')
     args = p.parse_args()
 
     if args.server is not None:
@@ -73,6 +74,8 @@ if __name__ == "__main__":
                 register_character_log_scenario()
             elif scenario == "Quests":
                 register_quests_scenario()
+            elif scenario == "ServiceTokenAccess":
+                register_service_token_scenario()
     else:
         register_gateway_main()
         register_user_profile_scenario()
@@ -90,6 +93,7 @@ if __name__ == "__main__":
         register_dashboard_config_scenario()
         register_character_log_scenario()
         register_quests_scenario()
+        register_service_token_scenario()
 
-    all_scenarios = gw_scenarios + up_scenarios + gi_scenarios + cl_scenarios + gs_scenarios + cs_scenarios + ei_scenarios + notes_scenarios + le_scenarios + sl_scenarios + cia_scenarios + cfa_scenarios + af_scenarios + dc_scenarios + cl_log_scenarios + q_scenarios
+    all_scenarios = gw_scenarios + up_scenarios + gi_scenarios + cl_scenarios + gs_scenarios + cs_scenarios + ei_scenarios + notes_scenarios + le_scenarios + sl_scenarios + cia_scenarios + cfa_scenarios + af_scenarios + dc_scenarios + cl_log_scenarios + q_scenarios + sta_scenarios
     main_test.start(all_scenarios)

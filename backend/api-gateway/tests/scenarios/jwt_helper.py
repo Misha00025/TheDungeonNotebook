@@ -24,3 +24,17 @@ def generate_token(user_id: int | None = None, expires_in: int = 3600, oidc: boo
         payload["iss"] = "http://auth-service:8080"
         payload["auth_time"] = int(time.time())
     return jwt.encode(payload, PRIVATE_KEY, algorithm="RS256"), user_id
+
+
+def generate_service_token(group_id: int | None = None, expires_in: int = 3600) -> tuple[str, int]:
+    if group_id is None:
+        group_id = next(_next_id)
+    payload = {
+        "sub": str(group_id),
+        "groupId": group_id,
+        "access_level": 3,
+        "aud": "api-gateway",
+        "iat": int(time.time()),
+        "exp": int(time.time()) + expires_in,
+    }
+    return jwt.encode(payload, PRIVATE_KEY, algorithm="RS256"), group_id

@@ -20,22 +20,37 @@ async def handle_get_api(ctx: RouteContext):
 
 @register_response_handler("whoami")
 async def handle_whoami(ctx: RouteContext):
-    uid = get_user_id(ctx.jwt)
-    gid = ctx.jwt.get("groupId") if ctx.jwt else None
+    jwt_payload = ctx.jwt or {}
+    gid = jwt_payload.get("groupId")
 
-    res_id = uid or gid
-    access_type = "anonymous"
+    # Service token: есть groupId, нет userId
+    if gid is not None:
+        return ok({
+            "id": int(gid),
+            "type": "group",
+            "userId": None,
+            "sub": jwt_payload.get("sub"),
+            "groupId": gid,
+        })
+
+    # User token
+    uid = get_user_id(jwt_payload)
     if uid is not None:
-        access_type = "user"
-    elif gid is not None:
-        access_type = "group"
+        return ok({
+            "id": int(uid),
+            "type": "user",
+            "userId": uid,
+            "sub": jwt_payload.get("sub"),
+            "groupId": None,
+        })
 
+    # Anonymous
     return ok({
-        "id": int(res_id) if res_id is not None else None,
-        "type": access_type,
-        "userId": uid,
-        "sub": uid,
-        "groupId": gid,
+        "id": None,
+        "type": "anonymous",
+        "userId": None,
+        "sub": None,
+        "groupId": None,
     })
 
 
