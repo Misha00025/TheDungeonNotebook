@@ -135,18 +135,18 @@ public class TokenController : ControllerBase
         return JsonSerializer.Deserialize<Dictionary<string, string>>(body) ?? new();
     }
 
-    private async Task<ActionResult> HandlePasswordGrant(Dictionary<string, string> data)
+    private Task<ActionResult> HandlePasswordGrant(Dictionary<string, string> data)
     {
         var username = data.GetValueOrDefault("username");
         var password = data.GetValueOrDefault("password");
         var scope = data.GetValueOrDefault("scope", "openid profile");
 
         if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
-            return BadRequest(new { error = "invalid_request", error_description = "username and password are required" });
+            return Task.FromResult<ActionResult>(BadRequest(new { error = "invalid_request", error_description = "username and password are required" }));
 
         var user = _dbContext.Users.Where(e => e.Username == username).FirstOrDefault();
         if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
-            return Unauthorized(new { error = "invalid_grant", error_description = "Invalid credentials" });
+            return Task.FromResult<ActionResult>(Unauthorized(new { error = "invalid_grant", error_description = "Invalid credentials" }));
 
         var claims = GetUserClaims(user.Id.ToString());
 
@@ -167,7 +167,7 @@ public class TokenController : ControllerBase
             ["scope"] = scope
         };
 
-        return Ok(result);
+        return Task.FromResult<ActionResult>(Ok(result));
     }
 
     private Task<ActionResult> HandleRefreshTokenGrant(Dictionary<string, string> data)
