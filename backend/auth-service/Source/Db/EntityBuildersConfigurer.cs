@@ -31,7 +31,8 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
       builder.ToTable("auth_data");
       builder.HasKey(e => e.Id);
       builder.Property(e => e.Id).HasColumnName("user_id");
-      builder.Property(e => e.Username).HasColumnName("username");
-      builder.Property(e => e.PasswordHash).HasColumnName("password_hash");
+      builder.Property(e => e.Username).HasColumnName("username").HasMaxLength(255);
+      builder.Property(e => e.PasswordHash).HasColumnName("password_hash").HasMaxLength(255);
+      builder.HasIndex(e => e.Username).IsUnique();
     }
 }

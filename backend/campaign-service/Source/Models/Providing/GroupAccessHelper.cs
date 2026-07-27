@@ -38,7 +38,7 @@ public class GroupAccessHelper
     public bool IsAdmin(int groupId, int userId)
     {
         return _policesContext.Groups
-            .Any(g => g.GroupId == groupId && g.UserId == userId && g.IsAdmin);
+            .Any(g => g.GroupId == groupId && g.UserId == userId && g.IsAdmin == true);
     }
 
     /// <summary>
@@ -73,6 +73,6 @@ public class GroupAccessHelper
         if (isGroupAdmin) return true;
 
         return _policesContext.Characters
-            .Any(c => c.GroupId == groupId && c.CharacterId == characterId && c.UserId == userId && c.CanWrite);
+            .Any(c => c.GroupId == groupId && c.CharacterId == characterId && c.UserId == userId && c.CanWrite == true);
     }
 }

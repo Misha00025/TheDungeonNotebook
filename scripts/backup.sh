@@ -40,14 +40,14 @@ for db_var in AUTH_DATABASE USERS_DATABASE CAMPAIGN_DATABASE; do
             continue
         fi
         echo "Backing up $db_var=$db ..."
-        docker compose -f "$COMPOSE_FILE" exec -T mysql mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" \
+        docker compose -f "$COMPOSE_FILE" exec -T mysql mysqldump --no-create-info -u root -p"$MYSQL_ROOT_PASSWORD" \
             --routines --triggers "$db" > "$BACKUP_DIR/$(echo "$db_var" | tr '[:upper:]' '[:lower:]').sql"
     fi
 done
 
 # Полный дамп всего инстанса — всегда
 echo "Backing up all databases ..."
-docker compose -f "$COMPOSE_FILE" exec -T mysql mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" \
+docker compose -f "$COMPOSE_FILE" exec -T mysql mysqldump --no-create-info -u root -p"$MYSQL_ROOT_PASSWORD" \
     --all-databases --routines --triggers > "$BACKUP_DIR/all_databases.sql"
 
 echo "Backup saved to $BACKUP_DIR"

@@ -11,7 +11,7 @@ using Tdn.Db.Contexts;
 namespace users_service.Migrations
 {
     [DbContext(typeof(UserContext))]
-    [Migration("20260726092936_InitialCreate")]
+    [Migration("20260727090103_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -31,12 +31,14 @@ namespace users_service.Migrations
                         .HasColumnName("user_id");
 
                     b.Property<string>("Platform")
-                        .HasColumnType("varchar(255)")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
                         .HasColumnName("platform");
 
                     b.Property<string>("PlatformId")
                         .IsRequired()
-                        .HasColumnType("longtext")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
                         .HasColumnName("platform_id");
 
                     b.HasKey("UserId", "Platform");
@@ -47,28 +49,28 @@ namespace users_service.Migrations
             modelBuilder.Entity("Tdn.Db.Entities.UserData", b =>
                 {
                     b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("int")
                         .HasColumnName("user_id");
 
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
                     b.Property<string>("Image")
-                        .IsRequired()
-                        .HasColumnType("longtext")
+                        .HasColumnType("text")
                         .HasColumnName("image_link");
 
                     b.Property<string>("Nickname")
                         .IsRequired()
-                        .HasColumnType("longtext")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
                         .HasColumnName("nickname");
 
                     b.Property<string>("VisibleName")
-                        .IsRequired()
-                        .HasColumnType("longtext")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
                         .HasColumnName("visible_name");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Nickname")
+                        .IsUnique();
 
                     b.ToTable("user", (string)null);
                 });
@@ -78,7 +80,7 @@ namespace users_service.Migrations
                     b.HasOne("Tdn.Db.Entities.UserData", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("User");

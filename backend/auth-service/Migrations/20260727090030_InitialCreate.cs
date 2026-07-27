@@ -20,9 +20,9 @@ namespace auth_service.Migrations
                 {
                     user_id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
-                    password_hash = table.Column<string>(type: "longtext", nullable: false)
+                    password_hash = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    username = table.Column<string>(type: "longtext", nullable: false)
+                    username = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
@@ -30,6 +30,12 @@ namespace auth_service.Migrations
                     table.PrimaryKey("PK_auth_data", x => x.user_id);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_auth_data_username",
+                table: "auth_data",
+                column: "username",
+                unique: true);
         }
 
         /// <inheritdoc />

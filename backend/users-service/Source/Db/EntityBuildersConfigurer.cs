@@ -29,12 +29,13 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
     // }
     public void ConfigureModel(EntityTypeBuilder<UserData> builder)
     {
-		builder.ToTable("user");
-		builder.HasKey(e => e.Id);
-		builder.Property(e => e.Id).HasColumnName("user_id");
-		builder.Property(e => e.Nickname).HasColumnName("nickname");
-		builder.Property(e => e.VisibleName).HasColumnName("visible_name");
-		builder.Property(e => e.Image).HasColumnName("image_link");
+        builder.ToTable("user");
+        builder.HasKey(e => e.Id);
+        builder.Property(e => e.Id).HasColumnName("user_id").ValueGeneratedNever();
+        builder.Property(e => e.Nickname).HasColumnName("nickname").HasMaxLength(255);
+        builder.Property(e => e.VisibleName).HasColumnName("visible_name").HasMaxLength(255);
+        builder.Property(e => e.Image).HasColumnName("image_link").HasColumnType("text");
+        builder.HasIndex(e => e.Nickname).IsUnique();
     }
 
     public void ConfigureModel(EntityTypeBuilder<LinkedServicesData> builder)
@@ -43,11 +44,12 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
         builder.HasKey(l => new { l.UserId, l.Platform });
         
         builder.Property(l => l.UserId).HasColumnName("user_id");
-        builder.Property(l => l.Platform).HasColumnName("platform").IsRequired();
-        builder.Property(l => l.PlatformId).HasColumnName("platform_id").IsRequired();
+        builder.Property(l => l.Platform).HasColumnName("platform").IsRequired().HasMaxLength(50);
+        builder.Property(l => l.PlatformId).HasColumnName("platform_id").IsRequired().HasMaxLength(255);
         
         builder.HasOne(l => l.User)
                .WithMany()
-               .HasForeignKey(l => l.UserId);
+               .HasForeignKey(l => l.UserId)
+               .OnDelete(DeleteBehavior.Restrict);
     }
 }

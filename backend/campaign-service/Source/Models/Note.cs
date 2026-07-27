@@ -6,7 +6,7 @@ public class Note
     public int GroupId;
     public int? CharacterId;
     public string Header = "";
-    public string ShortDescription = "";
+    public string? ShortDescription;
     public string? Body;
     public DateTime CreatedAt;
     public DateTime UpdatedAt;

@@ -12,7 +12,7 @@ using Tdn.Db.Contexts;
 namespace backend_cs.Migrations
 {
     [DbContext(typeof(CampaignContext))]
-    [Migration("20260726093019_InitialCreate")]
+    [Migration("20260727094734_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -62,38 +62,38 @@ namespace backend_cs.Migrations
 
             modelBuilder.Entity("Tdn.Db.Entities.CharacterItemData", b =>
                 {
-                    b.Property<int>("ItemId")
-                        .HasColumnType("int")
-                        .HasColumnName("item_id");
-
                     b.Property<int>("CharacterId")
                         .HasColumnType("int")
                         .HasColumnName("character_id");
+
+                    b.Property<int>("ItemId")
+                        .HasColumnType("int")
+                        .HasColumnName("item_id");
 
                     b.Property<int>("Amount")
                         .HasColumnType("int")
                         .HasColumnName("amount");
 
-                    b.HasKey("ItemId", "CharacterId");
+                    b.HasKey("CharacterId", "ItemId");
 
-                    b.HasIndex("CharacterId");
+                    b.HasIndex("ItemId");
 
                     b.ToTable("character_item", (string)null);
                 });
 
             modelBuilder.Entity("Tdn.Db.Entities.CharacterSkillData", b =>
                 {
-                    b.Property<int>("SkillId")
-                        .HasColumnType("int")
-                        .HasColumnName("skill_id");
-
                     b.Property<int>("CharacterId")
                         .HasColumnType("int")
                         .HasColumnName("character_id");
 
-                    b.HasKey("SkillId", "CharacterId");
+                    b.Property<int>("SkillId")
+                        .HasColumnType("int")
+                        .HasColumnName("skill_id");
 
-                    b.HasIndex("CharacterId");
+                    b.HasKey("CharacterId", "SkillId");
+
+                    b.HasIndex("SkillId");
 
                     b.ToTable("character_skill", (string)null);
                 });
@@ -133,7 +133,8 @@ namespace backend_cs.Migrations
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Icon")
-                        .HasColumnType("longtext")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)")
                         .HasColumnName("photo_link");
 
                     b.Property<string>("Name")
@@ -181,8 +182,10 @@ namespace backend_cs.Migrations
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("AdditionDate")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("datetime(6)")
-                        .HasColumnName("addition_date");
+                        .HasColumnName("addition_date")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<int?>("CharacterId")
                         .HasColumnType("int")
@@ -198,11 +201,14 @@ namespace backend_cs.Migrations
                         .HasColumnName("header");
 
                     b.Property<DateTime>("ModifyDate")
+                        .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("datetime(6)")
-                        .HasColumnName("modified_date");
+                        .HasColumnName("modified_date")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlComputedColumn(b.Property<DateTime>("ModifyDate"));
 
                     b.Property<string>("ShortDescription")
-                        .IsRequired()
                         .HasColumnType("longtext")
                         .HasColumnName("short_description");
 
@@ -268,7 +274,8 @@ namespace backend_cs.Migrations
 
                     b.Property<string>("Header")
                         .IsRequired()
-                        .HasColumnType("longtext")
+                        .HasMaxLength(255)
+                        .HasColumnType("varchar(255)")
                         .HasColumnName("header");
 
                     b.Property<string>("Status")
@@ -278,12 +285,16 @@ namespace backend_cs.Migrations
 
                     b.Property<string>("UUID")
                         .IsRequired()
-                        .HasColumnType("longtext")
+                        .HasMaxLength(36)
+                        .HasColumnType("varchar(36)")
                         .HasColumnName("uuid");
 
                     b.HasKey("Id");
 
                     b.HasIndex("GroupId");
+
+                    b.HasIndex("UUID")
+                        .IsUnique();
 
                     b.ToTable("quest", (string)null);
                 });
@@ -327,7 +338,7 @@ namespace backend_cs.Migrations
                         .HasColumnType("int")
                         .HasColumnName("character_id");
 
-                    b.Property<bool>("CanWrite")
+                    b.Property<bool?>("CanWrite")
                         .HasColumnType("tinyint(1)")
                         .HasColumnName("can_write");
 
@@ -346,7 +357,7 @@ namespace backend_cs.Migrations
                         .HasColumnType("int")
                         .HasColumnName("group_id");
 
-                    b.Property<bool>("IsAdmin")
+                    b.Property<bool?>("IsAdmin")
                         .HasColumnType("tinyint(1)")
                         .HasColumnName("is_admin");
 

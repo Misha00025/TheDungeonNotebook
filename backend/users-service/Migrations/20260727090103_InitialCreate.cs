@@ -1,5 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -18,13 +17,12 @@ namespace users_service.Migrations
                 name: "user",
                 columns: table => new
                 {
-                    user_id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
-                    image_link = table.Column<string>(type: "longtext", nullable: false)
+                    user_id = table.Column<int>(type: "int", nullable: false),
+                    image_link = table.Column<string>(type: "text", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    nickname = table.Column<string>(type: "longtext", nullable: false)
+                    nickname = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    visible_name = table.Column<string>(type: "longtext", nullable: false)
+                    visible_name = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
@@ -38,9 +36,9 @@ namespace users_service.Migrations
                 columns: table => new
                 {
                     user_id = table.Column<int>(type: "int", nullable: false),
-                    platform = table.Column<string>(type: "varchar(255)", nullable: false)
+                    platform = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    platform_id = table.Column<string>(type: "longtext", nullable: false)
+                    platform_id = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
@@ -51,9 +49,15 @@ namespace users_service.Migrations
                         column: x => x.user_id,
                         principalTable: "user",
                         principalColumn: "user_id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_user_nickname",
+                table: "user",
+                column: "nickname",
+                unique: true);
         }
 
         /// <inheritdoc />

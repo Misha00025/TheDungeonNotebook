@@ -23,7 +23,7 @@ namespace backend_cs.Migrations
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
                     name = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    photo_link = table.Column<string>(type: "longtext", nullable: true)
+                    photo_link = table.Column<string>(type: "varchar(200)", maxLength: 200, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
@@ -38,7 +38,7 @@ namespace backend_cs.Migrations
                 {
                     user_id = table.Column<int>(type: "int", nullable: false),
                     group_id = table.Column<int>(type: "int", nullable: false),
-                    is_admin = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                    is_admin = table.Column<bool>(type: "tinyint(1)", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -96,12 +96,12 @@ namespace backend_cs.Migrations
                 {
                     quest_id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
-                    header = table.Column<string>(type: "longtext", nullable: false)
+                    header = table.Column<string>(type: "varchar(255)", maxLength: 255, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     status = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     group_id = table.Column<int>(type: "int", nullable: false),
-                    uuid = table.Column<string>(type: "longtext", nullable: false)
+                    uuid = table.Column<string>(type: "varchar(36)", maxLength: 36, nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
@@ -145,7 +145,7 @@ namespace backend_cs.Migrations
                     user_id = table.Column<int>(type: "int", nullable: false),
                     group_id = table.Column<int>(type: "int", nullable: false),
                     character_id = table.Column<int>(type: "int", nullable: false),
-                    can_write = table.Column<bool>(type: "tinyint(1)", nullable: false)
+                    can_write = table.Column<bool>(type: "tinyint(1)", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -199,7 +199,7 @@ namespace backend_cs.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_character_item", x => new { x.item_id, x.character_id });
+                    table.PrimaryKey("PK_character_item", x => new { x.character_id, x.item_id });
                     table.ForeignKey(
                         name: "FK_character_item_character_character_id",
                         column: x => x.character_id,
@@ -224,7 +224,7 @@ namespace backend_cs.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_character_skill", x => new { x.skill_id, x.character_id });
+                    table.PrimaryKey("PK_character_skill", x => new { x.character_id, x.skill_id });
                     table.ForeignKey(
                         name: "FK_character_skill_character_character_id",
                         column: x => x.character_id,
@@ -249,10 +249,11 @@ namespace backend_cs.Migrations
                     character_id = table.Column<int>(type: "int", nullable: true),
                     header = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    short_description = table.Column<string>(type: "longtext", nullable: false)
+                    short_description = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    addition_date = table.Column<DateTime>(type: "datetime(6)", nullable: false),
-                    modified_date = table.Column<DateTime>(type: "datetime(6)", nullable: false),
+                    addition_date = table.Column<DateTime>(type: "datetime(6)", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
+                    modified_date = table.Column<DateTime>(type: "datetime(6)", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP")
+                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.ComputedColumn),
                     group_id = table.Column<int>(type: "int", nullable: false),
                     uuid = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4")
@@ -331,14 +332,14 @@ namespace backend_cs.Migrations
                 column: "template_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_character_item_character_id",
+                name: "IX_character_item_item_id",
                 table: "character_item",
-                column: "character_id");
+                column: "item_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_character_skill_character_id",
+                name: "IX_character_skill_skill_id",
                 table: "character_skill",
-                column: "character_id");
+                column: "skill_id");
 
             migrationBuilder.CreateIndex(
                 name: "IX_charlist_template_group_id",
@@ -364,6 +365,12 @@ namespace backend_cs.Migrations
                 name: "IX_quest_group_id",
                 table: "quest",
                 column: "group_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_quest_uuid",
+                table: "quest",
+                column: "uuid",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_quest_assignment_character_id",
