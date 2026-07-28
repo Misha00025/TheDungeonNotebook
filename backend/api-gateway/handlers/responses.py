@@ -136,10 +136,7 @@ async def handle_group_import(ctx: RouteContext):
     if uid:
         params["userId"] = str(uid)
 
-    try:
-        body_data = await ctx.request.json()
-    except Exception:
-        body_data = {}
+    body_data = ctx.request.json or {}
 
     result = ctx.services.campaign.post(
         f"/groups/{group_id}/import",
@@ -156,10 +153,7 @@ async def handle_user_create(ctx: RouteContext):
     if uid is None:
         return forbidden()
 
-    try:
-        data = await ctx.request.json()
-    except Exception:
-        data = {}
+    data = ctx.request.json or {}
     data["id"] = int(uid)
 
     result = ctx.services.users.post("/users", json=data)
@@ -175,10 +169,7 @@ async def handle_quest_create_for_character(ctx: RouteContext):
     if group_id is None or character_id is None:
         return forbidden()
 
-    try:
-        data = await ctx.request.json()
-    except Exception:
-        data = {}
+    data = ctx.request.json or {}
     data["assignedCharacters"] = [int(character_id)]
 
     result = ctx.services.campaign.post(

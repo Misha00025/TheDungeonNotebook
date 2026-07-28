@@ -1,0 +1,11 @@
+{
+  "logging": {
+    "level": "INFO",
+    "file": null,
+    "format": "%(asctime)s [%(levelname)s] [%(name)s] %(message)s"
+  },
+  "request_id": {
+    "header": "X-Request-ID",
+    "generate_if_missing": true
+  }
+}
