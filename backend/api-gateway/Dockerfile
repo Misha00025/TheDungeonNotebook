@@ -1,4 +1,4 @@
-FROM ghcr.io/misha00025/pyapi-gate:0.2.3
+FROM ghcr.io/misha00025/pyapi-gate:0.3.0
 
 COPY configs/ /app/configs/
 COPY handlers/ /app/handlers/

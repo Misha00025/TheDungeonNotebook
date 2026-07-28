@@ -120,8 +120,6 @@ services:
       - "5000:5000"
     env_file:
       - ./.env
-    environment:
-      - CONFIG_PATH=/app/configs/routes.yaml
     volumes:
       - ./certs:/certs:ro
       - ../logs:/app/logs

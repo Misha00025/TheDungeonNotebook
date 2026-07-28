@@ -2,19 +2,25 @@
 
 Единая точка входа в систему. Проксирует запросы к backend-сервисам, проверяет JWT-токены, управляет доступом.
 
-**Стек:** Python / FastAPI + Uvicorn, [PyApiGate 0.1.1](https://github.com/misha00025/pyapi-gate)
+**Стек:** Python / FastAPI + Uvicorn, [PyApiGate 0.3.0](https://github.com/Misha00025/PyApiGate)
 
 ---
 
 ## Содержание
 
-- [Архитектура](#архитектура)
-- [Конфигурация (routes.yaml)](#конфигурация-routesyaml)
-- [Access-хендлеры](#access-хендлеры)
-- [Response-хендлеры](#response-хендлеры)
-- [Структура проекта](#структура-проекта)
-- [ENV](#env)
-- [Запуск тестов](#запуск-тестов)
+- [API Gateway](#api-gateway)
+  - [Содержание](#содержание)
+  - [Архитектура](#архитектура)
+  - [Конфигурация (routes.yaml)](#конфигурация-routesyaml)
+    - [Auth на корневом уровне](#auth-на-корневом-уровне)
+    - [Подстановка переменных](#подстановка-переменных)
+    - [Подстановка параметров](#подстановка-параметров)
+    - [Особые случаи](#особые-случаи)
+  - [Access-хендлеры](#access-хендлеры)
+  - [Response-хендлеры](#response-хендлеры)
+  - [Структура проекта](#структура-проекта)
+  - [ENV](#env)
+  - [Запуск тестов](#запуск-тестов)
 
 ---
 
@@ -22,7 +28,7 @@
 
 Gateway работает на **декларативном движке PyApiGate**: все маршруты, права доступа и правила проксирования описываются в YAML-конфиге.
 
-Движок живёт во внешнем образе `ghcr.io/misha00025/pyapi-gate:0.1.1`. В этом репозитории — только кастомный код:
+Движок живёт во внешнем образе `ghcr.io/misha00025/pyapi-gate:0.3.0`. В этом репозитории — только кастомный код:
 - `configs/routes.yaml` — декларативная конфигурация маршрутов
 - `handlers/` — кастомные access и response хендлеры
 - `main.py` — точка входа для uvicorn
@@ -225,7 +231,7 @@ api-gateway/
 │   ├── access.py                 # group_member, group_admin, character_writer, ...
 │   └── responses.py              # whoami, group_users, export, import, ...
 ├── main.py                       # import handlers; create_app()
-├── Dockerfile                    # FROM ghcr.io/misha00025/pyapi-gate:0.1.1
+├── Dockerfile                    # FROM ghcr.io/misha00025/pyapi-gate:0.3.0
 ├── rules.md
 └── tests/
     ├── test.sh                   # Оркестратор тестов
@@ -244,7 +250,7 @@ api-gateway/
 | `CAMPAIGN_SERVICE_URL` | URL campaign-service | Да |
 | `PUBLIC_KEY_PATH` | Путь к публичному RSA-ключу | Нет (default: `/certs/public.pem`) |
 | `OIDC_ISSUER` | Issuer для проверки JWT | Да |
-| `CONFIG_PATH` | Путь к routes.yaml | Нет (default: `/app/configs/routes.yaml`) |
+| `APP_CONFIG` | Путь к app.json | Нет (default: `/app/configs/app.json`) |
 
 ---
 

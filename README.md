@@ -4,9 +4,9 @@
 
 ## Архитектура
 
-API Gateway (Flask, порт 5000) — единая точка входа. Проксирует запросы к микросервисам:
+API Gateway (FastAPI/PyApiGate, порт 5000) — единая точка входа. Проксирует запросы к микросервисам:
 
-- **api-gateway** (Python/Flask) — [README](backend/api-gateway/README.md)
+- **api-gateway** (Python/FastAPI) — [README](backend/api-gateway/README.md)
 - **auth-service** (C# .NET 8) — [README](backend/auth-service/README.md)
 - **users-service** (C# .NET 8) — [README](backend/users-service/README.md)
 - **campaign-service** (C# .NET 8) — [README](backend/campaign-service/README.md)
