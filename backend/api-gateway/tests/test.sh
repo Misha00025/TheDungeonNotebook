@@ -26,6 +26,9 @@ openssl rsa -in certs/private.pem -pubout -out certs/public.pem 2>/dev/null
 sudo rm -rf mongo_data
 sudo rm -rf mysql_data
 
+sudo rm -rf logs 
+mkdir logs
+
 # Поднимаем Docker Compose в фоновых процессах
 docker compose build
 docker compose up -d
@@ -48,9 +51,6 @@ done
 
 sleep $1
 
-sudo rm -rf logs 
-mkdir logs
-
 # После того, как все контейнеры готовы, запускаем тесты
 ./venv/bin/python test.py --server http://localhost:5000 ${@:2} > logs/test.log
 
@@ -60,7 +60,7 @@ docker compose logs | grep "mongo-db-gateway-test  " > logs/db.log
 docker compose logs | grep "mysql-db-gateway-test  " >> logs/db.log
 
 # Завершаем работу
-docker compose down -v
+docker compose down
 
 # Сводка результатов
 echo ""

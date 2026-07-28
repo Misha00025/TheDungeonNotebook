@@ -132,7 +132,7 @@ services:
       - CONFIG_PATH=/app/configs/routes.yaml
     volumes:
       - ./certs:/certs:ro
-    command: uvicorn main:app --host 0.0.0.0 --port 5000
+      - ./logs/gateway:/app/logs
 
 networks:
   backend-network:

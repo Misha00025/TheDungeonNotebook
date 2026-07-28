@@ -781,6 +781,4 @@ routes:
       path: /groups/{group_id}/characters/{character_id}/log
     auth: required
     access: character_viewer
-    params:
-      query:
-        userId: "{jwt.userId}"
+
