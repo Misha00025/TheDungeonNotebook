@@ -14,7 +14,7 @@ api-gateway/
 ```
 
 ## Overview
-API Gateway теперь основан на **PyApiGate** — внешнем FastAPI-сервисе (образ `ghcr.io/misha00025/pyapi-gate:latest`).
+API Gateway теперь основан на **PyApiGate** — внешнем FastAPI-сервисе (образ `ghcr.io/misha00025/pyapi-gate:0.1.1`).
 Движок и вся инфраструктура живут в образе. В этом репозитории — только кастомный код:
 - `configs/routes.yaml` — декларативная конфигурация маршрутов
 - `handlers/` — кастомные access и response хендлеры
@@ -86,7 +86,7 @@ ctx.services.campaign # http://campaign-service:8080
 | `from app.status import ok` | `from app.engine.status import ok` |
 | Access handlers — любые | Access handlers — **синхронные** |
 | Response handlers — синхронные | Response handlers — **async** |
-| `build: context: ./api-gateway` | `image: ghcr.io/misha00025/pyapi-gate:latest` |
+| `build: context: ./api-gateway` | `image: ghcr.io/misha00025/pyapi-gate:0.1.1` |
 | Свой `app/` (engine, security) | Engine в образе, только кастомный код в `handlers/` |
 
 ## Dependencies
