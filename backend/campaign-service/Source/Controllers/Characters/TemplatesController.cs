@@ -73,7 +73,7 @@ public class TemplatesController : GroupsBaseController
         {
             var templateSet = _campaignContext.Set<TemplateData>();
             var templates = templateSet.Where(e => e.GroupId == groupId).Select(e => e.ToDict(_mongo.GetEntity<TemplateMongoData>(MongoCollections.Templates, e.UUID)));
-            return Ok(new Dictionary<string, object>() { {"templates", templates} });
+            return Ok(new { templates = templates.ToList() });
         }
         return NotFound("Group not found");
         

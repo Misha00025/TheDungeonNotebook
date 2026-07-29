@@ -34,7 +34,7 @@ public class CharacterItemsController : GroupsBaseController
         {
             var items = _provider.GetItems(groupId, characterId);
             var result = items.Select(e => e.ToResponse()).Concat(character.Items.ToDict()).ToList();
-            return Ok(new Dictionary<string, object>(){ {"items", result} });
+            return Ok(new { items = result });
         }
         return NotFound("Character not found");
     }

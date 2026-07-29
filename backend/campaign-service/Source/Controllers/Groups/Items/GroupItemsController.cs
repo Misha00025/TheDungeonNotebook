@@ -28,7 +28,7 @@ public class GroupItemsController : GroupsBaseController
             var items = _provider.GetItems(groupId);
             if (!withSecrets)
                 items = items.Where(e => !e.IsSecret).ToList();
-            return Ok(new Dictionary<string, object>(){{"items", items.Select(e => e.ToResponse())}});
+            return Ok(new { items = items.Select(e => e.ToResponse()).ToList() });
         }
         return NotFound("Group not found");
     }

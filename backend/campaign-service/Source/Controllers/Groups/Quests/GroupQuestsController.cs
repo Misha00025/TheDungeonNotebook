@@ -25,7 +25,7 @@ public class GroupQuestsController : GroupsBaseController
         if (!TryGetGroup(groupId, out var _))
             return NotFound("Group not found");
         var quests = _provider.GetQuests(groupId, userId, characterId);
-        return Ok(new Dictionary<string, object>() { { "quests", quests.Select(e => e.ToResponse()) } });
+        return Ok(new { quests = quests.Select(e => e.ToResponse()).ToList() });
     }
 
     [HttpPost]
