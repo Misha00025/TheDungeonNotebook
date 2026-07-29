@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Tdn.Models.Providing;
 using Tdn.Models.Conversions;
-using NotePostData = Tdn.Api.Controllers.GroupNotesController.NotePostData;
+using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
 

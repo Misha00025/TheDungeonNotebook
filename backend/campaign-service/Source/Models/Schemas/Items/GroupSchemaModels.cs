@@ -3,12 +3,6 @@ using Tdn.Db;
 
 namespace Tdn.Models.Schemas.Items;
 
-public struct SchemaPostData 
-{
-    public List<string> GroupBy { get; set; }
-    // public List<FilterPresetPostData>? FilterPresets { get; set; }
-}
-
 public class Schema 
 {
     public string Type = "";

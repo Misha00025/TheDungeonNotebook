@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Tdn.Db.Contexts;
 using Tdn.Models.Providing;
+using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
 
@@ -69,15 +70,4 @@ public class CharacterEquipmentController : GroupsBaseController
         var equipment = _provider.GetEquipment(groupId, characterId);
         return Ok(new { items = equipment });
     }
-}
-
-public class EquipmentPatchData
-{
-    public string Action { get; set; } = "";
-    public int ItemId { get; set; }
-}
-
-public class EquipmentPutData
-{
-    public List<int> ItemIds { get; set; } = new();
 }

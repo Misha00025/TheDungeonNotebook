@@ -4,6 +4,7 @@ using Tdn.Models;
 using Tdn.Models.Conversions;
 using Tdn.Models.Processing;
 using Tdn.Models.Providing;
+using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
 
@@ -11,13 +12,6 @@ namespace Tdn.Api.Controllers;
 [Route("groups/{groupId}/characters")]
 public class CharactersController : GroupsBaseController
 {
-    public struct CharacterPostData
-    {
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public int? TemplateId { get; set; }
-    }
-
     private CharactersProvider _provider;
     private CharacterLogProvider _logProvider;
 

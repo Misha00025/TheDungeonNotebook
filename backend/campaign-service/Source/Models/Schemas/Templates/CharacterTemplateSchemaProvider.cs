@@ -1,5 +1,6 @@
 using MongoDB.Driver;
 using Tdn.Db;
+using Tdn.Models.DTOs;
 
 namespace Tdn.Models.Schemas.Templates;
 

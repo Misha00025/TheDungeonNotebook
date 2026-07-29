@@ -3,18 +3,6 @@ using Tdn.Db;
 
 namespace Tdn.Models.Schemas.Templates;
 
-public struct CategorySchemaPostData
-{
-    public string Name { get; set; }
-    public List<string> Fields { get; set; }
-    public List<CategorySchemaPostData>? Categories { get; set; }
-}
-
-public struct TemplateSchemaPostData
-{
-    public List<CategorySchemaPostData> Categories { get; set; }
-}
-
 public class CategorySchemaMongoData
 {
 	[BsonElement("name")]

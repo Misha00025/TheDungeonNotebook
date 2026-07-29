@@ -5,6 +5,7 @@ using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
+using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
 
@@ -12,25 +13,6 @@ namespace Tdn.Api.Controllers;
 [Route("groups/{groupId}/characters/templates")]
 public class TemplatesController : GroupsBaseController
 {
-    public struct FieldPostData
-    {
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public int Value { get; set; }
-        public int? MaxValue { get; set; }
-        public string? Formula { get; set; }
-        public string? ModifierFormula { get; set; }
-    }
-
-    
-
-    public struct TemplatePostData
-    {
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public Dictionary<string, FieldPostData> Fields { get; set; }
-    }
-
     private IMongoDbContext _mongo;
     private CampaignContext _campaignContext;
 

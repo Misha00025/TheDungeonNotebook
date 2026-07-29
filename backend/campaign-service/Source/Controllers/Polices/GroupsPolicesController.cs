@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Tdn.Models.Providing;
+using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
 
@@ -8,21 +9,6 @@ namespace Tdn.Api.Controllers;
 [Route("polices/groups")]
 public class GroupsPolicesController : BaseController
 {
-    public struct GroupPutData
-    {
-        public int? UserId { get; set; }
-        public int? GroupId { get; set; }
-        public bool? IsAdmin { get; set; }
-    }
-    
-    public struct CharacterPutData
-    {
-        public int? UserId { get; set; }
-        public int? GroupId { get; set; }      
-        public int? CharacterId { get; set; }  
-        public bool? CanWrite { get; set; }    
-    }
-
     private GroupPolicesProvider _provider;
     
     public GroupsPolicesController(GroupPolicesProvider provider)

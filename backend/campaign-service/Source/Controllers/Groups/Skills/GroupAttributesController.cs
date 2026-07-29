@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Tdn.Models;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
+using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
 
@@ -11,11 +12,6 @@ public class GroupAttributesController : BaseController
 {
     private AttributesProvider _provider;
     private GroupAccessHelper _accessHelper;
-    
-    public struct PostData
-    {
-        public List<AttributePostData> attributes { get; set; }
-    }
 
     public GroupAttributesController(AttributesProvider attributesProvider, GroupAccessHelper accessHelper)
     {

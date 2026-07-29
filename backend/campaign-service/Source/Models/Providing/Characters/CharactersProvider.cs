@@ -7,34 +7,9 @@ using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 using Tdn.Models.Conversions;
 using Tdn.Models.Processing;
+using Tdn.Models.DTOs;
 
 namespace Tdn.Models.Providing;
-
-public struct FieldPatchData
-{
-    public string? Name { get; set; }
-    public string? Description { get; set; }
-    public int? Value { get; set; }
-    public int? MaxValue { get; set; }
-    public string? Formula { get; set; }
-}
-
-public struct CharacterPatchData
-{
-    public string? Name { get; set; }
-    public string? Description { get; set; }
-    public int? OwnerId { get; set; }
-    public Dictionary<string, FieldPatchData?>? Fields { get; set; }
-}
-
-public class PatchCharacterResult
-{
-    public bool Success { get; init; }
-    public Dictionary<string, object?>? Data { get; init; }
-    public List<string>? Errors { get; init; }
-    public int? StatusCode { get; init; }
-    public Dictionary<string, int>? OldFieldValues { get; init; }
-}
 
 public class CharactersProvider : DualDbRepository<Character, CharacterData, CharacterMongoData>
 {

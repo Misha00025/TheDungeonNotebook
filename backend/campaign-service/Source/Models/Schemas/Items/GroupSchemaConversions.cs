@@ -1,3 +1,5 @@
+using Tdn.Models.DTOs;
+
 namespace Tdn.Models.Schemas.Items.Conversion;
 
 public static class GroupSchemaConversion

@@ -1,3 +1,5 @@
+using Tdn.Models.DTOs;
+
 namespace Tdn.Models.Schemas.Characters.Conversion;
 
 using Tdn.Models.Schemas.Characters;

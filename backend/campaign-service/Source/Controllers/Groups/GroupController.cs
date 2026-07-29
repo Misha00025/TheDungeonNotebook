@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Tdn.Db.Contexts;
 using Tdn.Models.Providing;
 using Tdn.Models.Conversions;
+using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
 
@@ -9,18 +10,6 @@ namespace Tdn.Api.Controllers;
 [Route("groups")]
 public class GroupsController : GroupsBaseController
 {
-    public struct GroupPostData
-    {
-        public string Name { get; set; }
-        public string? Icon { get; set; }
-    }
-    
-    public struct GroupPatchData
-    {
-        public string? Name { get; set; }
-        public string? Icon { get; set; }   
-    }
-
     private GroupProvider _provider;
 
     public GroupsController(CampaignContext context, GroupAccessHelper accessHelper, GroupProvider provider) : base(context, accessHelper)

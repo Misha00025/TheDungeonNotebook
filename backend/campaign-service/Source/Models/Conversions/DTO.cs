@@ -1,3 +1,5 @@
+using Tdn.Models.DTOs;
+
 namespace Tdn.Models.Conversions;
 
 public static class DTO

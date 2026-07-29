@@ -32,20 +32,4 @@ public class Skill
     }
 }
 
-public struct AttributePostData
-{
-    public string? Key { get; set; }
-    public string? Name { get; set; }
-    public string? Value { get; set; }
-    public string? Description { get; set; }
-    public bool? isFiltered { get; set; }
-}
 
-
-public struct SkillPostData
-{
-    public string? Name { get; set; }
-    public string? Description { get; set; }
-    public List<AttributePostData>? Attributes { get; set; }
-    public bool? IsSecret { get; set; }
-}
