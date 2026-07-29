@@ -59,7 +59,7 @@ public static class DataToDictExtensions
         };
     }
     
-    public static Dictionary<string, object?> ToDict(this GroupEntityData data, CharlistMongoData? mongoData)
+    public static Dictionary<string, object?> ToDict(this GroupEntityData data, TemplateMongoData? mongoData)
     {
         var result = data.ToDict(mongoData as GroupEntityMongoData);
         result.Add("fields", mongoData?.Fields.ToDict());
@@ -68,7 +68,7 @@ public static class DataToDictExtensions
     
     public static Dictionary<string, object?> ToDict(this CharacterData data, CharacterMongoData? mongoData)
     {
-        var result = data.ToDict(mongoData as CharlistMongoData);
+        var result = data.ToDict(mongoData as TemplateMongoData);
         result.Add("templateId", data.TemplateId);
         return result;
     }

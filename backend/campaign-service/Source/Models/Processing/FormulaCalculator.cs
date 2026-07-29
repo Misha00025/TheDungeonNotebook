@@ -25,9 +25,9 @@ public static class FormulaCalculator
         {"e", args => Math.E},
     };
 
-    public static void CalculateFields(CharlistMongoData charlist)
+    public static void CalculateFields(TemplateMongoData template)
     {
-        var fields = charlist.Fields;
+        var fields = template.Fields;
         var computed = new HashSet<string>();
         var unresolved = new List<string>();
         

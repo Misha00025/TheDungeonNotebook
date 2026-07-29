@@ -2,7 +2,7 @@ using Tdn.Db.Entities;
 
 namespace Tdn.Models.Conversions;
 
-public static class CharlistsComparingExtensions
+public static class TemplateComparingExtensions
 {
     public static PropertyMongoData AsProperty(this FieldMongoData field, int MaxValue = 0) => new PropertyMongoData()
     {
@@ -36,7 +36,7 @@ public static class CharlistsComparingExtensions
         return field;
     }
          
-    public static void CompareWith(this CharlistMongoData data, CharlistMongoData source)
+    public static void CompareWith(this TemplateMongoData data, TemplateMongoData source)
     {
         var result = data;
         foreach (var field in source.Fields)
@@ -54,9 +54,9 @@ public static class CharlistsComparingExtensions
         }
     }
 
-    public static CharacterMongoData CompareWith(this CharacterMongoData data, CharlistMongoData source)
+    public static CharacterMongoData CompareWith(this CharacterMongoData data, TemplateMongoData source)
     {
-        ((CharlistMongoData)data).CompareWith(source);
+        ((TemplateMongoData)data).CompareWith(source);
         return data;
     }
 }

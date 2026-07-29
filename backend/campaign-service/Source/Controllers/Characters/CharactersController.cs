@@ -72,12 +72,12 @@ public class CharactersController : CharactersBaseController
             return BadRequest("TemplateId must be not null");
         if (TryGetGroup(groupId, out var _))
         {
-            var charlistSet = DbContext.Set<CharlistData>();
-            var charlistData = charlistSet.Where(e => e.GroupId == groupId && e.Id == data.TemplateId).FirstOrDefault();
-            if (charlistData == null)
+            var templateSet = DbContext.Set<TemplateData>();
+            var templateData = templateSet.Where(e => e.GroupId == groupId && e.Id == data.TemplateId).FirstOrDefault();
+            if (templateData == null)
                 return NotFound("Template not found");
-            var charlist = Mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, charlistData.UUID);
-            if (charlist == null)
+            var template = Mongo.GetEntity<TemplateMongoData>(MongoCollections.Templates, templateData.UUID);
+            if (template == null)
                 return NotFound("Template document not found");
             var character = new CharacterMongoData()
             {
@@ -85,7 +85,7 @@ public class CharactersController : CharactersBaseController
                 Description = data.Description
             };
             if (copyTemplate)
-                character.Fields = charlist.Fields;
+                character.Fields = template.Fields;
             var characterData = new CharacterData(){ GroupId = groupId, TemplateId = (int)data.TemplateId };
             GetCollection().InsertOne(character);
             characterData.UUID = character.Id.ToString();
@@ -98,14 +98,14 @@ public class CharactersController : CharactersBaseController
 
     private CharacterMongoData AsCharacterWithTemplate(CharacterData data, CharacterMongoData character)
     {
-        var charlistSet = DbContext.Set<CharlistData>();
-        var charlistData = charlistSet.Where(e => e.GroupId == data.GroupId && e.Id == data.TemplateId).FirstOrDefault();
-        if (charlistData == null)
+        var templateSet = DbContext.Set<TemplateData>();
+        var templateData = templateSet.Where(e => e.GroupId == data.GroupId && e.Id == data.TemplateId).FirstOrDefault();
+        if (templateData == null)
             return character;
-        var charlist = Mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, charlistData.UUID);
-        if (charlist == null)
+        var template = Mongo.GetEntity<TemplateMongoData>(MongoCollections.Templates, templateData.UUID);
+        if (template == null)
             return character;
-        return character.CompareWith(charlist);
+        return character.CompareWith(template);
     }
 
     [HttpGet("{characterId}")]
@@ -133,7 +133,7 @@ public class CharactersController : CharactersBaseController
         return ok;
     } 
     
-    private bool TryChangeFields(CharacterMongoData character, CharlistMongoData template, CharacterPatchData data, out List<string> errors)
+    private bool TryChangeFields(CharacterMongoData character, TemplateMongoData template, CharacterPatchData data, out List<string> errors)
     {
         var doSomething = false;
         errors = new();
@@ -213,12 +213,12 @@ public class CharactersController : CharactersBaseController
         {
             var anythingChanged = false;
             anythingChanged = anythingChanged || TryChangeProperties(character, data);
-            var charlistSet = DbContext.Set<CharlistData>();
-            var charlistData = charlistSet.Where(e => e.GroupId == groupId && e.Id == characterData.TemplateId).FirstOrDefault();
-            if (charlistData == null)
+            var templateSet = DbContext.Set<TemplateData>();
+            var templateData = templateSet.Where(e => e.GroupId == groupId && e.Id == characterData.TemplateId).FirstOrDefault();
+            if (templateData == null)
                 return NotFound("Template not found");
-            var charlist = Mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, charlistData.UUID);
-            if (charlist == null)
+            var template = Mongo.GetEntity<TemplateMongoData>(MongoCollections.Templates, templateData.UUID);
+            if (template == null)
                 return NotFound("Template document not found");
 
             var oldFieldValues = new Dictionary<string, int>();
@@ -229,11 +229,11 @@ public class CharactersController : CharactersBaseController
                     if (field.Value?.Value == null) continue;
                     if (character.Fields.ContainsKey(field.Key))
                         oldFieldValues[field.Key] = character.Fields[field.Key].Value;
-                    else if (charlist.Fields.ContainsKey(field.Key))
-                        oldFieldValues[field.Key] = charlist.Fields[field.Key].Value;
+                    else if (template.Fields.ContainsKey(field.Key))
+                        oldFieldValues[field.Key] = template.Fields[field.Key].Value;
                 }
             }
-            var fieldsChanged = TryChangeFields(character, charlist, data, out var errors);
+            var fieldsChanged = TryChangeFields(character, template, data, out var errors);
             anythingChanged = (anythingChanged && data.Fields == null) || fieldsChanged;
             if (anythingChanged)
             {

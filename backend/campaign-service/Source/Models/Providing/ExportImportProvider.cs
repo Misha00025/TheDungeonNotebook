@@ -70,16 +70,16 @@ public class ExportImportProvider
             };
         }
 
-        var charlistDataSet = _db.Set<CharlistData>();
-        var charlists = charlistDataSet.Where(e => e.GroupId == groupId).ToList();
-        if (charlists.Any())
+        var templateDataSet = _db.Set<TemplateData>();
+        var templates = templateDataSet.Where(e => e.GroupId == groupId).ToList();
+        if (templates.Any())
         {
-            export.Charlists = charlists.Select(cd =>
+            export.Templates = templates.Select(td =>
             {
-                var mongoData = _mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, cd.UUID);
-                return new CharlistExportData
+                var mongoData = _mongo.GetEntity<TemplateMongoData>(MongoCollections.Templates, td.UUID);
+                return new TemplateExportData
                 {
-                    OldId = cd.Id,
+                    OldId = td.Id,
                     Name = mongoData?.Name ?? "",
                     Description = mongoData?.Description ?? "",
                     Fields = mongoData?.Fields.ToDictionary(f => f.Key, f => MapField(f.Value)) ?? new()
@@ -224,8 +224,8 @@ public class ExportImportProvider
             if (include.Contains("templates"))
             {
                 ImportTemplateSchema(groupId, data);
-                ImportCharlists(groupId, data, templateOldToNew);
-                result.Imported["templates"] = data.Charlists?.Count ?? 0;
+                ImportTemplates(groupId, data, templateOldToNew);
+                result.Imported["templates"] = data.Templates?.Count ?? 0;
             }
 
             if (include.Contains("skills"))
@@ -277,33 +277,33 @@ public class ExportImportProvider
         _schemaProvider.TrySaveSchema(groupId, postData);
     }
 
-    private void ImportCharlists(int groupId, ExportData data, Dictionary<int, int> oldToNew)
+    private void ImportTemplates(int groupId, ExportData data, Dictionary<int, int> oldToNew)
     {
-        if (data.Charlists == null || !data.Charlists.Any()) return;
+        if (data.Templates == null || !data.Templates.Any()) return;
 
-        var charlistSet = _db.Set<CharlistData>();
-        var collection = _mongo.GetCollection<CharlistMongoData>(MongoCollections.Templates);
+        var templateSet = _db.Set<TemplateData>();
+        var collection = _mongo.GetCollection<TemplateMongoData>(MongoCollections.Templates);
 
-        foreach (var ch in data.Charlists)
+        foreach (var t in data.Templates)
         {
-            var mongoItem = new CharlistMongoData
+            var mongoItem = new TemplateMongoData
             {
-                Name = ch.Name,
-                Description = ch.Description,
-                Fields = ch.Fields.ToDictionary(f => f.Key, f => CreateFieldMongoData(f.Value))
+                Name = t.Name,
+                Description = t.Description,
+                Fields = t.Fields.ToDictionary(f => f.Key, f => CreateFieldMongoData(f.Value))
             };
 
             collection.InsertOne(mongoItem);
 
-            var sqlData = new CharlistData
+            var sqlData = new TemplateData
             {
                 UUID = mongoItem.Id.ToString(),
                 GroupId = groupId
             };
-            charlistSet.Add(sqlData);
+            templateSet.Add(sqlData);
             _db.SaveChanges();
 
-            oldToNew[ch.OldId] = sqlData.Id;
+            oldToNew[t.OldId] = sqlData.Id;
         }
     }
 

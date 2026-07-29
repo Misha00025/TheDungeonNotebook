@@ -15,7 +15,7 @@ public class CharacterEquipmentProviderTests
         {
             db.Groups.Add(new GroupData { Id = 1, Name = "TestGroup" });
             db.Characters.Add(new CharacterData { Id = 100, GroupId = 1, UUID = charUuid, TemplateId = 1 });
-            db.CharlistTemplates.Add(new CharlistData { Id = 1, GroupId = 1, UUID = ObjectId.GenerateNewId().ToString() });
+            db.Templates.Add(new TemplateData { Id = 1, GroupId = 1, UUID = ObjectId.GenerateNewId().ToString() });
         });
         var mongoMock = new Mock<IMongoDbContext>(MockBehavior.Loose);
         mongoMock.Setup(m => m.GetEntity<CharacterMongoData>(MongoCollections.Characters, charUuid))
@@ -39,7 +39,7 @@ public class CharacterEquipmentProviderTests
         {
             db.Groups.Add(new GroupData { Id = 1, Name = "TestGroup" });
             db.Characters.Add(new CharacterData { Id = 100, GroupId = 1, UUID = charUuid, TemplateId = 1 });
-            db.CharlistTemplates.Add(new CharlistData { Id = 1, GroupId = 1, UUID = ObjectId.GenerateNewId().ToString() });
+            db.Templates.Add(new TemplateData { Id = 1, GroupId = 1, UUID = ObjectId.GenerateNewId().ToString() });
         });
         var collectionMock = new Mock<IMongoCollection<CharacterMongoData>>(MockBehavior.Loose);
         var mongoMock = new Mock<IMongoDbContext>(MockBehavior.Loose);
@@ -72,7 +72,7 @@ public class CharacterEquipmentProviderTests
         {
             db.Groups.Add(new GroupData { Id = 1, Name = "TestGroup" });
             db.Characters.Add(new CharacterData { Id = 100, GroupId = 1, UUID = charUuid, TemplateId = 1 });
-            db.CharlistTemplates.Add(new CharlistData { Id = 1, GroupId = 1, UUID = ObjectId.GenerateNewId().ToString() });
+            db.Templates.Add(new TemplateData { Id = 1, GroupId = 1, UUID = ObjectId.GenerateNewId().ToString() });
         });
         var collectionMock = new Mock<IMongoCollection<CharacterMongoData>>(MockBehavior.Loose);
         var mongoMock = new Mock<IMongoDbContext>(MockBehavior.Loose);
@@ -105,7 +105,7 @@ public class CharacterEquipmentProviderTests
         {
             db.Groups.Add(new GroupData { Id = 1, Name = "TestGroup" });
             db.Characters.Add(new CharacterData { Id = 100, GroupId = 1, UUID = charUuid, TemplateId = 1 });
-            db.CharlistTemplates.Add(new CharlistData { Id = 1, GroupId = 1, UUID = ObjectId.GenerateNewId().ToString() });
+            db.Templates.Add(new TemplateData { Id = 1, GroupId = 1, UUID = ObjectId.GenerateNewId().ToString() });
         });
         var collectionMock = new Mock<IMongoCollection<CharacterMongoData>>(MockBehavior.Loose);
         var mongoMock = new Mock<IMongoDbContext>(MockBehavior.Loose);

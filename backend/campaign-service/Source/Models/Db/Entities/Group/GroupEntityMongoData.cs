@@ -56,7 +56,7 @@ public class ModifiedFieldMongoData : FieldMongoData
 
 
 [BsonIgnoreExtraElements]
-public class CharlistMongoData : GroupEntityMongoData 
+public class TemplateMongoData : GroupEntityMongoData 
 { 
 	[BsonElement("fields")]
 	public Dictionary<string, FieldMongoData> Fields { get; set; } = new();
@@ -126,7 +126,7 @@ public class AmountedItemMongoData : NamedMongoElement
 }
 
 [BsonIgnoreExtraElements]
-public class CharacterMongoData : CharlistMongoData
+public class CharacterMongoData : TemplateMongoData
 {
 	[BsonElement("items")]
 	public List<AmountedItemMongoData> Items = new();

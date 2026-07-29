@@ -21,7 +21,7 @@ public class CampaignContext : BaseDbContext<CampaignContext>
     public DbSet<SkillData> Skills => Set<SkillData>();
     public DbSet<CharacterSkillData> CharacterSkills => Set<CharacterSkillData>();
     public DbSet<CharacterData> Characters => Set<CharacterData>();
-    public DbSet<CharlistData> CharlistTemplates => Set<CharlistData>();
+    public DbSet<TemplateData> Templates => Set<TemplateData>();
     public DbSet<UserGroupData> UserGroups => Set<UserGroupData>();
     public DbSet<UserCharacterData> UserCharacters => Set<UserCharacterData>();
     
@@ -30,7 +30,7 @@ public class CampaignContext : BaseDbContext<CampaignContext>
         // Все entity из EntityContext + PolicesContext + GroupContext
         Configurer.ConfigureModel(builder.Entity<GroupData>());
         Configurer.ConfigureModel(builder.Entity<ItemData>());
-        Configurer.ConfigureModel(builder.Entity<CharlistData>());
+        Configurer.ConfigureModel(builder.Entity<TemplateData>());
         Configurer.ConfigureModel(builder.Entity<CharacterData>());
         Configurer.ConfigureModel(builder.Entity<SkillData>());
         Configurer.ConfigureModel(builder.Entity<CharacterSkillData>());

@@ -8,7 +8,7 @@ public interface IEntityBuildersConfigurer
 {
 	void ConfigureModel(EntityTypeBuilder<GroupData> builder);
 	void ConfigureModel(EntityTypeBuilder<ItemData> builder);
-	void ConfigureModel(EntityTypeBuilder<CharlistData> builder);
+	void ConfigureModel(EntityTypeBuilder<TemplateData> builder);
 	void ConfigureModel(EntityTypeBuilder<CharacterData> builder);
 	void ConfigureModel(EntityTypeBuilder<SkillData> builder);
 	void ConfigureModel(EntityTypeBuilder<CharacterSkillData> builder);
@@ -43,7 +43,7 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
 		builder.HasOne(e => e.Group).WithMany().HasForeignKey(e => e.GroupId);
 	}
 
-	public void ConfigureModel(EntityTypeBuilder<CharlistData> builder)
+	public void ConfigureModel(EntityTypeBuilder<TemplateData> builder)
 	{
 		builder.ToTable("charlist_template");
 		builder.HasKey(e => e.Id);
@@ -66,6 +66,7 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
 		builder.Property(e => e.TemplateId).HasColumnName("template_id");
 		builder.HasOne(e => e.Template).WithMany().HasForeignKey(e => e.TemplateId);
 	}
+	
 	
 	public void ConfigureModel(EntityTypeBuilder<SkillData> builder)
 	{
