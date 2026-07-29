@@ -27,6 +27,7 @@ builder.Services.AddScoped<ISchemasMongoDbContext>(_ => new SchemasMongoDbContex
 
 // Providers
 builder.Services.AddScoped<GroupAccessHelper, GroupAccessHelper>();
+builder.Services.AddScoped<GroupPolicesProvider, GroupPolicesProvider>();
 builder.Services.AddScoped<AttributesProvider, AttributesProvider>();
 builder.Services.AddScoped<SkillsProvider, SkillsProvider>();
 builder.Services.AddScoped<ItemsProvider, ItemsProvider>();

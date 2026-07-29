@@ -1,10 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
-using Tdn.Db.Contexts;
-using Tdn.Db.Entities;
+using Tdn.Models.Providing;
 
 namespace Tdn.Api.Controllers;
-
 
 [ApiController]
 [Route("polices/groups")]
@@ -25,39 +23,34 @@ public class GroupsPolicesController : BaseController
         public bool? CanWrite { get; set; }    
     }
 
-    private CampaignContext _dbContext;
+    private GroupPolicesProvider _provider;
     
-    public GroupsPolicesController(CampaignContext context)
+    public GroupsPolicesController(GroupPolicesProvider provider)
     {
-        _dbContext = context;
+        _provider = provider;
     }
     
     [HttpGet]
     public ActionResult GetMany([FromQuery] int? userId = null, [FromQuery] int? groupId = null)
     {
-        var groups = _dbContext.UserGroups.Where(e => true);
-        if (userId != null)
-            groups = groups.Where(e => e.UserId == (int)userId);
-        if (groupId != null)
-            groups = groups.Where(e => e.GroupId == (int)groupId);
+        var groups = _provider.GetGroupRules(userId, groupId);
         var result = new
-            {
-                users = groups.Select(e =>
-                    new
-                    {
-                        userId = e.UserId,
-                        groupId = e.GroupId,
-                        isAdmin = e.IsAdmin,
-                        characters = _dbContext.UserCharacters
-                            .Where(c => c.UserId == e.UserId && c.GroupId == e.GroupId)
-                            .Select(d => new
-                            {
-                                characterId = d.CharacterId,
-                                canWrite = d.CanWrite
-                            }).ToList()
-                    }
-                ).ToList()
-            };
+        {
+            users = groups.Select(e =>
+                new
+                {
+                    userId = e.UserId,
+                    groupId = e.GroupId,
+                    isAdmin = e.IsAdmin,
+                    characters = _provider.GetCharacterRules(e.GroupId, e.UserId, null)
+                        .Select(d => new
+                        {
+                            characterId = d.CharacterId,
+                            canWrite = d.CanWrite
+                        }).ToList()
+                }
+            ).ToList()
+        };
         return Ok(result);
     }
     
@@ -66,36 +59,20 @@ public class GroupsPolicesController : BaseController
     {
         if (data.GroupId == null || data.UserId == null)
             return BadRequest();
-        var rule = _dbContext.UserGroups.Where(e => e.GroupId == (int)data.GroupId && e.UserId == (int)data.UserId).FirstOrDefault();
-        ActionResult result;
-        if (rule == null)
-        {
-            _dbContext.UserGroups.Add(new Db.Entities.UserGroupData()
-            {
-                UserId = (int)data.UserId, 
-                GroupId = (int)data.GroupId,
-                IsAdmin = data.IsAdmin != null ? (bool)data.IsAdmin : false
-            });
-            result = Created("", null);
-        }
-        else
-        {
-            rule.IsAdmin = data.IsAdmin != null ? (bool)data.IsAdmin : rule.IsAdmin;
-            result = Ok();
-        }
-        _dbContext.SaveChanges();
-        return result;
+        var (isCreated, _) = _provider.UpsertGroupRule(
+            data.GroupId.Value,
+            data.UserId.Value,
+            data.IsAdmin ?? false);
+        return isCreated ? Created("", null) : Ok();
     }
     
     [HttpGet("characters")]
     public ActionResult GetCharacterRules([FromQuery] int groupId, [FromQuery] int? userId = null, [FromQuery] int? characterId = null)
     {
-        var characters = _dbContext.UserCharacters.Where(e => e.GroupId == groupId);
-        if (userId != null)
-            characters = characters.Where(e => e.UserId == (int)userId);
-        if (characterId != null)
-            characters = characters.Where(e => e.CharacterId == (int)characterId);
-        return Ok(new { users = characters.Select(e => new { userId = e.UserId, canWrite = e.CanWrite }).ToList() });
+        var characters = _provider.GetCharacterRules(groupId, userId, characterId)
+            .Select(e => new { userId = e.UserId, canWrite = e.CanWrite })
+            .ToList();
+        return Ok(new { users = characters });
     }
     
     [HttpPut("characters")]
@@ -103,49 +80,21 @@ public class GroupsPolicesController : BaseController
     {
         if (data.GroupId == null || data.UserId == null || data.CharacterId == null)
             return BadRequest();
-        var rule = _dbContext.UserCharacters.Where(e => e.GroupId == (int)data.GroupId && e.UserId == (int)data.UserId && e.CharacterId == (int)data.CharacterId).FirstOrDefault();
-        ActionResult result;
-        if (rule == null)
-        {
-            if (!_dbContext.UserGroups.Any(e => e.GroupId == (int)data.GroupId && e.UserId == (int)data.UserId))
-                return NotFound();
-            _dbContext.UserCharacters.Add(new Db.Entities.UserCharacterData()
-            {
-                UserId = (int)data.UserId, 
-                GroupId = (int)data.GroupId,
-                CharacterId = (int)data.CharacterId,
-                CanWrite = data.CanWrite != null ? (bool)data.CanWrite : false
-            });
-            result = Created("", null);
-        }
-        else
-        {
-            rule.CanWrite = data.CanWrite != null ? (bool)data.CanWrite : rule.CanWrite;
-            result = Ok();
-        }
-        _dbContext.SaveChanges();
-        return result;
+        var result = _provider.UpsertCharacterRule(
+            data.GroupId.Value,
+            data.UserId.Value,
+            data.CharacterId.Value,
+            data.CanWrite ?? false);
+        if (result == null)
+            return NotFound();
+        return result.Value.isCreated ? Created("", null) : Ok();
     }
     
     [HttpDelete]
     public ActionResult DeleteRule([FromQuery] int userId, [FromQuery, Required] int groupId, [FromQuery] int? characterId)
     {
-        if (characterId != null)
-        {
-            var character = _dbContext.UserCharacters.Where(e => e.UserId == userId && e.CharacterId == (int)characterId && e.GroupId == groupId).FirstOrDefault();
-            if (character == null)
-                return NotFound();
-            _dbContext.UserCharacters.Remove(character);
-        }
-        else
-        {
-            var group = _dbContext.UserGroups.Where(e => e.UserId == userId && e.GroupId == groupId).FirstOrDefault();
-            if (group == null)
-                return NotFound();
-            _dbContext.UserCharacters.RemoveRange(_dbContext.UserCharacters.Where(e => e.GroupId == groupId && e.UserId == userId));
-            _dbContext.UserGroups.Remove(group);
-        };
-        _dbContext.SaveChanges();
+        if (!_provider.DeleteRule(userId, groupId, characterId))
+            return NotFound();
         return Ok();
     }
 }
