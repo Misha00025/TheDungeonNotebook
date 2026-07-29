@@ -65,32 +65,32 @@ public class CharlistMongoData : GroupEntityMongoData
 public class AttributeMongoData
 {
 	[BsonElement("key")]
-	public string Key = "";
+	public string Key { get; set; } = "";
 	[BsonElement("name")]
-	public string Name = "";
+	public string Name { get; set; } = "";
 	[BsonElement("description")]
-	public string Description = "";
+	public string Description { get; set; } = "";
 	[BsonElement("is_filtered")]
-	public bool IsFiltered = false;
+	public bool IsFiltered { get; set; } = false;
 	[BsonElement("known_values")]
-	public List<string> KnownValues = new();
+	public List<string> KnownValues { get; set; } = new();
 }
 
 public class GroupAttributesMongoData : MongoDbContext.MongoEntity
 {
 	[BsonElement("group_id")]
-	public int GroupId;
+	public int GroupId { get; set; }
 
 	[BsonElement("attributes")]
-	public List<AttributeMongoData> Attributes = new();
+	public List<AttributeMongoData> Attributes { get; set; } = new();
 }
 
 public class ValuedAttributeMongoData
 {
 	[BsonElement("key")]
-	public string Key = "";
+	public string Key { get; set; } = "";
 	[BsonElement("value")]
-	public string Value = "";
+	public string Value { get; set; } = "";
 }
 
 [BsonIgnoreExtraElements]

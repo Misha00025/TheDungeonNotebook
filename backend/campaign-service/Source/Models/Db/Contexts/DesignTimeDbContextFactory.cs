@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Tdn.Configuration;
-using Tdn.Db.Configuers;
+using Tdn.Db.Configurers;
 
 namespace Tdn.Db.Contexts;
 

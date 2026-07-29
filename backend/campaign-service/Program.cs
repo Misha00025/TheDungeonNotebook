@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Tdn.Configuration;
-using Tdn.Db.Configuers;
+using Tdn.Db.Configurers;
 using Tdn.Db.Contexts;
 using Tdn.Settings;
 using Tdn.Db;

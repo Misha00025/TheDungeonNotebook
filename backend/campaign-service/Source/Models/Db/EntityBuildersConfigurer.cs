@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Tdn.Db.Entities;
 
-namespace Tdn.Db.Configuers;
+namespace Tdn.Db.Configurers;
 
 public interface IEntityBuildersConfigurer
 {
