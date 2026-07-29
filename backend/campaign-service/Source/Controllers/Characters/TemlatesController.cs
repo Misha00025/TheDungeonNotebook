@@ -154,25 +154,4 @@ public class TemplatesController : GroupsBaseController
         }
         return NotFound("Group not found");
     }
-    
-    [HttpDelete("{templateId}")]
-    public ActionResult DeleteTemplate(int groupId, int templateId)
-    {
-        if (TryGetGroup(groupId, out var _))
-        {
-            var charlistSet = DbContext.Set<CharlistData>();
-            var charlist = charlistSet.Where(e => e.GroupId == groupId && e.Id == templateId).FirstOrDefault();
-            if (charlist == null)
-                return NotFound("Template not found");
-            var mongoData = _mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, charlist.UUID);
-            if (mongoData == null)
-                return NotFound("Template document not found");
-		    var filter = Builders<CharlistMongoData>.Filter.Eq("_id", mongoData.Id);
-            DbContext.Remove(charlist);
-            DbContext.SaveChanges();
-            GetCollection().DeleteOne(filter);
-            return Ok(charlist.ToDict(mongoData));
-        }
-        return NotFound("Group not found");
-    }
 }

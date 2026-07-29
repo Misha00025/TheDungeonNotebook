@@ -1,32 +1,10 @@
 namespace Tdn;
 
-public static class Constants
-{
-	public const string ApiPrefix = "";
-}
-
-public static class Fields
-{
-	public const string GroupId = "group_id";
-	public const string UserId = "user_id";
-	public const string CharacterID = "character_id";
-}
-
-public static class Platform
-{
-	public const string Tdn = "tdn";
-	public const string Vk = "vk";
-	public const string Tg = "tg";
-}
-
 public static class MongoCollections
 {
 	public const string Templates = "templates";
 	public const string Characters = "characters";
 	public const string Items = "items";
 	public const string Skills = "skills";
-	public const string SkillsAttributes = "skills_attributes";
-	public const string Notes = "notes";
 	public const string CharacterLogs = "character_logs";
-	public const string Quests = "quests";
 }

@@ -62,22 +62,4 @@ public class AttributesProvider
         var result = Collection.UpdateOne(filter, update, options);
         return result.IsAcknowledged && (result.ModifiedCount > 0 || result.UpsertedId != null);
     }
-    
-    public bool TryAddAttribute(int groupId, Attribute attribute)
-    {
-        var attributes = GetAttributes(groupId);
-        if (attributes.Any(e => e.Key == attribute.Key))
-            return false;
-        attributes.Add(attribute);
-        return TrySaveAttributes(groupId, attributes);
-    }
-    
-    public bool TryPatchAttribute(int groupId, Attribute attribute)
-    {
-        var attributes = GetAttributes(groupId);
-        if (TryGetAttribute(groupId, attribute.Key, out var a))
-            attributes.Remove(a);
-        attributes.Add(attribute);
-        return TrySaveAttributes(groupId, attributes);
-    }
 }

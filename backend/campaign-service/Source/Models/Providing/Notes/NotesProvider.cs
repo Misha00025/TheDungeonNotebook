@@ -204,28 +204,6 @@ public class NotesProvider
         }
     }
 
-    public List<string> GetGroupKeywords(int groupId)
-    {
-        return _db.NoteKeywords
-            .Include(e => e.Note)
-            .Where(e => e.Note!.GroupId == groupId)
-            .Select(e => e.Keyword)
-            .Distinct()
-            .OrderBy(k => k)
-            .ToList();
-    }
-
-    public List<string> GetCharacterKeywords(int groupId, int characterId)
-    {
-        return _db.NoteKeywords
-            .Include(e => e.Note)
-            .Where(e => e.Note!.GroupId == groupId && e.Note!.CharacterId == characterId)
-            .Select(e => e.Keyword)
-            .Distinct()
-            .OrderBy(k => k)
-            .ToList();
-    }
-
     public bool TryDeleteGroupNote(int groupId, int noteId)
     {
         return TryDeleteNote(groupId, null, noteId);

@@ -4,13 +4,6 @@ namespace Tdn.Models.Conversions;
 
 public static class CharlistsComparingExtensions
 {
-    public static CharlistMongoData Copy(this CharlistMongoData data) => new CharlistMongoData()
-    {
-        Name = data.Name,
-        Description = data.Description,
-        Fields = data.Fields,
-    };
-
     public static PropertyMongoData AsProperty(this FieldMongoData field, int MaxValue = 0) => new PropertyMongoData()
     {
         Name = field.Name,

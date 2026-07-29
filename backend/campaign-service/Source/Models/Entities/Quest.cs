@@ -17,11 +17,6 @@ public struct ObjectivePostData
     public string? Status { get; set; }
 }
 
-public struct ObjectiveStatusPostData
-{
-    public string Status { get; set; }
-}
-
 public class Quest
 {
     public int Id;

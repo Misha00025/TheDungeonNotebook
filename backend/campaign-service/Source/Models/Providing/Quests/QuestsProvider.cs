@@ -333,31 +333,4 @@ public class QuestsProvider
             return false;
         }
     }
-
-    public bool TryUpdateObjectiveStatus(int groupId, int questId, string objectiveKey, string status)
-    {
-        try
-        {
-            var sqlData = _db.Quests
-                .FirstOrDefault(e => e.GroupId == groupId && e.Id == questId);
-            if (sqlData == null)
-                return false;
-
-            var collection = _mongo.GetCollection<QuestMongoData>(QUESTS_COLLECTION_NAME);
-            var filter = Builders<QuestMongoData>.Filter.Eq(x => x.Id, new ObjectId(sqlData.UUID));
-            var update = Builders<QuestMongoData>.Update.Set("objectives.$[elem].status", status);
-            var arrayFilters = new List<ArrayFilterDefinition>
-            {
-                new BsonDocumentArrayFilterDefinition<BsonDocument>(
-                    new BsonDocument("elem.key", objectiveKey))
-            };
-            var result = collection.UpdateOne(filter, update, new UpdateOptions { ArrayFilters = arrayFilters });
-            return result.IsAcknowledged && result.ModifiedCount > 0;
-        }
-        catch (Exception e)
-        {
-            _logger.LogWarning($"Error updating objective status: {e}");
-            return false;
-        }
-    }
 }

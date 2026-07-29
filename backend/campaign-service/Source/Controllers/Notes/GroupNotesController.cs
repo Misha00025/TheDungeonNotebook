@@ -62,11 +62,4 @@ public class GroupNotesController : BaseController
             return NotFound();
         return Ok();
     }
-
-    [HttpGet("keywords")]
-    public ActionResult GetKeywords(int groupId)
-    {
-        var keywords = _provider.GetGroupKeywords(groupId);
-        return Ok(new { keywords });
-    }
 }

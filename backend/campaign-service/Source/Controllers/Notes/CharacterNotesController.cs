@@ -62,11 +62,4 @@ public class CharacterNotesController : BaseController
             return NotFound();
         return Ok();
     }
-
-    [HttpGet("keywords")]
-    public ActionResult GetKeywords(int groupId, int characterId)
-    {
-        var keywords = _provider.GetCharacterKeywords(groupId, characterId);
-        return Ok(new { keywords });
-    }
 }

@@ -66,14 +66,6 @@ public static class DataToDictExtensions
         return result;
     }
     
-    public static Dictionary<string, object?> ToDict(this GroupEntityData data, ItemMongoData? mongoData)
-    {
-        var result = data.ToDict(mongoData as GroupEntityMongoData);
-        result.Add("price", mongoData?.Price);
-        result.Add("image_link", mongoData?.Image);
-        return result;
-    }
-    
     public static Dictionary<string, object?> ToDict(this CharacterData data, CharacterMongoData? mongoData)
     {
         var result = data.ToDict(mongoData as CharlistMongoData);
