@@ -1,9 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Tdn.Db.Contexts;
-using Tdn.Db.Entities;
-using Tdn.Models;
-using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
 
 namespace Tdn.Api.Controllers;
@@ -16,15 +12,6 @@ public class GroupsController : GroupsBaseController
     {
         public string Name { get; set; }
         public string? Icon { get; set; }
-        
-        public GroupData ToData()
-        {
-            return new()
-            {
-                Name = Name,
-                Icon = Icon
-            };
-        }
     }
     
     public struct GroupPatchData
@@ -33,53 +20,51 @@ public class GroupsController : GroupsBaseController
         public string? Icon { get; set; }   
     }
 
-    
-    public GroupsController(CampaignContext context, GroupAccessHelper accessHelper) : base(context, accessHelper)
+    private GroupProvider _provider;
+
+    public GroupsController(CampaignContext context, GroupAccessHelper accessHelper, GroupProvider provider) : base(context, accessHelper)
     {
+        _provider = provider;
     }
     
     [HttpGet]
     public ActionResult GetAll([FromQuery] int? userId = null)
     {
-        var groups = DbContext.Groups.ToList();
-        if (userId != null)
+        var groups = _provider.GetAll(userId);
+        return Ok(groups.Select(e => new Dictionary<string, object?>
         {
-            var accessibleIds = AccessHelper.GetAccessibleGroupIds(userId.Value);
-            groups = groups.Where(e => accessibleIds.Contains(e.Id)).ToList();
-        }
-        return Ok(groups.Select(e => e.ToDict()));
+            {"id", e.Id},
+            {"name", e.Name},
+            {"icon", e.Icon}
+        }));
     }
     
     [HttpPost]
     public ActionResult PostGroup(GroupPostData data, [FromQuery] int? userId = null)
     {
-        var group = data.ToData();
-        DbContext.Add(group);
-        DbContext.SaveChanges();
-        
-        if (userId != null)
+        var group = _provider.Create(data.Name, data.Icon, userId);
+        return Created($"groups/{group.Id}", new Dictionary<string, object?>
         {
-            DbContext.UserGroups.Add(new UserGroupData()
-            {
-                UserId = userId.Value,
-                GroupId = group.Id,
-                IsAdmin = true
-            });
-            DbContext.SaveChanges();
-        }
-        
-        return Created($"groups/{group.Id}", group.ToDict());
+            {"id", group.Id},
+            {"name", group.Name},
+            {"icon", group.Icon}
+        });
     }
     
     [HttpGet("{groupId}")]
     public ActionResult GetGroup(int groupId, [FromQuery] int? userId = null)
     {
-        var group = DbContext.Groups.Where(e => e.Id == groupId).FirstOrDefault();
-        if (group == null)
-            return NotFound();
         if (!CheckGroupAccess(groupId, userId))
             return NotFound();
-        return Ok(group.ToDict());
+        var group = _provider.Get(groupId);
+        if (group == null)
+            return NotFound();
+        return Ok(new Dictionary<string, object?>
+        {
+            {"id", group.Id},
+            {"name", group.Name},
+            {"icon", group.Icon}
+        });
     }
     
     [HttpPatch("{groupId}")]
@@ -87,29 +72,32 @@ public class GroupsController : GroupsBaseController
     {
         if (data.Icon == null && data.Name == null)
             return BadRequest();
-        var group = DbContext.Groups.Where(e => e.Id == groupId).FirstOrDefault();
-        if (group == null)
-            return NotFound();
         if (!CheckGroupAccess(groupId, userId))
             return NotFound();
-        if (data.Name != null)
-            group.Name = data.Name;
-        if (data.Icon != null)
-            group.Icon = data.Icon;
-        DbContext.SaveChanges();
-        return Ok(group.ToDict());
+        var group = _provider.Update(groupId, data.Name, data.Icon);
+        if (group == null)
+            return NotFound();
+        return Ok(new Dictionary<string, object?>
+        {
+            {"id", group.Id},
+            {"name", group.Name},
+            {"icon", group.Icon}
+        });
     }
     
     [HttpDelete("{groupId}")]
     public ActionResult DeleteGroup(int groupId, [FromQuery] int? userId = null)
     {
-        var group = DbContext.Groups.Where(e => e.Id == groupId).FirstOrDefault();
-        if (group == null)
-            return NotFound();
         if (!CheckGroupAccess(groupId, userId))
             return NotFound();
-        DbContext.Groups.Remove(group);
-        DbContext.SaveChanges();
-        return Ok(group.ToDict());
+        var group = _provider.Delete(groupId);
+        if (group == null)
+            return NotFound();
+        return Ok(new Dictionary<string, object?>
+        {
+            {"id", group.Id},
+            {"name", group.Name},
+            {"icon", group.Icon}
+        });
     }
 }

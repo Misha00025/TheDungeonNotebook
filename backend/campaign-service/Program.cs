@@ -38,6 +38,7 @@ builder.Services.AddScoped<CharacterResourcesSchemaProvider, CharacterResourcesS
 builder.Services.AddScoped<CharacterEquipmentProvider, CharacterEquipmentProvider>();
 builder.Services.AddScoped<CharacterLogProvider, CharacterLogProvider>();
 builder.Services.AddScoped<CharactersProvider, CharactersProvider>();
+builder.Services.AddScoped<GroupProvider, GroupProvider>();
 builder.Services.AddScoped<QuestsProvider, QuestsProvider>();
 
 // General
