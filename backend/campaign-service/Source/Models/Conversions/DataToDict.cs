@@ -1,9 +1,20 @@
 using Tdn.Db.Entities;
+using Tdn.Models;
 
 namespace Tdn.Models.Conversions;
 
 public static class DataToDictExtensions
-{    
+{
+    public static Dictionary<string, object?> ToDict(this Group group)
+    {
+        return new()
+        {
+            {"id", group.Id},
+            {"name", group.Name},
+            {"icon", group.Icon},
+        };
+    }
+
     public static Dictionary<string, object?> ToDict(this GroupData data)
     {
         return new()

@@ -15,7 +15,6 @@ public abstract class GroupsBaseController : BaseController
         _accessHelper = accessHelper;
     }
 
-    protected CampaignContext DbContext => _db;
     protected GroupAccessHelper AccessHelper => _accessHelper;
 
     protected bool TryGetGroup(int groupId, out GroupData group)

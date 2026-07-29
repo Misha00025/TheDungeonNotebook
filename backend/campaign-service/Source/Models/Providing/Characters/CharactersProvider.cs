@@ -5,8 +5,36 @@ using MongoDB.Driver;
 using Tdn.Db;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
+using Tdn.Models.Conversions;
+using Tdn.Models.Processing;
 
 namespace Tdn.Models.Providing;
+
+public struct FieldPatchData
+{
+    public string? Name { get; set; }
+    public string? Description { get; set; }
+    public int? Value { get; set; }
+    public int? MaxValue { get; set; }
+    public string? Formula { get; set; }
+}
+
+public struct CharacterPatchData
+{
+    public string? Name { get; set; }
+    public string? Description { get; set; }
+    public int? OwnerId { get; set; }
+    public Dictionary<string, FieldPatchData?>? Fields { get; set; }
+}
+
+public class PatchCharacterResult
+{
+    public bool Success { get; init; }
+    public Dictionary<string, object?>? Data { get; init; }
+    public List<string>? Errors { get; init; }
+    public int? StatusCode { get; init; }
+    public Dictionary<string, int>? OldFieldValues { get; init; }
+}
 
 public class CharactersProvider : DualDbRepository<Character, CharacterData, CharacterMongoData>
 {
@@ -124,6 +152,11 @@ public class CharactersProvider : DualDbRepository<Character, CharacterData, Cha
         }
     }
 
+    public CharacterData? GetCharacterSqlData(int groupId, int characterId)
+    {
+        return Db.Set<CharacterData>().FirstOrDefault(cd => cd.Id == characterId && cd.GroupId == groupId);
+    }
+
     public TemplateMongoData? GetTemplate(int groupId, int templateId)
     {
         var templateData = Db.Set<TemplateData>()
@@ -131,5 +164,163 @@ public class CharactersProvider : DualDbRepository<Character, CharacterData, Cha
             .FirstOrDefault();
         if (templateData == null) return null;
         return Mongo.GetEntity<TemplateMongoData>(MongoCollections.Templates, templateData.UUID);
+    }
+
+    public CharacterMongoData BuildMongoData(Character c) => new CharacterMongoData
+    {
+        Name = c.Name,
+        Description = c.Description,
+        Fields = c.Fields,
+        Items = c.Items,
+        Equipment = c.Equipment,
+    };
+
+    public CharacterMongoData AsCharacterWithTemplate(Character character, int groupId)
+    {
+        var template = GetTemplate(character.GroupId, character.TemplateId);
+        var mongoData = BuildMongoData(character);
+        if (template == null)
+            return mongoData;
+        return mongoData.CompareWith(template);
+    }
+
+    private static bool TryChangeProperties(CharacterMongoData character, CharacterPatchData data)
+    {
+        var ok = data.Name != null || data.Description != null;
+        if (data.Name != null)
+            character.Name = data.Name;
+        if (data.Description != null)
+            character.Description = data.Description;
+        return ok;
+    }
+
+    private static bool TryChangeFields(CharacterMongoData character, TemplateMongoData template, CharacterPatchData data, out List<string> errors)
+    {
+        var doSomething = false;
+        errors = new();
+        if (data.Fields == null || data.Fields.Count == 0)
+            return false;
+        foreach (var field in data.Fields)
+        {
+            var tmp = field.Value;
+            var isExist = character.Fields.ContainsKey(field.Key);
+            if (isExist)
+            {
+                if (tmp == null)
+                {
+                    character.Fields.Remove(field.Key);
+                    doSomething = true;
+                }
+                else
+                {
+                    var value = (FieldPatchData)tmp;
+                    if (value.Name == null && value.Description == null && value.Value == null && value.MaxValue == null && value.Formula == null)
+                        continue;
+                    FieldMongoData existField = character.Fields[field.Key];
+                    if (value.MaxValue != null && existField is PropertyMongoData)
+                        ((PropertyMongoData)existField).MaxValue = (int)value.MaxValue;
+                    existField.Name = value.Name != null ? value.Name : existField.Name;
+                    existField.Description = value.Description != null ? value.Description : existField.Description;
+                    existField.Value = value.Value != null ? (int)value.Value : existField.Value;
+                    existField.Formula = value.Formula != null ? value.Formula : existField.Formula;
+                    doSomething = true;
+                }
+            }
+            else
+            {
+                if (tmp == null)
+                {
+                    errors.Add($"Can't delete field with key '{field.Key}': this field does not exist or set as default");
+                    continue;
+                }
+                var value = (FieldPatchData)tmp;
+                var isDefaultField = template.Fields.ContainsKey(field.Key);
+                if (isDefaultField)
+                {
+                    var newField = template.Fields[field.Key];
+                    if (value.MaxValue != null && newField is PropertyMongoData)
+                        ((PropertyMongoData)newField).MaxValue = (int)value.MaxValue;
+                    newField.Value = value.Value != null ? (int)value.Value : newField.Value;
+                    newField.Formula = value.Formula != null ? value.Formula : newField.Formula;
+                    character.Fields.Add(field.Key, newField);
+                }
+                else
+                {
+                    errors.Add($"Can't create field with key '{field.Key}': name and description must be not null");
+                    continue;
+                }
+                doSomething = true;
+            }
+        }
+        return doSomething;
+    }
+
+    public PatchCharacterResult PatchCharacter(
+        int groupId,
+        int characterId,
+        CharacterPatchData data,
+        bool withEmptyFields = true)
+    {
+        var character = GetCharacter(groupId, characterId);
+        if (character == null)
+            return new PatchCharacterResult { Success = false, StatusCode = 404 };
+
+        var mongoData = BuildMongoData(character);
+        var anythingChanged = TryChangeProperties(mongoData, data);
+
+        var template = GetTemplate(groupId, character.TemplateId);
+        if (template == null)
+            return new PatchCharacterResult { Success = false, StatusCode = 404, Data = null };
+
+        var oldFieldValues = new Dictionary<string, int>();
+        if (data.Fields != null)
+        {
+            foreach (var field in data.Fields)
+            {
+                if (field.Value?.Value == null) continue;
+                if (mongoData.Fields.ContainsKey(field.Key))
+                    oldFieldValues[field.Key] = mongoData.Fields[field.Key].Value;
+                else if (template.Fields.ContainsKey(field.Key))
+                    oldFieldValues[field.Key] = template.Fields[field.Key].Value;
+            }
+        }
+
+        var fieldsChanged = TryChangeFields(mongoData, template, data, out var errors);
+        anythingChanged = (anythingChanged && data.Fields == null) || fieldsChanged;
+
+        if (anythingChanged)
+        {
+            character.Name = mongoData.Name;
+            character.Description = mongoData.Description;
+            character.Fields = mongoData.Fields;
+            character.Items = mongoData.Items;
+            character.Equipment = mongoData.Equipment;
+
+            TryUpdateCharacter(character);
+
+            if (withEmptyFields)
+            {
+                var mongoDataWithTemplate = AsCharacterWithTemplate(character, groupId);
+                FormulaCalculator.CalculateFields(mongoDataWithTemplate);
+                var sqlData = GetCharacterSqlData(groupId, characterId);
+                var result = sqlData!.ToDict(mongoDataWithTemplate);
+                if (errors.Count > 0)
+                    result.Add("errors", errors);
+                return new PatchCharacterResult { Success = true, Data = result, OldFieldValues = oldFieldValues };
+            }
+            else
+            {
+                FormulaCalculator.CalculateFields(mongoData);
+                var sqlData = GetCharacterSqlData(groupId, characterId);
+                var result = sqlData!.ToDict(mongoData);
+                if (errors.Count > 0)
+                    result.Add("errors", errors);
+                return new PatchCharacterResult { Success = true, Data = result, OldFieldValues = oldFieldValues };
+            }
+        }
+        else if (errors.Count > 0)
+            return new PatchCharacterResult { Success = false, StatusCode = 400, Errors = errors };
+        else
+            return new PatchCharacterResult { Success = false, StatusCode = 400 };
     }
 }

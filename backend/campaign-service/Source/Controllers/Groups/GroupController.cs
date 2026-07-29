@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Tdn.Db.Contexts;
 using Tdn.Models.Providing;
+using Tdn.Models.Conversions;
 
 namespace Tdn.Api.Controllers;
 
@@ -31,24 +32,14 @@ public class GroupsController : GroupsBaseController
     public ActionResult GetAll([FromQuery] int? userId = null)
     {
         var groups = _provider.GetAll(userId);
-        return Ok(groups.Select(e => new Dictionary<string, object?>
-        {
-            {"id", e.Id},
-            {"name", e.Name},
-            {"icon", e.Icon}
-        }));
+        return Ok(groups.Select(e => e.ToDict()));
     }
     
     [HttpPost]
     public ActionResult PostGroup(GroupPostData data, [FromQuery] int? userId = null)
     {
         var group = _provider.Create(data.Name, data.Icon, userId);
-        return Created($"groups/{group.Id}", new Dictionary<string, object?>
-        {
-            {"id", group.Id},
-            {"name", group.Name},
-            {"icon", group.Icon}
-        });
+        return Created($"groups/{group.Id}", group.ToDict());
     }
     
     [HttpGet("{groupId}")]
@@ -59,12 +50,7 @@ public class GroupsController : GroupsBaseController
         var group = _provider.Get(groupId);
         if (group == null)
             return NotFound();
-        return Ok(new Dictionary<string, object?>
-        {
-            {"id", group.Id},
-            {"name", group.Name},
-            {"icon", group.Icon}
-        });
+        return Ok(group.ToDict());
     }
     
     [HttpPatch("{groupId}")]
@@ -77,12 +63,7 @@ public class GroupsController : GroupsBaseController
         var group = _provider.Update(groupId, data.Name, data.Icon);
         if (group == null)
             return NotFound();
-        return Ok(new Dictionary<string, object?>
-        {
-            {"id", group.Id},
-            {"name", group.Name},
-            {"icon", group.Icon}
-        });
+        return Ok(group.ToDict());
     }
     
     [HttpDelete("{groupId}")]
@@ -93,11 +74,6 @@ public class GroupsController : GroupsBaseController
         var group = _provider.Delete(groupId);
         if (group == null)
             return NotFound();
-        return Ok(new Dictionary<string, object?>
-        {
-            {"id", group.Id},
-            {"name", group.Name},
-            {"icon", group.Icon}
-        });
+        return Ok(group.ToDict());
     }
 }

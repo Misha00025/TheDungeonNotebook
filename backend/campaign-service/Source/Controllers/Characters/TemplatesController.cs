@@ -32,10 +32,12 @@ public class TemplatesController : GroupsBaseController
     }
 
     private IMongoDbContext _mongo;
+    private CampaignContext _campaignContext;
 
     public TemplatesController(CampaignContext context, IMongoDbContext mongo, GroupAccessHelper accessHelper) : base(context, accessHelper)
     {
         _mongo = mongo;
+        _campaignContext = context;
     }
     
     private FieldMongoData CreateFieldMongoData(FieldPostData data)
@@ -69,7 +71,7 @@ public class TemplatesController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var group))
         {
-            var templateSet = DbContext.Set<TemplateData>();
+            var templateSet = _campaignContext.Set<TemplateData>();
             var templates = templateSet.Where(e => e.GroupId == groupId).Select(e => e.ToDict(_mongo.GetEntity<TemplateMongoData>(MongoCollections.Templates, e.UUID)));
             return Ok(new Dictionary<string, object>() { {"templates", templates} });
         }
@@ -82,7 +84,7 @@ public class TemplatesController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var _))
         {
-            var templateSet = DbContext.Set<TemplateData>();
+            var templateSet = _campaignContext.Set<TemplateData>();
             var template = templateSet.Where(e => e.GroupId == groupId).FirstOrDefault();
             if (template != null)
                 return Conflict("Template already exist");
@@ -92,7 +94,7 @@ public class TemplatesController : GroupsBaseController
                 Description = data.Description,
                 Fields = Convert(data.Fields),
             };
-            var set = DbContext.Set<TemplateData>();
+            var set = _campaignContext.Set<TemplateData>();
             var collection = GetCollection();
             collection.InsertOne(mongoItem);
             template = new TemplateData()
@@ -103,7 +105,7 @@ public class TemplatesController : GroupsBaseController
             set.Add(template);
             try
             {
-                DbContext.SaveChanges();
+                _campaignContext.SaveChanges();
             }
             catch
             {
@@ -121,7 +123,7 @@ public class TemplatesController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var _))
         {
-            var templateSet = DbContext.Set<TemplateData>();
+            var templateSet = _campaignContext.Set<TemplateData>();
             var template = templateSet.Where(e => e.GroupId == groupId).FirstOrDefault();
             if (template == null)
                 return NotFound("Template not found");
@@ -136,7 +138,7 @@ public class TemplatesController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var _))
         {
-            var templateSet = DbContext.Set<TemplateData>();
+            var templateSet = _campaignContext.Set<TemplateData>();
             var template = templateSet.Where(e => e.GroupId == groupId).FirstOrDefault();
             TemplateMongoData? mongoData;
             if (template == null)
