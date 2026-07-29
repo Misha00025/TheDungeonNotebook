@@ -32,6 +32,14 @@ public abstract class DualDbRepository<TEntity, TSqlData, TMongoData>
     protected abstract int GetEntityId(TEntity entity);
     protected abstract void SetEntityId(TEntity entity, int id);
 
+    protected virtual TSqlData CreateSqlData(int groupId, string uuid, TEntity entity)
+    {
+        var sqlData = Activator.CreateInstance<TSqlData>();
+        sqlData.GroupId = groupId;
+        sqlData.UUID = uuid;
+        return sqlData;
+    }
+
     protected TEntity FromSqlData(TSqlData sqlData)
     {
         var mongoData = Mongo.GetEntity<TMongoData>(CollectionName, sqlData.UUID);
@@ -77,9 +85,7 @@ public abstract class DualDbRepository<TEntity, TSqlData, TMongoData>
         {
             var mongoData = ToMongoData(entity);
             Mongo.GetCollection<TMongoData>(CollectionName).InsertOne(mongoData);
-            var sqlData = (TSqlData)Activator.CreateInstance(typeof(TSqlData))!;
-            sqlData.GroupId = groupId;
-            sqlData.UUID = mongoData.Id.ToString();
+            var sqlData = CreateSqlData(groupId, mongoData.Id.ToString(), entity);
             Db.Set<TSqlData>().Add(sqlData);
             Db.SaveChanges();
             SetEntityId(entity, sqlData.Id);

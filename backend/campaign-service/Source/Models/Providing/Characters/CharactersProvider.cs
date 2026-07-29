@@ -48,55 +48,19 @@ public class CharactersProvider : DualDbRepository<Character, CharacterData, Cha
     public Character? GetCharacter(int groupId, int characterId) => Get(groupId, characterId);
     public IEnumerable<Character> GetCharacters(int groupId) => GetByGroup(groupId);
 
-    public bool TryCreateCharacter(int groupId, Character character)
+    protected override CharacterData CreateSqlData(int groupId, string uuid, Character entity)
     {
-        try
+        return new CharacterData
         {
-            var mongoData = ToMongoData(character);
-            Mongo.GetCollection<CharacterMongoData>(CollectionName).InsertOne(mongoData);
-            var sqlData = new CharacterData
-            {
-                GroupId = groupId,
-                TemplateId = character.TemplateId,
-                OwnerId = character.OwnerId,
-                UUID = mongoData.Id.ToString()
-            };
-            Db.Set<CharacterData>().Add(sqlData);
-            Db.SaveChanges();
-            character.Id = sqlData.Id;
-            return true;
-        }
-        catch (Exception e)
-        {
-            Logger.LogWarning($"Error creating character: {e}");
-            return false;
-        }
+            GroupId = groupId,
+            UUID = uuid,
+            TemplateId = entity.TemplateId,
+            OwnerId = entity.OwnerId,
+        };
     }
 
-    public bool TryUpdateCharacter(Character character)
-    {
-        try
-        {
-            var sqlData = Db.Set<CharacterData>()
-                .FirstOrDefault(IdFilter(character.GroupId, character.Id));
-            if (sqlData == null)
-                return false;
-
-            var mongoData = ToMongoData(character);
-            mongoData.Id = new ObjectId(sqlData.UUID);
-
-            var result = Mongo.GetCollection<CharacterMongoData>(CollectionName)
-                .ReplaceOne(
-                    Builders<CharacterMongoData>.Filter.Eq(x => x.Id, new ObjectId(sqlData.UUID)),
-                    mongoData);
-            return result.IsAcknowledged && result.ModifiedCount > 0;
-        }
-        catch (Exception e)
-        {
-            Logger.LogWarning($"Error updating character: {e}");
-            return false;
-        }
-    }
+    public bool TryCreateCharacter(int groupId, Character character) => TryCreate(groupId, character);
+    public bool TryUpdateCharacter(Character character) => TryUpdate(character);
 
     public bool TryUpdateOwnerId(int groupId, int characterId, int? ownerId)
     {
@@ -107,25 +71,7 @@ public class CharactersProvider : DualDbRepository<Character, CharacterData, Cha
         return true;
     }
 
-    public bool TryDeleteCharacter(int groupId, int characterId)
-    {
-        try
-        {
-            var sqlData = Db.Set<CharacterData>().FirstOrDefault(IdFilter(groupId, characterId));
-            if (sqlData == null)
-                return false;
-            Mongo.GetCollection<CharacterMongoData>(CollectionName)
-                .DeleteOne(Builders<CharacterMongoData>.Filter.Eq(x => x.Id, new ObjectId(sqlData.UUID)));
-            Db.Set<CharacterData>().Remove(sqlData);
-            Db.SaveChanges();
-            return true;
-        }
-        catch (Exception e)
-        {
-            Logger.LogWarning($"Error deleting character: {e}");
-            return false;
-        }
-    }
+    public bool TryDeleteCharacter(int groupId, int characterId) => TryDelete(groupId, characterId);
 
     public CharacterData? GetCharacterSqlData(int groupId, int characterId)
     {
