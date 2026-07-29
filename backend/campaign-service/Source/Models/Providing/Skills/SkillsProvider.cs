@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -8,28 +9,38 @@ using Tdn.Db.Entities;
 
 namespace Tdn.Models.Providing;
 
-public class SkillsProvider 
+public class SkillsProvider : DualDbRepository<Skill, SkillData, SkillMongoData>
 {
-    private const string SKILLS_COLLECTION_NAME = "skills";
-    
-    private CampaignContext _db;
-    private IMongoDbContext _mongo;
     private AttributesProvider _attributes;
-    private ILogger<SkillsProvider> _logger;
 
-    public SkillsProvider(CampaignContext skillsContext, IMongoDbContext mongoDbContext, AttributesProvider attributesProvider, ILogger<SkillsProvider> logger)
+    public SkillsProvider(CampaignContext context, IMongoDbContext mongoDbContext, AttributesProvider attributesProvider, ILogger<SkillsProvider> logger)
+        : base(context, mongoDbContext, logger)
     {
-        _db = skillsContext;
-        _mongo = mongoDbContext;
         _attributes = attributesProvider;
-        _logger = logger;
     }
 
-    private static Group ToGroup(GroupData data) => new()
+    protected override string CollectionName => "skills";
+
+    protected override Expression<Func<SkillData, bool>> GroupFilter(int groupId) => e => e.GroupId == groupId;
+    protected override Expression<Func<SkillData, bool>> IdFilter(int groupId, int entityId) => e => e.GroupId == groupId && e.Id == entityId;
+    protected override int GetGroupId(Skill entity) => entity.Group.Id;
+    protected override int GetEntityId(Skill entity) => entity.Id;
+    protected override void SetEntityId(Skill entity, int id) => entity.Id = id;
+
+    protected override Skill ToDomain(SkillData sqlData, SkillMongoData mongoData) => ToSkill(sqlData, mongoData);
+
+    protected override SkillMongoData ToMongoData(Skill entity) => new SkillMongoData()
     {
-        Id = data.Id,
-        Name = data.Name,
-        Description = data.Name
+        Name = entity.Name,
+        Description = entity.Description,
+        Attributes = entity.Attributes
+            .Select(e => new ValuedAttributeMongoData()
+            {
+                Key = e.Key,
+                Value = e.Value
+            })
+            .ToList(),
+        IsSecret = entity.IsSecret
     };
 
     private ValuedAttribute ToAttribute(int groupId, ValuedAttributeMongoData data)
@@ -41,7 +52,7 @@ public class SkillsProvider
                 Key = data.Key,
                 Name = data.Key,
             };
-    
+
         return new()
         {
             Key = attribute.Key,
@@ -49,8 +60,8 @@ public class SkillsProvider
             Description = attribute.Description,
             Value = data.Value
         };
-    } 
-    
+    }
+
     private Skill ToSkill(SkillData data, SkillMongoData mongoData)
     {
         var group = ToGroup(data.Group);
@@ -62,150 +73,34 @@ public class SkillsProvider
         skill.IsSecret = mongoData.IsSecret;
         return skill;
     }
-    
-    private Skill GetSkill(SkillData data)
-    {
-        _logger.LogInformation($"GetSkill: skillId={data.Id}, groupId={data.GroupId}, UUID={data.UUID}");
-        var mongoData = _mongo.GetEntity<SkillMongoData>(SKILLS_COLLECTION_NAME, data.UUID);
-        if (mongoData == null)
-        {
-            _logger.LogWarning($"GetSkill: Mongo document not found for UUID={data.UUID}, skillId={data.Id}");
-        }
-        return ToSkill(data, mongoData!);
-    }
-    
-    public Skill? GetSkill(int groupId, int skillId)
-    {
-        var data = _db.Skills
-                    .Where(e => e.GroupId == groupId && e.Id == skillId)
-                    .Include(e => e.Group)
-                    .FirstOrDefault();
-        if (data == null)
-            return null;
-        return GetSkill(data);
-    }
-    
-    public IEnumerable<Skill> GetSkills(int groupId)
-    {
-        var skills = _db.Skills
-                        .Where(e => e.GroupId == groupId)
-                        .Include(e => e.Group)
-                        .AsEnumerable()
-                        .Select(GetSkill)
-                        .ToList();
-        _logger.LogInformation($"GetSkills(groupId={groupId}): SQL returned {skills.Count} skills");
-        return skills;
-    }
-    
+
+    public Skill? GetSkill(int groupId, int skillId) => Get(groupId, skillId);
+
+    public IEnumerable<Skill> GetSkills(int groupId) => GetByGroup(groupId);
+
     public IEnumerable<Skill> GetSkills(int groupId, int characterId)
     {
-        var skills = _db.CharacterSkills
-                        .Include(e => e.Skill)
-                        .Include(e => e.Skill.Group)
-                        .Where(e => e.Skill.GroupId == groupId && e.CharacterId == characterId)
-                        .AsEnumerable()
-                        .Select(e => GetSkill(e.Skill))
-                        .ToList();
-        return skills;
+        return Db.CharacterSkills
+            .Include(e => e.Skill)
+            .Include(e => e.Skill.Group)
+            .Where(e => e.Skill.GroupId == groupId && e.CharacterId == characterId)
+            .AsEnumerable()
+            .Select(e => FromSqlData(e.Skill))
+            .Where(e => e != null)
+            .ToList()!;
     }
-    
-    public bool TryCreateSkill(int groupId, Skill skill)
-    {
-        try
-        {
-            var mongoData = new SkillMongoData()
-            {
-                Name = skill.Name,
-                Description = skill.Description,
-                Attributes = skill.Attributes
-                    .Select(e => new ValuedAttributeMongoData()
-                    {
-                        Key = e.Key,
-                        Value = e.Value
-                    })
-                    .ToList(),
-                IsSecret = skill.IsSecret
-            };
-            _mongo.GetCollection<SkillMongoData>(SKILLS_COLLECTION_NAME).InsertOne(mongoData);
-            SkillData data = new SkillData() { GroupId = groupId, UUID = mongoData.Id.ToString() };
-            _db.Skills.Add(data);
-            _db.SaveChanges();
-            skill.Id = data.Id;
-            return true;
-        }
-        catch (Exception e)
-        {
-            _logger.LogWarning($"Error with create skill: {e}");
-            return false;
-        }
-    }
-    
-    public bool TryUpdateSkill(Skill skill)
-    {
-        try
-        {
-            var skillData = _db.Skills
-                .Include(e => e.Group)
-                .FirstOrDefault(e => e.Id == skill.Id && e.GroupId == skill.Group.Id);
-            
-            if (skillData == null)
-                return false;
 
-            var mongoData = new SkillMongoData()
-            {
-                Id = new ObjectId(skillData.UUID),
-                Name = skill.Name,
-                Description = skill.Description,
-                Attributes = skill.Attributes
-                    .Select(e => new ValuedAttributeMongoData()
-                    {
-                        Key = e.Key,
-                        Value = e.Value
-                    })
-                    .ToList(),
-                IsSecret = skill.IsSecret
-            };
+    public bool TryCreateSkill(int groupId, Skill skill) => TryCreate(groupId, skill);
 
-            var collection = _mongo.GetCollection<SkillMongoData>(SKILLS_COLLECTION_NAME);
-            var result = collection.ReplaceOne(
-                Builders<SkillMongoData>.Filter.Eq(x => x.Id, new ObjectId(skillData.UUID)),
-                mongoData);
+    public bool TryUpdateSkill(Skill skill) => TryUpdate(skill);
 
-            return result.IsAcknowledged && result.ModifiedCount > 0;
-        }
-        catch (Exception e)
-        {
-            _logger.LogWarning($"Error with update skill: {e}");
-            return false;
-        }
-    }
-    
-    public bool TryDeleteSkill(int groupId, int skillId)
-    {
-        try
-        {
-            var skillData = _db.Skills
-                .FirstOrDefault(e => e.GroupId == groupId && e.Id == skillId);
-            if (skillData == null)
-                return false;
-            var collection = _mongo.GetCollection<SkillMongoData>(SKILLS_COLLECTION_NAME);
-            var mongoResult = collection.DeleteOne(Builders<SkillMongoData>.Filter.Eq(x => x.Id, new ObjectId(skillData.UUID)));
-            _db.Skills.Remove(skillData);
-            _db.SaveChanges();
-            return mongoResult.IsAcknowledged && mongoResult.DeletedCount > 0;
-        }
-        catch (Exception e)
-        {
-            _logger.LogWarning($"Error with delete skill: {e}");
-            return false;
-        }
-    }
-    
+    public bool TryDeleteSkill(int groupId, int skillId) => TryDelete(groupId, skillId);
+
     public bool TryAddSkillToCharacter(Skill skill, int characterId)
     {
         try
         {
-            var existing = _db.CharacterSkills
+            var existing = Db.CharacterSkills
                 .FirstOrDefault(e => e.CharacterId == characterId && e.SkillId == skill.Id);
             if (existing != null)
                 return true;
@@ -214,36 +109,36 @@ public class SkillsProvider
                 CharacterId = characterId,
                 SkillId = skill.Id
             };
-            _db.CharacterSkills.Add(characterSkill);
-            _db.SaveChanges();
+            Db.CharacterSkills.Add(characterSkill);
+            Db.SaveChanges();
             return true;
         }
         catch (Exception e)
         {
-            _logger.LogWarning($"Error adding skill to character: {e}");
+            Logger.LogWarning($"Error adding skill to character: {e}");
             return false;
         }
     }
-    
+
     public bool TryRemoveSkillFromCharacter(Skill skill, int characterId)
     {
         try
         {
-            var existing = _db.CharacterSkills
+            var existing = Db.CharacterSkills
                 .FirstOrDefault(e => e.CharacterId == characterId && e.SkillId == skill.Id);
             if (existing == null)
                 return true;
-            _db.CharacterSkills.Remove(existing);
-            _db.SaveChanges();
+            Db.CharacterSkills.Remove(existing);
+            Db.SaveChanges();
             return true;
         }
         catch (Exception e)
         {
-            _logger.LogWarning($"Error removing skill from character: {e}");
+            Logger.LogWarning($"Error removing skill from character: {e}");
             return false;
         }
     }
-    
+
     public IEnumerable<Skill> ApplyFilters(IEnumerable<Skill> skills, Dictionary<string, string> filters)
     {
         foreach (var skill in skills)

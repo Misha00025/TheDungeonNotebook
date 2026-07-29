@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -7,30 +8,41 @@ using Tdn.Db.Entities;
 
 namespace Tdn.Models.Providing;
 
-public class ItemsProvider
+public class ItemsProvider : DualDbRepository<Item, ItemData, ItemMongoData>
 {
-    private const string ITEMS_COLLECTION_NAME = "items";
-    
-    private CampaignContext _db;
-    private IMongoDbContext _mongo;
     private AttributesProvider _attributes;
-    private ILogger<ItemsProvider> _logger;
 
     public ItemsProvider(CampaignContext context, IMongoDbContext mongoDbContext, AttributesProvider attributesProvider, ILogger<ItemsProvider> logger)
+        : base(context, mongoDbContext, logger)
     {
-        _db = context;
-        _mongo = mongoDbContext;
         _attributes = attributesProvider;
-        _logger = logger;
     }
 
-    private static Group ToGroup(GroupData data) => new()
+    protected override string CollectionName => "items";
+
+    protected override Expression<Func<ItemData, bool>> GroupFilter(int groupId) => e => e.GroupId == groupId;
+    protected override Expression<Func<ItemData, bool>> IdFilter(int groupId, int entityId) => e => e.GroupId == groupId && e.Id == entityId;
+    protected override int GetGroupId(Item entity) => entity.Group.Id;
+    protected override int GetEntityId(Item entity) => entity.Id;
+    protected override void SetEntityId(Item entity, int id) => entity.Id = id;
+
+    protected override Item ToDomain(ItemData sqlData, ItemMongoData mongoData) => ToItem(sqlData, mongoData);
+
+    protected override ItemMongoData ToMongoData(Item entity) => new ItemMongoData()
     {
-        Id = data.Id,
-        Name = data.Name,
-        Description = data.Name
+        Name = entity.Name,
+        Description = entity.Description,
+        Price = entity.Price,
+        Attributes = entity.Attributes
+            .Select(e => new ValuedAttributeMongoData()
+            {
+                Key = e.Key,
+                Value = e.Value
+            })
+            .ToList(),
+        IsSecret = entity.IsSecret
     };
-    
+
     private ValuedAttribute ToAttribute(int groupId, ValuedAttributeMongoData data)
     {
         Attribute attribute;
@@ -40,7 +52,7 @@ public class ItemsProvider
                 Key = data.Key,
                 Name = data.Key,
             };
-    
+
         return new()
         {
             Key = attribute.Key,
@@ -49,7 +61,7 @@ public class ItemsProvider
             Value = data.Value
         };
     }
-    
+
     private Item ToItem(ItemData data, ItemMongoData mongoData)
     {
         var group = ToGroup(data.Group);
@@ -63,159 +75,47 @@ public class ItemsProvider
         return item;
     }
 
-    private Item GetItem(ItemData data)
-    {
-        var mongoData = _mongo.GetEntity<ItemMongoData>(ITEMS_COLLECTION_NAME, data.UUID);
-        return ToItem(data, mongoData!);
-    }
+    public Item? GetItem(int groupId, int itemId) => Get(groupId, itemId);
 
-    public Item? GetItem(int groupId, int itemId)
-    {
-        var data = _db.Items
-                    .Where(e => e.GroupId == groupId && e.Id == itemId)
-                    .Include(e => e.Group)
-                    .FirstOrDefault();
-        if (data == null)
-            return null;
-        return GetItem(data);
-    }
-    
     public Item? GetItem(int groupId, int itemId, int characterId)
     {
-        var data = _db.CharacterItems
+        var data = Db.CharacterItems
                     .Include(e => e.Item)
                     .Where(e => e.Item.GroupId == groupId && e.ItemId == itemId && e.CharacterId == characterId)
                     .Include(e => e.Item.Group)
                     .FirstOrDefault();
-        if (data == null)
-            return null;
-        var item = GetItem(data.Item);
+        if (data == null) return null;
+        var item = FromSqlData(data.Item);
+        if (item == null) return null;
         item.Amount = data.Amount;
         return item;
     }
-       
-    public IEnumerable<Item> GetItems(int groupId)
-    {
-        var skills = _db.Items
-                        .Where(e => e.GroupId == groupId)
-                        .Include(e => e.Group)
-                        .AsEnumerable()
-                        .Select(GetItem)
-                        .ToList();
-        return skills;
-    }
-    
+
+    public IEnumerable<Item> GetItems(int groupId) => GetByGroup(groupId);
+
     public IEnumerable<Item> GetItems(int groupId, int characterId)
     {
-        var skills = _db.CharacterItems
-                        .Include(e => e.Item)
-                        .Include(e => e.Item.Group)
-                        .Where(e => e.Item.GroupId == groupId && e.CharacterId == characterId)
-                        .AsEnumerable()
-                        .Select(e => {var item = GetItem(e.Item); item.Amount = e.Amount; return item;})
-                        .ToList();
-        return skills;
+        return Db.CharacterItems
+            .Include(e => e.Item)
+            .Include(e => e.Item.Group)
+            .Where(e => e.Item.GroupId == groupId && e.CharacterId == characterId)
+            .AsEnumerable()
+            .Select(e => { var item = FromSqlData(e.Item); if (item != null) item.Amount = e.Amount; return item; })
+            .Where(e => e != null)
+            .ToList()!;
     }
-    
-    public bool TryCreateItem(int groupId, Item item)
-    {
-        try
-        {
-            var mongoData = new ItemMongoData()
-            {
-                Name = item.Name,
-                Description = item.Description,
-                Price = item.Price,
-                Attributes = item.Attributes
-                    .Select(e => new ValuedAttributeMongoData()
-                    {
-                        Key = e.Key,
-                        Value = e.Value
-                    })
-                    .ToList(),
-                IsSecret = item.IsSecret
-            };
-            _mongo.GetCollection<ItemMongoData>(ITEMS_COLLECTION_NAME).InsertOne(mongoData);
-            ItemData data = new ItemData() { GroupId = groupId, UUID = mongoData.Id.ToString() };
-            _db.Items.Add(data);
-            _db.SaveChanges();
-            item.Id = data.Id;
-            return true;
-        }
-        catch (Exception e)
-        {
-            _logger.LogWarning($"Error with create item: {e}");
-            return false;
-        }
-    }
-    
-    public bool TryUpdateItem(Item item)
-    {
-        try
-        {
-            var itemData = _db.Items
-                .Include(e => e.Group)
-                .FirstOrDefault(e => e.Id == item.Id && e.GroupId == item.Group.Id);
-            
-            if (itemData == null)
-                return false;
 
-            var mongoData = new ItemMongoData()
-            {
-                Id = new ObjectId(itemData.UUID),
-                Name = item.Name,
-                Description = item.Description,
-                Price = item.Price,
-                Attributes = item.Attributes
-                    .Select(e => new ValuedAttributeMongoData()
-                    {
-                        Key = e.Key,
-                        Value = e.Value
-                    })
-                    .ToList(),
-                IsSecret = item.IsSecret
-            };
+    public bool TryCreateItem(int groupId, Item item) => TryCreate(groupId, item);
 
-            var collection = _mongo.GetCollection<ItemMongoData>(ITEMS_COLLECTION_NAME);
-            var result = collection.ReplaceOne(
-                Builders<ItemMongoData>.Filter.Eq(x => x.Id, new ObjectId(itemData.UUID)),
-                mongoData);
+    public bool TryUpdateItem(Item item) => TryUpdate(item);
 
-            return result.IsAcknowledged && result.ModifiedCount > 0;
-        }
-        catch (Exception e)
-        {
-            _logger.LogWarning($"Error with update item: {e}");
-            return false;
-        }
-    }
-    
-    public bool TryDeleteItem(int groupId, int itemId)
-    {
-        try
-        {
-            var itemData = _db.Items
-                .FirstOrDefault(e => e.GroupId == groupId && e.Id == itemId);
-            if (itemData == null)
-                return false;
-            var collection = _mongo.GetCollection<ItemMongoData>(ITEMS_COLLECTION_NAME);
-            _db.Items.Remove(itemData);
-            _db.SaveChanges();
-            var mongoResult = collection.DeleteOne(Builders<ItemMongoData>.Filter.Eq(x => x.Id, new ObjectId(itemData.UUID)));
-            return mongoResult.IsAcknowledged && mongoResult.DeletedCount > 0;
-        }
-        catch (Exception e)
-        {
-            _logger.LogWarning($"Error with delete skill: {e}");
-            return false;
-        }
-    }
-    
+    public bool TryDeleteItem(int groupId, int itemId) => TryDelete(groupId, itemId);
+
     public bool TrySetItemToCharacter(Item item, int characterId, int amount)
     {
         try
         {
-            var existing = _db.CharacterItems
+            var existing = Db.CharacterItems
                 .FirstOrDefault(e => e.CharacterId == characterId && e.ItemId == item.Id);
             if (existing != null)
             {
@@ -229,33 +129,33 @@ public class ItemsProvider
                     ItemId = item.Id,
                     Amount = amount
                 };
-                _db.CharacterItems.Add(characterItem);
+                Db.CharacterItems.Add(characterItem);
             }
-            _db.SaveChanges();
+            Db.SaveChanges();
             return true;
         }
         catch (Exception e)
         {
-            _logger.LogWarning($"Error adding item to character: {e}");
+            Logger.LogWarning($"Error adding item to character: {e}");
             return false;
         }
     }
-    
+
     public bool TryRemoveItemFromCharacter(Item item, int characterId)
     {
         try
         {
-            var existing = _db.CharacterItems
+            var existing = Db.CharacterItems
                 .FirstOrDefault(e => e.CharacterId == characterId && e.ItemId == item.Id);
             if (existing == null)
                 return true;
-            _db.CharacterItems.Remove(existing);
-            _db.SaveChanges();
+            Db.CharacterItems.Remove(existing);
+            Db.SaveChanges();
             return true;
         }
         catch (Exception e)
         {
-            _logger.LogWarning($"Error removing item from character: {e}");
+            Logger.LogWarning($"Error removing item from character: {e}");
             return false;
         }
     }
