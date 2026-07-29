@@ -6,9 +6,9 @@ namespace Tdn.Models.Providing;
 
 public class CharacterLogProvider
 {
-    private readonly MongoDbContext _mongo;
+    private readonly IMongoDbContext _mongo;
 
-    public CharacterLogProvider(MongoDbContext mongo)
+    public CharacterLogProvider(IMongoDbContext mongo)
     {
         _mongo = mongo;
     }

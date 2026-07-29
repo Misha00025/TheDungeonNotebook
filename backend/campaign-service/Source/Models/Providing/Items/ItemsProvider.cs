@@ -11,14 +11,14 @@ public class ItemsProvider
 {
     private const string ITEMS_COLLECTION_NAME = "items";
     
-    private ItemsContext _sql;
-    private MongoDbContext _mongo;
+    private CampaignContext _db;
+    private IMongoDbContext _mongo;
     private AttributesProvider _attributes;
     private ILogger<ItemsProvider> _logger;
 
-    public ItemsProvider(ItemsContext context, MongoDbContext mongoDbContext, AttributesProvider attributesProvider, ILogger<ItemsProvider> logger)
+    public ItemsProvider(CampaignContext context, IMongoDbContext mongoDbContext, AttributesProvider attributesProvider, ILogger<ItemsProvider> logger)
     {
-        _sql = context;
+        _db = context;
         _mongo = mongoDbContext;
         _attributes = attributesProvider;
         _logger = logger;
@@ -71,7 +71,7 @@ public class ItemsProvider
 
     public Item? GetItem(int groupId, int itemId)
     {
-        var data = _sql.Items
+        var data = _db.Items
                     .Where(e => e.GroupId == groupId && e.Id == itemId)
                     .Include(e => e.Group)
                     .FirstOrDefault();
@@ -82,7 +82,7 @@ public class ItemsProvider
     
     public Item? GetItem(int groupId, int itemId, int characterId)
     {
-        var data = _sql.CharacterItems
+        var data = _db.CharacterItems
                     .Include(e => e.Item)
                     .Where(e => e.Item.GroupId == groupId && e.ItemId == itemId && e.CharacterId == characterId)
                     .Include(e => e.Item.Group)
@@ -96,7 +96,7 @@ public class ItemsProvider
        
     public IEnumerable<Item> GetItems(int groupId)
     {
-        var skills = _sql.Items
+        var skills = _db.Items
                         .Where(e => e.GroupId == groupId)
                         .Include(e => e.Group)
                         .AsEnumerable()
@@ -107,7 +107,7 @@ public class ItemsProvider
     
     public IEnumerable<Item> GetItems(int groupId, int characterId)
     {
-        var skills = _sql.CharacterItems
+        var skills = _db.CharacterItems
                         .Include(e => e.Item)
                         .Include(e => e.Item.Group)
                         .Where(e => e.Item.GroupId == groupId && e.CharacterId == characterId)
@@ -137,8 +137,8 @@ public class ItemsProvider
             };
             _mongo.GetCollection<ItemMongoData>(ITEMS_COLLECTION_NAME).InsertOne(mongoData);
             ItemData data = new ItemData() { GroupId = groupId, UUID = mongoData.Id.ToString() };
-            _sql.Items.Add(data);
-            _sql.SaveChanges();
+            _db.Items.Add(data);
+            _db.SaveChanges();
             item.Id = data.Id;
             return true;
         }
@@ -153,7 +153,7 @@ public class ItemsProvider
     {
         try
         {
-            var itemData = _sql.Items
+            var itemData = _db.Items
                 .Include(e => e.Group)
                 .FirstOrDefault(e => e.Id == item.Id && e.GroupId == item.Group.Id);
             
@@ -194,13 +194,13 @@ public class ItemsProvider
     {
         try
         {
-            var itemData = _sql.Items
+            var itemData = _db.Items
                 .FirstOrDefault(e => e.GroupId == groupId && e.Id == itemId);
             if (itemData == null)
                 return false;
             var collection = _mongo.GetCollection<ItemMongoData>(ITEMS_COLLECTION_NAME);
-            _sql.Items.Remove(itemData);
-            _sql.SaveChanges();
+            _db.Items.Remove(itemData);
+            _db.SaveChanges();
             var mongoResult = collection.DeleteOne(Builders<ItemMongoData>.Filter.Eq(x => x.Id, new ObjectId(itemData.UUID)));
             return mongoResult.IsAcknowledged && mongoResult.DeletedCount > 0;
         }
@@ -215,7 +215,7 @@ public class ItemsProvider
     {
         try
         {
-            var existing = _sql.CharacterItems
+            var existing = _db.CharacterItems
                 .FirstOrDefault(e => e.CharacterId == characterId && e.ItemId == item.Id);
             if (existing != null)
             {
@@ -229,9 +229,9 @@ public class ItemsProvider
                     ItemId = item.Id,
                     Amount = amount
                 };
-                _sql.CharacterItems.Add(characterItem);
+                _db.CharacterItems.Add(characterItem);
             }
-            _sql.SaveChanges();
+            _db.SaveChanges();
             return true;
         }
         catch (Exception e)
@@ -245,12 +245,12 @@ public class ItemsProvider
     {
         try
         {
-            var existing = _sql.CharacterItems
+            var existing = _db.CharacterItems
                 .FirstOrDefault(e => e.CharacterId == characterId && e.ItemId == item.Id);
             if (existing == null)
                 return true;
-            _sql.CharacterItems.Remove(existing);
-            _sql.SaveChanges();
+            _db.CharacterItems.Remove(existing);
+            _db.SaveChanges();
             return true;
         }
         catch (Exception e)

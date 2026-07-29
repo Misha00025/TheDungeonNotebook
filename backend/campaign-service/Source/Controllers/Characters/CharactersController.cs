@@ -39,7 +39,7 @@ public class CharactersController : CharactersBaseController
 
     private CharacterLogProvider _logProvider;
 
-    public CharactersController(EntityContext context, MongoDbContext mongo, GroupContext groupContext, GroupAccessHelper accessHelper, CharacterLogProvider logProvider) : base(context, mongo, groupContext, accessHelper)
+    public CharactersController(CampaignContext context, IMongoDbContext mongo, GroupAccessHelper accessHelper, CharacterLogProvider logProvider) : base(context, mongo, accessHelper)
     {
         _logProvider = logProvider;
     }

@@ -15,13 +15,12 @@ public class CharacterEquipmentController : CharactersBaseController
     private CharacterLogProvider _logProvider;
 
     public CharacterEquipmentController(
-        EntityContext context,
-        MongoDbContext mongo,
-        GroupContext groupContext,
+        CampaignContext context,
+        IMongoDbContext mongo,
         GroupAccessHelper accessHelper,
         CharacterEquipmentProvider provider,
         CharacterLogProvider logProvider)
-        : base(context, mongo, groupContext, accessHelper)
+        : base(context, mongo, accessHelper)
     {
         _provider = provider;
         _logProvider = logProvider;

@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Tdn.Db.Contexts;
+using Tdn.Db.Entities;
 
 namespace Tdn.Api.Controllers;
 
@@ -24,9 +25,9 @@ public class GroupsPolicesController : BaseController
         public bool? CanWrite { get; set; }    
     }
 
-    private PolicesContext _dbContext;
+    private CampaignContext _dbContext;
     
-    public GroupsPolicesController(PolicesContext context)
+    public GroupsPolicesController(CampaignContext context)
     {
         _dbContext = context;
     }
@@ -34,7 +35,7 @@ public class GroupsPolicesController : BaseController
     [HttpGet]
     public ActionResult GetMany([FromQuery] int? userId = null, [FromQuery] int? groupId = null)
     {
-        var groups = _dbContext.Groups.Where(e => true);
+        var groups = _dbContext.UserGroups.Where(e => true);
         if (userId != null)
             groups = groups.Where(e => e.UserId == (int)userId);
         if (groupId != null)
@@ -47,7 +48,7 @@ public class GroupsPolicesController : BaseController
                         userId = e.UserId,
                         groupId = e.GroupId,
                         isAdmin = e.IsAdmin,
-                        characters = _dbContext.Characters
+                        characters = _dbContext.UserCharacters
                             .Where(c => c.UserId == e.UserId && c.GroupId == e.GroupId)
                             .Select(d => new
                             {
@@ -65,11 +66,11 @@ public class GroupsPolicesController : BaseController
     {
         if (data.GroupId == null || data.UserId == null)
             return BadRequest();
-        var rule = _dbContext.Groups.Where(e => e.GroupId == (int)data.GroupId && e.UserId == (int)data.UserId).FirstOrDefault();
+        var rule = _dbContext.UserGroups.Where(e => e.GroupId == (int)data.GroupId && e.UserId == (int)data.UserId).FirstOrDefault();
         ActionResult result;
         if (rule == null)
         {
-            _dbContext.Groups.Add(new Db.Entities.UserGroupData()
+            _dbContext.UserGroups.Add(new Db.Entities.UserGroupData()
             {
                 UserId = (int)data.UserId, 
                 GroupId = (int)data.GroupId,
@@ -89,7 +90,7 @@ public class GroupsPolicesController : BaseController
     [HttpGet("characters")]
     public ActionResult GetCharacterRules([FromQuery] int groupId, [FromQuery] int? userId = null, [FromQuery] int? characterId = null)
     {
-        var characters = _dbContext.Characters.Where(e => e.GroupId == groupId);
+        var characters = _dbContext.UserCharacters.Where(e => e.GroupId == groupId);
         if (userId != null)
             characters = characters.Where(e => e.UserId == (int)userId);
         if (characterId != null)
@@ -102,13 +103,13 @@ public class GroupsPolicesController : BaseController
     {
         if (data.GroupId == null || data.UserId == null || data.CharacterId == null)
             return BadRequest();
-        var rule = _dbContext.Characters.Where(e => e.GroupId == (int)data.GroupId && e.UserId == (int)data.UserId && e.CharacterId == (int)data.CharacterId).FirstOrDefault();
+        var rule = _dbContext.UserCharacters.Where(e => e.GroupId == (int)data.GroupId && e.UserId == (int)data.UserId && e.CharacterId == (int)data.CharacterId).FirstOrDefault();
         ActionResult result;
         if (rule == null)
         {
-            if (!_dbContext.Groups.Any(e => e.GroupId == (int)data.GroupId && e.UserId == (int)data.UserId))
+            if (!_dbContext.UserGroups.Any(e => e.GroupId == (int)data.GroupId && e.UserId == (int)data.UserId))
                 return NotFound();
-            _dbContext.Characters.Add(new Db.Entities.UserCharacterData()
+            _dbContext.UserCharacters.Add(new Db.Entities.UserCharacterData()
             {
                 UserId = (int)data.UserId, 
                 GroupId = (int)data.GroupId,
@@ -131,18 +132,18 @@ public class GroupsPolicesController : BaseController
     {
         if (characterId != null)
         {
-            var character = _dbContext.Characters.Where(e => e.UserId == userId && e.CharacterId == (int)characterId && e.GroupId == groupId).FirstOrDefault();
+            var character = _dbContext.UserCharacters.Where(e => e.UserId == userId && e.CharacterId == (int)characterId && e.GroupId == groupId).FirstOrDefault();
             if (character == null)
                 return NotFound();
-            _dbContext.Characters.Remove(character);
+            _dbContext.UserCharacters.Remove(character);
         }
         else
         {
-            var group = _dbContext.Groups.Where(e => e.UserId == userId && e.GroupId == groupId).FirstOrDefault();
+            var group = _dbContext.UserGroups.Where(e => e.UserId == userId && e.GroupId == groupId).FirstOrDefault();
             if (group == null)
                 return NotFound();
-            _dbContext.Characters.RemoveRange(_dbContext.Characters.Where(e => e.GroupId == groupId && e.UserId == userId));
-            _dbContext.Groups.Remove(group);
+            _dbContext.UserCharacters.RemoveRange(_dbContext.UserCharacters.Where(e => e.GroupId == groupId && e.UserId == userId));
+            _dbContext.UserGroups.Remove(group);
         };
         _dbContext.SaveChanges();
         return Ok();

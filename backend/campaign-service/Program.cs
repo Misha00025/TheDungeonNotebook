@@ -21,14 +21,9 @@ builder.Services.AddLogging(e => e.AddConsole());
 // DataBase Contexts
 builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
 builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigurer>();
-builder.Services.AddDbContext<GroupContext>(config.ConfigDbConnections);
-builder.Services.AddDbContext<EntityContext>(config.ConfigDbConnections);
-builder.Services.AddDbContext<SkillsContext>(config.ConfigDbConnections);
-builder.Services.AddDbContext<ItemsContext>(config.ConfigDbConnections);
-builder.Services.AddDbContext<PolicesContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<CampaignContext>(config.ConfigDbConnections);
-builder.Services.AddScoped(_ => new MongoDbContext(config.GetMongoDbSettings()));
-builder.Services.AddScoped(_ => new SchemasMongoDbContext(config.GetSchemasMongoDbSettings()));
+builder.Services.AddScoped<IMongoDbContext>(_ => new MongoDbContext(config.GetMongoDbSettings()));
+builder.Services.AddScoped<ISchemasMongoDbContext>(_ => new SchemasMongoDbContext(config.GetSchemasMongoDbSettings()));
 
 // Providers
 builder.Services.AddScoped<GroupAccessHelper, GroupAccessHelper>();

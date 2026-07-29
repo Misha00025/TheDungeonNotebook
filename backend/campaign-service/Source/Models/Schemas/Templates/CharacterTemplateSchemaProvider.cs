@@ -8,10 +8,10 @@ public class CharacterTemplateSchemaProvider
     private const string COLLECTION_NAME = "templates";
     private const string TYPE = "template";
 
-    public SchemasMongoDbContext _dbContext;
+    public ISchemasMongoDbContext _dbContext;
     
     
-    public CharacterTemplateSchemaProvider(SchemasMongoDbContext context)
+    public CharacterTemplateSchemaProvider(ISchemasMongoDbContext context)
     {
         _dbContext = context;
     }

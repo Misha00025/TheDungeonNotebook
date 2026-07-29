@@ -33,19 +33,15 @@ public class GroupsController : GroupsBaseController
         public string? Icon { get; set; }   
     }
 
-    private GroupContext _dbContext;
-    private PolicesContext _policesContext;
     
-    public GroupsController(GroupContext context, GroupAccessHelper accessHelper, PolicesContext policesContext) : base(context, accessHelper)
+    public GroupsController(CampaignContext context, GroupAccessHelper accessHelper) : base(context, accessHelper)
     {
-        _dbContext = context;
-        _policesContext = policesContext;
     }
     
     [HttpGet]
     public ActionResult GetAll([FromQuery] int? userId = null)
     {
-        var groups = _dbContext.Groups.ToList();
+        var groups = DbContext.Groups.ToList();
         if (userId != null)
         {
             var accessibleIds = AccessHelper.GetAccessibleGroupIds(userId.Value);
@@ -58,18 +54,18 @@ public class GroupsController : GroupsBaseController
     public ActionResult PostGroup(GroupPostData data, [FromQuery] int? userId = null)
     {
         var group = data.ToData();
-        _dbContext.Add(group);
-        _dbContext.SaveChanges();
+        DbContext.Add(group);
+        DbContext.SaveChanges();
         
         if (userId != null)
         {
-            _policesContext.Groups.Add(new UserGroupData()
+            DbContext.UserGroups.Add(new UserGroupData()
             {
                 UserId = userId.Value,
                 GroupId = group.Id,
                 IsAdmin = true
             });
-            _policesContext.SaveChanges();
+            DbContext.SaveChanges();
         }
         
         return Created($"groups/{group.Id}", group.ToDict());
@@ -78,7 +74,7 @@ public class GroupsController : GroupsBaseController
     [HttpGet("{groupId}")]
     public ActionResult GetGroup(int groupId, [FromQuery] int? userId = null)
     {
-        var group = _dbContext.Groups.Where(e => e.Id == groupId).FirstOrDefault();
+        var group = DbContext.Groups.Where(e => e.Id == groupId).FirstOrDefault();
         if (group == null)
             return NotFound();
         if (!CheckGroupAccess(groupId, userId))
@@ -91,7 +87,7 @@ public class GroupsController : GroupsBaseController
     {
         if (data.Icon == null && data.Name == null)
             return BadRequest();
-        var group = _dbContext.Groups.Where(e => e.Id == groupId).FirstOrDefault();
+        var group = DbContext.Groups.Where(e => e.Id == groupId).FirstOrDefault();
         if (group == null)
             return NotFound();
         if (!CheckGroupAccess(groupId, userId))
@@ -100,20 +96,20 @@ public class GroupsController : GroupsBaseController
             group.Name = data.Name;
         if (data.Icon != null)
             group.Icon = data.Icon;
-        _dbContext.SaveChanges();
+        DbContext.SaveChanges();
         return Ok(group.ToDict());
     }
     
     [HttpDelete("{groupId}")]
     public ActionResult DeleteGroup(int groupId, [FromQuery] int? userId = null)
     {
-        var group = _dbContext.Groups.Where(e => e.Id == groupId).FirstOrDefault();
+        var group = DbContext.Groups.Where(e => e.Id == groupId).FirstOrDefault();
         if (group == null)
             return NotFound();
         if (!CheckGroupAccess(groupId, userId))
             return NotFound();
-        _dbContext.Groups.Remove(group);
-        _dbContext.SaveChanges();
+        DbContext.Groups.Remove(group);
+        DbContext.SaveChanges();
         return Ok(group.ToDict());
     }
 }

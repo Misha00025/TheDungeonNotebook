@@ -7,10 +7,10 @@ public class GroupSchemasProvider
 {
     private const string COLLECTION_NAME = "schemas";
 
-    public SchemasMongoDbContext _dbContext;
+    public ISchemasMongoDbContext _dbContext;
     
     
-    public GroupSchemasProvider(SchemasMongoDbContext context)
+    public GroupSchemasProvider(ISchemasMongoDbContext context)
     {
         _dbContext = context;
     }

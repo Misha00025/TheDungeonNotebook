@@ -31,12 +31,10 @@ public class TemplatesController : GroupsBaseController
         public Dictionary<string, FieldPostData> Fields { get; set; }
     }
 
-    private EntityContext _dbContext;
-    private MongoDbContext _mongo;
+    private IMongoDbContext _mongo;
 
-    public TemplatesController(EntityContext context, MongoDbContext mongo, GroupContext groupContext, GroupAccessHelper accessHelper) : base(groupContext, accessHelper)
+    public TemplatesController(CampaignContext context, IMongoDbContext mongo, GroupAccessHelper accessHelper) : base(context, accessHelper)
     {
-        _dbContext = context;
         _mongo = mongo;
     }
     
@@ -71,7 +69,7 @@ public class TemplatesController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var group))
         {
-            var charlistSet = _dbContext.Set<CharlistData>();
+            var charlistSet = DbContext.Set<CharlistData>();
             var charlists = charlistSet.Where(e => e.GroupId == groupId).Select(e => e.ToDict(_mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, e.UUID)));
             return Ok(new Dictionary<string, object>() { {"templates", charlists} });
         }
@@ -84,7 +82,7 @@ public class TemplatesController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var _))
         {
-            var charlistSet = _dbContext.Set<CharlistData>();
+            var charlistSet = DbContext.Set<CharlistData>();
             var charlist = charlistSet.Where(e => e.GroupId == groupId).FirstOrDefault();
             if (charlist != null)
                 return Conflict("Template already exist");
@@ -94,7 +92,7 @@ public class TemplatesController : GroupsBaseController
                 Description = data.Description,
                 Fields = Convert(data.Fields),
             };
-            var set = _dbContext.Set<CharlistData>();
+            var set = DbContext.Set<CharlistData>();
             var collection = GetCollection();
             collection.InsertOne(mongoItem);
             charlist = new CharlistData()
@@ -105,7 +103,7 @@ public class TemplatesController : GroupsBaseController
             set.Add(charlist);
             try
             {
-                _dbContext.SaveChanges();
+                DbContext.SaveChanges();
             }
             catch
             {
@@ -123,7 +121,7 @@ public class TemplatesController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var _))
         {
-            var charlistSet = _dbContext.Set<CharlistData>();
+            var charlistSet = DbContext.Set<CharlistData>();
             var charlist = charlistSet.Where(e => e.GroupId == groupId).FirstOrDefault();
             if (charlist == null)
                 return NotFound("Template not found");
@@ -138,7 +136,7 @@ public class TemplatesController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var _))
         {
-            var charlistSet = _dbContext.Set<CharlistData>();
+            var charlistSet = DbContext.Set<CharlistData>();
             var charlist = charlistSet.Where(e => e.GroupId == groupId).FirstOrDefault();
             CharlistMongoData? mongoData;
             if (charlist == null)
@@ -162,7 +160,7 @@ public class TemplatesController : GroupsBaseController
     {
         if (TryGetGroup(groupId, out var _))
         {
-            var charlistSet = _dbContext.Set<CharlistData>();
+            var charlistSet = DbContext.Set<CharlistData>();
             var charlist = charlistSet.Where(e => e.GroupId == groupId && e.Id == templateId).FirstOrDefault();
             if (charlist == null)
                 return NotFound("Template not found");
@@ -170,8 +168,8 @@ public class TemplatesController : GroupsBaseController
             if (mongoData == null)
                 return NotFound("Template document not found");
 		    var filter = Builders<CharlistMongoData>.Filter.Eq("_id", mongoData.Id);
-            _dbContext.Remove(charlist);
-            _dbContext.SaveChanges();
+            DbContext.Remove(charlist);
+            DbContext.SaveChanges();
             GetCollection().DeleteOne(filter);
             return Ok(charlist.ToDict(mongoData));
         }

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Tdn.Db.Contexts;
+using Tdn.Db.Entities;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
 
@@ -13,7 +14,7 @@ public class ExportImportController : GroupsBaseController
     private readonly ILogger<ExportImportController> _logger;
 
     public ExportImportController(
-        GroupContext groupContext,
+        CampaignContext groupContext,
         GroupAccessHelper accessHelper,
         ExportImportProvider provider,
         ILogger<ExportImportController> logger)

@@ -14,7 +14,7 @@ public class GroupQuestsController : GroupsBaseController
 {
     private QuestsProvider _provider;
 
-    public GroupQuestsController(GroupContext groupContext, QuestsProvider provider, GroupAccessHelper accessHelper) : base(groupContext, accessHelper)
+    public GroupQuestsController(CampaignContext groupContext, QuestsProvider provider, GroupAccessHelper accessHelper) : base(groupContext, accessHelper)
     {
         _provider = provider;
     }

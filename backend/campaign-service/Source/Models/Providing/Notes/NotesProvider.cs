@@ -11,20 +11,20 @@ public class NotesProvider
 {
     private const string NOTES_COLLECTION_NAME = "notes";
 
-    private EntityContext _sql;
-    private MongoDbContext _mongo;
+    private CampaignContext _db;
+    private IMongoDbContext _mongo;
     private ILogger<NotesProvider> _logger;
 
-    public NotesProvider(EntityContext context, MongoDbContext mongoDbContext, ILogger<NotesProvider> logger)
+    public NotesProvider(CampaignContext context, IMongoDbContext mongoDbContext, ILogger<NotesProvider> logger)
     {
-        _sql = context;
+        _db = context;
         _mongo = mongoDbContext;
         _logger = logger;
     }
 
     public IEnumerable<Note> GetGroupNotes(int groupId)
     {
-        return _sql.Notes
+        return _db.Notes
             .Where(e => e.GroupId == groupId && e.CharacterId == null)
             .Include(e => e.Group)
             .Include(e => e.Keywords)
@@ -35,7 +35,7 @@ public class NotesProvider
 
     public IEnumerable<Note> GetCharacterNotes(int groupId, int characterId)
     {
-        return _sql.Notes
+        return _db.Notes
             .Where(e => e.GroupId == groupId && e.CharacterId == characterId)
             .Include(e => e.Group)
             .Include(e => e.Keywords)
@@ -46,7 +46,7 @@ public class NotesProvider
 
     public Note? GetGroupNote(int groupId, int noteId)
     {
-        var data = _sql.Notes
+        var data = _db.Notes
             .Where(e => e.GroupId == groupId && e.Id == noteId && e.CharacterId == null)
             .Include(e => e.Group)
             .Include(e => e.Keywords)
@@ -57,7 +57,7 @@ public class NotesProvider
 
     public Note? GetCharacterNote(int groupId, int characterId, int noteId)
     {
-        var data = _sql.Notes
+        var data = _db.Notes
             .Where(e => e.GroupId == groupId && e.CharacterId == characterId && e.Id == noteId)
             .Include(e => e.Group)
             .Include(e => e.Keywords)
@@ -99,16 +99,16 @@ public class NotesProvider
                 AdditionDate = now,
                 ModifyDate = now
             };
-            _sql.Notes.Add(sqlData);
-            _sql.SaveChanges();
+            _db.Notes.Add(sqlData);
+            _db.SaveChanges();
 
             if (keywords != null && keywords.Count > 0)
             {
                 foreach (var kw in keywords)
                 {
-                    _sql.NoteKeywords.Add(new NoteKeywordData { NoteId = sqlData.Id, Keyword = kw });
+                    _db.NoteKeywords.Add(new NoteKeywordData { NoteId = sqlData.Id, Keyword = kw });
                 }
-                _sql.SaveChanges();
+                _db.SaveChanges();
             }
 
             note = new Note
@@ -147,7 +147,7 @@ public class NotesProvider
     {
         try
         {
-            var sqlData = _sql.Notes
+            var sqlData = _db.Notes
                 .FirstOrDefault(e => e.GroupId == groupId && e.CharacterId == characterId && e.Id == noteId);
             if (sqlData == null)
             {
@@ -183,15 +183,15 @@ public class NotesProvider
 
             if (keywords != null)
             {
-                var oldKeywords = _sql.NoteKeywords.Where(e => e.NoteId == sqlData.Id);
-                _sql.NoteKeywords.RemoveRange(oldKeywords);
+                var oldKeywords = _db.NoteKeywords.Where(e => e.NoteId == sqlData.Id);
+                _db.NoteKeywords.RemoveRange(oldKeywords);
                 foreach (var kw in keywords)
                 {
-                    _sql.NoteKeywords.Add(new NoteKeywordData { NoteId = sqlData.Id, Keyword = kw });
+                    _db.NoteKeywords.Add(new NoteKeywordData { NoteId = sqlData.Id, Keyword = kw });
                 }
             }
 
-            _sql.SaveChanges();
+            _db.SaveChanges();
 
             note = ToNoteWithBody(sqlData);
             return true;
@@ -206,7 +206,7 @@ public class NotesProvider
 
     public List<string> GetGroupKeywords(int groupId)
     {
-        return _sql.NoteKeywords
+        return _db.NoteKeywords
             .Include(e => e.Note)
             .Where(e => e.Note!.GroupId == groupId)
             .Select(e => e.Keyword)
@@ -217,7 +217,7 @@ public class NotesProvider
 
     public List<string> GetCharacterKeywords(int groupId, int characterId)
     {
-        return _sql.NoteKeywords
+        return _db.NoteKeywords
             .Include(e => e.Note)
             .Where(e => e.Note!.GroupId == groupId && e.Note!.CharacterId == characterId)
             .Select(e => e.Keyword)
@@ -240,7 +240,7 @@ public class NotesProvider
     {
         try
         {
-            var sqlData = _sql.Notes
+            var sqlData = _db.Notes
                 .FirstOrDefault(e => e.GroupId == groupId && e.CharacterId == characterId && e.Id == noteId);
             if (sqlData == null) return false;
 
@@ -250,8 +250,8 @@ public class NotesProvider
                 collection.DeleteOne(Builders<NoteMongoData>.Filter.Eq(x => x.Id, new ObjectId(sqlData.UUID)));
             }
 
-            _sql.Notes.Remove(sqlData);
-            _sql.SaveChanges();
+            _db.Notes.Remove(sqlData);
+            _db.SaveChanges();
             return true;
         }
         catch (Exception e)

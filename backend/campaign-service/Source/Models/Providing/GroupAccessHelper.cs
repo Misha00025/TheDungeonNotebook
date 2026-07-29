@@ -1,15 +1,14 @@
 using Tdn.Db.Contexts;
-using Tdn.Db.Entities;
 
 namespace Tdn.Models.Providing;
 
 public class GroupAccessHelper
 {
-    private readonly PolicesContext _policesContext;
+    private readonly CampaignContext _context;
 
-    public GroupAccessHelper(PolicesContext policesContext)
+    public GroupAccessHelper(CampaignContext context)
     {
-        _policesContext = policesContext;
+        _context = context;
     }
 
     /// <summary>
@@ -17,7 +16,7 @@ public class GroupAccessHelper
     /// </summary>
     public List<int> GetAccessibleGroupIds(int userId)
     {
-        return _policesContext.Groups
+        return _context.UserGroups
             .Where(g => g.UserId == userId)
             .Select(g => g.GroupId)
             .ToList();
@@ -28,7 +27,7 @@ public class GroupAccessHelper
     /// </summary>
     public bool HasGroupAccess(int groupId, int userId)
     {
-        return _policesContext.Groups
+        return _context.UserGroups
             .Any(g => g.GroupId == groupId && g.UserId == userId);
     }
 
@@ -37,7 +36,7 @@ public class GroupAccessHelper
     /// </summary>
     public bool IsAdmin(int groupId, int userId)
     {
-        return _policesContext.Groups
+        return _context.UserGroups
             .Any(g => g.GroupId == groupId && g.UserId == userId && g.IsAdmin == true);
     }
 
@@ -46,7 +45,7 @@ public class GroupAccessHelper
     /// </summary>
     public List<int> GetAccessibleCharacterIds(int groupId, int userId)
     {
-        return _policesContext.Characters
+        return _context.UserCharacters
             .Where(c => c.GroupId == groupId && c.UserId == userId)
             .Select(c => c.CharacterId)
             .ToList();
@@ -60,7 +59,7 @@ public class GroupAccessHelper
         var isGroupAdmin = IsAdmin(groupId, userId);
         if (isGroupAdmin) return true;
 
-        return _policesContext.Characters
+        return _context.UserCharacters
             .Any(c => c.GroupId == groupId && c.CharacterId == characterId && c.UserId == userId);
     }
 
@@ -72,7 +71,7 @@ public class GroupAccessHelper
         var isGroupAdmin = IsAdmin(groupId, userId);
         if (isGroupAdmin) return true;
 
-        return _policesContext.Characters
+        return _context.UserCharacters
             .Any(c => c.GroupId == groupId && c.CharacterId == characterId && c.UserId == userId && c.CanWrite == true);
     }
 }

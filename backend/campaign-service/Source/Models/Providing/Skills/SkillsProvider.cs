@@ -12,14 +12,14 @@ public class SkillsProvider
 {
     private const string SKILLS_COLLECTION_NAME = "skills";
     
-    private SkillsContext _sql;
-    private MongoDbContext _mongo;
+    private CampaignContext _db;
+    private IMongoDbContext _mongo;
     private AttributesProvider _attributes;
     private ILogger<SkillsProvider> _logger;
 
-    public SkillsProvider(SkillsContext skillsContext, MongoDbContext mongoDbContext, AttributesProvider attributesProvider, ILogger<SkillsProvider> logger)
+    public SkillsProvider(CampaignContext skillsContext, IMongoDbContext mongoDbContext, AttributesProvider attributesProvider, ILogger<SkillsProvider> logger)
     {
-        _sql = skillsContext;
+        _db = skillsContext;
         _mongo = mongoDbContext;
         _attributes = attributesProvider;
         _logger = logger;
@@ -76,7 +76,7 @@ public class SkillsProvider
     
     public Skill? GetSkill(int groupId, int skillId)
     {
-        var data = _sql.Skills
+        var data = _db.Skills
                     .Where(e => e.GroupId == groupId && e.Id == skillId)
                     .Include(e => e.Group)
                     .FirstOrDefault();
@@ -87,7 +87,7 @@ public class SkillsProvider
     
     public IEnumerable<Skill> GetSkills(int groupId)
     {
-        var skills = _sql.Skills
+        var skills = _db.Skills
                         .Where(e => e.GroupId == groupId)
                         .Include(e => e.Group)
                         .AsEnumerable()
@@ -99,7 +99,7 @@ public class SkillsProvider
     
     public IEnumerable<Skill> GetSkills(int groupId, int characterId)
     {
-        var skills = _sql.CharacterSkills
+        var skills = _db.CharacterSkills
                         .Include(e => e.Skill)
                         .Include(e => e.Skill.Group)
                         .Where(e => e.Skill.GroupId == groupId && e.CharacterId == characterId)
@@ -128,8 +128,8 @@ public class SkillsProvider
             };
             _mongo.GetCollection<SkillMongoData>(SKILLS_COLLECTION_NAME).InsertOne(mongoData);
             SkillData data = new SkillData() { GroupId = groupId, UUID = mongoData.Id.ToString() };
-            _sql.Skills.Add(data);
-            _sql.SaveChanges();
+            _db.Skills.Add(data);
+            _db.SaveChanges();
             skill.Id = data.Id;
             return true;
         }
@@ -144,7 +144,7 @@ public class SkillsProvider
     {
         try
         {
-            var skillData = _sql.Skills
+            var skillData = _db.Skills
                 .Include(e => e.Group)
                 .FirstOrDefault(e => e.Id == skill.Id && e.GroupId == skill.Group.Id);
             
@@ -184,14 +184,14 @@ public class SkillsProvider
     {
         try
         {
-            var skillData = _sql.Skills
+            var skillData = _db.Skills
                 .FirstOrDefault(e => e.GroupId == groupId && e.Id == skillId);
             if (skillData == null)
                 return false;
             var collection = _mongo.GetCollection<SkillMongoData>(SKILLS_COLLECTION_NAME);
             var mongoResult = collection.DeleteOne(Builders<SkillMongoData>.Filter.Eq(x => x.Id, new ObjectId(skillData.UUID)));
-            _sql.Skills.Remove(skillData);
-            _sql.SaveChanges();
+            _db.Skills.Remove(skillData);
+            _db.SaveChanges();
             return mongoResult.IsAcknowledged && mongoResult.DeletedCount > 0;
         }
         catch (Exception e)
@@ -205,7 +205,7 @@ public class SkillsProvider
     {
         try
         {
-            var existing = _sql.CharacterSkills
+            var existing = _db.CharacterSkills
                 .FirstOrDefault(e => e.CharacterId == characterId && e.SkillId == skill.Id);
             if (existing != null)
                 return true;
@@ -214,8 +214,8 @@ public class SkillsProvider
                 CharacterId = characterId,
                 SkillId = skill.Id
             };
-            _sql.CharacterSkills.Add(characterSkill);
-            _sql.SaveChanges();
+            _db.CharacterSkills.Add(characterSkill);
+            _db.SaveChanges();
             return true;
         }
         catch (Exception e)
@@ -229,12 +229,12 @@ public class SkillsProvider
     {
         try
         {
-            var existing = _sql.CharacterSkills
+            var existing = _db.CharacterSkills
                 .FirstOrDefault(e => e.CharacterId == characterId && e.SkillId == skill.Id);
             if (existing == null)
                 return true;
-            _sql.CharacterSkills.Remove(existing);
-            _sql.SaveChanges();
+            _db.CharacterSkills.Remove(existing);
+            _db.SaveChanges();
             return true;
         }
         catch (Exception e)

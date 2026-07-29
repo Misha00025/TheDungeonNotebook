@@ -17,7 +17,7 @@ public class CharacterItemsController : CharactersBaseController
     private ItemsProvider _provider;
     private CharacterLogProvider _logProvider;
 
-    public CharacterItemsController(EntityContext context, MongoDbContext mongo, GroupContext groupContext, ItemsProvider itemsProvider, GroupAccessHelper accessHelper, CharacterLogProvider logProvider) : base(context, mongo, groupContext, accessHelper)
+    public CharacterItemsController(CampaignContext context, IMongoDbContext mongo, ItemsProvider itemsProvider, GroupAccessHelper accessHelper, CharacterLogProvider logProvider) : base(context, mongo, accessHelper)
     {
             _provider = itemsProvider;
             _logProvider = logProvider;

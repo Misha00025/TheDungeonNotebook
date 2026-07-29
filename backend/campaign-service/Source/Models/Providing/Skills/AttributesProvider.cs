@@ -6,10 +6,10 @@ namespace Tdn.Models.Providing;
 
 public class AttributesProvider 
 {
-    private readonly MongoDbContext _mongo;
+    private readonly IMongoDbContext _mongo;
     private IMongoCollection<GroupAttributesMongoData> Collection => _mongo.GetCollection<GroupAttributesMongoData>("skills_attributes");
 
-    public AttributesProvider(MongoDbContext mongoDbContext)
+    public AttributesProvider(IMongoDbContext mongoDbContext)
     {
         _mongo = mongoDbContext;
     }

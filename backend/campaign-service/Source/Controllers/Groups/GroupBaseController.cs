@@ -6,21 +6,21 @@ namespace Tdn.Api.Controllers;
 
 public abstract class GroupsBaseController : BaseController
 {
-    private GroupContext _groupContext;
+    private CampaignContext _db;
     private GroupAccessHelper _accessHelper;
     
-    public GroupsBaseController(GroupContext context, GroupAccessHelper accessHelper)
+    public GroupsBaseController(CampaignContext context, GroupAccessHelper accessHelper)
     {
-        _groupContext = context;
+        _db = context;
         _accessHelper = accessHelper;
     }
 
-    protected GroupContext GroupContext => _groupContext;
+    protected CampaignContext DbContext => _db;
     protected GroupAccessHelper AccessHelper => _accessHelper;
 
     protected bool TryGetGroup(int groupId, out GroupData group)
     {
-        var tmp = GroupContext.Groups.Where(e => e.Id == groupId).FirstOrDefault();
+        var tmp = _db.Groups.Where(e => e.Id == groupId).FirstOrDefault();
         group = tmp!;
         return tmp != null;    
     }
