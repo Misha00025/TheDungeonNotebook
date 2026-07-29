@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Driver;
 using Tdn.Db;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
@@ -11,16 +10,18 @@ namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("/groups/{groupId}/characters/{characterId}/items")]
-public class CharacterItemsController : CharactersBaseController
+public class CharacterItemsController : GroupsBaseController
 {
 
     private ItemsProvider _provider;
     private CharacterLogProvider _logProvider;
+    private CharactersProvider _charactersProvider;
 
-    public CharacterItemsController(CampaignContext context, IMongoDbContext mongo, ItemsProvider itemsProvider, GroupAccessHelper accessHelper, CharacterLogProvider logProvider) : base(context, mongo, accessHelper)
+    public CharacterItemsController(CampaignContext context, ItemsProvider itemsProvider, GroupAccessHelper accessHelper, CharacterLogProvider logProvider, CharactersProvider charactersProvider) : base(context, accessHelper)
     {
             _provider = itemsProvider;
             _logProvider = logProvider;
+            _charactersProvider = charactersProvider;
     }
     
     [HttpGet]
@@ -28,7 +29,8 @@ public class CharacterItemsController : CharactersBaseController
     {
         if (userId != null && !AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
             return NotFound("Character not found");
-        if (TryGetCharacter(groupId, characterId, out var data, out var character))
+        var character = _charactersProvider.GetCharacter(groupId, characterId);
+        if (character != null)
         {
             var items = _provider.GetItems(groupId, characterId);
             var result = items.Select(e => e.ToResponse()).Concat(character.Items.ToDict()).ToList();
@@ -42,7 +44,8 @@ public class CharacterItemsController : CharactersBaseController
     {
         if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
             return Forbidden();
-        if (TryGetCharacter(groupId, characterId, out var _, out var character))
+        var character = _charactersProvider.GetCharacter(groupId, characterId);
+        if (character != null)
         {
             var item = data.AsItem(groupId);
             item.IsSecret = true;
@@ -65,7 +68,8 @@ public class CharacterItemsController : CharactersBaseController
     {
         if (userId != null && !AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
             return NotFound("Character not found");
-        if (TryGetCharacter(groupId, characterId, out var _, out var character))
+        var character = _charactersProvider.GetCharacter(groupId, characterId);
+        if (character != null)
         {
             var item = _provider.GetItem(groupId, itemId, characterId);
             if (item == null)
@@ -80,7 +84,8 @@ public class CharacterItemsController : CharactersBaseController
     {
         if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
             return Forbidden();
-        if (TryGetCharacter(groupId, characterId, out var _, out var character))
+        var character = _charactersProvider.GetCharacter(groupId, characterId);
+        if (character != null)
         {
             var item = _provider.GetItem(groupId, itemId);
             if (item == null)
@@ -107,7 +112,8 @@ public class CharacterItemsController : CharactersBaseController
     [HttpDelete("{itemId}")]
     public ActionResult DeleteItem(int groupId, int characterId, int itemId, [FromQuery] int? userId = null)
     {
-        if (TryGetCharacter(groupId, characterId, out var _, out var character))
+        var character = _charactersProvider.GetCharacter(groupId, characterId);
+        if (character != null)
         {
             var item = _provider.GetItem(groupId, itemId, characterId);
             if (item == null)

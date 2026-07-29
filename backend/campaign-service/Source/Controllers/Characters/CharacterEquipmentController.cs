@@ -1,26 +1,22 @@
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Bson;
-using Tdn.Db;
 using Tdn.Db.Contexts;
-using Tdn.Db.Entities;
 using Tdn.Models.Providing;
 
 namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("groups/{groupId}/characters/{characterId}/equipment")]
-public class CharacterEquipmentController : CharactersBaseController
+public class CharacterEquipmentController : GroupsBaseController
 {
     private CharacterEquipmentProvider _provider;
     private CharacterLogProvider _logProvider;
 
     public CharacterEquipmentController(
         CampaignContext context,
-        IMongoDbContext mongo,
         GroupAccessHelper accessHelper,
         CharacterEquipmentProvider provider,
         CharacterLogProvider logProvider)
-        : base(context, mongo, accessHelper)
+        : base(context, accessHelper)
     {
         _provider = provider;
         _logProvider = logProvider;

@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Driver;
 using Tdn.Db;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
+using Tdn.Models;
 using Tdn.Models.Conversions;
 using Tdn.Models.Processing;
 using Tdn.Models.Providing;
@@ -11,7 +11,7 @@ namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("groups/{groupId}/characters")]
-public class CharactersController : CharactersBaseController
+public class CharactersController : GroupsBaseController
 {
     public struct CharacterPostData
     {
@@ -37,19 +37,30 @@ public class CharactersController : CharactersBaseController
         public Dictionary<string, FieldPatchData?>? Fields { get; set; }
     }
 
+    private CharactersProvider _provider;
     private CharacterLogProvider _logProvider;
 
-    public CharactersController(CampaignContext context, IMongoDbContext mongo, GroupAccessHelper accessHelper, CharacterLogProvider logProvider) : base(context, mongo, accessHelper)
+    public CharactersController(CampaignContext context, GroupAccessHelper accessHelper, CharactersProvider provider, CharacterLogProvider logProvider) : base(context, accessHelper)
     {
+        _provider = provider;
         _logProvider = logProvider;
     }
+
+    private static CharacterMongoData BuildMongoData(Character c) => new CharacterMongoData
+    {
+        Name = c.Name,
+        Description = c.Description,
+        Fields = c.Fields,
+        Items = c.Items,
+        Equipment = c.Equipment,
+    };
     
     [HttpGet]
     public ActionResult GetAll(int groupId, int? ownerId = null, [FromQuery] int? userId = null)
     {
-        var characters = GetCharacters(groupId);
-        if (characters == null)
+        if (!TryGetGroup(groupId, out var _))
             return NotFound("Group not found");
+        var characters = _provider.GetCharacters(groupId).ToList();
         if (userId != null)
         {
             if (!AccessHelper.HasGroupAccess(groupId, userId.Value))
@@ -57,12 +68,16 @@ public class CharactersController : CharactersBaseController
             if (!AccessHelper.IsAdmin(groupId, userId.Value))
             {
                 var accessibleIds = AccessHelper.GetAccessibleCharacterIds(groupId, userId.Value);
-                characters = characters.Where(e => accessibleIds.Contains(e.metadata.Id)).ToList();
+                characters = characters.Where(e => accessibleIds.Contains(e.Id)).ToList();
             }
         }
         if (ownerId != null)
-            characters = characters.Where(e => e.metadata.OwnerId! == ownerId!).ToList();
-        return Ok(characters.Select(e => e.metadata.ToDict(e.character)));
+            characters = characters.Where(e => e.OwnerId! == ownerId!).ToList();
+        return Ok(characters.Select(e =>
+        {
+            var data = DbContext.Set<CharacterData>().FirstOrDefault(cd => cd.Id == e.Id && cd.GroupId == groupId);
+            return data!.ToDict(BuildMongoData(e));
+        }));
     }
     
     [HttpPost]
@@ -72,40 +87,35 @@ public class CharactersController : CharactersBaseController
             return BadRequest("TemplateId must be not null");
         if (TryGetGroup(groupId, out var _))
         {
-            var templateSet = DbContext.Set<TemplateData>();
-            var templateData = templateSet.Where(e => e.GroupId == groupId && e.Id == data.TemplateId).FirstOrDefault();
-            if (templateData == null)
-                return NotFound("Template not found");
-            var template = Mongo.GetEntity<TemplateMongoData>(MongoCollections.Templates, templateData.UUID);
+            var template = _provider.GetTemplate(groupId, data.TemplateId.Value);
             if (template == null)
-                return NotFound("Template document not found");
-            var character = new CharacterMongoData()
+                return NotFound("Template not found");
+            var character = new Character()
             {
+                GroupId = groupId,
+                TemplateId = data.TemplateId.Value,
                 Name = data.Name,
-                Description = data.Description
+                Description = data.Description,
             };
             if (copyTemplate)
                 character.Fields = template.Fields;
-            var characterData = new CharacterData(){ GroupId = groupId, TemplateId = (int)data.TemplateId };
-            GetCollection().InsertOne(character);
-            characterData.UUID = character.Id.ToString();
-            DbContext.Set<CharacterData>().Add(characterData);
-            DbContext.SaveChanges();
-            return Created($"/groups/{groupId}/characters/{characterData.Id}", characterData.ToDict(character));
+            if (_provider.TryCreateCharacter(groupId, character))
+            {
+                var characterData = DbContext.Set<CharacterData>().FirstOrDefault(cd => cd.Id == character.Id && cd.GroupId == groupId);
+                return Created($"/groups/{groupId}/characters/{character.Id}", characterData!.ToDict(BuildMongoData(character)));
+            }
+            return BadRequest();
         }
         return NotFound("Group not found");
     }
 
-    private CharacterMongoData AsCharacterWithTemplate(CharacterData data, CharacterMongoData character)
+    private CharacterMongoData AsCharacterWithTemplate(Character character)
     {
-        var templateSet = DbContext.Set<TemplateData>();
-        var templateData = templateSet.Where(e => e.GroupId == data.GroupId && e.Id == data.TemplateId).FirstOrDefault();
-        if (templateData == null)
-            return character;
-        var template = Mongo.GetEntity<TemplateMongoData>(MongoCollections.Templates, templateData.UUID);
+        var template = _provider.GetTemplate(character.GroupId, character.TemplateId);
+        var mongoData = BuildMongoData(character);
         if (template == null)
-            return character;
-        return character.CompareWith(template);
+            return mongoData;
+        return mongoData.CompareWith(template);
     }
 
     [HttpGet("{characterId}")]
@@ -113,12 +123,15 @@ public class CharactersController : CharactersBaseController
     {
         if (userId != null && !AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
             return NotFound("Character not found");
-        if (TryGetCharacter(groupId, characterId, out var data, out var character))
+        var character = _provider.GetCharacter(groupId, characterId);
+        if (character != null)
         {
+            var mongoData = BuildMongoData(character);
             if (witEmptyFields)
-                character = AsCharacterWithTemplate(data, character);
-            FormulaCalculator.CalculateFields(character);
-            return Ok(data.ToDict(character));
+                mongoData = AsCharacterWithTemplate(character);
+            FormulaCalculator.CalculateFields(mongoData);
+            var data = DbContext.Set<CharacterData>().FirstOrDefault(cd => cd.Id == characterId && cd.GroupId == groupId);
+            return Ok(data!.ToDict(mongoData));
         }
         return NotFound("Character or Group not found");
     }
@@ -209,17 +222,15 @@ public class CharactersController : CharactersBaseController
     {
         if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
             return Forbidden();
-        if (TryGetCharacter(groupId, characterId, out var characterData, out var character))
+        var character = _provider.GetCharacter(groupId, characterId);
+        if (character != null)
         {
             var anythingChanged = false;
-            anythingChanged = anythingChanged || TryChangeProperties(character, data);
-            var templateSet = DbContext.Set<TemplateData>();
-            var templateData = templateSet.Where(e => e.GroupId == groupId && e.Id == characterData.TemplateId).FirstOrDefault();
-            if (templateData == null)
-                return NotFound("Template not found");
-            var template = Mongo.GetEntity<TemplateMongoData>(MongoCollections.Templates, templateData.UUID);
+            var mongoData = BuildMongoData(character);
+            anythingChanged = anythingChanged || TryChangeProperties(mongoData, data);
+            var template = _provider.GetTemplate(groupId, character.TemplateId);
             if (template == null)
-                return NotFound("Template document not found");
+                return NotFound("Template not found");
 
             var oldFieldValues = new Dictionary<string, int>();
             if (data.Fields != null)
@@ -227,19 +238,23 @@ public class CharactersController : CharactersBaseController
                 foreach (var field in data.Fields)
                 {
                     if (field.Value?.Value == null) continue;
-                    if (character.Fields.ContainsKey(field.Key))
-                        oldFieldValues[field.Key] = character.Fields[field.Key].Value;
+                    if (mongoData.Fields.ContainsKey(field.Key))
+                        oldFieldValues[field.Key] = mongoData.Fields[field.Key].Value;
                     else if (template.Fields.ContainsKey(field.Key))
                         oldFieldValues[field.Key] = template.Fields[field.Key].Value;
                 }
             }
-            var fieldsChanged = TryChangeFields(character, template, data, out var errors);
+            var fieldsChanged = TryChangeFields(mongoData, template, data, out var errors);
             anythingChanged = (anythingChanged && data.Fields == null) || fieldsChanged;
             if (anythingChanged)
             {
-                var filter = Builders<CharacterMongoData>.Filter.Eq("_id", character.Id);
-                GetCollection().ReplaceOne(filter, character);
-                DbContext.SaveChanges();
+                character.Name = mongoData.Name;
+                character.Description = mongoData.Description;
+                character.Fields = mongoData.Fields;
+                character.Items = mongoData.Items;
+                character.Equipment = mongoData.Equipment;
+
+                _provider.TryUpdateCharacter(character);
 
                 if (data.Fields != null && userId != null)
                 {
@@ -264,9 +279,10 @@ public class CharactersController : CharactersBaseController
                 }
 
                 if (witEmptyFields)
-                    character = AsCharacterWithTemplate(characterData, character);
-                FormulaCalculator.CalculateFields(character);
-                var result = characterData.ToDict(character);
+                    mongoData = AsCharacterWithTemplate(character);
+                FormulaCalculator.CalculateFields(mongoData);
+                var resultData = DbContext.Set<CharacterData>().FirstOrDefault(cd => cd.Id == characterId && cd.GroupId == groupId);
+                var result = resultData!.ToDict(mongoData);
                 if (errors.Count > 0)
                     result.Add("errors", errors);
                 return Ok(result);
@@ -282,15 +298,15 @@ public class CharactersController : CharactersBaseController
     [HttpDelete("{characterId}")]
     public ActionResult DeleteCharacter(int groupId, int characterId, [FromQuery] bool witEmptyFields = true)
     {
-        if (TryGetCharacter(groupId, characterId, out var data, out var character))
+        var character = _provider.GetCharacter(groupId, characterId);
+        if (character != null)
         {
-            var filter = Builders<CharacterMongoData>.Filter.Eq("_id", character.Id);
-            DbContext.Remove(data);
-            DbContext.SaveChanges();
-            GetCollection().DeleteOne(filter);
+            var data = DbContext.Set<CharacterData>().FirstOrDefault(cd => cd.Id == characterId && cd.GroupId == groupId);
+            var mongoData = BuildMongoData(character);
+            _provider.TryDeleteCharacter(groupId, characterId);
             if (witEmptyFields)
-                character = AsCharacterWithTemplate(data, character);
-            return Ok(data.ToDict(character));
+                mongoData = AsCharacterWithTemplate(character);
+            return Ok(data!.ToDict(mongoData));
         }
         return NotFound("Character or Group not found");
     }
