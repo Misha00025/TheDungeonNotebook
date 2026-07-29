@@ -74,7 +74,11 @@ public class GroupProvider
         var data = _db.Groups.Where(e => e.Id == groupId).FirstOrDefault();
         if (data == null) return null;
         var group = new Group { Id = data.Id, Name = data.Name, Description = "" };
+        
+        _db.UserCharacters.RemoveRange(_db.UserCharacters.Where(e => e.GroupId == groupId));
+        _db.UserGroups.RemoveRange(_db.UserGroups.Where(e => e.GroupId == groupId));
         _db.Groups.Remove(data);
+        
         _db.SaveChanges();
         return group;
     }

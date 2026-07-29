@@ -33,7 +33,7 @@ public class GroupsPolicesController : BaseController
     [HttpGet]
     public ActionResult GetMany([FromQuery] int? userId = null, [FromQuery] int? groupId = null)
     {
-        var groups = _provider.GetGroupRules(userId, groupId);
+        var groups = _provider.GetGroupRules(userId, groupId).ToList();
         var result = new
         {
             users = groups.Select(e =>

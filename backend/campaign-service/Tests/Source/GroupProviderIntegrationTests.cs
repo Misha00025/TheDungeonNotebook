@@ -125,8 +125,7 @@ public class GroupProviderIntegrationTests
         var group = groupProvider.Create("TestGroup", null, 1);
         var groupId = group.Id;
 
-        ctx.Groups.Remove(ctx.Groups.Find(groupId)!);
-        ctx.SaveChanges();
+        groupProvider.Delete(groupId);
 
         var rules = policesProvider.GetGroupRules(1, null).ToList();
         
