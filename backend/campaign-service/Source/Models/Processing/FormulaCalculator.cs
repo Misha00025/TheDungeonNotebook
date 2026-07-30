@@ -89,7 +89,7 @@ public static class FormulaCalculator
 
                 try
                 {
-                    if (TryCalculateModifier(modifiedField, fields, out int modifierResult))
+                    if (TryCalculateModifier(modifiedField, fields, out int modifierResult, key, new HashSet<string>()))
                     {
                         modifiedField.Modifier = modifierResult;
                         computedModifiers.Add(key);
@@ -151,7 +151,7 @@ public static class FormulaCalculator
                     else
                     {
                         // Пытаемся вычислить модификатор на месте
-                        if (TryCalculateModifier(modifiedReferencedField, allFields, out int modifierValue))
+                        if (TryCalculateModifier(modifiedReferencedField, allFields, out int modifierValue, fieldKey, new HashSet<string>()))
                         {
                             modifiedReferencedField.Modifier = modifierValue;
                             expression = expression.Replace(match.Value, modifierValue.ToString());
@@ -196,9 +196,15 @@ public static class FormulaCalculator
     private static bool TryCalculateModifier(
         ModifiedFieldMongoData field,
         Dictionary<string, FieldMongoData> allFields,
-        out int result)
+        out int result,
+        string key = "",
+        HashSet<string>? computing = null)
     {
         result = field.Modifier;
+        computing ??= new HashSet<string>();
+        if (!string.IsNullOrEmpty(key) && !computing.Add(key))
+            return false; // circular dependency detected
+
         if (string.IsNullOrEmpty(field.ModifierFormula)) 
         {
             // Если формула модификатора пуста, используем CalculatedValue
@@ -242,7 +248,7 @@ public static class FormulaCalculator
                         else
                         {
                             // Пытаемся вычислить модификатор на месте
-                            if (TryCalculateModifier(modifiedReferencedField, allFields, out int modifierValue))
+                            if (TryCalculateModifier(modifiedReferencedField, allFields, out int modifierValue, fieldKey, computing))
                             {
                                 modifiedReferencedField.Modifier = modifierValue;
                                 expression = expression.Replace(match.Value, modifierValue.ToString());
