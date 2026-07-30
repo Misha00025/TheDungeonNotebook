@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Tdn.Models.Providing;
 using Tdn.Models.DTOs;
+using Tdn.Models.Schemas;
 using Tdn.Models.Schemas.Items;
 using Tdn.Models.Schemas.Items.Conversion;
 
@@ -10,38 +11,42 @@ namespace Tdn.Api.Controllers;
 [Route("schemas/groups/{groupId}")]
 public class GroupSchemasController : BaseController
 {
-    private GroupSchemasProvider _provider;
+    private GenericMongoProvider<SkillsSchemaMongoData> _skillsProvider;
+    private GenericMongoProvider<ItemsSchemaMongoData> _itemsProvider;
     private GroupAccessHelper _accessHelper;
 
-    public GroupSchemasController(GroupSchemasProvider provider, GroupAccessHelper accessHelper)
+    public GroupSchemasController(
+        GenericMongoProvider<SkillsSchemaMongoData> skillsProvider,
+        GenericMongoProvider<ItemsSchemaMongoData> itemsProvider,
+        GroupAccessHelper accessHelper)
     {
-        _provider = provider;
+        _skillsProvider = skillsProvider;
+        _itemsProvider = itemsProvider;
         _accessHelper = accessHelper;
     }
 
-    private ActionResult GetSchema(int groupId, string type)
+    private static Schema AsSchema(SchemaMongoData data) => new()
     {
-        var schema = _provider.GetSchema(groupId, type);
-        if (schema == null)
-            return NotFound($"Schema for {type} not found");
-        return Ok(schema.ToResponse());   
-    }
-    
-    private ActionResult PutSchema(int groupId, string type, SchemaPostData data)
+        Type = data.Type,
+        GroupingAttributes = data.GroupingAttributes
+    };
+
+    private static T AsData<T>(int groupId, Schema schema) where T : SchemaMongoData, new() => new T()
     {
-        var schema = data.AsSchema(type);
-        var ok = _provider.TrySaveSchema(groupId, schema);
-        if (ok == false)
-            return BadRequest($"Can't save schema for {type}");
-        return Ok(schema.ToResponse());
-    }
+        GroupId = groupId,
+        Type = schema.Type,
+        GroupingAttributes = schema.GroupingAttributes
+    };
 
     [HttpGet("skills")]
     public ActionResult GetSkillsSchema(int groupId, [FromQuery] int? userId = null)
     {
         if (userId != null && !_accessHelper.HasGroupAccess(groupId, userId.Value))
             return NotFound();
-        return GetSchema(groupId, "skills");
+        var mongoData = _skillsProvider.GetSchema(groupId);
+        if (mongoData == null)
+            return NotFound("Schema for skills not found");
+        return Ok(AsSchema(mongoData).ToResponse());
     }
     
     [HttpPut("skills")]
@@ -49,7 +54,12 @@ public class GroupSchemasController : BaseController
     {
         if (userId != null && !_accessHelper.IsAdmin(groupId, userId.Value))
             return Forbidden();
-        return PutSchema(groupId, "skills", data);
+        var schema = data.AsSchema("skills");
+        var mongoData = AsData<SkillsSchemaMongoData>(groupId, schema);
+        var ok = _skillsProvider.TrySaveSchema(groupId, mongoData);
+        if (ok == false)
+            return BadRequest("Can't save schema for skills");
+        return Ok(schema.ToResponse());
     }
     
     [HttpGet("items")]
@@ -57,7 +67,10 @@ public class GroupSchemasController : BaseController
     {
         if (userId != null && !_accessHelper.HasGroupAccess(groupId, userId.Value))
             return NotFound();
-        return GetSchema(groupId, "items");
+        var mongoData = _itemsProvider.GetSchema(groupId);
+        if (mongoData == null)
+            return NotFound("Schema for items not found");
+        return Ok(AsSchema(mongoData).ToResponse());
     }
     
     [HttpPut("items")]
@@ -65,6 +78,11 @@ public class GroupSchemasController : BaseController
     {
         if (userId != null && !_accessHelper.IsAdmin(groupId, userId.Value))
             return Forbidden();
-        return PutSchema(groupId, "items", data);
+        var schema = data.AsSchema("items");
+        var mongoData = AsData<ItemsSchemaMongoData>(groupId, schema);
+        var ok = _itemsProvider.TrySaveSchema(groupId, mongoData);
+        if (ok == false)
+            return BadRequest("Can't save schema for items");
+        return Ok(schema.ToResponse());
     }
 }

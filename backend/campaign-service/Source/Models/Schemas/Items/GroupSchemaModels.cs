@@ -17,3 +17,13 @@ public class SchemaMongoData : GroupSchemaMongoData
     // [BsonElement("presets")]
     // public List<FilterPresetMongoData> FilterPresets = new();
 }
+
+public class SkillsSchemaMongoData : SchemaMongoData
+{
+    public SkillsSchemaMongoData() => Type = "skills";
+}
+
+public class ItemsSchemaMongoData : SchemaMongoData
+{
+    public ItemsSchemaMongoData() => Type = "items";
+}

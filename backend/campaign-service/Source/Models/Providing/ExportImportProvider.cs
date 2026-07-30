@@ -4,6 +4,7 @@ using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 using Tdn.Models.Conversions;
 using Tdn.Models.DTOs;
+using Tdn.Models.Schemas;
 using Tdn.Models.Schemas.Templates;
 
 namespace Tdn.Models.Providing;
@@ -14,7 +15,7 @@ public class ExportImportProvider
     private readonly IMongoDbContext _mongo;
     private readonly ISchemasMongoDbContext _schemasMongo;
     private readonly AttributesProvider _attributesProvider;
-    private readonly CharacterTemplateSchemaProvider _schemaProvider;
+    private readonly GenericMongoProvider<TemplateSchemaMongoData> _schemaProvider;
     private readonly GroupAccessHelper _accessHelper;
     private readonly ILogger<ExportImportProvider> _logger;
 
@@ -23,7 +24,7 @@ public class ExportImportProvider
         IMongoDbContext mongo,
         ISchemasMongoDbContext schemasMongo,
         AttributesProvider attributesProvider,
-        CharacterTemplateSchemaProvider schemaProvider,
+        GenericMongoProvider<TemplateSchemaMongoData> schemaProvider,
         GroupAccessHelper accessHelper,
         ILogger<ExportImportProvider> logger)
     {
@@ -271,11 +272,18 @@ public class ExportImportProvider
     {
         if (data.TemplateSchema == null) return;
 
-        var postData = new TemplateSchemaPostData
+        var mongoData = new TemplateSchemaMongoData
         {
-            Categories = data.TemplateSchema.Categories.Select(c => MapCategoryPostData(c)).ToList()
+            GroupId = groupId,
+            Type = "template",
+            Categories = data.TemplateSchema.Categories.Select(c => new CategorySchemaMongoData
+            {
+                Name = c.Name,
+                Fields = c.Fields,
+                Categories = c.Categories?.Select(MapCategoryMongoData).ToList()
+            }).ToList()
         };
-        _schemaProvider.TrySaveSchema(groupId, postData);
+        _schemaProvider.TrySaveSchema(groupId, mongoData);
     }
 
     private void ImportTemplates(int groupId, ExportData data, Dictionary<int, int> oldToNew)
@@ -488,6 +496,16 @@ public class ExportImportProvider
             Name = cat.Name,
             Fields = cat.Fields.ToList(),
             Categories = cat.Categories?.Select(MapCategoryPostData).ToList()
+        };
+    }
+
+    private static CategorySchemaMongoData MapCategoryMongoData(CategorySchemaExportData cat)
+    {
+        return new CategorySchemaMongoData
+        {
+            Name = cat.Name,
+            Fields = cat.Fields.ToList(),
+            Categories = cat.Categories?.Select(MapCategoryMongoData).ToList()
         };
     }
 

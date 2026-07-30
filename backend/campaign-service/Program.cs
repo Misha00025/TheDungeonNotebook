@@ -5,6 +5,7 @@ using Tdn.Db.Contexts;
 using Tdn.Settings;
 using Tdn.Db;
 using Tdn.Models.Providing;
+using Tdn.Models.Schemas;
 using Tdn.Models.Schemas.Items;
 using Tdn.Models.Schemas.Templates;
 using Tdn.Models.Schemas.Characters;
@@ -31,11 +32,16 @@ builder.Services.AddScoped<GroupPolicesProvider, GroupPolicesProvider>();
 builder.Services.AddScoped<AttributesProvider, AttributesProvider>();
 builder.Services.AddScoped<SkillsProvider, SkillsProvider>();
 builder.Services.AddScoped<ItemsProvider, ItemsProvider>();
-builder.Services.AddScoped<GroupSchemasProvider, GroupSchemasProvider>();
-builder.Services.AddScoped<CharacterTemplateSchemaProvider, CharacterTemplateSchemaProvider>();
+builder.Services.AddScoped(sp => new GenericMongoProvider<SkillsSchemaMongoData>(
+    sp.GetRequiredService<ISchemasMongoDbContext>(), "schemas", "skills"));
+builder.Services.AddScoped(sp => new GenericMongoProvider<ItemsSchemaMongoData>(
+    sp.GetRequiredService<ISchemasMongoDbContext>(), "schemas", "items"));
+builder.Services.AddScoped(sp => new GenericMongoProvider<TemplateSchemaMongoData>(
+    sp.GetRequiredService<ISchemasMongoDbContext>(), "templates", "template"));
 builder.Services.AddScoped<ExportImportProvider, ExportImportProvider>();
 builder.Services.AddScoped<NotesProvider, NotesProvider>();
-builder.Services.AddScoped<CharacterResourcesSchemaProvider, CharacterResourcesSchemaProvider>();
+builder.Services.AddScoped(sp => new GenericMongoProvider<CharacterResourcesMongoData>(
+    sp.GetRequiredService<ISchemasMongoDbContext>(), "schemas", "characters"));
 builder.Services.AddScoped<CharacterEquipmentProvider, CharacterEquipmentProvider>();
 builder.Services.AddScoped<CharacterLogProvider, CharacterLogProvider>();
 builder.Services.AddScoped<CharactersProvider, CharactersProvider>();

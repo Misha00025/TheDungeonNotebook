@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Tdn.Models.Providing;
 using Tdn.Models.DTOs;
+using Tdn.Models.Schemas;
 using Tdn.Models.Schemas.Characters;
 using Tdn.Models.Schemas.Characters.Conversion;
 
@@ -10,10 +11,10 @@ namespace Tdn.Api.Controllers;
 [Route("schemas/groups/{groupId}/characters/resources")]
 public class CharacterResourcesSchemaController : BaseController
 {
-    private CharacterResourcesSchemaProvider _provider;
+    private GenericMongoProvider<CharacterResourcesMongoData> _provider;
     private GroupAccessHelper _accessHelper;
 
-    public CharacterResourcesSchemaController(CharacterResourcesSchemaProvider provider, GroupAccessHelper accessHelper)
+    public CharacterResourcesSchemaController(GenericMongoProvider<CharacterResourcesMongoData> provider, GroupAccessHelper accessHelper)
     {
         _provider = provider;
         _accessHelper = accessHelper;
@@ -37,7 +38,13 @@ public class CharacterResourcesSchemaController : BaseController
         if (userId != null && !_accessHelper.IsAdmin(groupId, userId.Value))
             return Forbidden();
         var schema = data.AsModel();
-        var ok = _provider.TrySaveSchema(groupId, schema);
+        var mongoData = new CharacterResourcesMongoData
+        {
+            GroupId = groupId,
+            Type = "characters",
+            Fields = schema.Fields
+        };
+        var ok = _provider.TrySaveSchema(groupId, mongoData);
         return ok ? Ok(schema.ToResponse()) : BadRequest();
     }
 }
