@@ -20,16 +20,9 @@ def hybrid_jwt_factory(config):
             token_from_cookie = False
 
             # Priority 1: Cookie (SPA clients)
-            cookie_header = ctx.request.headers.get("Cookie", "")
-            if cookie_header:
-                for item in cookie_header.split(";"):
-                    item = item.strip()
-                    if "=" in item:
-                        key, value = item.split("=", 1)
-                        if key.strip() == "access_token":
-                            token = value.strip()
-                            token_from_cookie = True
-                            break
+            if ctx.request.cookies:
+                token = ctx.request.cookies.get("access_token")
+                token_from_cookie = bool(token)
 
             # Priority 2: Authorization Bearer header (mobile/service clients)
             if not token:

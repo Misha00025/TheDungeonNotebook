@@ -19,34 +19,34 @@ def get_text(res, url, method, params={}, compact = test_variables.compact):
     return text
 
 
-def get_test(headers, params, url, compact=test_variables.compact) -> rq.Response:
+def get_test(headers, params, url, compact=test_variables.compact, cookies=None) -> rq.Response:
     base = variables.server_url.rstrip("/")
     full_url = f"{base}/{url}"
-    res = rq.get(url=full_url, headers=headers, params=params)
+    res = rq.get(url=full_url, headers=headers, params=params, cookies=cookies)
     return res
 
 
-def post_test(headers, params, url, data, compact=test_variables.compact) -> rq.Response:
+def post_test(headers, params, url, data, compact=test_variables.compact, cookies=None) -> rq.Response:
     base = variables.server_url.rstrip("/")
     full_url = f"{base}/{url}"
-    res = rq.post(url=full_url, headers=headers, params=params, json=data)
+    res = rq.post(url=full_url, headers=headers, params=params, json=data, cookies=cookies)
     return res
 
 
-def put_test(headers, params, url, data, compact=test_variables.compact) -> rq.Response:
+def put_test(headers, params, url, data, compact=test_variables.compact, cookies=None) -> rq.Response:
     base = variables.server_url.rstrip("/")
     full_url = f"{base}/{url}"
-    res = rq.put(url=full_url, headers=headers, params=params, json=data)
+    res = rq.put(url=full_url, headers=headers, params=params, json=data, cookies=cookies)
     return res
 
-def patch_test(headers, params, url, data, compact=test_variables.compact) -> rq.Response:
+def patch_test(headers, params, url, data, compact=test_variables.compact, cookies=None) -> rq.Response:
     base = variables.server_url.rstrip("/")
     full_url = f"{base}/{url}"
-    res = rq.patch(url=full_url, headers=headers, params=params, json=data)
+    res = rq.patch(url=full_url, headers=headers, params=params, json=data, cookies=cookies)
     return res
 
-def delete_test(headers, params, url, compact=test_variables.compact) -> rq.Response:
+def delete_test(headers, params, url, compact=test_variables.compact, cookies=None) -> rq.Response:
     base = variables.server_url.rstrip("/")
     full_url = f"{base}/{url}"
-    res = rq.delete(url=full_url, headers=headers, params=params)
+    res = rq.delete(url=full_url, headers=headers, params=params, cookies=cookies)
     return res

@@ -33,6 +33,7 @@ class Test:
 				 request: str = "",
 				 params: dict = {},
 				 headers: dict = {},
+				 cookies: dict = {},
 				 data: dict = {},
 				 method: str = "GET",
 				 requirement: int = 200,
@@ -45,6 +46,7 @@ class Test:
 		if debug:
 			self.params[DEBUG] = True 
 		self.headers = headers.copy()
+		self.cookies = cookies.copy()
 		self.method = method
 		self.data = data
 		self.check_access = check_access
@@ -141,15 +143,15 @@ class Step:
 		test.data = data
 		match test.method:
 			case "GET":
-				res = get_test(headers, params, url)
+				res = get_test(headers, params, url, cookies=test.cookies)
 			case "PUT":
-				res = put_test(headers, params, url, data)
+				res = put_test(headers, params, url, data, cookies=test.cookies)
 			case "POST":
-				res = post_test(headers, params, url, data)
+				res = post_test(headers, params, url, data, cookies=test.cookies)
 			case "PATCH":
-				res = patch_test(headers, params, url, data)
+				res = patch_test(headers, params, url, data, cookies=test.cookies)
 			case "DELETE":
-				res = delete_test(headers, params, url)
+				res = delete_test(headers, params, url, cookies=test.cookies)
 		self.ok = test.check(res)
 		self.message = get_text(res, url, test.method, params=test.params)
 		return res
@@ -162,6 +164,10 @@ class GatewayStep(Step):
 		for key, value in test.headers.items():
 			processed_headers[key] = replace_placeholders(str(value), _data)
 		test.headers = processed_headers
+		processed_cookies = {}
+		for key, value in test.cookies.items():
+			processed_cookies[key] = replace_placeholders(str(value), _data)
+		test.cookies = processed_cookies
 		return super().execute(_data)
 
 
