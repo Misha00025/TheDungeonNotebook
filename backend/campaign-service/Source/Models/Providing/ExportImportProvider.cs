@@ -16,7 +16,6 @@ public class ExportImportProvider
     private readonly ISchemasMongoDbContext _schemasMongo;
     private readonly AttributesProvider _attributesProvider;
     private readonly GenericMongoProvider<TemplateSchemaMongoData> _schemaProvider;
-    private readonly GroupAccessHelper _accessHelper;
     private readonly ILogger<ExportImportProvider> _logger;
 
     public ExportImportProvider(
@@ -25,7 +24,6 @@ public class ExportImportProvider
         ISchemasMongoDbContext schemasMongo,
         AttributesProvider attributesProvider,
         GenericMongoProvider<TemplateSchemaMongoData> schemaProvider,
-        GroupAccessHelper accessHelper,
         ILogger<ExportImportProvider> logger)
     {
         _db = db;
@@ -33,7 +31,6 @@ public class ExportImportProvider
         _schemasMongo = schemasMongo;
         _attributesProvider = attributesProvider;
         _schemaProvider = schemaProvider;
-        _accessHelper = accessHelper;
         _logger = logger;
     }
 

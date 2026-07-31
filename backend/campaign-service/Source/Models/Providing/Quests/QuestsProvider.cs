@@ -4,7 +4,6 @@ using MongoDB.Driver;
 using Tdn.Db;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
-using Tdn.Models.Access;
 using Tdn.Models.DTOs;
 
 namespace Tdn.Models.Providing;
@@ -15,14 +14,12 @@ public class QuestsProvider
 
     private CampaignContext _db;
     private IMongoDbContext _mongo;
-    private SubjectAccessHelper _subjectAccessHelper;
     private ILogger<QuestsProvider> _logger;
 
-    public QuestsProvider(CampaignContext context, IMongoDbContext mongoDbContext, SubjectAccessHelper subjectAccessHelper, ILogger<QuestsProvider> logger)
+    public QuestsProvider(CampaignContext context, IMongoDbContext mongoDbContext, ILogger<QuestsProvider> logger)
     {
         _db = context;
         _mongo = mongoDbContext;
-        _subjectAccessHelper = subjectAccessHelper;
         _logger = logger;
     }
 
@@ -62,25 +59,21 @@ public class QuestsProvider
         return ToQuest(data, mongoData);
     }
 
-    public List<Quest> GetQuests(int groupId, int? characterId)
+    public List<Quest> GetQuests(int groupId, List<int>? accessibleCharacterIds, int? characterId)
     {
         var query = _db.Quests
             .Where(e => e.GroupId == groupId)
             .Include(e => e.Group)
             .AsQueryable();
 
-        if (!_subjectAccessHelper.IsAdmin(groupId))
+        if (accessibleCharacterIds != null && accessibleCharacterIds.Count > 0)
         {
-            var accessibleCharacterIds = _subjectAccessHelper.GetAccessibleCharacterIds(groupId);
-            if (accessibleCharacterIds.Count > 0)
-            {
-                var questIdsWithAccess = _db.QuestAssignments
-                    .Where(a => accessibleCharacterIds.Contains(a.CharacterId))
-                    .Select(a => a.QuestId)
-                    .Distinct()
-                    .ToList();
-                query = query.Where(e => questIdsWithAccess.Contains(e.Id));
-            }
+            var questIdsWithAccess = _db.QuestAssignments
+                .Where(a => accessibleCharacterIds.Contains(a.CharacterId))
+                .Select(a => a.QuestId)
+                .Distinct()
+                .ToList();
+            query = query.Where(e => questIdsWithAccess.Contains(e.Id));
         }
 
         if (characterId != null)

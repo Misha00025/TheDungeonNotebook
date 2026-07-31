@@ -9,16 +9,13 @@ public class CharacterEquipmentProvider
 {
     private readonly CampaignContext _db;
     private readonly IMongoDbContext _mongo;
-    private readonly GroupAccessHelper _accessHelper;
 
     public CharacterEquipmentProvider(
         CampaignContext context,
-        IMongoDbContext mongo,
-        GroupAccessHelper accessHelper)
+        IMongoDbContext mongo)
     {
         _db = context;
         _mongo = mongo;
-        _accessHelper = accessHelper;
     }
 
     public List<int> GetEquipment(int groupId, int characterId)

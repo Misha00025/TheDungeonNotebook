@@ -15,9 +15,8 @@ public class GroupProvider
         _subjectAccessHelper = subjectAccessHelper;
     }
 
-    public List<Group> GetAll()
+    public List<Group> GetAll(List<int> accessibleIds)
     {
-        var accessibleIds = _subjectAccessHelper.GetAccessibleGroupIds();
         var groups = _db.Groups.ToList();
 
         if (accessibleIds.Count > 0)

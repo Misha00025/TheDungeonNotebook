@@ -20,9 +20,8 @@ public class CharacterEquipmentProviderTests
         var mongoMock = new Mock<IMongoDbContext>(MockBehavior.Loose);
         mongoMock.Setup(m => m.GetEntity<CharacterMongoData>(MongoCollections.Characters, charUuid))
             .Returns(new CharacterMongoData { Equipment = new List<int> { 10, 20 } });
-        var accessHelper = new GroupAccessHelper(ctx);
-        
-        var provider = new CharacterEquipmentProvider(ctx, mongoMock.Object, accessHelper);
+
+        var provider = new CharacterEquipmentProvider(ctx, mongoMock.Object);
         
         var equipment = provider.GetEquipment(1, 100);
         
@@ -55,10 +54,9 @@ public class CharacterEquipmentProviderTests
                 It.IsAny<UpdateOptions>(),
                 It.IsAny<CancellationToken>()))
             .Returns(updateResult.Object);
-        var accessHelper = new GroupAccessHelper(ctx);
-        
-        var provider = new CharacterEquipmentProvider(ctx, mongoMock.Object, accessHelper);
-        
+
+        var provider = new CharacterEquipmentProvider(ctx, mongoMock.Object);
+
         var result = provider.TryAddEquipment(1, 100, 30);
         
         Assert.True(result);
@@ -88,10 +86,9 @@ public class CharacterEquipmentProviderTests
                 It.IsAny<UpdateOptions>(),
                 It.IsAny<CancellationToken>()))
             .Returns(updateResult.Object);
-        var accessHelper = new GroupAccessHelper(ctx);
-        
-        var provider = new CharacterEquipmentProvider(ctx, mongoMock.Object, accessHelper);
-        
+
+        var provider = new CharacterEquipmentProvider(ctx, mongoMock.Object);
+
         var result = provider.TryRemoveEquipment(1, 100, 30);
         
         Assert.True(result);
@@ -121,10 +118,9 @@ public class CharacterEquipmentProviderTests
                 It.IsAny<UpdateOptions>(),
                 It.IsAny<CancellationToken>()))
             .Returns(updateResult.Object);
-        var accessHelper = new GroupAccessHelper(ctx);
-        
-        var provider = new CharacterEquipmentProvider(ctx, mongoMock.Object, accessHelper);
-        
+
+        var provider = new CharacterEquipmentProvider(ctx, mongoMock.Object);
+
         var result = provider.TrySaveEquipment(1, 100, new List<int> { 10, 20, 30 });
         
         Assert.True(result);

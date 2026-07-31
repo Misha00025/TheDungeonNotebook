@@ -22,7 +22,8 @@ public class GroupsController : GroupsBaseController
     [HttpGet]
     public ActionResult GetAll()
     {
-        var groups = _provider.GetAll();
+        var accessibleIds = SubjectAccess.GetAccessibleGroupIds();
+        var groups = _provider.GetAll(accessibleIds);
         return Ok(groups.Select(e => e.ToDict()));
     }
     
