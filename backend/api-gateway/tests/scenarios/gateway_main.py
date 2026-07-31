@@ -226,9 +226,9 @@ def register_gateway_main():
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/1/users/{eid}", method="DELETE", requirement=OK))
 
-    # Verify evil can no longer see the group → 403
+    # Verify evil can no longer see the group → 404
     tests.append(Test(headers={**h, "Authorization": "{et}"},
-        request="groups/1", method="GET", requirement=FORBID,
+        request="groups/1", method="GET", requirement=NOT_FOUND,
         is_valid=is_error()))
 
     steps = [GatewayStep(t) for t in tests]

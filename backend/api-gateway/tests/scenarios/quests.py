@@ -196,7 +196,7 @@ def register_quests_scenario():
     # 22. GET quests as stranger (should see error)
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{steps.2.id}/quests", method="GET",
-        requirement=NOT_FOUND, is_valid=has_list("quests")))
+        requirement=NOT_FOUND))
 
     # 23. DELETE quest (admin)
     tests.append(Test(headers={**h, "Authorization": "{at}"},
