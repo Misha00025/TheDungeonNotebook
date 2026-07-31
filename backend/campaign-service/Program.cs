@@ -5,6 +5,8 @@ using Tdn.Db.Contexts;
 using Tdn.Settings;
 using Tdn.Db;
 using Tdn.Models.Providing;
+using Tdn.Models.Access;
+using Tdn.Middleware;
 using Tdn.Models.Schemas;
 using Tdn.Models.Schemas.Items;
 using Tdn.Models.Schemas.Templates;
@@ -47,6 +49,7 @@ builder.Services.AddScoped<CharacterLogProvider, CharacterLogProvider>();
 builder.Services.AddScoped<CharactersProvider, CharactersProvider>();
 builder.Services.AddScoped<GroupProvider, GroupProvider>();
 builder.Services.AddScoped<QuestsProvider, QuestsProvider>();
+builder.Services.AddScoped<SubjectAccessHelper>();
 
 // General
 builder.Services.AddEndpointsApiExplorer();
@@ -76,6 +79,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseHttpMetrics();
+app.UseMiddleware<SubjectPresentMiddleware>();
 app.MapMetrics();
 app.MapControllers();
 app.Run();
