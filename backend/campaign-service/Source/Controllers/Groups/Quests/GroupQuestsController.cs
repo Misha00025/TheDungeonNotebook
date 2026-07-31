@@ -27,7 +27,7 @@ public class GroupQuestsController : GroupsBaseController
     {
         if (!TryGetGroup(groupId, out var _))
             return NotFound("Group not found");
-        var quests = _provider.GetQuests(groupId, SubjectAccess.CurrentUserId, characterId);
+        var quests = _provider.GetQuests(groupId, characterId);
         return Ok(new { quests = quests.Select(e => e.ToResponse()).ToList() });
     }
 
