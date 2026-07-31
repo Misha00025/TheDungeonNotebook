@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Tdn.Db.Contexts;
 using Tdn.Models.Providing;
+using Tdn.Models.Access;
 using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
@@ -15,9 +16,10 @@ public class CharacterEquipmentController : GroupsBaseController
     public CharacterEquipmentController(
         CampaignContext context,
         GroupAccessHelper accessHelper,
+        SubjectAccessHelper subjectAccessHelper,
         CharacterEquipmentProvider provider,
         CharacterLogProvider logProvider)
-        : base(context, accessHelper)
+        : base(context, accessHelper, subjectAccessHelper)
     {
         _provider = provider;
         _logProvider = logProvider;

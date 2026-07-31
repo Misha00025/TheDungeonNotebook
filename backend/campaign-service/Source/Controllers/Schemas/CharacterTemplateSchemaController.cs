@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Tdn.Db.Contexts;
+using Tdn.Models.Access;
 using Tdn.Models.Providing;
 using Tdn.Models.DTOs;
 using Tdn.Models.Schemas;
@@ -9,15 +11,17 @@ namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("schemas/groups/{groupId}/template")]
-public class CharacterTemplateSchemaController : BaseController
+public class CharacterTemplateSchemaController : GroupsBaseController
 {
     private GenericMongoProvider<TemplateSchemaMongoData> _provider;
-    private GroupAccessHelper _accessHelper;
 
-    public CharacterTemplateSchemaController(GenericMongoProvider<TemplateSchemaMongoData> provider, GroupAccessHelper accessHelper)
+    public CharacterTemplateSchemaController(
+        CampaignContext context,
+        GenericMongoProvider<TemplateSchemaMongoData> provider,
+        GroupAccessHelper accessHelper,
+        SubjectAccessHelper subjectAccessHelper) : base(context, accessHelper, subjectAccessHelper)
     {
         _provider = provider;
-        _accessHelper = accessHelper;
     }
 
     private static CategorySchemaMongoData AsData(CategorySchemaPostData category) => new()
@@ -37,7 +41,7 @@ public class CharacterTemplateSchemaController : BaseController
     [HttpGet]
     public ActionResult GetSchema(int groupId, [FromQuery] int? userId = null)
     {
-        if (userId != null && !_accessHelper.HasGroupAccess(groupId, userId.Value))
+        if (userId != null && !CheckGroupAccess(groupId, userId))
             return NotFound();
         var schema = _provider.GetSchema(groupId);
         if (schema != null)
@@ -48,7 +52,7 @@ public class CharacterTemplateSchemaController : BaseController
     [HttpPut]
     public ActionResult PutSchema(int groupId, TemplateSchemaPostData data, [FromQuery] int? userId = null)
     {
-        if (userId != null && !_accessHelper.IsAdmin(groupId, userId.Value))
+        if (userId != null && !AccessHelper.IsAdmin(groupId, userId.Value))
             return Forbidden();
         var mongoData = AsData(groupId, data);
         var ok = _provider.TrySaveSchema(groupId, mongoData);

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Tdn.Db.Contexts;
 using Tdn.Models.Providing;
+using Tdn.Models.Access;
 using Tdn.Models.Conversions;
 using Tdn.Models.DTOs;
 
@@ -12,7 +13,7 @@ public class GroupsController : GroupsBaseController
 {
     private GroupProvider _provider;
 
-    public GroupsController(CampaignContext context, GroupAccessHelper accessHelper, GroupProvider provider) : base(context, accessHelper)
+    public GroupsController(CampaignContext context, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, GroupProvider provider) : base(context, accessHelper, subjectAccessHelper)
     {
         _provider = provider;
     }

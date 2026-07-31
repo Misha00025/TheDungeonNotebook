@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Tdn.Db.Contexts;
 using Tdn.Models;
+using Tdn.Models.Access;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
 
@@ -7,16 +9,14 @@ namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("groups/{groupId}/characters/{characterId}/skills")]
-public class CharacterSkillsController : BaseController
+public class CharacterSkillsController : GroupsBaseController
 {
     private SkillsProvider _provider;
-    private GroupAccessHelper _accessHelper;
     private CharacterLogProvider _logProvider;
 
-    public CharacterSkillsController(SkillsProvider skillsProvider, GroupAccessHelper accessHelper, CharacterLogProvider logProvider)
+    public CharacterSkillsController(CampaignContext context, SkillsProvider skillsProvider, GroupAccessHelper accessHelper, CharacterLogProvider logProvider, SubjectAccessHelper subjectAccessHelper) : base(context, accessHelper, subjectAccessHelper)
     {
         _provider = skillsProvider;
-        _accessHelper = accessHelper;
         _logProvider = logProvider;
     }
     
@@ -25,7 +25,7 @@ public class CharacterSkillsController : BaseController
     [HttpGet]
     public ActionResult GetSkills(int groupId, int characterId, [FromQuery] Dictionary<string, string>? filters = null, [FromQuery] int? userId = null)
     {
-        if (userId != null && !_accessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
+        if (userId != null && !AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
             return NotFound();
             
         var skills = _provider.GetSkills(groupId, characterId);
@@ -41,7 +41,7 @@ public class CharacterSkillsController : BaseController
     [HttpPut("{skillId}")]
     public ActionResult PutSkill(int groupId, int characterId, int skillId, [FromQuery] int? userId = null)
     {
-        if (userId != null && !_accessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+        if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
             return Forbidden();
 
         var skill = _provider.GetSkill(groupId, skillId);
@@ -60,7 +60,7 @@ public class CharacterSkillsController : BaseController
     [HttpDelete("{skillId}")]
     public ActionResult DeleteSkill(int groupId, int characterId, int skillId, [FromQuery] int? userId = null)
     {
-        if (userId != null && !_accessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+        if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
             return Forbidden();
             
         var skill = _provider.GetSkill(groupId, skillId);

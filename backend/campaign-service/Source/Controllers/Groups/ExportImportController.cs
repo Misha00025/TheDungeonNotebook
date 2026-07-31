@@ -3,6 +3,7 @@ using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
+using Tdn.Models.Access;
 
 namespace Tdn.Api.Controllers;
 
@@ -16,9 +17,10 @@ public class ExportImportController : GroupsBaseController
     public ExportImportController(
         CampaignContext groupContext,
         GroupAccessHelper accessHelper,
+        SubjectAccessHelper subjectAccessHelper,
         ExportImportProvider provider,
         ILogger<ExportImportController> logger)
-        : base(groupContext, accessHelper)
+        : base(groupContext, accessHelper, subjectAccessHelper)
     {
         _provider = provider;
         _logger = logger;

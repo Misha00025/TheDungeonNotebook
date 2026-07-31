@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Tdn.Db.Contexts;
+using Tdn.Models.Access;
 using Tdn.Models.Providing;
 using Tdn.Models.DTOs;
 using Tdn.Models.Schemas;
@@ -9,21 +11,23 @@ namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("schemas/groups/{groupId}/characters/resources")]
-public class CharacterResourcesSchemaController : BaseController
+public class CharacterResourcesSchemaController : GroupsBaseController
 {
     private GenericMongoProvider<CharacterResourcesMongoData> _provider;
-    private GroupAccessHelper _accessHelper;
 
-    public CharacterResourcesSchemaController(GenericMongoProvider<CharacterResourcesMongoData> provider, GroupAccessHelper accessHelper)
+    public CharacterResourcesSchemaController(
+        CampaignContext context,
+        GenericMongoProvider<CharacterResourcesMongoData> provider,
+        GroupAccessHelper accessHelper,
+        SubjectAccessHelper subjectAccessHelper) : base(context, accessHelper, subjectAccessHelper)
     {
         _provider = provider;
-        _accessHelper = accessHelper;
     }
     
     [HttpGet]
     public ActionResult GetSchema(int groupId, [FromQuery] int? userId = null)
     {
-        if (userId != null && !_accessHelper.HasGroupAccess(groupId, userId.Value))
+        if (userId != null && !CheckGroupAccess(groupId, userId))
             return NotFound();
         var mongoData = _provider.GetSchema(groupId);
         var schema = mongoData != null
@@ -35,7 +39,7 @@ public class CharacterResourcesSchemaController : BaseController
     [HttpPut]
     public ActionResult PutSchema(int groupId, CharacterResourcesPostData data, [FromQuery] int? userId = null)
     {
-        if (userId != null && !_accessHelper.IsAdmin(groupId, userId.Value))
+        if (userId != null && !AccessHelper.IsAdmin(groupId, userId.Value))
             return Forbidden();
         var schema = data.AsModel();
         var mongoData = new CharacterResourcesMongoData

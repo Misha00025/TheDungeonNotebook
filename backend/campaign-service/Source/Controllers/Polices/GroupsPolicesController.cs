@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
+using Tdn.Db.Contexts;
 using Tdn.Models.Access;
 using Tdn.Models.Providing;
 using Tdn.Models.DTOs;
@@ -8,15 +9,15 @@ namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("polices/groups")]
-public class GroupsPolicesController : BaseController
+public class GroupsPolicesController : GroupsBaseController
 {
     private GroupPolicesProvider _provider;
-    private SubjectAccessHelper _accessHelper;
+    private SubjectAccessHelper _subjectHelper;
     
-    public GroupsPolicesController(GroupPolicesProvider provider, SubjectAccessHelper accessHelper)
+    public GroupsPolicesController(CampaignContext context, GroupPolicesProvider provider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper) : base(context, accessHelper, subjectAccessHelper)
     {
         _provider = provider;
-        _accessHelper = accessHelper;
+        _subjectHelper = subjectAccessHelper;
     }
     
     [HttpGet]
@@ -48,7 +49,7 @@ public class GroupsPolicesController : BaseController
     {
         if (data.GroupId == null || data.UserId == null)
             return BadRequest();
-        if (!_accessHelper.IsAdmin(data.GroupId.Value))
+        if (!_subjectHelper.IsAdmin(data.GroupId.Value))
             return Forbidden();
         var (isCreated, _) = _provider.UpsertGroupRule(
             data.GroupId.Value,
@@ -71,7 +72,7 @@ public class GroupsPolicesController : BaseController
     {
         if (data.GroupId == null || data.UserId == null || data.CharacterId == null)
             return BadRequest();
-        if (!_accessHelper.IsAdmin(data.GroupId.Value))
+        if (!_subjectHelper.IsAdmin(data.GroupId.Value))
             return Forbidden();
         var result = _provider.UpsertCharacterRule(
             data.GroupId.Value,
@@ -86,7 +87,7 @@ public class GroupsPolicesController : BaseController
     [HttpDelete]
     public ActionResult DeleteRule([FromQuery] int userId, [FromQuery, Required] int groupId, [FromQuery] int? characterId)
     {
-        if (!_accessHelper.IsAdmin(groupId))
+        if (!_subjectHelper.IsAdmin(groupId))
             return Forbidden();
         if (!_provider.DeleteRule(userId, groupId, characterId))
             return NotFound();

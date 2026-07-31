@@ -5,6 +5,7 @@ using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
+using Tdn.Models.Access;
 using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
@@ -16,7 +17,7 @@ public class TemplatesController : GroupsBaseController
     private IMongoDbContext _mongo;
     private CampaignContext _campaignContext;
 
-    public TemplatesController(CampaignContext context, IMongoDbContext mongo, GroupAccessHelper accessHelper) : base(context, accessHelper)
+    public TemplatesController(CampaignContext context, IMongoDbContext mongo, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper) : base(context, accessHelper, subjectAccessHelper)
     {
         _mongo = mongo;
         _campaignContext = context;

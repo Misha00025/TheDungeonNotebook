@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Tdn.Db.Contexts;
+using Tdn.Models.Access;
 using Tdn.Models.Providing;
 using Tdn.Models.Conversions;
 using Tdn.Models.DTOs;
@@ -7,11 +9,11 @@ namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("/groups/{groupId}/characters/{characterId}/notes")]
-public class CharacterNotesController : BaseController
+public class CharacterNotesController : GroupsBaseController
 {
     private NotesProvider _provider;
 
-    public CharacterNotesController(NotesProvider provider)
+    public CharacterNotesController(CampaignContext context, NotesProvider provider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper) : base(context, accessHelper, subjectAccessHelper)
     {
         _provider = provider;
     }

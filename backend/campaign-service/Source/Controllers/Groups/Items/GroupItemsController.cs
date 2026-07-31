@@ -6,6 +6,7 @@ using Tdn.Db.Entities;
 using Tdn.Models;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
+using Tdn.Models.Access;
 using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
@@ -16,7 +17,7 @@ public class GroupItemsController : GroupsBaseController
 {
     private ItemsProvider _provider;
     
-    public GroupItemsController(CampaignContext groupContext, ItemsProvider provider, GroupAccessHelper accessHelper) : base(groupContext, accessHelper)
+    public GroupItemsController(CampaignContext groupContext, ItemsProvider provider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper) : base(groupContext, accessHelper, subjectAccessHelper)
     {
         _provider = provider;
     }

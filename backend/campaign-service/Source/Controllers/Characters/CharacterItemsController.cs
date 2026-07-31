@@ -5,6 +5,7 @@ using Tdn.Db.Entities;
 using Tdn.Models;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
+using Tdn.Models.Access;
 using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
@@ -18,7 +19,7 @@ public class CharacterItemsController : GroupsBaseController
     private CharacterLogProvider _logProvider;
     private CharactersProvider _charactersProvider;
 
-    public CharacterItemsController(CampaignContext context, ItemsProvider itemsProvider, GroupAccessHelper accessHelper, CharacterLogProvider logProvider, CharactersProvider charactersProvider) : base(context, accessHelper)
+    public CharacterItemsController(CampaignContext context, ItemsProvider itemsProvider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, CharacterLogProvider logProvider, CharactersProvider charactersProvider) : base(context, accessHelper, subjectAccessHelper)
     {
             _provider = itemsProvider;
             _logProvider = logProvider;
