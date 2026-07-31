@@ -15,17 +15,16 @@ public class GroupProvider
         _subjectAccessHelper = subjectAccessHelper;
     }
 
-    public List<Group> GetAll(int? userId = null)
+    public List<Group> GetAll()
     {
+        var accessibleIds = _subjectAccessHelper.GetAccessibleGroupIds();
         var groups = _db.Groups.ToList();
-        if (userId != null)
+
+        if (accessibleIds.Count > 0)
         {
-            var accessibleIds = _db.UserGroups
-                .Where(g => g.UserId == userId.Value)
-                .Select(g => g.GroupId)
-                .ToList();
             groups = groups.Where(e => accessibleIds.Contains(e.Id)).ToList();
         }
+
         return groups.Select(e => new Group
         {
             Id = e.Id,

@@ -22,7 +22,7 @@ public class GroupsController : GroupsBaseController
     [HttpGet]
     public ActionResult GetAll()
     {
-        var groups = _provider.GetAll(SubjectAccess.CurrentUserId);
+        var groups = _provider.GetAll();
         return Ok(groups.Select(e => e.ToDict()));
     }
     
