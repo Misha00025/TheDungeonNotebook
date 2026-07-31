@@ -106,9 +106,10 @@ public class QuestsProvider
 
     public bool TryCreateQuest(int groupId, Quest quest)
     {
+        QuestMongoData? mongoData = null;
         try
         {
-            var mongoData = new QuestMongoData()
+            mongoData = new QuestMongoData()
             {
                 Header = quest.Header,
                 Description = quest.Description,
@@ -148,6 +149,18 @@ public class QuestsProvider
         }
         catch (Exception e)
         {
+            if (mongoData != null)
+            {
+                try
+                {
+                    _mongo.GetCollection<QuestMongoData>(QUESTS_COLLECTION_NAME)
+                        .DeleteOne(Builders<QuestMongoData>.Filter.Eq(x => x.Id, mongoData.Id));
+                }
+                catch (Exception cleanupEx)
+                {
+                    _logger.LogWarning($"Failed to clean up Mongo orphan for quest: {cleanupEx}");
+                }
+            }
             _logger.LogWarning($"Error creating quest: {e}");
             return false;
         }

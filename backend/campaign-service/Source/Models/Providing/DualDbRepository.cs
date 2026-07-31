@@ -81,9 +81,10 @@ public abstract class DualDbRepository<TEntity, TSqlData, TMongoData>
 
     protected bool TryCreate(int groupId, TEntity entity)
     {
+        TMongoData? mongoData = null;
         try
         {
-            var mongoData = ToMongoData(entity);
+            mongoData = ToMongoData(entity);
             Mongo.GetCollection<TMongoData>(CollectionName).InsertOne(mongoData);
             var sqlData = CreateSqlData(groupId, mongoData.Id.ToString(), entity);
             Db.Set<TSqlData>().Add(sqlData);
@@ -93,6 +94,18 @@ public abstract class DualDbRepository<TEntity, TSqlData, TMongoData>
         }
         catch (Exception e)
         {
+            if (mongoData != null)
+            {
+                try
+                {
+                    Mongo.GetCollection<TMongoData>(CollectionName)
+                        .DeleteOne(Builders<TMongoData>.Filter.Eq(x => x.Id, mongoData.Id));
+                }
+                catch (Exception cleanupEx)
+                {
+                    Logger.LogWarning($"Failed to clean up Mongo orphan for {typeof(TEntity).Name}: {cleanupEx}");
+                }
+            }
             Logger.LogWarning($"Error creating {typeof(TEntity).Name}: {e}");
             return false;
         }
@@ -131,10 +144,11 @@ public abstract class DualDbRepository<TEntity, TSqlData, TMongoData>
             var sqlData = Db.Set<TSqlData>().FirstOrDefault(IdFilter(groupId, entityId));
             if (sqlData == null)
                 return false;
-            Mongo.GetCollection<TMongoData>(CollectionName)
-                .DeleteOne(Builders<TMongoData>.Filter.Eq(x => x.Id, new ObjectId(sqlData.UUID)));
+            var uuid = sqlData.UUID;
             Db.Set<TSqlData>().Remove(sqlData);
             Db.SaveChanges();
+            Mongo.GetCollection<TMongoData>(CollectionName)
+                .DeleteOne(Builders<TMongoData>.Filter.Eq(x => x.Id, new ObjectId(uuid)));
             return true;
         }
         catch (Exception e)
