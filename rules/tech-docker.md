@@ -33,9 +33,7 @@
 - Ports: `"5000:5000"`
 - Env: `AUTH_SERVICE_URL`, `USERS_SERVICE_URL`, `CAMPAIGN_SERVICE_URL`
 
-## Uploads Service
-- Runs **separately**: `cd backend/uploads-service && docker compose up -d`
-- Own docker-compose.yaml
+
 
 ## Environment Variables (shared .env)
 | Variable | Purpose |

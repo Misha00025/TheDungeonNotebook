@@ -92,8 +92,7 @@ CI script: `backend/api-gateway/tests/test-ci.sh`
    - Waits for api-gateway readiness
    - Runs all test scenarios
    - Prints summary and last gateway logs
-   - Stops all containers
-4. On failure: uploads test logs as a GitHub Actions artifact
+    - Stops all containers
 
 ### Local vs CI
 - **Local:** `./test.sh 15` — uses venv, sudo rm, colored summary

@@ -8,7 +8,7 @@
 ├── Dockerfile                    # dotnet publish multi-stage
 ├── appsettings.json
 ├── Properties/launchSettings.json
-├── Source/                       # (or Sources/ for uploads-service)
+├── Source/
 │   ├── Controllers/
 │   ├── Db/
 │   │   ├── Contexts/
