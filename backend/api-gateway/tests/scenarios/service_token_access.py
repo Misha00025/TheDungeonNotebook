@@ -141,20 +141,20 @@ def register_service_token_scenario():
 
     # --- Negative tests (service token on wrong group) ---
 
-    # Test 13: GET /groups/{secondGroupId} → 403
+    # Test 13: GET /groups/{secondGroupId} → 404
     tests.append(Test(headers={**h, "Authorization": "{st}"},
-        request="groups/{sgid2}", method="GET", requirement=FORBID,
+        request="groups/{sgid2}", method="GET", requirement=NOT_FOUND,
         is_valid=is_error()))
 
-    # Test 14: POST /groups/{secondGroupId}/items → 403
+    # Test 14: POST /groups/{secondGroupId}/items → 404
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{sgid2}/items", method="POST",
-        data=new_group_item, requirement=FORBID,
+        data=new_group_item, requirement=NOT_FOUND,
         is_valid=is_error()))
 
-    # Test 15: GET /groups/{secondGroupId}/characters → 403
+    # Test 15: GET /groups/{secondGroupId}/characters → 404
     tests.append(Test(headers={**h, "Authorization": "{st}"},
-        request="groups/{sgid2}/characters", method="GET", requirement=FORBID,
+        request="groups/{sgid2}/characters", method="GET", requirement=NOT_FOUND,
         is_valid=is_error()))
 
     steps = [GatewayStep(t) for t in tests]

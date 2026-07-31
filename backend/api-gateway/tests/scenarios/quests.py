@@ -193,10 +193,10 @@ def register_quests_scenario():
         request="groups/{steps.2.id}/quests?userId={uid}&characterId={steps.5.id}", method="GET",
         requirement=OK, is_valid=has_list("quests")))
 
-    # 22. GET quests as stranger (should see empty)
+    # 22. GET quests as stranger (should see error)
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{steps.2.id}/quests", method="GET",
-        requirement=OK, is_valid=has_list("quests")))
+        requirement=NOT_FOUND, is_valid=has_list("quests")))
 
     # 23. DELETE quest (admin)
     tests.append(Test(headers={**h, "Authorization": "{at}"},
@@ -299,7 +299,7 @@ def register_quests_scenario():
             "assignedCharacters": ["{steps.5.id}", "{steps.10.id}"]
         }, requirement=FORBID))
 
-    # 33. Stranger tries to create quest → 403
+    # 33. Stranger tries to create quest → 404
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{steps.2.id}/quests", method="POST",
         data={
@@ -309,9 +309,9 @@ def register_quests_scenario():
             "status": "active",
             "objectives": [],
             "assignedCharacters": ["{steps.5.id}"]
-        }, requirement=FORBID))
+        }, requirement=NOT_FOUND))
 
-    # 34. Stranger tries to create quest for character → 403
+    # 34. Stranger tries to create quest for character → 404
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/quests", method="POST",
         data={
@@ -320,9 +320,9 @@ def register_quests_scenario():
             "reward": [],
             "status": "active",
             "objectives": []
-        }, requirement=FORBID))
+        }, requirement=NOT_FOUND))
 
-    # 35. Stranger tries to update quest → 403
+    # 35. Stranger tries to update quest → 404
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{steps.2.id}/quests/{steps.12.id}", method="PUT",
         data={
@@ -332,13 +332,13 @@ def register_quests_scenario():
             "status": "active",
             "objectives": [],
             "assignedCharacters": ["{steps.5.id}"]
-        }, requirement=FORBID))
+        }, requirement=NOT_FOUND))
 
-    # 36. Stranger tries to patch quest → 403
+    # 36. Stranger tries to patch quest → 404
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{steps.2.id}/quests/{steps.12.id}", method="PATCH",
         data={"header": "Hacked!"},
-        requirement=FORBID))
+        requirement=NOT_FOUND))
 
     # 37. DELETE user's quest (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},

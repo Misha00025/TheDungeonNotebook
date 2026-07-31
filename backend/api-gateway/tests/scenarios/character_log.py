@@ -216,7 +216,7 @@ def register_character_log_scenario():
 
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/log", method="GET",
-        requirement=FORBID))
+        requirement=NOT_FOUND))
 
     steps = [GatewayStep(t) for t in tests]
     scenario = Scenario("CharacterLog", steps, data)
