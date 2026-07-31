@@ -62,15 +62,6 @@ public class CharactersProvider : DualDbRepository<Character, CharacterData, Cha
     public bool TryCreateCharacter(int groupId, Character character) => TryCreate(groupId, character);
     public bool TryUpdateCharacter(Character character) => TryUpdate(character);
 
-    public bool TryUpdateOwnerId(int groupId, int characterId, int? ownerId)
-    {
-        var sqlData = Db.Set<CharacterData>().FirstOrDefault(e => e.Id == characterId && e.GroupId == groupId);
-        if (sqlData == null) return false;
-        sqlData.OwnerId = ownerId;
-        Db.SaveChanges();
-        return true;
-    }
-
     public bool TryDeleteCharacter(int groupId, int characterId) => TryDelete(groupId, characterId);
 
     public CharacterData? GetCharacterSqlData(int groupId, int characterId)
