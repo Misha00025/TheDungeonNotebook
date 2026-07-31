@@ -12,11 +12,9 @@ public class GroupPolicesProvider
         _db = context;
     }
 
-    public IQueryable<UserGroupData> GetGroupRules(int? userId, int? groupId)
+    public IQueryable<UserGroupData> GetGroupRules(int? groupId)
     {
         var query = _db.UserGroups.AsQueryable();
-        if (userId != null)
-            query = query.Where(e => e.UserId == userId.Value);
         if (groupId != null)
             query = query.Where(e => e.GroupId == groupId.Value);
         return query;
@@ -47,11 +45,9 @@ public class GroupPolicesProvider
         }
     }
 
-    public IQueryable<UserCharacterData> GetCharacterRules(int groupId, int? userId, int? characterId)
+    public IQueryable<UserCharacterData> GetCharacterRules(int groupId, int? characterId)
     {
         var query = _db.UserCharacters.Where(e => e.GroupId == groupId);
-        if (userId != null)
-            query = query.Where(e => e.UserId == userId.Value);
         if (characterId != null)
             query = query.Where(e => e.CharacterId == characterId.Value);
         return query;

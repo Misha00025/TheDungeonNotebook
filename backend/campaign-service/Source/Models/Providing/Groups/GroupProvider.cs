@@ -1,15 +1,18 @@
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
+using Tdn.Models.Access;
 
 namespace Tdn.Models.Providing;
 
 public class GroupProvider
 {
     private CampaignContext _db;
+    private readonly SubjectAccessHelper _subjectAccessHelper;
 
-    public GroupProvider(CampaignContext context)
+    public GroupProvider(CampaignContext context, SubjectAccessHelper subjectAccessHelper)
     {
         _db = context;
+        _subjectAccessHelper = subjectAccessHelper;
     }
 
     public List<Group> GetAll(int? userId = null)
@@ -39,12 +42,13 @@ public class GroupProvider
         return new Group { Id = data.Id, Name = data.Name, Icon = data.Icon, Description = "" };
     }
 
-    public Group Create(string name, string? icon, int? userId)
+    public Group Create(string name, string? icon)
     {
         var data = new GroupData { Name = name, Icon = icon };
         _db.Add(data);
         _db.SaveChanges();
 
+        var userId = _subjectAccessHelper.CurrentUserId;
         if (userId != null)
         {
             _db.UserGroups.Add(new UserGroupData

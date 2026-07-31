@@ -21,7 +21,7 @@ public class GroupsPolicesController : GroupsBaseController
     [HttpGet]
     public ActionResult GetMany([FromQuery] int? groupId = null)
     {
-        var groups = _provider.GetGroupRules(SubjectAccess.CurrentUserId, groupId).ToList();
+        var groups = _provider.GetGroupRules(groupId).ToList();
         var result = new
         {
             users = groups.Select(e =>
@@ -30,7 +30,7 @@ public class GroupsPolicesController : GroupsBaseController
                     userId = e.UserId,
                     groupId = e.GroupId,
                     isAdmin = e.IsAdmin,
-                    characters = _provider.GetCharacterRules(e.GroupId, e.UserId, null)
+                    characters = _provider.GetCharacterRules(e.GroupId, null)
                         .Select(d => new
                         {
                             characterId = d.CharacterId,
@@ -59,7 +59,7 @@ public class GroupsPolicesController : GroupsBaseController
     [HttpGet("characters")]
     public ActionResult GetCharacterRules([FromQuery] int groupId, [FromQuery] int? characterId = null)
     {
-        var characters = _provider.GetCharacterRules(groupId, SubjectAccess.CurrentUserId, characterId)
+        var characters = _provider.GetCharacterRules(groupId, characterId)
             .Select(e => new { userId = e.UserId, canWrite = e.CanWrite })
             .ToList();
         return Ok(new { users = characters });

@@ -5,3 +5,5 @@ global using Tdn.Db;
 global using Tdn.Db.Contexts;
 global using Tdn.Db.Entities;
 global using Tdn.Db.Configurers;
+global using Tdn.Models.Access;
+global using Tdn.Models.Providing;

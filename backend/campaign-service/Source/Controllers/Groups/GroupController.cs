@@ -29,7 +29,7 @@ public class GroupsController : GroupsBaseController
     [HttpPost]
     public ActionResult PostGroup(GroupPostData data)
     {
-        var group = _provider.Create(data.Name, data.Icon, SubjectAccess.CurrentUserId);
+        var group = _provider.Create(data.Name, data.Icon);
         return Created($"groups/{group.Id}", group.ToDict());
     }
     

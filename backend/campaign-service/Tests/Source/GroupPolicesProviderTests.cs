@@ -18,10 +18,9 @@ public class GroupPolicesProviderTests
         });
         var provider = new GroupPolicesProvider(ctx);
 
-        var rules = provider.GetGroupRules(1, null).ToList();
+        var rules = provider.GetGroupRules(null).ToList();
 
-        Assert.Equal(2, rules.Count);
-        Assert.All(rules, r => Assert.Equal(1, r.UserId));
+        Assert.Equal(3, rules.Count);
     }
 
     [Fact]
@@ -35,14 +34,14 @@ public class GroupPolicesProviderTests
         });
         var provider = new GroupPolicesProvider(ctx);
 
-        var rules = provider.GetGroupRules(null, 10).ToList();
+        var rules = provider.GetGroupRules(10).ToList();
 
         Assert.Equal(2, rules.Count);
         Assert.All(rules, r => Assert.Equal(10, r.GroupId));
     }
 
     [Fact]
-    public void GetGroupRules_WithBothFilters_ReturnsFilteredRule()
+    public void GetGroupRules_WithGroupId_ReturnsFilteredRule()
     {
         using var ctx = TestCampaignContextFactory.CreateWithData(db =>
         {
@@ -51,10 +50,9 @@ public class GroupPolicesProviderTests
         });
         var provider = new GroupPolicesProvider(ctx);
 
-        var rules = provider.GetGroupRules(1, 10).ToList();
+        var rules = provider.GetGroupRules(10).ToList();
 
         Assert.Single(rules);
-        Assert.Equal(1, rules[0].UserId);
         Assert.Equal(10, rules[0].GroupId);
         Assert.True(rules[0].IsAdmin);
     }
@@ -69,7 +67,7 @@ public class GroupPolicesProviderTests
         });
         var provider = new GroupPolicesProvider(ctx);
 
-        var rules = provider.GetGroupRules(null, null).ToList();
+        var rules = provider.GetGroupRules(null).ToList();
 
         Assert.Equal(2, rules.Count);
     }
@@ -115,7 +113,7 @@ public class GroupPolicesProviderTests
         var provider = new GroupPolicesProvider(ctx);
 
         provider.UpsertGroupRule(10, 1, true);
-        var rules = provider.GetGroupRules(null, null).ToList();
+        var rules = provider.GetGroupRules(null).ToList();
 
         Assert.Single(rules);
         Assert.True(rules[0].IsAdmin);
@@ -133,23 +131,23 @@ public class GroupPolicesProviderTests
         });
         var provider = new GroupPolicesProvider(ctx);
 
-        var rules = provider.GetCharacterRules(10, null, null).ToList();
+        var rules = provider.GetCharacterRules(10, null).ToList();
 
         Assert.Single(rules);
         Assert.Equal(10, rules[0].GroupId);
     }
 
     [Fact]
-    public void GetCharacterRules_WithUserId_ReturnsFiltered()
+    public void GetCharacterRules_WithCharacterId_ReturnsFiltered()
     {
         using var ctx = TestCampaignContextFactory.CreateWithData(db =>
         {
             db.UserCharacters.Add(new UserCharacterData { UserId = 1, GroupId = 10, CharacterId = 100, CanWrite = true });
-            db.UserCharacters.Add(new UserCharacterData { UserId = 2, GroupId = 10, CharacterId = 200, CanWrite = false });
+            db.UserCharacters.Add(new UserCharacterData { UserId = 1, GroupId = 10, CharacterId = 200, CanWrite = false });
         });
         var provider = new GroupPolicesProvider(ctx);
 
-        var rules = provider.GetCharacterRules(10, 1, null).ToList();
+        var rules = provider.GetCharacterRules(10, 100).ToList();
 
         Assert.Single(rules);
         Assert.Equal(100, rules[0].CharacterId);
@@ -217,8 +215,8 @@ public class GroupPolicesProviderTests
         var deleted = provider.DeleteRule(1, 10, null);
 
         Assert.True(deleted);
-        Assert.Empty(provider.GetGroupRules(null, null).ToList());
-        Assert.Empty(provider.GetCharacterRules(10, null, null).ToList());
+        Assert.Empty(provider.GetGroupRules(null).ToList());
+        Assert.Empty(provider.GetCharacterRules(10, null).ToList());
     }
 
     [Fact]
@@ -235,8 +233,8 @@ public class GroupPolicesProviderTests
         var deleted = provider.DeleteRule(1, 10, 100);
 
         Assert.True(deleted);
-        Assert.Single(provider.GetGroupRules(null, null).ToList());
-        Assert.Single(provider.GetCharacterRules(10, null, null).ToList());
+        Assert.Single(provider.GetGroupRules(null).ToList());
+        Assert.Single(provider.GetCharacterRules(10, null).ToList());
     }
 
     [Fact]
