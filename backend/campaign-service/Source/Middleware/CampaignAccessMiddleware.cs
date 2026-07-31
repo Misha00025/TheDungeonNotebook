@@ -66,8 +66,8 @@ public class CampaignAccessMiddleware
 
         if (!hasGroupAccess)
         {
-            _logger.LogWarning("[CAMPAIGN ACCESS] DECISION: 403 - no group access");
-            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            _logger.LogWarning("[CAMPAIGN ACCESS] DECISION: 404 - no group access");
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
         }
 
