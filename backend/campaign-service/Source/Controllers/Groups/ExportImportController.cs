@@ -16,12 +16,11 @@ public class ExportImportController : GroupsBaseController
 
     public ExportImportController(
         CampaignContext groupContext,
-        GroupAccessHelper accessHelper,
         SubjectAccessHelper subjectAccessHelper,
         ExportImportProvider provider,
         ILogger<ExportImportController> logger,
         ILogger<GroupsBaseController> baseLogger)
-        : base(groupContext, accessHelper, subjectAccessHelper, baseLogger)
+        : base(groupContext, subjectAccessHelper, baseLogger)
     {
         _provider = provider;
         _logger = logger;
@@ -29,10 +28,9 @@ public class ExportImportController : GroupsBaseController
 
     [HttpGet("export")]
     public ActionResult Export(int groupId,
-        [FromQuery] string include = "templates,characters,items,skills",
-        [FromQuery] int? userId = null)
+        [FromQuery] string include = "templates,characters,items,skills")
     {
-        if (userId != null && !AccessHelper.IsAdmin(groupId, userId.Value))
+        if (!SubjectAccess.IsAdmin(groupId))
             return Forbidden();
 
         if (!TryGetGroup(groupId, out var _))
@@ -46,10 +44,9 @@ public class ExportImportController : GroupsBaseController
     [HttpPost("import")]
     public ActionResult Import(int groupId,
         [FromBody] ExportData data,
-        [FromQuery] string include = "templates,characters,items,skills",
-        [FromQuery] int? userId = null)
+        [FromQuery] string include = "templates,characters,items,skills")
     {
-        if (userId != null && !AccessHelper.IsAdmin(groupId, userId.Value))
+        if (!SubjectAccess.IsAdmin(groupId))
             return Forbidden();
 
         if (!TryGetGroup(groupId, out var _))

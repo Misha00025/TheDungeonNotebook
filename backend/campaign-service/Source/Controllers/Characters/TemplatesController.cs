@@ -17,7 +17,7 @@ public class TemplatesController : GroupsBaseController
     private IMongoDbContext _mongo;
     private CampaignContext _campaignContext;
 
-    public TemplatesController(CampaignContext context, IMongoDbContext mongo, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
+    public TemplatesController(CampaignContext context, IMongoDbContext mongo, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
         _mongo = mongo;
         _campaignContext = context;

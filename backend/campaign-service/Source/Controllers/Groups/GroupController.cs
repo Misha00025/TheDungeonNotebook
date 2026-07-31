@@ -14,29 +14,29 @@ public class GroupsController : GroupsBaseController
 {
     private GroupProvider _provider;
 
-    public GroupsController(CampaignContext context, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, GroupProvider provider, ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
+    public GroupsController(CampaignContext context, SubjectAccessHelper subjectAccessHelper, GroupProvider provider, ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
         _provider = provider;
     }
     
     [HttpGet]
-    public ActionResult GetAll([FromQuery] int? userId = null)
+    public ActionResult GetAll()
     {
-        var groups = _provider.GetAll(userId);
+        var groups = _provider.GetAll(SubjectAccess.CurrentUserId);
         return Ok(groups.Select(e => e.ToDict()));
     }
     
     [HttpPost]
-    public ActionResult PostGroup(GroupPostData data, [FromQuery] int? userId = null)
+    public ActionResult PostGroup(GroupPostData data)
     {
-        var group = _provider.Create(data.Name, data.Icon, userId);
+        var group = _provider.Create(data.Name, data.Icon, SubjectAccess.CurrentUserId);
         return Created($"groups/{group.Id}", group.ToDict());
     }
     
     [HttpGet("{groupId}")]
-    public ActionResult GetGroup(int groupId, [FromQuery] int? userId = null)
+    public ActionResult GetGroup(int groupId)
     {
-        if (!CheckGroupAccess(groupId, userId))
+        if (!CheckGroupAccess(groupId))
             return NotFound();
         var group = _provider.Get(groupId);
         if (group == null)
@@ -45,11 +45,11 @@ public class GroupsController : GroupsBaseController
     }
     
     [HttpPatch("{groupId}")]
-    public ActionResult PatchGroup(int groupId, GroupPatchData data, [FromQuery] int? userId = null)
+    public ActionResult PatchGroup(int groupId, GroupPatchData data)
     {
         if (data.Icon == null && data.Name == null)
             return BadRequest();
-        if (!CheckGroupAccess(groupId, userId))
+        if (!CheckGroupAccess(groupId))
             return NotFound();
         var group = _provider.Update(groupId, data.Name, data.Icon);
         if (group == null)
@@ -58,9 +58,9 @@ public class GroupsController : GroupsBaseController
     }
     
     [HttpDelete("{groupId}")]
-    public ActionResult DeleteGroup(int groupId, [FromQuery] int? userId = null)
+    public ActionResult DeleteGroup(int groupId)
     {
-        if (!CheckGroupAccess(groupId, userId))
+        if (!CheckGroupAccess(groupId))
             return NotFound();
         var group = _provider.Delete(groupId);
         if (group == null)

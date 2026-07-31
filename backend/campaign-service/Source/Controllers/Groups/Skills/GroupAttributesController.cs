@@ -14,15 +14,15 @@ public class GroupAttributesController : GroupsBaseController
 {
     private AttributesProvider _provider;
 
-    public GroupAttributesController(CampaignContext context, AttributesProvider attributesProvider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
+    public GroupAttributesController(CampaignContext context, AttributesProvider attributesProvider, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
         _provider = attributesProvider;
     }
     
     [HttpGet]
-    public ActionResult GetAttributes(int groupId, [FromQuery] int? userId = null)
+    public ActionResult GetAttributes(int groupId)
     {
-        if (userId != null && !CheckGroupAccess(groupId, userId))
+        if (!CheckGroupAccess(groupId))
             return NotFound("Group not found");
         var attributes = _provider.GetAttributes(groupId);
         return Ok(new 

@@ -14,7 +14,7 @@ public class CharacterSkillsController : GroupsBaseController
     private SkillsProvider _provider;
     private CharacterLogProvider _logProvider;
 
-    public CharacterSkillsController(CampaignContext context, SkillsProvider skillsProvider, GroupAccessHelper accessHelper, CharacterLogProvider logProvider, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
+    public CharacterSkillsController(CampaignContext context, SkillsProvider skillsProvider, CharacterLogProvider logProvider, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
         _provider = skillsProvider;
         _logProvider = logProvider;
@@ -23,9 +23,9 @@ public class CharacterSkillsController : GroupsBaseController
     private IEnumerable<Skill> ApplyFilters(IEnumerable<Skill> skills, Dictionary<string, string> filters) => _provider.ApplyFilters(skills, filters);
     
     [HttpGet]
-    public ActionResult GetSkills(int groupId, int characterId, [FromQuery] Dictionary<string, string>? filters = null, [FromQuery] int? userId = null)
+    public ActionResult GetSkills(int groupId, int characterId, [FromQuery] Dictionary<string, string>? filters = null)
     {
-        if (userId != null && !AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
+        if (!CheckCharacterAccess(groupId, characterId))
             return NotFound();
             
         var skills = _provider.GetSkills(groupId, characterId);
@@ -39,9 +39,9 @@ public class CharacterSkillsController : GroupsBaseController
     }
     
     [HttpPut("{skillId}")]
-    public ActionResult PutSkill(int groupId, int characterId, int skillId, [FromQuery] int? userId = null)
+    public ActionResult PutSkill(int groupId, int characterId, int skillId)
     {
-        if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+        if (!SubjectAccess.CanWriteCharacter(groupId, characterId))
             return Forbidden();
 
         var skill = _provider.GetSkill(groupId, skillId);
@@ -49,8 +49,7 @@ public class CharacterSkillsController : GroupsBaseController
             return NotFound(new { error = $"Skill with id {skillId} not found in group {groupId}" });
         if (_provider.TryAddSkillToCharacter(skill, characterId))
         {
-            if (userId != null)
-                _logProvider.LogSkillChange(characterId, groupId, userId.Value, skillId, 0, 1);
+            _logProvider.LogSkillChange(characterId, groupId, SubjectAccess.CurrentUserId ?? 0, skillId, 0, 1);
             return Ok(skill.ToResponse());
         }
         else
@@ -58,9 +57,9 @@ public class CharacterSkillsController : GroupsBaseController
     }
     
     [HttpDelete("{skillId}")]
-    public ActionResult DeleteSkill(int groupId, int characterId, int skillId, [FromQuery] int? userId = null)
+    public ActionResult DeleteSkill(int groupId, int characterId, int skillId)
     {
-        if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+        if (!SubjectAccess.CanWriteCharacter(groupId, characterId))
             return Forbidden();
             
         var skill = _provider.GetSkill(groupId, skillId);
@@ -68,8 +67,7 @@ public class CharacterSkillsController : GroupsBaseController
             return NotFound(new { error = $"Skill with id {skillId} not found in group {groupId}" });
         if (_provider.TryRemoveSkillFromCharacter(skill, characterId))
         {
-            if (userId != null)
-                _logProvider.LogSkillChange(characterId, groupId, userId.Value, skillId, 1, -1);
+            _logProvider.LogSkillChange(characterId, groupId, SubjectAccess.CurrentUserId ?? 0, skillId, 1, -1);
             return Ok(skill.ToResponse());
         }
         else

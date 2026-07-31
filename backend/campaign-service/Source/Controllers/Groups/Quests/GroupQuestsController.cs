@@ -15,21 +15,19 @@ namespace Tdn.Api.Controllers;
 public class GroupQuestsController : GroupsBaseController
 {
     private QuestsProvider _provider;
-    private SubjectAccessHelper _accessHelper;
 
-    public GroupQuestsController(CampaignContext groupContext, QuestsProvider provider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) 
-        : base(groupContext, accessHelper, subjectAccessHelper, logger)
+    public GroupQuestsController(CampaignContext groupContext, QuestsProvider provider, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) 
+        : base(groupContext, subjectAccessHelper, logger)
     {
         _provider = provider;
-        _accessHelper = subjectAccessHelper;
     }
 
     [HttpGet]
-    public ActionResult GetAll(int groupId, int? userId, int? characterId)
+    public ActionResult GetAll(int groupId, [FromQuery] int? characterId = null)
     {
         if (!TryGetGroup(groupId, out var _))
             return NotFound("Group not found");
-        var quests = _provider.GetQuests(groupId, userId, characterId);
+        var quests = _provider.GetQuests(groupId, SubjectAccess.CurrentUserId, characterId);
         return Ok(new { quests = quests.Select(e => e.ToResponse()).ToList() });
     }
 
@@ -40,13 +38,13 @@ public class GroupQuestsController : GroupsBaseController
             return NotFound("Group not found");
         if (string.IsNullOrEmpty(data.Header))
             return BadRequest("Header is required");
-        if (!_accessHelper.IsAdmin(groupId))
+        if (!SubjectAccess.IsAdmin(groupId))
         {
             // Non-admin needs at least one writable character, all must be readable
             if (data.AssignedCharacters == null || !data.AssignedCharacters.Any())
                 return Forbidden();
-            var hasWrite = data.AssignedCharacters.Any(c => _accessHelper.CanWriteCharacter(groupId, c));
-            var allReadable = data.AssignedCharacters.All(c => _accessHelper.HasCharacterAccess(groupId, c));
+            var hasWrite = data.AssignedCharacters.Any(c => SubjectAccess.CanWriteCharacter(groupId, c));
+            var allReadable = data.AssignedCharacters.All(c => SubjectAccess.HasCharacterAccess(groupId, c));
             if (!hasWrite || !allReadable)
                 return Forbidden();
         }
@@ -100,7 +98,7 @@ public class GroupQuestsController : GroupsBaseController
             return NotFound("Group not found");
         if (_provider.GetQuest(groupId, questId) == null)
             return NotFound("Quest not found");
-        if (!_accessHelper.IsAdmin(groupId))
+        if (!SubjectAccess.IsAdmin(groupId))
         {
             // Non-admin can't change assignedCharacters via PATCH
             if (data.AssignedCharacters != null && data.AssignedCharacters.Any())

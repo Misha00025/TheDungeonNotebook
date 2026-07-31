@@ -18,9 +18,8 @@ public class CharacterTemplateSchemaController : GroupsBaseController
     public CharacterTemplateSchemaController(
         CampaignContext context,
         GenericMongoProvider<TemplateSchemaMongoData> provider,
-        GroupAccessHelper accessHelper,
         SubjectAccessHelper subjectAccessHelper,
-        ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
+        ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
         _provider = provider;
     }
@@ -40,9 +39,9 @@ public class CharacterTemplateSchemaController : GroupsBaseController
     };
     
     [HttpGet]
-    public ActionResult GetSchema(int groupId, [FromQuery] int? userId = null)
+    public ActionResult GetSchema(int groupId)
     {
-        if (userId != null && !CheckGroupAccess(groupId, userId))
+        if (!CheckGroupAccess(groupId))
             return NotFound();
         var schema = _provider.GetSchema(groupId);
         if (schema != null)
@@ -51,9 +50,9 @@ public class CharacterTemplateSchemaController : GroupsBaseController
     }
     
     [HttpPut]
-    public ActionResult PutSchema(int groupId, TemplateSchemaPostData data, [FromQuery] int? userId = null)
+    public ActionResult PutSchema(int groupId, TemplateSchemaPostData data)
     {
-        if (userId != null && !AccessHelper.IsAdmin(groupId, userId.Value))
+        if (!SubjectAccess.IsAdmin(groupId))
             return Forbidden();
         var mongoData = AsData(groupId, data);
         var ok = _provider.TrySaveSchema(groupId, mongoData);

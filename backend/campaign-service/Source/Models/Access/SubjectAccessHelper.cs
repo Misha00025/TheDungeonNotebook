@@ -90,6 +90,24 @@ public class SubjectAccessHelper
         return _groupAccessHelper.GetAccessibleGroupIds(subject.Id);
     }
 
+    public int? CurrentUserId
+    {
+        get
+        {
+            var subject = GetSubject();
+            return subject?.Type == SubjectType.User ? subject.Id : null;
+        }
+    }
+
+    public List<int> GetAccessibleCharacterIds(int groupId)
+    {
+        var subject = GetSubject();
+        if (subject == null) return new List<int>();
+        if (subject.Type is SubjectType.Admin or SubjectType.Group)
+            return new List<int>(); // empty = "all" (caller should handle)
+        return _groupAccessHelper.GetAccessibleCharacterIds(groupId, subject.Id);
+    }
+
     private bool LogAndReturn(int groupId, bool result, Subject? subject, int? characterId = null)
     {
         var method = characterId.HasValue

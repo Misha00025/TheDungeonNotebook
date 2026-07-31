@@ -17,7 +17,7 @@ public class GroupSkillsController : GroupsBaseController
     private AttributesProvider _attributesProvider;
     private ILogger<GroupSkillsController> _logger;
 
-    public GroupSkillsController(CampaignContext context, SkillsProvider skillsProvider, AttributesProvider attributesProvider, GroupAccessHelper accessHelper, ILogger<GroupSkillsController> logger, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> baseLogger) : base(context, accessHelper, subjectAccessHelper, baseLogger)
+    public GroupSkillsController(CampaignContext context, SkillsProvider skillsProvider, AttributesProvider attributesProvider, ILogger<GroupSkillsController> logger, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> baseLogger) : base(context, subjectAccessHelper, baseLogger)
     {
         _provider = skillsProvider;
         _attributesProvider = attributesProvider;
@@ -66,11 +66,11 @@ public class GroupSkillsController : GroupsBaseController
     private IEnumerable<Skill> ApplyFilters(IEnumerable<Skill> skills, Dictionary<string, string> filters) => _provider.ApplyFilters(skills, filters);
 
     [HttpGet]
-    public ActionResult GetSkills(int groupId, [FromQuery] bool withSecrets = false, [FromQuery] Dictionary<string, string>? filters = null, [FromQuery] int? userId = null)
+    public ActionResult GetSkills(int groupId, [FromQuery] bool withSecrets = false, [FromQuery] Dictionary<string, string>? filters = null)
     {
-        if (!CheckGroupAccess(groupId, userId))
+        if (!CheckGroupAccess(groupId))
             return NotFound("Group not found");
-        _logger.LogInformation($"GetSkills called: groupId={groupId}, userId={userId}, withSecrets={withSecrets}");
+        _logger.LogInformation($"GetSkills called: groupId={groupId}, withSecrets={withSecrets}");
         var skills = _provider.GetSkills(groupId);
         _logger.LogInformation($"GetSkills result: {skills.Count()} skills before filtering");
         if (withSecrets == false)
@@ -79,7 +79,7 @@ public class GroupSkillsController : GroupsBaseController
             _logger.LogInformation($"After withSecrets filter: {skills.Count()} skills");
         }
         if (filters != null && filters.Any())
-            skills = ApplyFilters(skills, filters.Where(e => e.Key != "withSecrets" && e.Key != "userId").ToDictionary());
+            skills = ApplyFilters(skills, filters.Where(e => e.Key != "withSecrets").ToDictionary());
         return Ok(new
         {
             skills = skills.Select(e => e.ToResponse()).ToList(),
@@ -88,9 +88,9 @@ public class GroupSkillsController : GroupsBaseController
     }
 
     [HttpGet("{skillId}")]
-    public ActionResult GetSkill(int groupId, int skillId, [FromQuery] int? userId = null)
+    public ActionResult GetSkill(int groupId, int skillId)
     {
-        if (!CheckGroupAccess(groupId, userId))
+        if (!CheckGroupAccess(groupId))
             return NotFound("Group not found");
         var skill = _provider.GetSkill(groupId, skillId);
         if (skill == null)

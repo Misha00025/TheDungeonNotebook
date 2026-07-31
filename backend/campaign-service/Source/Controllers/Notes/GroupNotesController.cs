@@ -13,13 +13,13 @@ public class GroupNotesController : GroupsBaseController
 {
     private NotesProvider _provider;
 
-    public GroupNotesController(CampaignContext context, NotesProvider provider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
+    public GroupNotesController(CampaignContext context, NotesProvider provider, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
         _provider = provider;
     }
 
     [HttpGet]
-    public ActionResult GetAll(int groupId, [FromQuery] string? userId = null)
+    public ActionResult GetAll(int groupId)
     {
         var notes = _provider.GetGroupNotes(groupId);
         return Ok(notes.Select(n => n.ToResponse()));

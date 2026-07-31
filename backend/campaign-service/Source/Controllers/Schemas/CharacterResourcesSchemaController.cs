@@ -18,17 +18,16 @@ public class CharacterResourcesSchemaController : GroupsBaseController
     public CharacterResourcesSchemaController(
         CampaignContext context,
         GenericMongoProvider<CharacterResourcesMongoData> provider,
-        GroupAccessHelper accessHelper,
         SubjectAccessHelper subjectAccessHelper,
-        ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
+        ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
         _provider = provider;
     }
     
     [HttpGet]
-    public ActionResult GetSchema(int groupId, [FromQuery] int? userId = null)
+    public ActionResult GetSchema(int groupId)
     {
-        if (userId != null && !CheckGroupAccess(groupId, userId))
+        if (!CheckGroupAccess(groupId))
             return NotFound();
         var mongoData = _provider.GetSchema(groupId);
         var schema = mongoData != null
@@ -38,9 +37,9 @@ public class CharacterResourcesSchemaController : GroupsBaseController
     }
     
     [HttpPut]
-    public ActionResult PutSchema(int groupId, CharacterResourcesPostData data, [FromQuery] int? userId = null)
+    public ActionResult PutSchema(int groupId, CharacterResourcesPostData data)
     {
-        if (userId != null && !AccessHelper.IsAdmin(groupId, userId.Value))
+        if (!SubjectAccess.IsAdmin(groupId))
             return Forbidden();
         var schema = data.AsModel();
         var mongoData = new CharacterResourcesMongoData

@@ -16,27 +16,22 @@ public class CharactersController : GroupsBaseController
     private CharactersProvider _provider;
     private CharacterLogProvider _logProvider;
 
-    public CharactersController(CampaignContext context, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, CharactersProvider provider, CharacterLogProvider logProvider, ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
+    public CharactersController(CampaignContext context, SubjectAccessHelper subjectAccessHelper, CharactersProvider provider, CharacterLogProvider logProvider, ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
         _provider = provider;
         _logProvider = logProvider;
     }
 
     [HttpGet]
-    public ActionResult GetAll(int groupId, int? ownerId = null, [FromQuery] int? userId = null)
+    public ActionResult GetAll(int groupId, int? ownerId = null)
     {
         if (!TryGetGroup(groupId, out var _))
             return NotFound("Group not found");
         var characters = _provider.GetCharacters(groupId).ToList();
-        if (userId != null)
+        if (!SubjectAccess.IsAdmin(groupId))
         {
-            if (!AccessHelper.HasGroupAccess(groupId, userId.Value))
-                return NotFound("Group not found");
-            if (!AccessHelper.IsAdmin(groupId, userId.Value))
-            {
-                var accessibleIds = AccessHelper.GetAccessibleCharacterIds(groupId, userId.Value);
-                characters = characters.Where(e => accessibleIds.Contains(e.Id)).ToList();
-            }
+            var accessibleIds = SubjectAccess.GetAccessibleCharacterIds(groupId);
+            characters = characters.Where(e => accessibleIds.Contains(e.Id)).ToList();
         }
         if (ownerId != null)
             characters = characters.Where(e => e.OwnerId! == ownerId!).ToList();
@@ -77,9 +72,9 @@ public class CharactersController : GroupsBaseController
     }
 
     [HttpGet("{characterId}")]
-    public ActionResult GetCharacter(int groupId, int characterId, [FromQuery] bool witEmptyFields = true, [FromQuery] int? userId = null)
+    public ActionResult GetCharacter(int groupId, int characterId, [FromQuery] bool witEmptyFields = true)
     {
-        if (userId != null && !AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
+        if (!CheckCharacterAccess(groupId, characterId))
             return NotFound("Character not found");
         var character = _provider.GetCharacter(groupId, characterId);
         if (character != null)
@@ -95,9 +90,9 @@ public class CharactersController : GroupsBaseController
     }
           
     [HttpGet("{characterId}/log")]
-    public ActionResult GetCharacterLog(int groupId, int characterId, [FromQuery] int limit = 50, [FromQuery] int offset = 0, [FromQuery] int? userId = null)
+    public ActionResult GetCharacterLog(int groupId, int characterId, [FromQuery] int limit = 50, [FromQuery] int offset = 0)
     {
-        if (userId != null && !AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
+        if (!CheckCharacterAccess(groupId, characterId))
             return NotFound("Character not found");
 
         var (entries, total) = _logProvider.GetLog(characterId, limit, offset);
@@ -105,9 +100,9 @@ public class CharactersController : GroupsBaseController
     }
 
     [HttpPatch("{characterId}")]
-    public ActionResult PatchCharacter(int groupId, int characterId, CharacterPatchData data, [FromQuery] bool witEmptyFields = true, [FromQuery] int? userId = null)
+    public ActionResult PatchCharacter(int groupId, int characterId, CharacterPatchData data, [FromQuery] bool witEmptyFields = true)
     {
-        if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+        if (!SubjectAccess.CanWriteCharacter(groupId, characterId))
             return Forbidden();
 
         var result = _provider.PatchCharacter(groupId, characterId, data, witEmptyFields);
@@ -122,7 +117,7 @@ public class CharactersController : GroupsBaseController
                     : BadRequest("Nothing to do");
         }
 
-        if (data.Fields != null && userId != null && result.OldFieldValues != null)
+        if (data.Fields != null && result.OldFieldValues != null)
         {
             foreach (var kvp in data.Fields)
             {
@@ -135,7 +130,7 @@ public class CharactersController : GroupsBaseController
                 {
                     var delta = newValue - oldVal;
                     if (delta != 0)
-                        _logProvider.LogFieldChange(characterId, groupId, userId.Value, kvp.Key, oldVal, delta);
+                        _logProvider.LogFieldChange(characterId, groupId, SubjectAccess.CurrentUserId ?? 0, kvp.Key, oldVal, delta);
                 }
             }
         }

@@ -17,7 +17,7 @@ public class GroupItemsController : GroupsBaseController
 {
     private ItemsProvider _provider;
     
-    public GroupItemsController(CampaignContext groupContext, ItemsProvider provider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(groupContext, accessHelper, subjectAccessHelper, logger)
+    public GroupItemsController(CampaignContext groupContext, ItemsProvider provider, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(groupContext, subjectAccessHelper, logger)
     {
         _provider = provider;
     }

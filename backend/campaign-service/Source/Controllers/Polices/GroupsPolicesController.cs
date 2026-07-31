@@ -12,18 +12,16 @@ namespace Tdn.Api.Controllers;
 public class GroupsPolicesController : GroupsBaseController
 {
     private GroupPolicesProvider _provider;
-    private SubjectAccessHelper _subjectHelper;
     
-    public GroupsPolicesController(CampaignContext context, GroupPolicesProvider provider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
+    public GroupsPolicesController(CampaignContext context, GroupPolicesProvider provider, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
         _provider = provider;
-        _subjectHelper = subjectAccessHelper;
     }
     
     [HttpGet]
-    public ActionResult GetMany([FromQuery] int? userId = null, [FromQuery] int? groupId = null)
+    public ActionResult GetMany([FromQuery] int? groupId = null)
     {
-        var groups = _provider.GetGroupRules(userId, groupId).ToList();
+        var groups = _provider.GetGroupRules(SubjectAccess.CurrentUserId, groupId).ToList();
         var result = new
         {
             users = groups.Select(e =>
@@ -49,7 +47,7 @@ public class GroupsPolicesController : GroupsBaseController
     {
         if (data.GroupId == null || data.UserId == null)
             return BadRequest();
-        if (!_subjectHelper.IsAdmin(data.GroupId.Value))
+        if (!SubjectAccess.IsAdmin(data.GroupId.Value))
             return Forbidden();
         var (isCreated, _) = _provider.UpsertGroupRule(
             data.GroupId.Value,
@@ -59,9 +57,9 @@ public class GroupsPolicesController : GroupsBaseController
     }
     
     [HttpGet("characters")]
-    public ActionResult GetCharacterRules([FromQuery] int groupId, [FromQuery] int? userId = null, [FromQuery] int? characterId = null)
+    public ActionResult GetCharacterRules([FromQuery] int groupId, [FromQuery] int? characterId = null)
     {
-        var characters = _provider.GetCharacterRules(groupId, userId, characterId)
+        var characters = _provider.GetCharacterRules(groupId, SubjectAccess.CurrentUserId, characterId)
             .Select(e => new { userId = e.UserId, canWrite = e.CanWrite })
             .ToList();
         return Ok(new { users = characters });
@@ -72,7 +70,7 @@ public class GroupsPolicesController : GroupsBaseController
     {
         if (data.GroupId == null || data.UserId == null || data.CharacterId == null)
             return BadRequest();
-        if (!_subjectHelper.IsAdmin(data.GroupId.Value))
+        if (!SubjectAccess.IsAdmin(data.GroupId.Value))
             return Forbidden();
         var result = _provider.UpsertCharacterRule(
             data.GroupId.Value,
@@ -87,7 +85,7 @@ public class GroupsPolicesController : GroupsBaseController
     [HttpDelete]
     public ActionResult DeleteRule([FromQuery] int userId, [FromQuery, Required] int groupId, [FromQuery] int? characterId)
     {
-        if (!_subjectHelper.IsAdmin(groupId))
+        if (!SubjectAccess.IsAdmin(groupId))
             return Forbidden();
         if (!_provider.DeleteRule(userId, groupId, characterId))
             return NotFound();

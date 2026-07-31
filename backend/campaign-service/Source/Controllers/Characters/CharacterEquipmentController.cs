@@ -15,30 +15,29 @@ public class CharacterEquipmentController : GroupsBaseController
 
     public CharacterEquipmentController(
         CampaignContext context,
-        GroupAccessHelper accessHelper,
         SubjectAccessHelper subjectAccessHelper,
         CharacterEquipmentProvider provider,
         CharacterLogProvider logProvider,
         ILogger<GroupsBaseController> logger)
-        : base(context, accessHelper, subjectAccessHelper, logger)
+        : base(context, subjectAccessHelper, logger)
     {
         _provider = provider;
         _logProvider = logProvider;
     }
 
     [HttpGet]
-    public ActionResult GetEquipment(int groupId, int characterId, [FromQuery] int? userId = null)
+    public ActionResult GetEquipment(int groupId, int characterId)
     {
-        if (userId != null && !AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
+        if (!CheckCharacterAccess(groupId, characterId))
             return NotFound();
         var equipment = _provider.GetEquipment(groupId, characterId);
         return Ok(new { items = equipment });
     }
 
     [HttpPatch]
-    public ActionResult PatchEquipment(int groupId, int characterId, [FromBody] EquipmentPatchData data, [FromQuery] int? userId = null)
+    public ActionResult PatchEquipment(int groupId, int characterId, [FromBody] EquipmentPatchData data)
     {
-        if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+        if (!SubjectAccess.CanWriteCharacter(groupId, characterId))
             return Forbidden();
         bool ok;
         if (data.Action == "add")
@@ -51,21 +50,18 @@ public class CharacterEquipmentController : GroupsBaseController
         if (!ok)
             return BadRequest("Failed to update equipment");
 
-        if (userId != null)
-        {
-            int delta = data.Action == "add" ? 1 : -1;
-            int oldValue = data.Action == "add" ? 0 : 1;
-            _logProvider.LogEquipmentChange(characterId, groupId, userId.Value, data.ItemId, oldValue, delta);
-        }
+        int delta = data.Action == "add" ? 1 : -1;
+        int oldValue = data.Action == "add" ? 0 : 1;
+        _logProvider.LogEquipmentChange(characterId, groupId, SubjectAccess.CurrentUserId ?? 0, data.ItemId, oldValue, delta);
 
         var equipment = _provider.GetEquipment(groupId, characterId);
         return Ok(new { items = equipment });
     }
 
     [HttpPut]
-    public ActionResult PutEquipment(int groupId, int characterId, [FromBody] EquipmentPutData data, [FromQuery] int? userId = null)
+    public ActionResult PutEquipment(int groupId, int characterId, [FromBody] EquipmentPutData data)
     {
-        if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+        if (!SubjectAccess.CanWriteCharacter(groupId, characterId))
             return Forbidden();
         var ok = _provider.TrySaveEquipment(groupId, characterId, data.ItemIds);
         if (!ok)

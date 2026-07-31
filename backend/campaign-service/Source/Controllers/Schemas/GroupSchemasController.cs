@@ -20,9 +20,8 @@ public class GroupSchemasController : GroupsBaseController
         CampaignContext context,
         GenericMongoProvider<SkillsSchemaMongoData> skillsProvider,
         GenericMongoProvider<ItemsSchemaMongoData> itemsProvider,
-        GroupAccessHelper accessHelper,
         SubjectAccessHelper subjectAccessHelper,
-        ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
+        ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
         _skillsProvider = skillsProvider;
         _itemsProvider = itemsProvider;
@@ -42,9 +41,9 @@ public class GroupSchemasController : GroupsBaseController
     };
 
     [HttpGet("skills")]
-    public ActionResult GetSkillsSchema(int groupId, [FromQuery] int? userId = null)
+    public ActionResult GetSkillsSchema(int groupId)
     {
-        if (userId != null && !CheckGroupAccess(groupId, userId))
+        if (!CheckGroupAccess(groupId))
             return NotFound();
         var mongoData = _skillsProvider.GetSchema(groupId);
         if (mongoData == null)
@@ -53,9 +52,9 @@ public class GroupSchemasController : GroupsBaseController
     }
     
     [HttpPut("skills")]
-    public ActionResult PutSkillsSchema(int groupId, SchemaPostData data, [FromQuery] int? userId = null)
+    public ActionResult PutSkillsSchema(int groupId, SchemaPostData data)
     {
-        if (userId != null && !AccessHelper.IsAdmin(groupId, userId.Value))
+        if (!SubjectAccess.IsAdmin(groupId))
             return Forbidden();
         var schema = data.AsSchema("skills");
         var mongoData = AsData<SkillsSchemaMongoData>(groupId, schema);
@@ -66,9 +65,9 @@ public class GroupSchemasController : GroupsBaseController
     }
     
     [HttpGet("items")]
-    public ActionResult GetItemsSchema(int groupId, [FromQuery] int? userId = null)
+    public ActionResult GetItemsSchema(int groupId)
     {
-        if (userId != null && !CheckGroupAccess(groupId, userId))
+        if (!CheckGroupAccess(groupId))
             return NotFound();
         var mongoData = _itemsProvider.GetSchema(groupId);
         if (mongoData == null)
@@ -77,9 +76,9 @@ public class GroupSchemasController : GroupsBaseController
     }
     
     [HttpPut("items")]
-    public ActionResult PutItemsSchema(int groupId, SchemaPostData data, [FromQuery] int? userId = null)
+    public ActionResult PutItemsSchema(int groupId, SchemaPostData data)
     {
-        if (userId != null && !AccessHelper.IsAdmin(groupId, userId.Value))
+        if (!SubjectAccess.IsAdmin(groupId))
             return Forbidden();
         var schema = data.AsSchema("items");
         var mongoData = AsData<ItemsSchemaMongoData>(groupId, schema);
