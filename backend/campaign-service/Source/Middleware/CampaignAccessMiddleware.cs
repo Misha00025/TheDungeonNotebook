@@ -122,7 +122,7 @@ public class CampaignAccessMiddleware
                     case "characters":
                         return method == "GET" ? PermissionLevel.Member : PermissionLevel.Admin;
                     default:
-                        return PermissionLevel.None;
+                        return method == "GET" ? PermissionLevel.Member : PermissionLevel.Admin;
                 }
             }
             return PermissionLevel.None;
@@ -156,7 +156,7 @@ public class CampaignAccessMiddleware
 
             case "quests":
                 if (method == "GET")
-                    return PermissionLevel.None;
+                    return PermissionLevel.Member;
                 if (method == "POST" || method == "PATCH")
                     return PermissionLevel.Member;
                 return PermissionLevel.Admin;  // PUT, DELETE
@@ -169,7 +169,7 @@ public class CampaignAccessMiddleware
                 return method == "GET" ? PermissionLevel.Admin : PermissionLevel.Admin;
 
             case "polices":
-                return PermissionLevel.None;
+                return method == "GET" ? PermissionLevel.Member : PermissionLevel.Admin;
 
             case "characters":
                 // /groups/{id}/characters
