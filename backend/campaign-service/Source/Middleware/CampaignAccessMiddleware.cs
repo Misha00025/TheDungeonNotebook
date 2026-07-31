@@ -155,7 +155,11 @@ public class CampaignAccessMiddleware
                 return PermissionLevel.Admin;
 
             case "quests":
-                return method == "GET" ? PermissionLevel.None : PermissionLevel.Admin;
+                if (method == "GET")
+                    return PermissionLevel.None;
+                if (method == "POST" || method == "PATCH")
+                    return PermissionLevel.Member;
+                return PermissionLevel.Admin;  // PUT, DELETE
 
             case "notes":
                 // /groups/{id}/notes - collection GET is Member
