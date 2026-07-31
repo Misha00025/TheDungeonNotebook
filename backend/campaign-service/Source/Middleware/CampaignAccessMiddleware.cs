@@ -8,7 +8,7 @@ public class CampaignAccessMiddleware
     private readonly RequestDelegate _next;
     private readonly ILogger<CampaignAccessMiddleware> _logger;
 
-    private enum PermissionLevel { None, Member, Admin, CharacterWrite }
+    private enum PermissionLevel { Member, Admin, CharacterWrite }
 
     public CampaignAccessMiddleware(RequestDelegate next, ILogger<CampaignAccessMiddleware> logger)
     {
@@ -53,13 +53,6 @@ public class CampaignAccessMiddleware
 
         var requiredLevel = GetRequiredPermission(path, method);
         _logger.LogInformation("[CAMPAIGN ACCESS] Required permission: {Level}", requiredLevel);
-
-        if (requiredLevel == PermissionLevel.None)
-        {
-            _logger.LogInformation("[CAMPAIGN ACCESS] DECISION: None permission - skip access checks, let controller decide");
-            await _next(context);
-            return;
-        }
 
         var hasGroupAccess = accessHelper.HasGroupAccess(groupId.Value);
         _logger.LogInformation("[CAMPAIGN ACCESS] HasGroupAccess({GroupId}) = {Result}", groupId, hasGroupAccess);
@@ -125,7 +118,7 @@ public class CampaignAccessMiddleware
                         return method == "GET" ? PermissionLevel.Member : PermissionLevel.Admin;
                 }
             }
-            return PermissionLevel.None;
+            return PermissionLevel.Member;
         }
 
         // /groups/{id}
@@ -214,7 +207,7 @@ public class CampaignAccessMiddleware
                 break;
         }
 
-        return PermissionLevel.None;
+        return PermissionLevel.Member;
     }
 
     private static int? ExtractGroupId(string path)
