@@ -64,6 +64,21 @@ def hybrid_jwt_factory(config):
                     path="/",
                 )
 
+            # --- X-Subject injection (for campaign-service) ---
+            uid = payload.get("userId")
+            gid = payload.get("groupId")
+
+            import json
+            if uid is not None:
+                ctx.state["x_subject"] = json.dumps({"type": "user", "id": int(uid)})
+                logger.info("X-Subject injected: type=user, id=%s", uid)
+            elif gid is not None:
+                ctx.state["x_subject"] = json.dumps({"type": "group", "id": int(gid)})
+                logger.info("X-Subject injected: type=group, id=%s", gid)
+            else:
+                logger.info("X-Subject NOT injected: no userId or groupId in JWT")
+            # --- /X-Subject injection ---
+
             return payload
         except jwt.ExpiredSignatureError:
             logger.warning("hybrid_jwt: token expired")

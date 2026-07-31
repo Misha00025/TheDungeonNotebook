@@ -60,7 +60,8 @@ async def handle_group_users(ctx: RouteContext):
 
     pres = ctx.services.campaign.get(
         "/polices/groups",
-        params={"groupId": group_id}
+        params={"groupId": group_id},
+        headers={"X-Subject": ctx.state.get("x_subject")}
     )
     if not pres.ok:
         return not_found({"error": "Not found"})
@@ -87,7 +88,8 @@ async def handle_character_users(ctx: RouteContext):
         params={
             "groupId": group_id,
             "characterId": character_id,
-        }
+        },
+        headers={"X-Subject": ctx.state.get("x_subject")}
     )
     if not pres.ok:
         return not_found({"error": "Not found"})
@@ -117,6 +119,7 @@ async def handle_group_export(ctx: RouteContext):
     result = ctx.services.campaign.get(
         f"/groups/{group_id}/export",
         params=params,
+        headers={"X-Subject": ctx.state.get("x_subject")}
     )
 
     resp = ok(result.json() if result.ok else {})
@@ -142,6 +145,7 @@ async def handle_group_import(ctx: RouteContext):
         f"/groups/{group_id}/import",
         json=body_data,
         params=params,
+        headers={"X-Subject": ctx.state.get("x_subject")}
     )
 
     return Response(content=result.content, status_code=result.status_code, media_type="application/json")
@@ -176,6 +180,7 @@ async def handle_quest_create_for_character(ctx: RouteContext):
         f"/groups/{group_id}/quests",
         json=data,
         params={"userId": get_user_id(ctx.jwt)},
+        headers={"X-Subject": ctx.state.get("x_subject")}
     )
 
     return Response(content=result.content, status_code=result.status_code, media_type="application/json")

@@ -1,7 +1,6 @@
 from app.engine.context import RouteContext
 from app.engine.registry import register_access_handler
 from app.engine.status import forbidden
-from .inject_x_subject import inject_subject_to_state
 
 
 def get_user_id(jwt_payload: dict | None) -> str | None:
@@ -101,7 +100,6 @@ def check_group_member(ctx: RouteContext):
         return ctx.deny(response)
 
     ctx.state["is_admin"] = is_admin
-    inject_subject_to_state(ctx)
     return ctx.allow()
 
 
@@ -116,7 +114,6 @@ def check_group_admin(ctx: RouteContext):
     if not ok or not is_admin:
         return ctx.deny(response or forbidden())
 
-    inject_subject_to_state(ctx)
     return ctx.allow()
 
 
@@ -137,7 +134,6 @@ def check_character_viewer(ctx: RouteContext):
 
     ctx.state["is_admin"] = is_admin
     ctx.state["can_write"] = can_write
-    inject_subject_to_state(ctx)
     return ctx.allow()
 
 
@@ -158,7 +154,6 @@ def check_character_writer(ctx: RouteContext):
 
     ctx.state["is_admin"] = is_admin
     ctx.state["can_write"] = can_write
-    inject_subject_to_state(ctx)
     return ctx.allow()
 
 
@@ -177,7 +172,6 @@ def check_character_admin(ctx: RouteContext):
     if not ok or not is_admin:
         return ctx.deny(response or forbidden())
 
-    inject_subject_to_state(ctx)
     return ctx.allow()
 
 
@@ -192,7 +186,6 @@ def check_self_only(ctx: RouteContext):
     if int(user_id) != int(jwt_user_id):
         return ctx.deny(forbidden())
 
-    inject_subject_to_state(ctx)
     return ctx.allow()
 
 

@@ -20,3 +20,5 @@ memory-bank/**
 **/net*.*/
 **/logs/
 **/backups/
+
+STATE.md

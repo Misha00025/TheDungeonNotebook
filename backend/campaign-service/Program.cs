@@ -80,6 +80,7 @@ using (var scope = app.Services.CreateScope())
 
 app.UseHttpMetrics();
 app.UseMiddleware<SubjectPresentMiddleware>();
+app.UseMiddleware<CampaignAccessMiddleware>();
 app.MapMetrics();
 app.MapControllers();
 app.Run();

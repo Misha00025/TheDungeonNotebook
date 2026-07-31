@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
+using Tdn.Models.Access;
 using Tdn.Models.Providing;
 using Tdn.Models.DTOs;
 
@@ -10,10 +11,12 @@ namespace Tdn.Api.Controllers;
 public class GroupsPolicesController : BaseController
 {
     private GroupPolicesProvider _provider;
+    private SubjectAccessHelper _accessHelper;
     
-    public GroupsPolicesController(GroupPolicesProvider provider)
+    public GroupsPolicesController(GroupPolicesProvider provider, SubjectAccessHelper accessHelper)
     {
         _provider = provider;
+        _accessHelper = accessHelper;
     }
     
     [HttpGet]
@@ -45,6 +48,8 @@ public class GroupsPolicesController : BaseController
     {
         if (data.GroupId == null || data.UserId == null)
             return BadRequest();
+        if (!_accessHelper.IsAdmin(data.GroupId.Value))
+            return Forbidden();
         var (isCreated, _) = _provider.UpsertGroupRule(
             data.GroupId.Value,
             data.UserId.Value,
@@ -66,6 +71,8 @@ public class GroupsPolicesController : BaseController
     {
         if (data.GroupId == null || data.UserId == null || data.CharacterId == null)
             return BadRequest();
+        if (!_accessHelper.IsAdmin(data.GroupId.Value))
+            return Forbidden();
         var result = _provider.UpsertCharacterRule(
             data.GroupId.Value,
             data.UserId.Value,
@@ -79,6 +86,8 @@ public class GroupsPolicesController : BaseController
     [HttpDelete]
     public ActionResult DeleteRule([FromQuery] int userId, [FromQuery, Required] int groupId, [FromQuery] int? characterId)
     {
+        if (!_accessHelper.IsAdmin(groupId))
+            return Forbidden();
         if (!_provider.DeleteRule(userId, groupId, characterId))
             return NotFound();
         return Ok();

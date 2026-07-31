@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Tdn.Models.Access;
 
 namespace Tdn.Middleware;
@@ -29,7 +30,8 @@ public class SubjectPresentMiddleware
         {
             var subject = JsonSerializer.Deserialize<Subject>(header, new JsonSerializerOptions
             {
-                PropertyNameCaseInsensitive = true
+                PropertyNameCaseInsensitive = true,
+                Converters = { new JsonStringEnumConverter() }
             });
 
             if (subject != null)

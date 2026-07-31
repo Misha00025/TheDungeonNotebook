@@ -123,10 +123,12 @@ routes:
     auth: required
     methods:
       GET:
+        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PATCH: {}
+      PATCH:
+        access: group_admin
 
   # ============================================================
   # Group Users (composite)
@@ -135,6 +137,7 @@ routes:
     methods: [GET]
     handler: group_users
     auth: required
+    access: group_member
 
   - path: /groups/{group_id}/users/{user_id}
     proxy:
@@ -143,6 +146,7 @@ routes:
       headers:
         X-Subject: "{state.x_subject}"
     auth: required
+    access: group_admin
     methods:
       PUT:
         params:
@@ -167,10 +171,12 @@ routes:
     auth: required
     methods:
       GET:
+        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      POST: {}
+      POST:
+        access: group_admin
 
   - path: /groups/{group_id}/items/{item_id}
     proxy:
@@ -183,9 +189,12 @@ routes:
       query:
         userId: "{jwt.userId}"
     methods:
-      GET: {}
-      PUT: {}
-      DELETE: {}
+      GET:
+        access: group_member
+      PUT:
+        access: group_admin
+      DELETE:
+        access: group_admin
 
   # ============================================================
   # Group Notes
@@ -199,12 +208,14 @@ routes:
     auth: required
     methods:
       GET:
+        access: group_member
         response:
           wrap: notes
         params:
           query:
             userId: "{jwt.userId}"
-      POST: {}
+      POST:
+        access: group_admin
 
   - path: /groups/{group_id}/notes/{note_id}
     proxy:
@@ -214,9 +225,12 @@ routes:
         X-Subject: "{state.x_subject}"
     auth: required
     methods:
-      GET: {}
-      PUT: {}
-      DELETE: {}
+      GET:
+        access: group_admin
+      PUT:
+        access: group_admin
+      DELETE:
+        access: group_admin
 
   # ============================================================
   # Group Skills
@@ -230,10 +244,12 @@ routes:
     auth: required
     methods:
       GET:
+        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PUT: {}
+      PUT:
+        access: group_admin
 
   - path: /groups/{group_id}/skills
     proxy:
@@ -244,9 +260,11 @@ routes:
     auth: required
     methods:
       GET:
+        access: group_member
         params:
           query: "*"
-      POST: {}
+      POST:
+        access: group_admin
 
   - path: /groups/{group_id}/skills/{skill_id}
     proxy:
@@ -257,11 +275,14 @@ routes:
     auth: required
     methods:
       GET:
+        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PUT: {}
-      DELETE: {}
+      PUT:
+        access: group_admin
+      DELETE:
+        access: group_admin
 
   # ============================================================
   # Group Schemas
@@ -275,10 +296,12 @@ routes:
     auth: required
     methods:
       GET:
+        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PUT: {}
+      PUT:
+        access: group_admin
 
   - path: /groups/{group_id}/schemas/skills
     proxy:
@@ -289,10 +312,12 @@ routes:
     auth: required
     methods:
       GET:
+        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PUT: {}
+      PUT:
+        access: group_admin
 
   - path: /groups/{group_id}/schemas/template
     proxy:
@@ -303,10 +328,12 @@ routes:
     auth: required
     methods:
       GET:
+        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PUT: {}
+      PUT:
+        access: group_admin
 
   - path: /groups/{group_id}/schemas/characters/resources
     proxy:
@@ -317,10 +344,12 @@ routes:
     auth: required
     methods:
       GET:
+        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PUT: {}
+      PUT:
+        access: group_admin
 
   # ============================================================
   # Export / Import
@@ -329,11 +358,13 @@ routes:
     methods: [GET]
     handler: group_export
     auth: required
+    access: group_admin
 
   - path: /groups/{group_id}/import
     methods: [POST]
     handler: group_import
     auth: required
+    access: group_admin
 
   # ============================================================
   # Group Quests
@@ -350,7 +381,8 @@ routes:
         params:
           query:
             userId: "{jwt.userId}"
-      POST: {}
+      POST:
+        access: group_admin
 
   - path: /groups/{group_id}/quests/{quest_id}
     proxy:
@@ -361,12 +393,15 @@ routes:
     auth: required
     methods:
       GET: {}
-      PUT: {}
+      PUT:
+        access: group_admin
       PATCH:
+        access: quest_writer
         params:
           query:
             userId: "{jwt.userId}"
-      DELETE: {}
+      DELETE:
+        access: group_admin
 
   - path: /groups/{group_id}/characters/{character_id}/quests
     methods:
@@ -377,6 +412,7 @@ routes:
           headers:
             X-Subject: "{state.x_subject}"
         auth: required
+        access: character_viewer
         params:
           query:
             userId: "{jwt.userId}"
@@ -384,6 +420,7 @@ routes:
       POST:
         handler: quest_create_for_character
         auth: required
+        access: character_writer
 
   # ============================================================
   # Characters
@@ -397,10 +434,12 @@ routes:
     auth: required
     methods:
       GET:
+        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      POST: {}
+      POST:
+        access: group_admin
 
   - path: /groups/{group_id}/characters/{character_id}
     proxy:
@@ -413,9 +452,12 @@ routes:
       query:
         userId: "{jwt.userId}"
     methods:
-      GET: {}
-      PATCH: {}
-      DELETE: {}
+      GET:
+        access: group_member
+      PATCH:
+        access: character_writer
+      DELETE:
+        access: character_writer
 
   # ============================================================
   # Character Users (composite)
@@ -424,9 +466,11 @@ routes:
     methods: [GET]
     handler: character_users
     auth: required
+    access: group_member
 
   - path: /groups/{group_id}/characters/{character_id}/users/{user_id}
     auth: required
+    access: character_admin
     methods:
       PUT:
         proxy:
@@ -463,11 +507,14 @@ routes:
     auth: required
     methods:
       GET:
+        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      POST: {}
-      PUT: {}
+      POST:
+        access: group_admin
+      PUT:
+        access: group_admin
 
   - path: /groups/{group_id}/characters/templates/{template_id}
     proxy:
@@ -478,10 +525,12 @@ routes:
     auth: required
     methods:
       GET:
+        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PUT: {}
+      PUT:
+        access: group_admin
 
   # ============================================================
   # Character Items
@@ -497,8 +546,10 @@ routes:
       query:
         userId: "{jwt.userId}"
     methods:
-      GET: {}
-      POST: {}
+      GET:
+        access: character_viewer
+      POST:
+        access: character_writer
 
   - path: /groups/{group_id}/characters/{character_id}/items/{item_id}
     proxy:
@@ -511,9 +562,12 @@ routes:
       query:
         userId: "{jwt.userId}"
     methods:
-      GET: {}
-      PUT: {}
-      DELETE: {}
+      GET:
+        access: character_viewer
+      PUT:
+        access: character_writer
+      DELETE:
+        access: character_writer
 
   # ============================================================
   # Character Notes
@@ -527,9 +581,11 @@ routes:
     auth: required
     methods:
       GET:
+        access: character_viewer
         response:
           wrap: notes
-      POST: {}
+      POST:
+        access: character_writer
 
   - path: /groups/{group_id}/characters/{character_id}/notes/{note_id}
     proxy:
@@ -539,9 +595,12 @@ routes:
         X-Subject: "{state.x_subject}"
     auth: required
     methods:
-      GET: {}
-      PUT: {}
-      DELETE: {}
+      GET:
+        access: character_viewer
+      PUT:
+        access: character_writer
+      DELETE:
+        access: character_writer
 
   # ============================================================
   # Character Skills
@@ -555,6 +614,7 @@ routes:
           headers:
             X-Subject: "{state.x_subject}"
         auth: required
+        access: character_viewer
         params:
           query: "*"
 
@@ -570,8 +630,10 @@ routes:
       query:
         userId: "{jwt.userId}"
     methods:
-      PUT: {}
-      DELETE: {}
+      PUT:
+        access: character_writer
+      DELETE:
+        access: character_writer
 
   # ============================================================
   # Character Equipment
@@ -587,9 +649,12 @@ routes:
       query:
         userId: "{jwt.userId}"
     methods:
-      GET: {}
-      PATCH: {}
-      PUT: {}
+      GET:
+        access: character_viewer
+      PATCH:
+        access: character_writer
+      PUT:
+        access: character_writer
 
   # ============================================================
   # Character Log
@@ -602,3 +667,4 @@ routes:
       headers:
         X-Subject: "{state.x_subject}"
     auth: required
+    access: character_viewer
