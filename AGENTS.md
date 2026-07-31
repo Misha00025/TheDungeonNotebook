@@ -52,6 +52,7 @@ docker compose up -d
 
 | Действие | Читать |
 |----------|--------|
+| Запланировать крупное изменение | `rules/tech-planning.md` |
 | Запустить тесты | `rules/tech-testing.md` |
 | Собрать / запустить docker-compose | `rules/tech-docker.md` |
 | Изменить Python-сервис | `rules/tech-python.md` + `<service>/rules.md` |
