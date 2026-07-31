@@ -51,6 +51,16 @@ public class CampaignAccessMiddleware
             return;
         }
 
+        var requiredLevel = GetRequiredPermission(path, method);
+        _logger.LogInformation("[CAMPAIGN ACCESS] Required permission: {Level}", requiredLevel);
+
+        if (requiredLevel == PermissionLevel.None)
+        {
+            _logger.LogInformation("[CAMPAIGN ACCESS] DECISION: None permission - skip access checks, let controller decide");
+            await _next(context);
+            return;
+        }
+
         var hasGroupAccess = accessHelper.HasGroupAccess(groupId.Value);
         _logger.LogInformation("[CAMPAIGN ACCESS] HasGroupAccess({GroupId}) = {Result}", groupId, hasGroupAccess);
 
@@ -73,17 +83,6 @@ public class CampaignAccessMiddleware
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 return;
             }
-        }
-
-        // Permission-level check
-        var requiredLevel = GetRequiredPermission(path, method);
-        _logger.LogInformation("[CAMPAIGN ACCESS] Required permission: {Level}", requiredLevel);
-
-        if (requiredLevel == PermissionLevel.None)
-        {
-            _logger.LogInformation("[CAMPAIGN ACCESS] DECISION: None permission - skip access checks, let controller decide");
-            await _next(context);
-            return;
         }
 
         if (requiredLevel == PermissionLevel.Admin && !accessHelper.IsAdmin(groupId.Value))
@@ -110,7 +109,24 @@ public class CampaignAccessMiddleware
         var segments = path.Trim('/').Split('/');
 
         if (segments.Length < 2 || segments[0] != "groups")
+        {
+            if (segments[0] == "schemas" && segments.Length >= 3 && segments[1] == "groups")
+            {
+                // /schemas/groups/{groupId}/{resource}
+                var schemaGroup = segments[3];
+                switch (schemaGroup)
+                {
+                    case "items":
+                    case "skills":
+                    case "template":
+                    case "characters":
+                        return method == "GET" ? PermissionLevel.Member : PermissionLevel.Admin;
+                    default:
+                        return PermissionLevel.None;
+                }
+            }
             return PermissionLevel.None;
+        }
 
         // /groups/{id}
         if (segments.Length == 2)
