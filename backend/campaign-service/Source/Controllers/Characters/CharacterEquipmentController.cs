@@ -52,7 +52,7 @@ public class CharacterEquipmentController : GroupsBaseController
 
         int delta = data.Action == "add" ? 1 : -1;
         int oldValue = data.Action == "add" ? 0 : 1;
-        _logProvider.LogEquipmentChange(characterId, groupId, SubjectAccess.CurrentUserId ?? 0, data.ItemId, oldValue, delta);
+        _logProvider.LogEquipmentChange(characterId, groupId, SubjectAccess.GetCurrentActorId(), data.ItemId, oldValue, delta);
 
         var equipment = _provider.GetEquipment(groupId, characterId);
         return Ok(new { items = equipment });

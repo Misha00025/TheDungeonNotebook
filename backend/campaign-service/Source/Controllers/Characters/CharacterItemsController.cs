@@ -56,7 +56,7 @@ public class CharacterItemsController : GroupsBaseController
                 if (_provider.TrySetItemToCharacter(item, characterId, item.Amount ?? 0))
                 {
                     if (item.Amount != null)
-                        _logProvider.LogItemChange(characterId, groupId, SubjectAccess.CurrentUserId ?? 0, item.Id, 0, item.Amount ?? 0);
+                        _logProvider.LogItemChange(characterId, groupId, SubjectAccess.GetCurrentActorId(), item.Id, 0, item.Amount ?? 0);
                     return Created($"groups/{groupId}/characters/{characterId}/items/{item.Id}", item.ToResponse());
                 }
             }
@@ -101,7 +101,7 @@ public class CharacterItemsController : GroupsBaseController
 
             var delta = newAmount - oldAmount;
             if (delta != 0)
-                _logProvider.LogItemChange(characterId, groupId, SubjectAccess.CurrentUserId ?? 0, itemId, oldAmount, delta);
+                _logProvider.LogItemChange(characterId, groupId, SubjectAccess.GetCurrentActorId(), itemId, oldAmount, delta);
 
             return Ok(item.ToResponse());
         }
@@ -122,7 +122,7 @@ public class CharacterItemsController : GroupsBaseController
             _provider.TryRemoveItemFromCharacter(item, characterId);
 
             if (oldAmount > 0)
-                _logProvider.LogItemChange(characterId, groupId, SubjectAccess.CurrentUserId ?? 0, itemId, oldAmount, -oldAmount);
+                _logProvider.LogItemChange(characterId, groupId, SubjectAccess.GetCurrentActorId(), itemId, oldAmount, -oldAmount);
 
             return Ok(item.ToResponse());
         }
