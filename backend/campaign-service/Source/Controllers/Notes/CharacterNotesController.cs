@@ -13,7 +13,7 @@ public class CharacterNotesController : GroupsBaseController
 {
     private NotesProvider _provider;
 
-    public CharacterNotesController(CampaignContext context, NotesProvider provider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper) : base(context, accessHelper, subjectAccessHelper)
+    public CharacterNotesController(CampaignContext context, NotesProvider provider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
     {
         _provider = provider;
     }

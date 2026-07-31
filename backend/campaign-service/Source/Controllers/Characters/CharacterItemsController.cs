@@ -19,7 +19,7 @@ public class CharacterItemsController : GroupsBaseController
     private CharacterLogProvider _logProvider;
     private CharactersProvider _charactersProvider;
 
-    public CharacterItemsController(CampaignContext context, ItemsProvider itemsProvider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, CharacterLogProvider logProvider, CharactersProvider charactersProvider) : base(context, accessHelper, subjectAccessHelper)
+    public CharacterItemsController(CampaignContext context, ItemsProvider itemsProvider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, CharacterLogProvider logProvider, CharactersProvider charactersProvider, ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
     {
             _provider = itemsProvider;
             _logProvider = logProvider;

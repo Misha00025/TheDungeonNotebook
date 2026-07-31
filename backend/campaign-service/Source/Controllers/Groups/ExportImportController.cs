@@ -19,8 +19,9 @@ public class ExportImportController : GroupsBaseController
         GroupAccessHelper accessHelper,
         SubjectAccessHelper subjectAccessHelper,
         ExportImportProvider provider,
-        ILogger<ExportImportController> logger)
-        : base(groupContext, accessHelper, subjectAccessHelper)
+        ILogger<ExportImportController> logger,
+        ILogger<GroupsBaseController> baseLogger)
+        : base(groupContext, accessHelper, subjectAccessHelper, baseLogger)
     {
         _provider = provider;
         _logger = logger;

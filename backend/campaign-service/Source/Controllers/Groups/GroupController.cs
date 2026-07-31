@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Tdn.Db.Contexts;
 using Tdn.Models.Providing;
 using Tdn.Models.Access;
@@ -13,7 +14,7 @@ public class GroupsController : GroupsBaseController
 {
     private GroupProvider _provider;
 
-    public GroupsController(CampaignContext context, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, GroupProvider provider) : base(context, accessHelper, subjectAccessHelper)
+    public GroupsController(CampaignContext context, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, GroupProvider provider, ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
     {
         _provider = provider;
     }

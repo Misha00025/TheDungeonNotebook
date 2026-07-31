@@ -14,7 +14,7 @@ public class CharacterSkillsController : GroupsBaseController
     private SkillsProvider _provider;
     private CharacterLogProvider _logProvider;
 
-    public CharacterSkillsController(CampaignContext context, SkillsProvider skillsProvider, GroupAccessHelper accessHelper, CharacterLogProvider logProvider, SubjectAccessHelper subjectAccessHelper) : base(context, accessHelper, subjectAccessHelper)
+    public CharacterSkillsController(CampaignContext context, SkillsProvider skillsProvider, GroupAccessHelper accessHelper, CharacterLogProvider logProvider, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
     {
         _provider = skillsProvider;
         _logProvider = logProvider;

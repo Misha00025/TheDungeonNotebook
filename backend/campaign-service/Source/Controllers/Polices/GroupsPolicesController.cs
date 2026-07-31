@@ -14,7 +14,7 @@ public class GroupsPolicesController : GroupsBaseController
     private GroupPolicesProvider _provider;
     private SubjectAccessHelper _subjectHelper;
     
-    public GroupsPolicesController(CampaignContext context, GroupPolicesProvider provider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper) : base(context, accessHelper, subjectAccessHelper)
+    public GroupsPolicesController(CampaignContext context, GroupPolicesProvider provider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
     {
         _provider = provider;
         _subjectHelper = subjectAccessHelper;

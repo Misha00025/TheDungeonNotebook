@@ -14,7 +14,7 @@ public class GroupAttributesController : GroupsBaseController
 {
     private AttributesProvider _provider;
 
-    public GroupAttributesController(CampaignContext context, AttributesProvider attributesProvider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper) : base(context, accessHelper, subjectAccessHelper)
+    public GroupAttributesController(CampaignContext context, AttributesProvider attributesProvider, GroupAccessHelper accessHelper, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
     {
         _provider = attributesProvider;
     }

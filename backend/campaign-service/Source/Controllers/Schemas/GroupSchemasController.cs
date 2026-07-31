@@ -21,7 +21,8 @@ public class GroupSchemasController : GroupsBaseController
         GenericMongoProvider<SkillsSchemaMongoData> skillsProvider,
         GenericMongoProvider<ItemsSchemaMongoData> itemsProvider,
         GroupAccessHelper accessHelper,
-        SubjectAccessHelper subjectAccessHelper) : base(context, accessHelper, subjectAccessHelper)
+        SubjectAccessHelper subjectAccessHelper,
+        ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
     {
         _skillsProvider = skillsProvider;
         _itemsProvider = itemsProvider;

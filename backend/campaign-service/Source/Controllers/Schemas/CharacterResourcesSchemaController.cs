@@ -19,7 +19,8 @@ public class CharacterResourcesSchemaController : GroupsBaseController
         CampaignContext context,
         GenericMongoProvider<CharacterResourcesMongoData> provider,
         GroupAccessHelper accessHelper,
-        SubjectAccessHelper subjectAccessHelper) : base(context, accessHelper, subjectAccessHelper)
+        SubjectAccessHelper subjectAccessHelper,
+        ILogger<GroupsBaseController> logger) : base(context, accessHelper, subjectAccessHelper, logger)
     {
         _provider = provider;
     }
