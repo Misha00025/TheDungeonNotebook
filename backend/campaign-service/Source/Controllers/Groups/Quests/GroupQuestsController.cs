@@ -42,9 +42,12 @@ public class GroupQuestsController : GroupsBaseController
             return BadRequest("Header is required");
         if (!_accessHelper.IsAdmin(groupId))
         {
-            // Non-admin can only create quest for characters they can write
-            if (data.AssignedCharacters == null || !data.AssignedCharacters.Any() ||
-                !data.AssignedCharacters.All(c => _accessHelper.CanWriteCharacter(groupId, c)))
+            // Non-admin needs at least one writable character, all must be readable
+            if (data.AssignedCharacters == null || !data.AssignedCharacters.Any())
+                return Forbidden();
+            var hasWrite = data.AssignedCharacters.Any(c => _accessHelper.CanWriteCharacter(groupId, c));
+            var allReadable = data.AssignedCharacters.All(c => _accessHelper.HasCharacterAccess(groupId, c));
+            if (!hasWrite || !allReadable)
                 return Forbidden();
         }
         var quest = data.AsQuest(groupId);

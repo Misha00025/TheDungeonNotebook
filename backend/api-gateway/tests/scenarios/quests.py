@@ -90,7 +90,24 @@ def register_quests_scenario():
         request="groups/{steps.2.id}/characters/{steps.6.id}/users/{uid}", method="PUT",
         data={"canWrite": True}, requirement=CREATED))
 
-    # 9. POST quest (admin) with assigned character
+    # 9. Create third character (read-only for user)
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/{steps.2.id}/characters", method="POST",
+        data={"name": "QuestChar3", "description": "", "templateId": "{steps.4.id}"},
+        requirement=CREATED))
+
+    # 10. Create fourth character (no access for user)
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/{steps.2.id}/characters", method="POST",
+        data={"name": "QuestChar4", "description": "", "templateId": "{steps.4.id}"},
+        requirement=CREATED))
+
+    # 11. Give user read-only access to third character
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/{steps.2.id}/characters/{steps.9.id}/users/{uid}", method="PUT",
+        data={"canWrite": False}, requirement=CREATED))
+
+    # 12. POST quest (admin) with assigned character
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/quests", method="POST",
         data={
@@ -106,19 +123,19 @@ def register_quests_scenario():
             "assignedCharacters": ["{steps.5.id}"]
         }, requirement=CREATED, is_valid=has_id()))
 
-    # 10. GET quests list (admin, no filters)
+    # 13. GET quests list (admin, no filters)
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/quests", method="GET",
         requirement=OK, is_valid=has_list("quests")))
 
-    # 11. GET single quest (admin)
+    # 14. GET single quest (admin)
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/quests/{steps.9.id}", method="GET",
+        request="groups/{steps.2.id}/quests/{steps.12.id}", method="GET",
         requirement=OK, is_valid=has_id()))
 
-    # 12. PUT update quest (admin) — add second character
+    # 15. PUT update quest (admin) — add second character
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/quests/{steps.9.id}", method="PUT",
+        request="groups/{steps.2.id}/quests/{steps.12.id}", method="PUT",
         data={
             "header": "Find the Amulet (Updated)",
             "description": "Updated description",
@@ -132,26 +149,26 @@ def register_quests_scenario():
             "assignedCharacters": ["{steps.5.id}", "{steps.6.id}"]
         }, requirement=OK, is_valid=has_id()))
 
-    # 13. GET quest after update (admin)
+    # 16. GET quest after update (admin)
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/quests/{steps.9.id}", method="GET",
+        request="groups/{steps.2.id}/quests/{steps.12.id}", method="GET",
         requirement=OK,
         is_valid=lambda test, res: (
             res.json().get("header") == "Find the Amulet (Updated)",
             f"Expected header 'Find the Amulet (Updated)', got {res.json().get('header')}"
         )))
 
-    # 14. PATCH objective status via quest patch (user, character_writer)
+    # 17. PATCH objective status via quest patch (user, character_writer)
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
-        request="groups/{steps.2.id}/quests/{steps.9.id}",
+        request="groups/{steps.2.id}/quests/{steps.12.id}",
         method="PATCH", data={
             "objectives": [{"key": "find_temple", "status": "completed"}]
         },
         requirement=OK))
 
-    # 15. GET quest after objective update (admin)
+    # 18. GET quest after objective update (admin)
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/quests/{steps.9.id}", method="GET",
+        request="groups/{steps.2.id}/quests/{steps.12.id}", method="GET",
         requirement=OK,
         is_valid=lambda test, res: (
             any(
@@ -161,37 +178,37 @@ def register_quests_scenario():
             f"Expected find_temple=completed in objectives, got {res.json()}"
         )))
 
-    # 16. GET quests filtered by userId (user)
+    # 19. GET quests filtered by userId (user)
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/quests?userId={uid}", method="GET",
         requirement=OK, is_valid=has_list("quests")))
 
-    # 17. GET quests filtered by characterId (user)
+    # 20. GET quests filtered by characterId (user)
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/quests?characterId={steps.5.id}", method="GET",
         requirement=OK, is_valid=has_list("quests")))
 
-    # 18. GET quests combined filter (user)
+    # 21. GET quests combined filter (user)
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/quests?userId={uid}&characterId={steps.5.id}", method="GET",
         requirement=OK, is_valid=has_list("quests")))
 
-    # 19. GET quests as stranger (should see empty)
+    # 22. GET quests as stranger (should see empty)
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{steps.2.id}/quests", method="GET",
         requirement=OK, is_valid=has_list("quests")))
 
-    # 20. DELETE quest (admin)
+    # 23. DELETE quest (admin)
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/quests/{steps.9.id}", method="DELETE",
+        request="groups/{steps.2.id}/quests/{steps.12.id}", method="DELETE",
         requirement=OK))
 
-    # 21. GET quest after delete (admin) → 404
+    # 24. GET quest after delete (admin) → 404
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/quests/{steps.9.id}", method="GET",
+        request="groups/{steps.2.id}/quests/{steps.12.id}", method="GET",
         requirement=NOT_FOUND, is_valid=is_error()))
 
-    # 22. User creates quest for own character (via character endpoint) → 201
+    # 25. User creates quest for own character (via character endpoint) → 201
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/quests", method="POST",
         data={
@@ -202,9 +219,9 @@ def register_quests_scenario():
             "objectives": [{"key": "do_something", "description": "Do something", "status": "pending"}]
         }, requirement=CREATED, is_valid=has_id()))
 
-    # 23. User tries PUT on their own quest → 403 (PUT is group_admin only)
+    # 26. User tries PUT on their own quest → 403 (PUT is group_admin only)
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
-        request="groups/{steps.2.id}/quests/{steps.22.id}", method="PUT",
+        request="groups/{steps.2.id}/quests/{steps.25.id}", method="PUT",
         data={
             "header": "Should not work",
             "description": "",
@@ -214,15 +231,15 @@ def register_quests_scenario():
             "assignedCharacters": ["{steps.5.id}"]
         }, requirement=FORBID))
 
-    # 24. User tries PATCH on their own quest WITH assignedCharacters → 403
+    # 27. User tries PATCH on their own quest WITH assignedCharacters → 403
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
-        request="groups/{steps.2.id}/quests/{steps.22.id}", method="PATCH",
+        request="groups/{steps.2.id}/quests/{steps.25.id}", method="PATCH",
         data={
             "header": "Ok",
             "assignedCharacters": ["{steps.5.id}"]
         }, requirement=FORBID))
 
-    # 25. User tries abstract POST (not via character endpoint) → 403
+    # 28. User can POST quest with their own writable character → 201
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/quests", method="POST",
         data={
@@ -232,9 +249,57 @@ def register_quests_scenario():
             "status": "active",
             "objectives": [],
             "assignedCharacters": ["{steps.5.id}"]
+        }, requirement=CREATED, is_valid=has_id()))
+
+    # 29. User can POST quest with one writable + one readable character → 201
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/{steps.2.id}/quests", method="POST",
+        data={
+            "header": "Mixed Quest",
+            "description": "",
+            "reward": [],
+            "status": "active",
+            "objectives": [],
+            "assignedCharacters": ["{steps.5.id}", "{steps.9.id}"]
+        }, requirement=CREATED, is_valid=has_id()))
+
+    # 30. User cannot POST quest with empty assignedCharacters → 403
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/{steps.2.id}/quests", method="POST",
+        data={
+            "header": "Empty Quest",
+            "description": "",
+            "reward": [],
+            "status": "active",
+            "objectives": [],
+            "assignedCharacters": []
         }, requirement=FORBID))
 
-    # 26. Stranger tries to create quest → 403
+    # 31. User cannot POST quest with only read-only character → 403
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/{steps.2.id}/quests", method="POST",
+        data={
+            "header": "ReadOnly Quest",
+            "description": "",
+            "reward": [],
+            "status": "active",
+            "objectives": [],
+            "assignedCharacters": ["{steps.9.id}"]
+        }, requirement=FORBID))
+
+    # 32. User cannot POST quest with writable + no-access character → 403
+    tests.append(Test(headers={**h, "Authorization": "{ut}"},
+        request="groups/{steps.2.id}/quests", method="POST",
+        data={
+            "header": "Mixed Bad Quest",
+            "description": "",
+            "reward": [],
+            "status": "active",
+            "objectives": [],
+            "assignedCharacters": ["{steps.5.id}", "{steps.10.id}"]
+        }, requirement=FORBID))
+
+    # 33. Stranger tries to create quest → 403
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{steps.2.id}/quests", method="POST",
         data={
@@ -246,7 +311,7 @@ def register_quests_scenario():
             "assignedCharacters": ["{steps.5.id}"]
         }, requirement=FORBID))
 
-    # 27. Stranger tries to create quest for character → 403
+    # 34. Stranger tries to create quest for character → 403
     tests.append(Test(headers={**h, "Authorization": "{st}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/quests", method="POST",
         data={
@@ -257,9 +322,9 @@ def register_quests_scenario():
             "objectives": []
         }, requirement=FORBID))
 
-    # 28. Stranger tries to update quest → 403
+    # 35. Stranger tries to update quest → 403
     tests.append(Test(headers={**h, "Authorization": "{st}"},
-        request="groups/{steps.2.id}/quests/{steps.9.id}", method="PUT",
+        request="groups/{steps.2.id}/quests/{steps.12.id}", method="PUT",
         data={
             "header": "Hacked!",
             "description": "",
@@ -269,15 +334,15 @@ def register_quests_scenario():
             "assignedCharacters": ["{steps.5.id}"]
         }, requirement=FORBID))
 
-    # 29. Stranger tries to patch quest → 403
+    # 36. Stranger tries to patch quest → 403
     tests.append(Test(headers={**h, "Authorization": "{st}"},
-        request="groups/{steps.2.id}/quests/{steps.9.id}", method="PATCH",
+        request="groups/{steps.2.id}/quests/{steps.12.id}", method="PATCH",
         data={"header": "Hacked!"},
         requirement=FORBID))
 
-    # 30. DELETE user's quest (admin) → 200
+    # 37. DELETE user's quest (admin) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="groups/{steps.2.id}/quests/{steps.22.id}", method="DELETE",
+        request="groups/{steps.2.id}/quests/{steps.25.id}", method="DELETE",
         requirement=OK))
 
     steps = [DeepGatewayStep(t) for t in tests]
