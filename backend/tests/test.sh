@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Имя контейнера, состояние которого нужно отслеживать
-MAIN_SERVICE="api-gateway"
+MAIN_SERVICE="api-gateway-test"
 
 docker compose down -v
 

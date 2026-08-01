@@ -22,7 +22,7 @@ docker compose up -d --build
 # 3. Wait for api-gateway container
 echo "Waiting for api-gateway..."
 for i in $(seq 1 20); do
-    if docker inspect -f "{{.State.Running}}" api-gateway 2>/dev/null | grep -q true; then
+    if docker inspect -f "{{.State.Running}}" api-gateway-test 2>/dev/null | grep -q true; then
         echo "api-gateway is running!"
         break
     fi

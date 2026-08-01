@@ -13,7 +13,7 @@ x-common-resources: &common_resources
 services:
   mongo:
     image: mongo:latest
-    container_name: mongo-db-gateway-test
+    container_name: mongo-db-test
     restart: always
     networks:
       - backend-network
@@ -30,7 +30,7 @@ services:
 
   mysql:
     image: mysql:8.0
-    container_name: mysql-db-gateway-test
+    container_name: mysql-db-test
     restart: always
     networks:
       - backend-network
@@ -38,9 +38,9 @@ services:
       - ./.env
     volumes:
       - ./mysql_data:/var/lib/mysql
-      - ../../auth-service/init-auth.sh:/docker-entrypoint-initdb.d/0_auth.sh
-      - ../../users-service/init-users.sh:/docker-entrypoint-initdb.d/1_users.sh
-      - ../../campaign-service/init-campaign.sh:/docker-entrypoint-initdb.d/2_campaign.sh
+      - ../auth-service/init-auth.sh:/docker-entrypoint-initdb.d/0_auth.sh
+      - ../users-service/init-users.sh:/docker-entrypoint-initdb.d/1_users.sh
+      - ../campaign-service/init-campaign.sh:/docker-entrypoint-initdb.d/2_campaign.sh
     healthcheck:
       test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
       interval: 20s
@@ -50,7 +50,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: redis-cache-gateway-test
+    container_name: redis-cache-test
     restart: always
     networks:
       - backend-network
@@ -63,8 +63,8 @@ services:
   users-service:
     <<: *common_resources
     build:
-      context: ../../users-service
-    container_name: users-service-gateway-test
+      context: ../users-service
+    container_name: users-service-test
     depends_on:
       mysql:
         condition: service_healthy
@@ -78,8 +78,8 @@ services:
   campaign-service:
     <<: *common_resources
     build:
-      context: ../../campaign-service
-    container_name: campaign-service-gateway-test
+      context: ../campaign-service
+    container_name: campaign-service-test
     depends_on:
       mongo:
         condition: service_healthy
@@ -96,8 +96,8 @@ services:
   auth-service:
     <<: *common_resources
     build:
-      context: ../../auth-service
-    container_name: auth-service-gateway-test
+      context: ../auth-service
+    container_name: auth-service-test
     depends_on:
       mysql:
         condition: service_healthy
@@ -113,8 +113,8 @@ services:
       - MYSQL_CONNECTION_STRING=server=mysql;database=$AUTH_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
   api-gateway:
-    build: ../
-    container_name: api-gateway
+    build: ../api-gateway
+    container_name: api-gateway-test
     depends_on:
       auth-service:
         condition: service_started
