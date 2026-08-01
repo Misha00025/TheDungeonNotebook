@@ -62,6 +62,10 @@ docker compose logs | grep "mysql-db-gateway-test  " >> logs/db.log
 # Завершаем работу
 docker compose down
 
+grep -i 'campaign-service-test' logs/all.log > logs/campaign.log
+grep -i 'auth-service-test' logs/all.log > logs/auth.log
+grep -i 'users-service-test' logs/all.log > logs/user.log
+
 # Сводка результатов
 echo ""
 echo "╔═══════════════════════════════════════╗"

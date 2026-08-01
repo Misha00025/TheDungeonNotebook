@@ -2,7 +2,7 @@
 
 ## Test Framework
 - Custom Python framework (not pytest-style assertions)
-- Location: `backend/api-gateway/tests/`
+- Location: `backend/tests/`
 - Entry point: `test.py` with argparse (`-c` compact, `-d` debug, `--server`, `-S` scenario filter)
 
 ## Test Structure
@@ -19,7 +19,7 @@ tests/
 
 ## Test Execution
 ```bash
-cd backend/api-gateway/tests
+cd backend/tests
 ./test.sh 15                     # Wait 15s, run all tests
 ./test.sh 15 -S GatewayMain      # Run only GatewayMain scenario
 ./venv/bin/python test.py        # Direct run (requires running stack)
