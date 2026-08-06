@@ -22,7 +22,7 @@ campaign-service/
 │   └── Models/
 │       ├── Entities/         # Group.cs, Item.cs, Skill.cs (POCO)
 │       ├── Db/
-│       │   ├── Contexts/     # 6 DbContexts
+│       │   ├── Contexts/     # 1 SQL (CampaignContext) + 2 Mongo (MongoDbContext, SchemasMongoDbContext)
 │       │   ├── Entities/     # EF entities
 │       │   └── EntityBuildersConfigurer.cs
 │       ├── Providing/        # All providers
@@ -38,18 +38,15 @@ campaign-service/
 - Mongo settings from `appsettings.json` → `MongoDbSettings` section
 
 ## DbContexts (MySQL)
-- `GroupContext`
-- `EntityContext` (characters)
-- `SkillsContext`
-- `ItemsContext`
-- `PolicesContext`
+- `CampaignContext` — единственный SQL-контекст (MySQL), объединяет все сущности: группы, персонажи, предметы, навыки, заметки, квесты, политики, шаблоны
 
 ## MongoDbContexts (scoped, not singleton)
-- `MongoDbContext` — general Mongo access
-- `SchemasMongoDbContext` — schema collections
+- `MongoDbContext` — общий Mongo-доступ (контент: заметки, квесты и др.)
+- `SchemasMongoDbContext` — коллекции схем (групповые схемы, схемы шаблонов персонажей)
 
 ## Providers (registered as scoped in Program.cs)
-- `GroupAccessHelper` — reusable group access checks
+- `GroupAccessHelper` — низкоуровневые проверки доступа к группам/персонажам через `CampaignContext`
+- `SubjectAccessHelper` — высокоуровневый хелпер проверок доступа (`HasGroupAccess`, `IsAdmin`, `HasCharacterAccess`, `CanWriteCharacter`), делегирует `GroupAccessHelper`
 - `AttributesProvider`
 - `SkillsProvider`
 - `ItemsProvider`
@@ -59,9 +56,9 @@ campaign-service/
 - `NotesProvider`
 
 ## Access Control
-- `GroupAccessHelper` provides `GetAccessibleGroupIds(userId)`
-- Controllers pass `userId` query param (set by gateway from JWT)
-- `CheckGroupAccess(groupId, userId)` in base controllers
+- `CampaignAccessMiddleware` (Source/Middleware/) — авторизация в самом сервисе, проверяет права по path+method на уровнях Member / Admin / CharacterWrite
+- Middleware опирается на `SubjectAccessHelper` (IsAdmin, CanWriteCharacter, HasGroupAccess, HasCharacterAccess) и `GroupAccessHelper`
+- Gateway выполняет только аутентификацию (`auth: required`) и передаёт `X-Subject`; gateway access-хендлеры (group_admin, character_writer и т.п.) для campaign не используются
 - `GroupsPolicesController` manages user-group membership (UserGroupData)
 
 ## Special Features
