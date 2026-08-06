@@ -54,6 +54,17 @@ docker compose up -d
 
 
 
+## Makefile (автоматизация)
+
+В корне проекта находится `Makefile` для часто используемых операций.
+
+| Команда | Описание |
+|---------|----------|
+| `make test` | Запуск интеграционных тестов. Выполняет `cd backend/tests && ./test.sh 5` — очищает БД, пересобирает контейнеры, генерирует свежие RSA-ключи, ждёт 5 секунд и прогоняет все сценарии. |
+| `make build` | Сборка всех Docker-образов: `cd backend && docker compose build`. |
+| `make certs` | Генерация RSA-ключей (2048 bit) в `backend/certs/private.pem` и `backend/certs/public.pem`. |
+| `make clean` | Удаление данных MongoDB и MySQL (`backend/mongo_data/`, `backend/mysql_data/`) с подтверждением. Требует sudo. |
+
 ## Мониторинг
 
 Prometheus + Grafana — `cd monitoring && docker compose up -d`
