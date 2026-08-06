@@ -592,6 +592,19 @@ routes:
       PUT: {}
 
   # ============================================================
+  # Character Commands
+  # ============================================================
+  - path: /groups/{group_id}/characters/{character_id}/commands
+    proxy:
+      service: campaign
+      path: /groups/{group_id}/characters/{character_id}/commands
+      headers:
+        X-Subject: "{state.x_subject}"
+    auth: required
+    methods:
+      POST: {}
+
+  # ============================================================
   # Character Log
   # ============================================================
   - path: /groups/{group_id}/characters/{character_id}/log
