@@ -1,4 +1,3 @@
-using Tdn.Db;
 using Tdn.Db.Entities;
 using Tdn.Models;
 using Tdn.Models.Commands;
@@ -16,45 +15,10 @@ public class CommandsProvider
         _characters = characters;
     }
 
-    public CommandResult AddField(int groupId, int characterId, CommandPayload payload) =>
-        Apply(groupId, characterId, payload, add: true);
-
-    public CommandResult UpdateField(int groupId, int characterId, CommandPayload payload) =>
-        Apply(groupId, characterId, payload, add: false);
-
-    public CommandResult DeleteField(int groupId, int characterId, CommandPayload payload)
+    public CommandResult AddField(int groupId, int characterId, AddFieldCommand command)
     {
-        if (string.IsNullOrEmpty(payload.Key))
-            return CommandResult.Fail(new List<string> { "Field key required" });
-
-        var character = _characters.GetCharacter(groupId, characterId);
-        if (character == null) return CommandResult.NotFound();
-
-        var mongoData = _characters.BuildMongoData(character);
-
-        if (!mongoData.Fields.ContainsKey(payload.Key))
-        {
-            var noop = SaveNoOp(groupId, character);
-            noop.Success = true;
-            noop.StatusCode = 200;
-            noop.FieldKey = payload.Key;
-            return noop;
-        }
-
-        var oldValue = mongoData.Fields[payload.Key].Value;
-        mongoData.Fields.Remove(payload.Key);
-
-        var result = Save(groupId, character, mongoData);
-        result.FieldKey = payload.Key;
-        result.OldValue = oldValue;
-        result.NewValue = 0;
-        result.Changed = true;
-        return result;
-    }
-
-    private CommandResult Apply(int groupId, int characterId, CommandPayload payload, bool add)
-    {
-        if (string.IsNullOrEmpty(payload.Key))
+        var key = command.Key;
+        if (string.IsNullOrEmpty(key))
             return CommandResult.Fail(new List<string> { "Field key required" });
 
         var character = _characters.GetCharacter(groupId, characterId);
@@ -65,40 +29,90 @@ public class CommandsProvider
 
         var mongoData = _characters.BuildMongoData(character);
 
-        int oldValue = 0;
-        FieldMongoData? field = null;
+        // AddField must NOT override a field already on the character (that is UpdateField's job)
+        if (mongoData.Fields.ContainsKey(key))
+            return CommandResult.Conflict($"Field with key '{key}' already exists; use UpdateField");
 
-        if (mongoData.Fields.ContainsKey(payload.Key))
+        int oldValue = 0;
+        FieldMongoData field;
+        if (template.Fields.ContainsKey(key))
         {
-            oldValue = mongoData.Fields[payload.Key].Value;
-            field = mongoData.Fields[payload.Key];
-        }
-        else if (template.Fields.ContainsKey(payload.Key))
-        {
-            oldValue = template.Fields[payload.Key].Value;
-            field = CloneField(template.Fields[payload.Key]);
-            mongoData.Fields[payload.Key] = field;
-        }
-        else if (add)
-        {
-            if (payload.Field == null || string.IsNullOrEmpty(payload.Field.Value.Name))
-                return CommandResult.Fail(new List<string>
-                { $"Can't create field with key '{payload.Key}': name and description must be not null" });
-            field = BuildField(payload.Field.Value);
-            mongoData.Fields[payload.Key] = field;
+            // template default not yet materialized -> allowed to create/override
+            oldValue = template.Fields[key].Value;
+            field = CloneField(template.Fields[key]);
+            mongoData.Fields[key] = field;
         }
         else
         {
-            return CommandResult.Fail(new List<string> { $"Field with key '{payload.Key}' does not exist" });
+            if (command.Field == null || string.IsNullOrEmpty(command.Field.Value.Name))
+                return CommandResult.Fail(new List<string>
+                { $"Can't create field with key '{key}': name and description must be not null" });
+            field = BuildField(command.Field.Value);
+            mongoData.Fields[key] = field;
         }
 
-        ApplyFieldData(field, payload);
-        var newValue = field!.Value;
+        ApplyFieldData(field, command.Field);
+        var newValue = field.Value;
 
         var result = Save(groupId, character, mongoData);
-        result.FieldKey = payload.Key;
+        result.FieldKey = key;
         result.OldValue = oldValue;
         result.NewValue = newValue;
+        result.Changed = true;
+        return result;
+    }
+
+    public CommandResult UpdateField(int groupId, int characterId, UpdateFieldCommand command)
+    {
+        var key = command.Key;
+        if (string.IsNullOrEmpty(key))
+            return CommandResult.Fail(new List<string> { "Field key required" });
+
+        var character = _characters.GetCharacter(groupId, characterId);
+        if (character == null) return CommandResult.NotFound();
+
+        var template = _characters.GetTemplate(groupId, character.TemplateId);
+        if (template == null) return CommandResult.NotFound();
+
+        var mongoData = _characters.BuildMongoData(character);
+
+        if (!mongoData.Fields.ContainsKey(key))
+            return CommandResult.Fail(new List<string> { $"Field with key '{key}' does not exist" });
+
+        var field = mongoData.Fields[key];
+        var oldValue = field.Value;
+        ApplyFieldData(field, command.Field);
+        var newValue = field.Value;
+
+        var result = Save(groupId, character, mongoData);
+        result.FieldKey = key;
+        result.OldValue = oldValue;
+        result.NewValue = newValue;
+        result.Changed = true;
+        return result;
+    }
+
+    public CommandResult DeleteField(int groupId, int characterId, DeleteFieldCommand command)
+    {
+        var key = command.Key;
+        if (string.IsNullOrEmpty(key))
+            return CommandResult.Fail(new List<string> { "Field key required" });
+
+        var character = _characters.GetCharacter(groupId, characterId);
+        if (character == null) return CommandResult.NotFound();
+
+        var mongoData = _characters.BuildMongoData(character);
+
+        if (!mongoData.Fields.ContainsKey(key))
+            return CommandResult.NoOp();
+
+        var oldValue = mongoData.Fields[key].Value;
+        mongoData.Fields.Remove(key);
+
+        var result = Save(groupId, character, mongoData);
+        result.FieldKey = key;
+        result.OldValue = oldValue;
+        result.NewValue = 0;
         result.Changed = true;
         return result;
     }
@@ -112,15 +126,6 @@ public class CommandsProvider
         character.Equipment = mongoData.Equipment;
         _characters.TryUpdateCharacter(character);
 
-        var withTemplate = _characters.AsCharacterWithTemplate(character, groupId);
-        FormulaCalculator.CalculateFields(withTemplate);
-        var sqlData = _characters.GetCharacterSqlData(groupId, character.Id);
-        var data = sqlData!.ToDict(withTemplate);
-        return CommandResult.Ok(data);
-    }
-
-    private CommandResult SaveNoOp(int groupId, Character character)
-    {
         var withTemplate = _characters.AsCharacterWithTemplate(character, groupId);
         FormulaCalculator.CalculateFields(withTemplate);
         var sqlData = _characters.GetCharacterSqlData(groupId, character.Id);
@@ -158,14 +163,19 @@ public class CommandsProvider
         };
     }
 
-    private static void ApplyFieldData(FieldMongoData target, CommandPayload? payload)
+    private static void ApplyFieldData(FieldMongoData target, FieldCommandData? data)
     {
-        if (payload == null || payload.Value.Field == null) return;
-        var d = payload.Value.Field.Value;
+        if (data == null) return;
+        var d = data.Value;
         if (d.Name != null) target.Name = d.Name;
         if (d.Description != null) target.Description = d.Description;
-        if (d.Value != null) target.Value = d.Value.Value;
-        if (d.MaxValue != null && target is PropertyMongoData prop) prop.MaxValue = d.MaxValue.Value;
+
+        var v = d.Value;
+        if (v != null) target.Value = v.Value;
+
+        var mv = d.MaxValue;
+        if (mv != null && target is PropertyMongoData prop) prop.MaxValue = mv.Value;
+
         if (!string.IsNullOrEmpty(d.Formula)) target.Formula = d.Formula;
     }
 }

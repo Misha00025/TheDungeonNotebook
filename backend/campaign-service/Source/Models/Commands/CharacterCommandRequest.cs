@@ -1,11 +1,10 @@
-using System.Text.Json.Serialization;
+using System.Text.Json;
 
 namespace Tdn.Models.Commands;
 
 public struct CharacterCommandRequest
 {
-    [JsonConverter(typeof(CharacterCommandTypeConverter))]
-    public CharacterCommandType Type { get; set; }
-    public CommandPayload? Payload { get; set; }
+    public string Type { get; set; }
+    public JsonElement? Payload { get; set; }
     public string? IdempotencyKey { get; set; }
 }

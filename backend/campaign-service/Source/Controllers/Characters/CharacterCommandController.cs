@@ -27,14 +27,16 @@ public class CharacterCommandController : GroupsBaseController
         if (!SubjectAccess.CanWriteCharacter(groupId, characterId))
             return Forbidden();
 
-        var result = _dispatcher.Dispatch(groupId, characterId, data);
+        var result = _dispatcher.Dispatch(groupId, characterId, data.Type, data.Payload);
+
         if (result == null)
-            return NotImplemented();
+            return Unprocessable($"Unknown command type '{data.Type}'");
 
         return result.StatusCode switch
         {
             404 => NotFound("Character or Group not found"),
-            400 => BadRequest(new { title = "CommandRejected", errors = result.Errors }),
+            400 => BadRequest(new { title = "CommandRejected", message = result.Message, errors = result.Errors }),
+            409 => Conflict(new { title = "Conflict", message = result.Message }),
             _ => Ok(result.Data)
         };
     }

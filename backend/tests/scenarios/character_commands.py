@@ -1,6 +1,6 @@
 from tests.templates import Test, Scenario, GatewayStep
 from tests.test_variables import *
-from tests.validators import has_id, has_keys, has_fields, is_error
+from tests.validators import has_id, is_error
 from .jwt_helper import generate_token
 
 h = {"Content-Type": "application/json; charset=utf-8"}
@@ -78,13 +78,13 @@ def register_character_commands_scenario():
         request="groups/{steps.2.id}/characters/{steps.8.id}/users/{uid}", method="PUT",
         data={"canWrite": False}, requirement=CREATED))
 
-    # 10. POST commands on char_5 (admin) — endpoint NOT IMPLEMENTED → 501
+    # 10. POST commands — unknown type → 422 UNPROCESSABLE
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/commands", method="POST",
-        data={"type": "Bogus", "payload": {}}, requirement=NOT_IMPL,
+        data={"type": "Bogus", "payload": {}}, requirement=UNPROCESSABLE,
         is_valid=is_error()))
 
-    # 11. AddField — admin on char_5
+    # 11. AddField agility (new field) → 200
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/commands", method="POST",
         data={"type": "AddField",
@@ -96,7 +96,16 @@ def register_character_commands_scenario():
             and res.json()["fields"]["agility"]["name"] == "Agility",
             "AddField agility value=5, name=Agility")))
 
-    # 12. AddField (override existing field) — admin on char_5
+    # 12. AddField agility AGAIN (already exists) → 409 CONFLICT
+    tests.append(Test(headers={**h, "Authorization": "{at}"},
+        request="groups/{steps.2.id}/characters/{steps.5.id}/commands", method="POST",
+        data={"type": "AddField",
+              "payload": {"key": "agility",
+                          "field": {"name": "Agility", "description": "Agility stat", "value": 9}}},
+        requirement=CONFLICT,
+        is_valid=is_error()))
+
+    # 13. AddField hp (template default, not yet on character) → 200, value 75
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/commands", method="POST",
         data={"type": "AddField",
@@ -107,7 +116,7 @@ def register_character_commands_scenario():
             res.json()["fields"]["hp"]["value"] == 75,
             "AddField hp value=75")))
 
-    # 13. UpdateField — admin on char_5 with idempotency key
+    # 14. UpdateField agility → 200, value 8
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/commands", method="POST",
         data={"type": "UpdateField",
@@ -119,7 +128,7 @@ def register_character_commands_scenario():
             res.json()["fields"]["agility"]["value"] == 8,
             "UpdateField agility value=8")))
 
-    # 14. DeleteField — admin on char_5
+    # 15. DeleteField agility → 200, absent, hp value 75
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/commands", method="POST",
         data={"type": "DeleteField", "payload": {"key": "agility"}},
@@ -129,18 +138,14 @@ def register_character_commands_scenario():
             and res.json()["fields"]["hp"]["value"] == 75,
             "DeleteField agility removed, hp value=75")))
 
-    # 15. DeleteField (duplicate / no-op) — admin on char_5
+    # 16. DeleteField agility AGAIN (no-op / nothing to do) → 400 BAD
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}/commands", method="POST",
         data={"type": "DeleteField", "payload": {"key": "agility"}},
-        requirement=OK,
-        is_valid=lambda test, res: (
-            "error" not in res.json()
-            and "id" in res.json()
-            and "agility" not in res.json().get("fields", {}),
-            "Duplicate DeleteField: no error, has id, agility still absent")))
+        requirement=BAD,
+        is_valid=is_error()))
 
-    # 16. AddField — user on char_6 (has canWrite=True)
+    # 17. AddField luck — user on char_6 (canWrite=True) → 200
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/characters/{steps.6.id}/commands", method="POST",
         data={"type": "AddField",
@@ -151,7 +156,7 @@ def register_character_commands_scenario():
             res.json()["fields"]["luck"]["value"] == 7,
             "User AddField luck value=7 on writable char")))
 
-    # 17. AddField — user on char_8 (has canWrite=False) → FORBIDDEN
+    # 18. AddField luck — user on char_8 (canWrite=False) → 403 FORBIDDEN
     tests.append(Test(headers={**h, "Authorization": "{ut}"},
         request="groups/{steps.2.id}/characters/{steps.8.id}/commands", method="POST",
         data={"type": "AddField",
@@ -160,7 +165,7 @@ def register_character_commands_scenario():
         requirement=FORBID,
         is_valid=is_error()))
 
-    # 18. GET character (verify commands persisted — hp=75, agility absent)
+    # 19. GET character (verify commands persisted — hp=75, agility absent)
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="groups/{steps.2.id}/characters/{steps.5.id}", method="GET", requirement=OK,
         is_valid=lambda test, res: (

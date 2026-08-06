@@ -1,11 +1,5 @@
 namespace Tdn.Models.Commands;
 
-public struct CommandPayload
-{
-    public string? Key { get; set; }
-    public FieldCommandData? Field { get; set; }
-}
-
 public struct FieldCommandData
 {
     public string? Name { get; set; }

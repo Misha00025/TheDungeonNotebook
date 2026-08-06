@@ -1,14 +1,20 @@
+using System.Text.Json;
+
 namespace Tdn.Models.Commands;
 
- public class CommandDispatcher
+public class CommandDispatcher
 {
-    private readonly Dictionary<CharacterCommandType, ICommandHandler> _handlers;
+    private readonly Dictionary<string, ICommandHandler> _handlers;
 
     public CommandDispatcher(IEnumerable<ICommandHandler> handlers)
     {
         _handlers = handlers.ToDictionary(h => h.Handles);
     }
 
-    public CommandResult? Dispatch(int groupId, int characterId, CharacterCommandRequest request)
-        => _handlers.TryGetValue(request.Type, out var handler) ? handler.Execute(groupId, characterId, request) : null;
+    public CommandResult? Dispatch(int groupId, int characterId, string type, JsonElement? payload)
+    {
+        if (!_handlers.TryGetValue(type, out var handler))
+            return null;
+        return handler.Execute(groupId, characterId, payload ?? default);
+    }
 }

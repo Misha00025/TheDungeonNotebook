@@ -22,15 +22,15 @@ public abstract class BaseController : ControllerBase
 	
 	public ActionResult NotImplemented()
 	{
-	    return new ObjectResult(new
-	    {
-	        title = "NotImplemented",
-	        status = StatusCodes.Status501NotImplemented,
-	        message = "This feature is not implemented yet."
-	    })
-	    {
-	        StatusCode = StatusCodes.Status501NotImplemented
-	    };
+	    return new ObjectResult(new { Message = "This feature is not implemented yet." })
+		{
+			StatusCode = StatusCodes.Status501NotImplemented
+		};
+	}
+	
+	public ActionResult Unprocessable(string message)
+	{
+	    return StatusCode(StatusCodes.Status422UnprocessableEntity, new { title = "UnprocessableEntity", message });
 	}
 	
 	public ActionResult Forbidden()

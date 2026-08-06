@@ -1,9 +1,10 @@
+using System.Text.Json;
 using Tdn.Models.Access;
 using Tdn.Models.Providing;
 
 namespace Tdn.Models.Commands;
 
-public class UpdateFieldCommandHandler : ICommandHandler
+public class UpdateFieldCommandHandler : CommandHandler<UpdateFieldCommand>
 {
     private readonly CommandsProvider _provider;
     private readonly CharacterLogProvider _log;
@@ -16,11 +17,14 @@ public class UpdateFieldCommandHandler : ICommandHandler
         _access = access;
     }
 
-    public CharacterCommandType Handles => CharacterCommandType.UpdateField;
+    public override string Handles => "UpdateField";
 
-    public CommandResult Execute(int groupId, int characterId, CharacterCommandRequest request)
+    public override UpdateFieldCommand Parse(JsonElement payload)
+        => new(FieldCommandParser.GetKey(payload), FieldCommandParser.GetField(payload));
+
+    public override CommandResult Execute(int groupId, int characterId, UpdateFieldCommand command)
     {
-        var result = _provider.UpdateField(groupId, characterId, request.Payload ?? new CommandPayload());
+        var result = _provider.UpdateField(groupId, characterId, command);
         Audit(groupId, characterId, result);
         return result;
     }
