@@ -30,7 +30,8 @@ public class CharacterCommandController : GroupsBaseController
         if (!SubjectAccess.CanWriteCharacter(groupId, characterId))
             return Forbidden();
 
-        var result = _dispatcher.Dispatch(groupId, characterId, data.Type, data.Payload);
+        var ctx = new CommandContext(SubjectAccess.GetCommandActorId(), new CharacterScope(groupId, characterId));
+        var result = _dispatcher.Dispatch(data.Type, data.Payload, ctx);
 
         if (result == null)
             return Unprocessable($"Unknown command type '{data.Type}'");
@@ -52,7 +53,8 @@ public class CharacterCommandController : GroupsBaseController
         if (commands == null || commands.Count == 0)
             return BadRequest(new { title = "CommandRejected", message = "Batch must contain at least one command" });
 
-        var result = _batch.Process(groupId, characterId, commands);
+        var ctx = new CommandContext(SubjectAccess.GetCommandActorId(), new CharacterScope(groupId, characterId));
+        var result = _batch.Process(ctx, commands);
         if (result.Status == 200)
             return Ok(new { results = result.Results });
         return StatusCode(result.Status, new { title = "CommandBatchFailed", results = result.Results, failedIndex = result.FailedIndex });

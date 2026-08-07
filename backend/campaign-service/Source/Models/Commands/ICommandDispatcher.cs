@@ -4,5 +4,5 @@ namespace Tdn.Models.Commands;
 
 public interface ICommandDispatcher
 {
-    CommandResult? Dispatch(int groupId, int characterId, string type, JsonElement? payload);
+    CommandResult? Dispatch(string type, JsonElement? payload, CommandContext ctx);
 }

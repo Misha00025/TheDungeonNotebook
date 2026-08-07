@@ -27,6 +27,7 @@ public class CharacterLogProvider
 
     public void LogFieldChange(int characterId, int groupId, int actorId, string fieldKey, int oldValue, int delta)
     {
+        if (actorId == -1) return; // admin / no subject — not logged
         PushEntry(characterId, groupId, new CharacterLogEntry
         {
             Timestamp = DateTime.UtcNow,
@@ -60,6 +61,7 @@ public class CharacterLogProvider
 
     public void LogEquipmentChange(int characterId, int groupId, int actorId, int itemId, int oldValue, int delta)
     {
+        if (actorId == -1) return; // admin / no subject — not logged
         PushEntry(characterId, groupId, new CharacterLogEntry
         {
             Timestamp = DateTime.UtcNow,

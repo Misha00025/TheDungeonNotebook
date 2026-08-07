@@ -5,12 +5,12 @@ public class CommandBatchProcessor
     private readonly ICommandDispatcher _dispatcher;
     public CommandBatchProcessor(ICommandDispatcher dispatcher) => _dispatcher = dispatcher;
 
-    public CommandBatchResult Process(int groupId, int characterId, List<CharacterCommandRequest> commands)
+    public CommandBatchResult Process(CommandContext ctx, List<CharacterCommandRequest> commands)
     {
         var results = new List<CommandBatchItem>();
         foreach (var cmd in commands)
         {
-            var r = _dispatcher.Dispatch(groupId, characterId, cmd.Type, cmd.Payload);
+            var r = _dispatcher.Dispatch(cmd.Type, cmd.Payload, ctx);
             if (r == null)
             {
                 results.Add(new CommandBatchItem { Type = cmd.Type, Status = 422, Success = false,

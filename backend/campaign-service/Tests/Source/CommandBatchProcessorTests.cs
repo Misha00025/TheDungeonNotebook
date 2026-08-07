@@ -8,10 +8,12 @@ public class CommandBatchProcessorTests
     [Fact]
     public void Process_AllOk_Returns200_WithAllResults()
     {
+        var ctx = new CommandContext(1, new CharacterScope(1, 1));
+
         var dispatcherMock = new Mock<ICommandDispatcher>();
-        dispatcherMock.Setup(d => d.Dispatch(1, 1, "updatefield", It.IsAny<JsonElement?>()))
+        dispatcherMock.Setup(d => d.Dispatch("updatefield", It.IsAny<JsonElement?>(), ctx))
             .Returns(CommandResult.Ok(new Dictionary<string, object?> { { "field", "agility" } }));
-        dispatcherMock.Setup(d => d.Dispatch(1, 1, "adddata", It.IsAny<JsonElement?>()))
+        dispatcherMock.Setup(d => d.Dispatch("adddata", It.IsAny<JsonElement?>(), ctx))
             .Returns(CommandResult.Ok(new Dictionary<string, object?> { { "data", "added" } }));
 
         var processor = new CommandBatchProcessor(dispatcherMock.Object);
@@ -22,7 +24,7 @@ public class CommandBatchProcessorTests
             new() { Type = "adddata" }
         };
 
-        var result = processor.Process(1, 1, commands);
+        var result = processor.Process(ctx, commands);
 
         Assert.Equal(200, result.Status);
         Assert.Equal(2, result.Results.Count);
@@ -30,19 +32,21 @@ public class CommandBatchProcessorTests
         Assert.True(result.Results[1].Success);
         Assert.Null(result.FailedIndex);
 
-        dispatcherMock.Verify(d => d.Dispatch(1, 1, "updatefield", It.IsAny<JsonElement?>()), Times.Once);
-        dispatcherMock.Verify(d => d.Dispatch(1, 1, "adddata", It.IsAny<JsonElement?>()), Times.Once);
+        dispatcherMock.Verify(d => d.Dispatch("updatefield", It.IsAny<JsonElement?>(), ctx), Times.Once);
+        dispatcherMock.Verify(d => d.Dispatch("adddata", It.IsAny<JsonElement?>(), ctx), Times.Once);
     }
 
     [Fact]
     public void Process_StopsOnFirstFailure_ReturnsFailingStatus()
     {
+        var ctx = new CommandContext(1, new CharacterScope(1, 1));
+
         var dispatcherMock = new Mock<ICommandDispatcher>();
-        dispatcherMock.Setup(d => d.Dispatch(1, 1, "updatefield", It.IsAny<JsonElement?>()))
+        dispatcherMock.Setup(d => d.Dispatch("updatefield", It.IsAny<JsonElement?>(), ctx))
             .Returns(CommandResult.Ok(new Dictionary<string, object?> { { "field", "strength" } }));
-        dispatcherMock.Setup(d => d.Dispatch(1, 1, "adddata", It.IsAny<JsonElement?>()))
+        dispatcherMock.Setup(d => d.Dispatch("adddata", It.IsAny<JsonElement?>(), ctx))
             .Returns(CommandResult.NoOp());
-        dispatcherMock.Setup(d => d.Dispatch(1, 1, "deletefield", It.IsAny<JsonElement?>()))
+        dispatcherMock.Setup(d => d.Dispatch("deletefield", It.IsAny<JsonElement?>(), ctx))
             .Returns(CommandResult.Ok(new Dictionary<string, object?> { { "removed", true } }));
 
         var processor = new CommandBatchProcessor(dispatcherMock.Object);
@@ -54,7 +58,7 @@ public class CommandBatchProcessorTests
             new() { Type = "deletefield" }
         };
 
-        var result = processor.Process(1, 1, commands);
+        var result = processor.Process(ctx, commands);
 
         Assert.Equal(400, result.Status);
         Assert.Equal(2, result.Results.Count);
@@ -63,20 +67,22 @@ public class CommandBatchProcessorTests
         Assert.Equal(1, result.FailedIndex);
         Assert.Equal("Nothing to do", result.Results[1].Message);
 
-        dispatcherMock.Verify(d => d.Dispatch(1, 1, "updatefield", It.IsAny<JsonElement?>()), Times.Once);
-        dispatcherMock.Verify(d => d.Dispatch(1, 1, "adddata", It.IsAny<JsonElement?>()), Times.Once);
-        dispatcherMock.Verify(d => d.Dispatch(1, 1, "deletefield", It.IsAny<JsonElement?>()), Times.Never);
+        dispatcherMock.Verify(d => d.Dispatch("updatefield", It.IsAny<JsonElement?>(), ctx), Times.Once);
+        dispatcherMock.Verify(d => d.Dispatch("adddata", It.IsAny<JsonElement?>(), ctx), Times.Once);
+        dispatcherMock.Verify(d => d.Dispatch("deletefield", It.IsAny<JsonElement?>(), ctx), Times.Never);
     }
 
     [Fact]
     public void Process_UnknownType_Returns422()
     {
+        var ctx = new CommandContext(1, new CharacterScope(1, 1));
+
         var dispatcherMock = new Mock<ICommandDispatcher>();
-        dispatcherMock.Setup(d => d.Dispatch(1, 1, "updatefield", It.IsAny<JsonElement?>()))
+        dispatcherMock.Setup(d => d.Dispatch("updatefield", It.IsAny<JsonElement?>(), ctx))
             .Returns(CommandResult.Ok(new Dictionary<string, object?> { { "field", "hp" } }));
-        dispatcherMock.Setup(d => d.Dispatch(1, 1, "unknowncommand", It.IsAny<JsonElement?>()))
+        dispatcherMock.Setup(d => d.Dispatch("unknowncommand", It.IsAny<JsonElement?>(), ctx))
             .Returns((CommandResult?)null);
-        dispatcherMock.Setup(d => d.Dispatch(1, 1, "adddata", It.IsAny<JsonElement?>()))
+        dispatcherMock.Setup(d => d.Dispatch("adddata", It.IsAny<JsonElement?>(), ctx))
             .Returns(CommandResult.Ok(new Dictionary<string, object?> { { "data", "added" } }));
 
         var processor = new CommandBatchProcessor(dispatcherMock.Object);
@@ -88,7 +94,7 @@ public class CommandBatchProcessorTests
             new() { Type = "adddata" }
         };
 
-        var result = processor.Process(1, 1, commands);
+        var result = processor.Process(ctx, commands);
 
         Assert.Equal(422, result.Status);
         Assert.Equal(2, result.Results.Count);
@@ -97,8 +103,8 @@ public class CommandBatchProcessorTests
         Assert.Equal(1, result.FailedIndex);
         Assert.Contains("Unknown command type", result.Results[1].Message);
 
-        dispatcherMock.Verify(d => d.Dispatch(1, 1, "updatefield", It.IsAny<JsonElement?>()), Times.Once);
-        dispatcherMock.Verify(d => d.Dispatch(1, 1, "unknowncommand", It.IsAny<JsonElement?>()), Times.Once);
-        dispatcherMock.Verify(d => d.Dispatch(1, 1, "adddata", It.IsAny<JsonElement?>()), Times.Never);
+        dispatcherMock.Verify(d => d.Dispatch("updatefield", It.IsAny<JsonElement?>(), ctx), Times.Once);
+        dispatcherMock.Verify(d => d.Dispatch("unknowncommand", It.IsAny<JsonElement?>(), ctx), Times.Once);
+        dispatcherMock.Verify(d => d.Dispatch("adddata", It.IsAny<JsonElement?>(), ctx), Times.Never);
     }
 }

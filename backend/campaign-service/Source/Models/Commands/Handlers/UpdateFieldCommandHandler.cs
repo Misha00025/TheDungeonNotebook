@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Tdn.Models.Access;
 using Tdn.Models.Providing;
 
 namespace Tdn.Models.Commands;
@@ -8,13 +7,11 @@ public class UpdateFieldCommandHandler : CommandHandler<UpdateFieldCommand>
 {
     private readonly CommandsProvider _provider;
     private readonly CharacterLogProvider _log;
-    private readonly SubjectAccessHelper _access;
 
-    public UpdateFieldCommandHandler(CommandsProvider provider, CharacterLogProvider log, SubjectAccessHelper access)
+    public UpdateFieldCommandHandler(CommandsProvider provider, CharacterLogProvider log)
     {
         _provider = provider;
         _log = log;
-        _access = access;
     }
 
     public override string Handles => "UpdateField";
@@ -22,16 +19,18 @@ public class UpdateFieldCommandHandler : CommandHandler<UpdateFieldCommand>
     public override UpdateFieldCommand Parse(JsonElement payload)
         => new(FieldCommandParser.GetKey(payload), FieldCommandParser.GetField(payload));
 
-    public override CommandResult Execute(int groupId, int characterId, UpdateFieldCommand command)
+    public override CommandResult Execute(UpdateFieldCommand command, CommandContext ctx)
     {
-        var result = _provider.UpdateField(groupId, characterId, command);
-        Audit(groupId, characterId, result);
+        if (ctx.Scope is not CharacterScope cs)
+            return CommandResult.Fail(new List<string> { $"{Handles} requires a character scope" });
+        var result = _provider.UpdateField(cs.GroupId, cs.CharacterId, command);
+        Audit(cs.GroupId, cs.CharacterId, ctx.ActorId, result);
         return result;
     }
 
-    private void Audit(int groupId, int characterId, CommandResult result)
+    private void Audit(int groupId, int characterId, int actorId, CommandResult result)
     {
         if (result.Success && result.Changed && result.Delta != 0 && result.FieldKey != null)
-            _log.LogFieldChange(characterId, groupId, _access.GetCurrentActorId(), result.FieldKey, result.OldValue, result.Delta);
+            _log.LogFieldChange(characterId, groupId, actorId, result.FieldKey, result.OldValue, result.Delta);
     }
 }

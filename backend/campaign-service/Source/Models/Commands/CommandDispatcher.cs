@@ -11,10 +11,10 @@ public class CommandDispatcher : ICommandDispatcher
         _handlers = handlers.ToDictionary(h => h.Handles);
     }
 
-    public CommandResult? Dispatch(int groupId, int characterId, string type, JsonElement? payload)
+    public CommandResult? Dispatch(string type, JsonElement? payload, CommandContext ctx)
     {
         if (!_handlers.TryGetValue(type, out var handler))
             return null;
-        return handler.Execute(groupId, characterId, payload ?? default);
+        return handler.Execute(payload ?? default, ctx);
     }
 }

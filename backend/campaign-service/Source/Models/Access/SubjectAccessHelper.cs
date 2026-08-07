@@ -111,6 +111,18 @@ public class SubjectAccessHelper
         };
     }
 
+    public int GetCommandActorId()
+    {
+        var subject = GetSubject();
+        return subject switch
+        {
+            { Type: SubjectType.User } => subject.Id,
+            { Type: SubjectType.Group } => 0,
+            { Type: SubjectType.Admin } => -1,
+            null => -1
+        };
+    }
+
     public List<int> GetAccessibleCharacterIds(int groupId)
     {
         var subject = GetSubject();
