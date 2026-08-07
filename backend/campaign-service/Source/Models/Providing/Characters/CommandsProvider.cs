@@ -9,10 +9,12 @@ namespace Tdn.Models.Providing;
 public class CommandsProvider
 {
     private readonly CharactersProvider _characters;
+    private readonly ItemsProvider _items;
 
-    public CommandsProvider(CharactersProvider characters)
+    public CommandsProvider(CharactersProvider characters, ItemsProvider items)
     {
         _characters = characters;
+        _items = items;
     }
 
     public CommandResult AddField(int groupId, int characterId, AddFieldCommand command)
@@ -112,6 +114,46 @@ public class CommandsProvider
         var result = Save(groupId, character, mongoData);
         result.FieldKey = key;
         result.OldValue = oldValue;
+        result.NewValue = 0;
+        result.Changed = true;
+        return result;
+    }
+
+    public CommandResult EquipItem(int groupId, int characterId, EquipItemCommand command)
+    {
+        var character = _characters.GetCharacter(groupId, characterId);
+        if (character == null) return CommandResult.NotFound();
+        if (_items.GetItem(groupId, command.ItemId) == null)
+            return CommandResult.NotFound();
+
+        var mongoData = _characters.BuildMongoData(character);
+        mongoData.Equipment ??= new List<int>();
+        if (mongoData.Equipment.Contains(command.ItemId))
+            return CommandResult.Conflict($"Item '{command.ItemId}' is already equipped");
+
+        mongoData.Equipment.Add(command.ItemId);
+        var result = Save(groupId, character, mongoData);
+        result.FieldKey = command.ItemId.ToString();
+        result.OldValue = 0;
+        result.NewValue = 1;
+        result.Changed = true;
+        return result;
+    }
+
+    public CommandResult UnequipItem(int groupId, int characterId, UnequipItemCommand command)
+    {
+        var character = _characters.GetCharacter(groupId, characterId);
+        if (character == null) return CommandResult.NotFound();
+
+        var mongoData = _characters.BuildMongoData(character);
+        mongoData.Equipment ??= new List<int>();
+        if (!mongoData.Equipment.Contains(command.ItemId))
+            return CommandResult.NoOp();
+
+        mongoData.Equipment.Remove(command.ItemId);
+        var result = Save(groupId, character, mongoData);
+        result.FieldKey = command.ItemId.ToString();
+        result.OldValue = 1;
         result.NewValue = 0;
         result.Changed = true;
         return result;

@@ -604,6 +604,16 @@ routes:
     methods:
       POST: {}
 
+  - path: /groups/{group_id}/characters/{character_id}/commands/batch
+    proxy:
+      service: campaign
+      path: /groups/{group_id}/characters/{character_id}/commands/batch
+      headers:
+        X-Subject: "{state.x_subject}"
+    auth: required
+    methods:
+      POST: {}
+
   # ============================================================
   # Character Log
   # ============================================================

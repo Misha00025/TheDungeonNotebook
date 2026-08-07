@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace Tdn.Models.Commands;
 
-public class CommandDispatcher
+public class CommandDispatcher : ICommandDispatcher
 {
     private readonly Dictionary<string, ICommandHandler> _handlers;
 

@@ -21,6 +21,8 @@ from scenarios.character_log import register_character_log_scenario, scenarios a
 from scenarios.quests import register_quests_scenario, scenarios as q_scenarios
 from scenarios.service_token_access import register_service_token_scenario, scenarios as sta_scenarios
 from scenarios.character_commands import register_character_commands_scenario, scenarios as cmd_scenarios
+from scenarios.character_equipment_commands import register_character_equipment_commands_scenario, scenarios as eq_scenarios
+from scenarios.character_commands_batch import register_character_commands_batch_scenario, scenarios as cb_scenarios
 
 if __name__ == "__main__":
     import argparse
@@ -31,7 +33,7 @@ if __name__ == "__main__":
     p.add_argument("-c", "--compact", nargs='?', const=True, default=False)
     p.add_argument("-d", "--debug", nargs='?', const=True, default=False)
     p.add_argument("--server", type=str, help="Адрес сервера")
-    p.add_argument('-S', "--scenario", action='append', help=f'Добавляет сценарий для исполнения. Доступные значения: GatewayMain, UserProfile, GroupItemsLifecycle, CharacterLifecycle, GroupSkills, CharacterSkillsAssignment, ExportImport, Notes, LocalEndpoints, SchemasLifecycle, CharacterItemsAccess, CharacterFullAccess, OidcEndpoints, AuthFlow, DashboardConfig, CharacterLog, Quests, ServiceTokenAccess, CookieAuth, CharacterCommands')
+    p.add_argument('-S', "--scenario", action='append', help=f'Добавляет сценарий для исполнения. Доступные значения: GatewayMain, UserProfile, GroupItemsLifecycle, CharacterLifecycle, GroupSkills, CharacterSkillsAssignment, ExportImport, Notes, LocalEndpoints, SchemasLifecycle, CharacterItemsAccess, CharacterFullAccess, OidcEndpoints, AuthFlow, DashboardConfig, CharacterLog, Quests, ServiceTokenAccess, CookieAuth, CharacterCommands, CharacterEquipmentCommands, CharacterCommandsBatch')
     args = p.parse_args()
 
     if args.server is not None:
@@ -82,6 +84,10 @@ if __name__ == "__main__":
                 register_cookie_auth_scenario()
             elif scenario == "CharacterCommands":
                 register_character_commands_scenario()
+            elif scenario == "CharacterEquipmentCommands":
+                register_character_equipment_commands_scenario()
+            elif scenario == "CharacterCommandsBatch":
+                register_character_commands_batch_scenario()
     else:
         register_gateway_main()
         register_user_profile_scenario()
@@ -102,6 +108,8 @@ if __name__ == "__main__":
         register_service_token_scenario()
         register_cookie_auth_scenario()
         register_character_commands_scenario()
+        register_character_equipment_commands_scenario()
+        register_character_commands_batch_scenario()
 
-    all_scenarios = gw_scenarios + up_scenarios + gi_scenarios + cl_scenarios + gs_scenarios + cs_scenarios + ei_scenarios + notes_scenarios + le_scenarios + sl_scenarios + cia_scenarios + cfa_scenarios + af_scenarios + dc_scenarios + cl_log_scenarios + q_scenarios + sta_scenarios + ca_scenarios + cmd_scenarios
+    all_scenarios = gw_scenarios + up_scenarios + gi_scenarios + cl_scenarios + gs_scenarios + cs_scenarios + ei_scenarios + notes_scenarios + le_scenarios + sl_scenarios + cia_scenarios + cfa_scenarios + af_scenarios + dc_scenarios + cl_log_scenarios + q_scenarios + sta_scenarios + ca_scenarios + cmd_scenarios + eq_scenarios + cb_scenarios
     main_test.start(all_scenarios)

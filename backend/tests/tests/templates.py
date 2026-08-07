@@ -115,16 +115,19 @@ def replace_placeholders(text, data):
 	return result
 
 
-def prepare_data(data: dict, results):
-	result = data.copy()
-	if data is not None:
-		for key in data.keys():
-			try:
-				result[key] = replace_placeholders(data[key], results)
-			except:
-				if test_variables.debug:
-					print("WARNING: Can't parse:", result[key])
-	return result
+def prepare_data(data, results):
+	if data is None:
+		return None
+	if isinstance(data, list):
+		return [prepare_data(item, results) for item in data]
+	if isinstance(data, dict):
+		result = {}
+		for key, value in data.items():
+			result[key] = prepare_data(value, results)
+		return result
+	if isinstance(data, str):
+		return replace_placeholders(data, results)
+	return data
 
 
 class Step:

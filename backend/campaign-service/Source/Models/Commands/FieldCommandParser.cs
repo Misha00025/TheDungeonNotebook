@@ -32,4 +32,8 @@ public static class FieldCommandParser
 
     private static int? GetInt(JsonElement e, string prop)
         => e.TryGetProperty(prop, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var i) ? i : null;
+
+    public static int? GetItemId(JsonElement payload)
+        => payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("itemId", out var v)
+           && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var i) ? i : null;
 }
