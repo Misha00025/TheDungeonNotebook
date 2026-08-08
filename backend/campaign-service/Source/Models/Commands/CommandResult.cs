@@ -9,6 +9,7 @@ public class CommandResult
     public string? Message { get; set; }
 
     // Audit metadata
+    // TODO: Remove this shit
     public string? FieldKey { get; set; }
     public int OldValue { get; set; }
     public int NewValue { get; set; }

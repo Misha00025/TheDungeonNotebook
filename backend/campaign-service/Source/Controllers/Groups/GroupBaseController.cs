@@ -20,6 +20,7 @@ public abstract class GroupsBaseController : BaseController
     }
 
     protected SubjectAccessHelper SubjectAccess => _subjectAccessHelper;
+    protected ILogger<GroupsBaseController> Logger => _logger;
 
     protected bool TryGetGroup(int groupId, out GroupData group)
     {
