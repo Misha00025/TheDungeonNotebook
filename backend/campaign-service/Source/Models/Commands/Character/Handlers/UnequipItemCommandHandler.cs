@@ -35,7 +35,7 @@ public class UnequipItemCommandHandler : CharacterCommandHandler<UnequipItemComm
 
         mongoData.Equipment.Remove(command.ItemId);
         var result = SaveAndBuildResponse(groupId, character, mongoData);
-        TryAuditEquipmentChange(characterId, groupId, ctx.ActorId, command.ItemId, 1, 0);
+        _log.Log(characterId, groupId, ctx.ActorId, "UnequipItem", new Dictionary<string, object?> { ["itemId"] = command.ItemId, ["oldValue"] = 1, ["delta"] = -1 });
         return result;
     }
 }

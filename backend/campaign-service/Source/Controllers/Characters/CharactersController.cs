@@ -130,7 +130,12 @@ public class CharactersController : GroupsBaseController
                 {
                     var delta = newValue - oldVal;
                     if (delta != 0)
-                        _logProvider.LogFieldChange(characterId, groupId, SubjectAccess.GetCurrentActorId(), kvp.Key, oldVal, delta);
+                        _logProvider.Log(characterId, groupId, SubjectAccess.GetCurrentActorId(), "UpdateField", new Dictionary<string, object?>
+                        {
+                            ["key"] = kvp.Key,
+                            ["oldValue"] = oldVal,
+                            ["delta"] = delta
+                        });
                 }
             }
         }

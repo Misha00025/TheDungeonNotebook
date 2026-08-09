@@ -49,7 +49,12 @@ public class CharacterSkillsController : GroupsBaseController
             return NotFound(new { error = $"Skill with id {skillId} not found in group {groupId}" });
         if (_provider.TryAddSkillToCharacter(skill, characterId))
         {
-            _logProvider.LogSkillChange(characterId, groupId, SubjectAccess.GetCurrentActorId(), skillId, 0, 1);
+            _logProvider.Log(characterId, groupId, SubjectAccess.GetCurrentActorId(), "AddSkill", new Dictionary<string, object?>
+            {
+                ["skillId"] = skillId,
+                ["oldValue"] = 0,
+                ["delta"] = 1
+            });
             return Ok(skill.ToResponse());
         }
         else
@@ -67,7 +72,12 @@ public class CharacterSkillsController : GroupsBaseController
             return NotFound(new { error = $"Skill with id {skillId} not found in group {groupId}" });
         if (_provider.TryRemoveSkillFromCharacter(skill, characterId))
         {
-            _logProvider.LogSkillChange(characterId, groupId, SubjectAccess.GetCurrentActorId(), skillId, 1, -1);
+            _logProvider.Log(characterId, groupId, SubjectAccess.GetCurrentActorId(), "RemoveSkill", new Dictionary<string, object?>
+            {
+                ["skillId"] = skillId,
+                ["oldValue"] = 1,
+                ["delta"] = -1
+            });
             return Ok(skill.ToResponse());
         }
         else

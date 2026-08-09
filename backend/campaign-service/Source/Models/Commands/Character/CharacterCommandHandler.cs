@@ -36,18 +36,6 @@ public abstract class CharacterCommandHandler<TCommand> : CommandHandler<TComman
         return CommandResult.Ok(data);
     }
 
-    protected void TryAuditFieldChange(int characterId, int groupId, int actorId, string key, int oldValue, int newValue)
-    {
-        var delta = newValue - oldValue;
-        if (delta != 0) _log.LogFieldChange(characterId, groupId, actorId, key, oldValue, delta);
-    }
-
-    protected void TryAuditEquipmentChange(int characterId, int groupId, int actorId, int itemId, int oldValue, int newValue)
-    {
-        var delta = newValue - oldValue;
-        if (delta != 0) _log.LogEquipmentChange(characterId, groupId, actorId, itemId, oldValue, delta);
-    }
-
     protected static FieldMongoData CloneField(FieldMongoData source) => new PropertyMongoData
     {
         Name = source.Name,

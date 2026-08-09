@@ -40,7 +40,8 @@ public class DeleteFieldCommandHandler : CharacterCommandHandler<DeleteFieldComm
         mongoData.Fields.Remove(key);
 
         var result = SaveAndBuildResponse(groupId, character, mongoData);
-        TryAuditFieldChange(characterId, groupId, ctx.ActorId, key, oldValue, 0);
+        if (oldValue != 0)
+            _log.Log(characterId, groupId, ctx.ActorId, "DeleteField", new Dictionary<string, object?> { ["key"] = key, ["oldValue"] = oldValue, ["delta"] = 0 - oldValue });
         return result;
     }
 }

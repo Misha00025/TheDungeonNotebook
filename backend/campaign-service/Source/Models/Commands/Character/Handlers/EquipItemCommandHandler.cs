@@ -37,7 +37,7 @@ public class EquipItemCommandHandler : CharacterCommandHandler<EquipItemCommand>
 
         mongoData.Equipment.Add(command.ItemId);
         var result = SaveAndBuildResponse(groupId, character, mongoData);
-        TryAuditEquipmentChange(characterId, groupId, ctx.ActorId, command.ItemId, 0, 1);
+        _log.Log(characterId, groupId, ctx.ActorId, "EquipItem", new Dictionary<string, object?> { ["itemId"] = command.ItemId, ["oldValue"] = 0, ["delta"] = 1 });
         return result;
     }
 }

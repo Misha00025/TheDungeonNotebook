@@ -45,7 +45,9 @@ public class UpdateFieldCommandHandler : CharacterCommandHandler<UpdateFieldComm
         var newValue = field.Value;
 
         var result = SaveAndBuildResponse(groupId, character, mongoData);
-        TryAuditFieldChange(characterId, groupId, ctx.ActorId, key, oldValue, newValue);
+        var delta = newValue - oldValue;
+        if (delta != 0)
+            _log.Log(characterId, groupId, ctx.ActorId, "UpdateField", new Dictionary<string, object?> { ["key"] = key, ["oldValue"] = oldValue, ["delta"] = delta });
         return result;
     }
 }
