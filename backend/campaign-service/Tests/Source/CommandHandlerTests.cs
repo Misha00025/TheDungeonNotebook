@@ -4,12 +4,13 @@ using Microsoft.Extensions.Logging;
 using Tdn.Models;
 using Tdn.Models.DTOs;
 using Tdn.Models.Commands;
+using Tdn.Models.Commands.Character;
 using Tdn.Models.Providing;
 using Tdn.Tests.Fixtures;
 
 namespace Tdn.Tests.Source;
 
-public class CommandsProviderTests
+public class CommandHandlerTests
 {
     [Fact]
     public void AddField_CreatesNewField()
@@ -38,12 +39,18 @@ public class CommandsProviderTests
             .Returns(new ReplaceOneResult.Acknowledged(1L, 1L, null));
         mongoMock.Setup(m => m.GetCollection<CharacterMongoData>("characters")).Returns(collectionMock.Object);
 
+        var logCollectionMock = new Mock<IMongoCollection<CharacterLogDocument>>(MockBehavior.Loose);
+        mongoMock.Setup(m => m.GetCollection<CharacterLogDocument>(MongoCollections.CharacterLogs))
+            .Returns(logCollectionMock.Object);
+
         var chars = new CharactersProvider(ctx, mongoMock.Object, new Mock<ILogger<CharactersProvider>>().Object);
         var items = CreateItemsProvider(ctx, mongoMock);
-        var provider = new CommandsProvider(chars, items);
+        var log = new CharacterLogProvider(mongoMock.Object);
+        var handler = new AddFieldCommandHandler(chars, log, items);
 
-        var result = provider.AddField(1, 1, new AddFieldCommand("agility",
-            new FieldCommandData { Name = "Agility", Description = "Agility stat", Value = 5 }));
+        var result = handler.Execute(new AddFieldCommand("agility",
+            new FieldCommandData { Name = "Agility", Description = "Agility stat", Value = 5 }),
+            new CommandContext(1, new CharacterScope(1, 1)));
 
         Assert.True(result.Success);
         Assert.Equal(200, result.StatusCode);
@@ -84,11 +91,17 @@ public class CommandsProviderTests
             .Returns(new ReplaceOneResult.Acknowledged(1L, 1L, null));
         mongoMock.Setup(m => m.GetCollection<CharacterMongoData>("characters")).Returns(collectionMock.Object);
 
+        var logCollectionMock = new Mock<IMongoCollection<CharacterLogDocument>>(MockBehavior.Loose);
+        mongoMock.Setup(m => m.GetCollection<CharacterLogDocument>(MongoCollections.CharacterLogs))
+            .Returns(logCollectionMock.Object);
+
         var chars = new CharactersProvider(ctx, mongoMock.Object, new Mock<ILogger<CharactersProvider>>().Object);
         var items = CreateItemsProvider(ctx, mongoMock);
-        var provider = new CommandsProvider(chars, items);
+        var log = new CharacterLogProvider(mongoMock.Object);
+        var handler = new AddFieldCommandHandler(chars, log, items);
 
-        var result = provider.AddField(1, 1, new AddFieldCommand("hp", new FieldCommandData { Value = 75 }));
+        var result = handler.Execute(new AddFieldCommand("hp", new FieldCommandData { Value = 75 }),
+            new CommandContext(1, new CharacterScope(1, 1)));
 
         Assert.True(result.Success);
         Assert.Equal(200, result.StatusCode);
@@ -124,9 +137,11 @@ public class CommandsProviderTests
 
         var chars = new CharactersProvider(ctx, mongoMock.Object, new Mock<ILogger<CharactersProvider>>().Object);
         var items = CreateItemsProvider(ctx, mongoMock);
-        var provider = new CommandsProvider(chars, items);
+        var log = new CharacterLogProvider(mongoMock.Object);
+        var handler = new AddFieldCommandHandler(chars, log, items);
 
-        var result = provider.AddField(1, 1, new AddFieldCommand("agility", new FieldCommandData { Value = 9 }));
+        var result = handler.Execute(new AddFieldCommand("agility", new FieldCommandData { Value = 9 }),
+            new CommandContext(1, new CharacterScope(1, 1)));
 
         Assert.False(result.Success);
         Assert.Equal(409, result.StatusCode);
@@ -164,11 +179,17 @@ public class CommandsProviderTests
             .Returns(new ReplaceOneResult.Acknowledged(1L, 1L, null));
         mongoMock.Setup(m => m.GetCollection<CharacterMongoData>("characters")).Returns(collectionMock.Object);
 
+        var logCollectionMock = new Mock<IMongoCollection<CharacterLogDocument>>(MockBehavior.Loose);
+        mongoMock.Setup(m => m.GetCollection<CharacterLogDocument>(MongoCollections.CharacterLogs))
+            .Returns(logCollectionMock.Object);
+
         var chars = new CharactersProvider(ctx, mongoMock.Object, new Mock<ILogger<CharactersProvider>>().Object);
         var items = CreateItemsProvider(ctx, mongoMock);
-        var provider = new CommandsProvider(chars, items);
+        var log = new CharacterLogProvider(mongoMock.Object);
+        var handler = new UpdateFieldCommandHandler(chars, log, items);
 
-        var result = provider.UpdateField(1, 1, new UpdateFieldCommand("agility", new FieldCommandData { Value = 8 }));
+        var result = handler.Execute(new UpdateFieldCommand("agility", new FieldCommandData { Value = 8 }),
+            new CommandContext(1, new CharacterScope(1, 1)));
 
         Assert.True(result.Success);
         Assert.Equal(200, result.StatusCode);
@@ -197,9 +218,11 @@ public class CommandsProviderTests
 
         var chars = new CharactersProvider(ctx, mongoMock.Object, new Mock<ILogger<CharactersProvider>>().Object);
         var items = CreateItemsProvider(ctx, mongoMock);
-        var provider = new CommandsProvider(chars, items);
+        var log = new CharacterLogProvider(mongoMock.Object);
+        var handler = new UpdateFieldCommandHandler(chars, log, items);
 
-        var result = provider.UpdateField(1, 1, new UpdateFieldCommand("agility", new FieldCommandData { Value = 8 }));
+        var result = handler.Execute(new UpdateFieldCommand("agility", new FieldCommandData { Value = 8 }),
+            new CommandContext(1, new CharacterScope(1, 1)));
 
         Assert.False(result.Success);
         Assert.Equal(400, result.StatusCode);
@@ -237,11 +260,17 @@ public class CommandsProviderTests
             .Returns(new ReplaceOneResult.Acknowledged(1L, 1L, null));
         mongoMock.Setup(m => m.GetCollection<CharacterMongoData>("characters")).Returns(collectionMock.Object);
 
+        var logCollectionMock = new Mock<IMongoCollection<CharacterLogDocument>>(MockBehavior.Loose);
+        mongoMock.Setup(m => m.GetCollection<CharacterLogDocument>(MongoCollections.CharacterLogs))
+            .Returns(logCollectionMock.Object);
+
         var chars = new CharactersProvider(ctx, mongoMock.Object, new Mock<ILogger<CharactersProvider>>().Object);
         var items = CreateItemsProvider(ctx, mongoMock);
-        var provider = new CommandsProvider(chars, items);
+        var log = new CharacterLogProvider(mongoMock.Object);
+        var handler = new DeleteFieldCommandHandler(chars, log, items);
 
-        var result = provider.DeleteField(1, 1, new DeleteFieldCommand("agility"));
+        var result = handler.Execute(new DeleteFieldCommand("agility"),
+            new CommandContext(1, new CharacterScope(1, 1)));
 
         Assert.True(result.Success);
         Assert.Equal(200, result.StatusCode);
@@ -269,9 +298,11 @@ public class CommandsProviderTests
 
         var chars = new CharactersProvider(ctx, mongoMock.Object, new Mock<ILogger<CharactersProvider>>().Object);
         var items = CreateItemsProvider(ctx, mongoMock);
-        var provider = new CommandsProvider(chars, items);
+        var log = new CharacterLogProvider(mongoMock.Object);
+        var handler = new DeleteFieldCommandHandler(chars, log, items);
 
-        var result = provider.DeleteField(1, 1, new DeleteFieldCommand("agility"));
+        var result = handler.Execute(new DeleteFieldCommand("agility"),
+            new CommandContext(1, new CharacterScope(1, 1)));
 
         Assert.False(result.Success);
         Assert.Equal(400, result.StatusCode);
@@ -289,10 +320,12 @@ public class CommandsProviderTests
         var mongoMock = new Mock<IMongoDbContext>(MockBehavior.Loose);
         var chars = new CharactersProvider(ctx, mongoMock.Object, new Mock<ILogger<CharactersProvider>>().Object);
         var items = CreateItemsProvider(ctx, mongoMock);
-        var provider = new CommandsProvider(chars, items);
+        var log = new CharacterLogProvider(mongoMock.Object);
+        var handler = new AddFieldCommandHandler(chars, log, items);
 
-        var result = provider.AddField(1, 999, new AddFieldCommand("agility",
-            new FieldCommandData { Name = "Agility", Description = "Agility stat", Value = 5 }));
+        var result = handler.Execute(new AddFieldCommand("agility",
+            new FieldCommandData { Name = "Agility", Description = "Agility stat", Value = 5 }),
+            new CommandContext(1, new CharacterScope(1, 999)));
 
         Assert.False(result.Success);
         Assert.Equal(404, result.StatusCode);
@@ -328,17 +361,20 @@ public class CommandsProviderTests
             .Returns(new ReplaceOneResult.Acknowledged(1L, 1L, null));
         mongoMock.Setup(m => m.GetCollection<CharacterMongoData>("characters")).Returns(collectionMock.Object);
 
+        var logCollectionMock = new Mock<IMongoCollection<CharacterLogDocument>>(MockBehavior.Loose);
+        mongoMock.Setup(m => m.GetCollection<CharacterLogDocument>(MongoCollections.CharacterLogs))
+            .Returns(logCollectionMock.Object);
+
         var chars = new CharactersProvider(ctx, mongoMock.Object, new Mock<ILogger<CharactersProvider>>().Object);
         var items = CreateItemsProvider(ctx, mongoMock);
-        var provider = new CommandsProvider(chars, items);
+        var log = new CharacterLogProvider(mongoMock.Object);
+        var handler = new EquipItemCommandHandler(chars, log, items);
 
-        var result = provider.EquipItem(1, 1, new EquipItemCommand(100));
+        var result = handler.Execute(new EquipItemCommand(100),
+            new CommandContext(1, new CharacterScope(1, 1)));
 
         Assert.True(result.Success);
         Assert.Equal(200, result.StatusCode);
-        Assert.True(result.Changed);
-        Assert.Equal("100", result.FieldKey);
-        Assert.Equal(1, result.Delta);
     }
 
     [Fact]
@@ -357,9 +393,11 @@ public class CommandsProviderTests
 
         var chars = new CharactersProvider(ctx, mongoMock.Object, new Mock<ILogger<CharactersProvider>>().Object);
         var items = CreateItemsProvider(ctx, mongoMock);
-        var provider = new CommandsProvider(chars, items);
+        var log = new CharacterLogProvider(mongoMock.Object);
+        var handler = new EquipItemCommandHandler(chars, log, items);
 
-        var result = provider.EquipItem(1, 1, new EquipItemCommand(999));
+        var result = handler.Execute(new EquipItemCommand(999),
+            new CommandContext(1, new CharacterScope(1, 1)));
 
         Assert.False(result.Success);
         Assert.Equal(404, result.StatusCode);
@@ -399,9 +437,11 @@ public class CommandsProviderTests
 
         var chars = new CharactersProvider(ctx, mongoMock.Object, new Mock<ILogger<CharactersProvider>>().Object);
         var items = CreateItemsProvider(ctx, mongoMock);
-        var provider = new CommandsProvider(chars, items);
+        var log = new CharacterLogProvider(mongoMock.Object);
+        var handler = new EquipItemCommandHandler(chars, log, items);
 
-        var result = provider.EquipItem(1, 1, new EquipItemCommand(100));
+        var result = handler.Execute(new EquipItemCommand(100),
+            new CommandContext(1, new CharacterScope(1, 1)));
 
         Assert.False(result.Success);
         Assert.Equal(409, result.StatusCode);
@@ -437,21 +477,24 @@ public class CommandsProviderTests
             .Returns(new ReplaceOneResult.Acknowledged(1L, 1L, null));
         mongoMock.Setup(m => m.GetCollection<CharacterMongoData>("characters")).Returns(collectionMock.Object);
 
+        var logCollectionMock = new Mock<IMongoCollection<CharacterLogDocument>>(MockBehavior.Loose);
+        mongoMock.Setup(m => m.GetCollection<CharacterLogDocument>(MongoCollections.CharacterLogs))
+            .Returns(logCollectionMock.Object);
+
         var chars = new CharactersProvider(ctx, mongoMock.Object, new Mock<ILogger<CharactersProvider>>().Object);
         var itemsMock = new Mock<ItemsProvider>(
             It.IsAny<CampaignContext>(),
             It.IsAny<IMongoDbContext>(),
             It.IsAny<AttributesProvider>(),
             It.IsAny<ILogger<ItemsProvider>>());
-        var provider = new CommandsProvider(chars, itemsMock.Object);
+        var log = new CharacterLogProvider(mongoMock.Object);
+        var handler = new UnequipItemCommandHandler(chars, log, itemsMock.Object);
 
-        var result = provider.UnequipItem(1, 1, new UnequipItemCommand(100));
+        var result = handler.Execute(new UnequipItemCommand(100),
+            new CommandContext(1, new CharacterScope(1, 1)));
 
         Assert.True(result.Success);
         Assert.Equal(200, result.StatusCode);
-        Assert.True(result.Changed);
-        Assert.Equal("100", result.FieldKey);
-        Assert.Equal(-1, result.Delta);
     }
 
     [Fact]
@@ -474,9 +517,11 @@ public class CommandsProviderTests
             It.IsAny<IMongoDbContext>(),
             It.IsAny<AttributesProvider>(),
             It.IsAny<ILogger<ItemsProvider>>());
-        var provider = new CommandsProvider(chars, itemsMock.Object);
+        var log = new CharacterLogProvider(mongoMock.Object);
+        var handler = new UnequipItemCommandHandler(chars, log, itemsMock.Object);
 
-        var result = provider.UnequipItem(1, 1, new UnequipItemCommand(100));
+        var result = handler.Execute(new UnequipItemCommand(100),
+            new CommandContext(1, new CharacterScope(1, 1)));
 
         Assert.False(result.Success);
         Assert.Equal(400, result.StatusCode);
@@ -494,9 +539,11 @@ public class CommandsProviderTests
         var mongoMock = new Mock<IMongoDbContext>(MockBehavior.Loose);
         var chars = new CharactersProvider(ctx, mongoMock.Object, new Mock<ILogger<CharactersProvider>>().Object);
         var items = CreateItemsProvider(ctx, mongoMock);
-        var provider = new CommandsProvider(chars, items);
+        var log = new CharacterLogProvider(mongoMock.Object);
+        var handler = new EquipItemCommandHandler(chars, log, items);
 
-        var result = provider.EquipItem(1, 999, new EquipItemCommand(100));
+        var result = handler.Execute(new EquipItemCommand(100),
+            new CommandContext(1, new CharacterScope(1, 999)));
 
         Assert.False(result.Success);
         Assert.Equal(404, result.StatusCode);

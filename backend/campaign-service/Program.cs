@@ -12,6 +12,7 @@ using Tdn.Models.Schemas.Items;
 using Tdn.Models.Schemas.Templates;
 using Tdn.Models.Schemas.Characters;
 using Tdn.Models.Commands;
+using Tdn.Models.Commands.Character;
 using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -48,7 +49,6 @@ builder.Services.AddScoped(sp => new GenericMongoProvider<CharacterResourcesMong
 builder.Services.AddScoped<CharacterEquipmentProvider, CharacterEquipmentProvider>();
 builder.Services.AddScoped<CharacterLogProvider, CharacterLogProvider>();
 builder.Services.AddScoped<CharactersProvider, CharactersProvider>();
-builder.Services.AddScoped<CommandsProvider, CommandsProvider>();
 builder.Services.AddScoped<ICommandHandler, AddFieldCommandHandler>();
 builder.Services.AddScoped<ICommandHandler, UpdateFieldCommandHandler>();
 builder.Services.AddScoped<ICommandHandler, DeleteFieldCommandHandler>();

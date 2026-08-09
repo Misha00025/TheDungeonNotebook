@@ -1,17 +1,15 @@
 using System.Text.Json;
+using Tdn.Models;
+using Tdn.Models.Commands;
 using Tdn.Models.Providing;
 
-namespace Tdn.Models.Commands;
+namespace Tdn.Models.Commands.Character;
 
-public class DeleteFieldCommandHandler : CommandHandler<DeleteFieldCommand>
+public class DeleteFieldCommandHandler : CharacterCommandHandler<DeleteFieldCommand>
 {
-    private readonly CommandsProvider _provider;
-    private readonly CharacterLogProvider _log;
-
-    public DeleteFieldCommandHandler(CommandsProvider provider, CharacterLogProvider log)
+    public DeleteFieldCommandHandler(CharactersProvider characters, CharacterLogProvider log, ItemsProvider items)
+        : base(characters, log, items)
     {
-        _provider = provider;
-        _log = log;
     }
 
     public override string Handles => "DeleteField";
@@ -23,14 +21,26 @@ public class DeleteFieldCommandHandler : CommandHandler<DeleteFieldCommand>
     {
         if (ctx.Scope is not CharacterScope cs)
             return CommandResult.Fail(new List<string> { $"{Handles} requires a character scope" });
-        var result = _provider.DeleteField(cs.GroupId, cs.CharacterId, command);
-        Audit(cs.GroupId, cs.CharacterId, ctx.ActorId, result);
-        return result;
-    }
 
-    private void Audit(int groupId, int characterId, int actorId, CommandResult result)
-    {
-        if (result.Success && result.Changed && result.Delta != 0 && result.FieldKey != null)
-            _log.LogFieldChange(characterId, groupId, actorId, result.FieldKey, result.OldValue, result.Delta);
+        var groupId = cs.GroupId;
+        var characterId = cs.CharacterId;
+        var key = command.Key;
+        if (string.IsNullOrEmpty(key))
+            return CommandResult.Fail(new List<string> { "Field key required" });
+
+        var character = _characters.GetCharacter(groupId, characterId);
+        if (character == null) return CommandResult.NotFound();
+
+        var mongoData = _characters.BuildMongoData(character);
+
+        if (!mongoData.Fields.ContainsKey(key))
+            return CommandResult.NoOp();
+
+        var oldValue = mongoData.Fields[key].Value;
+        mongoData.Fields.Remove(key);
+
+        var result = SaveAndBuildResponse(groupId, character, mongoData);
+        TryAuditFieldChange(characterId, groupId, ctx.ActorId, key, oldValue, 0);
+        return result;
     }
 }

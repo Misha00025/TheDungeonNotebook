@@ -8,14 +8,6 @@ public class CommandResult
     public List<string>? Errors { get; set; }
     public string? Message { get; set; }
 
-    // Audit metadata
-    // TODO: Remove this shit
-    public string? FieldKey { get; set; }
-    public int OldValue { get; set; }
-    public int NewValue { get; set; }
-    public bool Changed { get; set; }
-    public int Delta => NewValue - OldValue;
-
     public static CommandResult NotFound() => new() { Success = false, StatusCode = 404 };
     public static CommandResult NoOp() => new() { Success = false, StatusCode = 400, Message = "Nothing to do" };
     public static CommandResult Conflict(string message) => new() { Success = false, StatusCode = 409, Message = message };

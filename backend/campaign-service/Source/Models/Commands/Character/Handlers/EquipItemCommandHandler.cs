@@ -1,17 +1,15 @@
 using System.Text.Json;
+using Tdn.Models;
+using Tdn.Models.Commands;
 using Tdn.Models.Providing;
 
-namespace Tdn.Models.Commands;
+namespace Tdn.Models.Commands.Character;
 
-public class EquipItemCommandHandler : CommandHandler<EquipItemCommand>
+public class EquipItemCommandHandler : CharacterCommandHandler<EquipItemCommand>
 {
-    private readonly CommandsProvider _provider;
-    private readonly CharacterLogProvider _log;
-
-    public EquipItemCommandHandler(CommandsProvider provider, CharacterLogProvider log)
+    public EquipItemCommandHandler(CharactersProvider characters, CharacterLogProvider log, ItemsProvider items)
+        : base(characters, log, items)
     {
-        _provider = provider;
-        _log = log;
     }
 
     public override string Handles => "EquipItem";
@@ -23,14 +21,23 @@ public class EquipItemCommandHandler : CommandHandler<EquipItemCommand>
     {
         if (ctx.Scope is not CharacterScope cs)
             return CommandResult.Fail(new List<string> { $"{Handles} requires a character scope" });
-        var result = _provider.EquipItem(cs.GroupId, cs.CharacterId, command);
-        Audit(cs.GroupId, cs.CharacterId, ctx.ActorId, result);
-        return result;
-    }
 
-    private void Audit(int groupId, int characterId, int actorId, CommandResult result)
-    {
-        if (result.Success && result.Changed && result.Delta != 0 && result.FieldKey != null)
-            _log.LogEquipmentChange(characterId, groupId, actorId, int.Parse(result.FieldKey), result.OldValue, result.Delta);
+        var groupId = cs.GroupId;
+        var characterId = cs.CharacterId;
+
+        var character = _characters.GetCharacter(groupId, characterId);
+        if (character == null) return CommandResult.NotFound();
+        if (_items.GetItem(groupId, command.ItemId) == null)
+            return CommandResult.NotFound();
+
+        var mongoData = _characters.BuildMongoData(character);
+        mongoData.Equipment ??= new List<int>();
+        if (mongoData.Equipment.Contains(command.ItemId))
+            return CommandResult.Conflict($"Item '{command.ItemId}' is already equipped");
+
+        mongoData.Equipment.Add(command.ItemId);
+        var result = SaveAndBuildResponse(groupId, character, mongoData);
+        TryAuditEquipmentChange(characterId, groupId, ctx.ActorId, command.ItemId, 0, 1);
+        return result;
     }
 }
