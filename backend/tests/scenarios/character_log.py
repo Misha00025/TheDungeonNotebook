@@ -79,11 +79,11 @@ def register_character_log_scenario():
         requirement=OK,
         is_valid=lambda test, res: (
             len(res.json().get("entries", [])) >= 1 and
-            res.json()["entries"][0]["actionType"] == "field_change" and
+            res.json()["entries"][0]["actionType"] == "UpdateField" and
             res.json()["entries"][0]["details"]["key"] == "hp" and
             res.json()["entries"][0]["details"]["oldValue"] == 100 and
             res.json()["entries"][0]["details"]["delta"] == -10,
-            f"Expected field_change hp: old=100, delta=-10, got {res.json()}"
+            f"Expected UpdateField hp: old=100, delta=-10, got {res.json()}"
         )))
 
     # 9. PATCH character field (admin increases MP by 20)
@@ -101,11 +101,11 @@ def register_character_log_scenario():
         requirement=OK,
         is_valid=lambda test, res: (
             len(res.json().get("entries", [])) >= 2 and
-            res.json()["entries"][0]["actionType"] == "field_change" and
+            res.json()["entries"][0]["actionType"] == "UpdateField" and
             res.json()["entries"][0]["details"]["key"] == "mp" and
             res.json()["entries"][0]["details"]["oldValue"] == 50 and
             res.json()["entries"][0]["details"]["delta"] == 20,
-            f"Expected field_change mp: old=50, delta=20 at entries[0], got {res.json()}"
+            f"Expected UpdateField mp: old=50, delta=20 at entries[0], got {res.json()}"
         )))
 
     # --- item_change test ---
@@ -122,12 +122,12 @@ def register_character_log_scenario():
         requirement=OK,
         is_valid=lambda test, res: (
             any(
-                e["actionType"] == "item_change" and
+                e["actionType"] == "AddItem" and
                 e["details"]["oldValue"] == 0 and
                 e["details"]["delta"] == 5
                 for e in res.json().get("entries", [])
             ),
-            f"Expected item_change entry with old=0, delta=5, got {res.json()}"
+            f"Expected AddItem entry with old=0, delta=5, got {res.json()}"
         )))
 
     # --- skill_change test ---
@@ -149,12 +149,12 @@ def register_character_log_scenario():
         requirement=OK,
         is_valid=lambda test, res: (
             any(
-                e["actionType"] == "skill_change" and
+                e["actionType"] == "AddSkill" and
                 e["details"]["oldValue"] == 0 and
                 e["details"]["delta"] == 1
                 for e in res.json().get("entries", [])
             ),
-            f"Expected skill_change entry with old=0, delta=1, got {res.json()}"
+            f"Expected AddSkill entry with old=0, delta=1, got {res.json()}"
         )))
 
     # --- equipment_change test ---
@@ -177,12 +177,12 @@ def register_character_log_scenario():
         requirement=OK,
         is_valid=lambda test, res: (
             any(
-                e["actionType"] == "equipment_change" and
+                e["actionType"] == "EquipItem" and
                 e["details"]["oldValue"] == 0 and
                 e["details"]["delta"] == 1
                 for e in res.json().get("entries", [])
             ),
-            f"Expected equipment_change entry with old=0, delta=1, got {res.json()}"
+            f"Expected EquipItem entry with old=0, delta=1, got {res.json()}"
         )))
 
     # --- Remove equipment test ---
@@ -199,12 +199,12 @@ def register_character_log_scenario():
         requirement=OK,
         is_valid=lambda test, res: (
             any(
-                e["actionType"] == "equipment_change" and
+                e["actionType"] == "UnequipItem" and
                 e["details"]["oldValue"] == 1 and
                 e["details"]["delta"] == -1
                 for e in res.json().get("entries", [])
             ),
-            f"Expected equipment_change entry with old=1, delta=-1, got {res.json()}"
+            f"Expected UnequipItem entry with old=1, delta=-1, got {res.json()}"
         )))
 
     # --- Access control: random user can't see log ---
