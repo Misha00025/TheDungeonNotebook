@@ -66,11 +66,11 @@
     }
 
     if (ep.requestBody) {
-      html += '<div class="request-body"><h3>Тело запроса</h3><pre class="json-schema">' + escapeHtml(ep.requestBody) + '</pre></div>';
+      html += '<div class="request-body"><h3>Тело запроса</h3><pre class="json-schema">' + escapeHtml(prettySchema(ep.requestBody)) + '</pre></div>';
     }
 
     if (ep.responseSchema){
-      html += '<div class="response-block"><h3>Ответ</h3><pre class="json-schema">' + (ep.responseSchema ? escapeHtml(ep.responseSchema) : 'null') + '</pre>';
+      html += '<div class="response-block"><h3>Ответ</h3><pre class="json-schema">' + (ep.responseSchema ? escapeHtml(prettySchema(ep.responseSchema)) : 'null') + '</pre>';
     }
     
     html += '<div class="status-codes">';
@@ -123,7 +123,8 @@
     { key: 'character-templates', page: 'groups/characters/templates.html' },
     { key: 'character-items', page: 'groups/characters/items.html' },
     { key: 'character-notes', page: 'groups/characters/notes.html' },
-    { key: 'character-skills', page: 'groups/characters/skills.html' }
+    { key: 'character-skills', page: 'groups/characters/skills.html' },
+    { key: 'character-commands', page: 'groups/characters/commands.html' },
   ];
 
   var matchingPage = false;

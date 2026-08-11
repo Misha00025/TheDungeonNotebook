@@ -50,3 +50,16 @@ docs/api/
 
 ## SCHEMAS Object
 Common schemas are defined in `var SCHEMAS = { ... }` at the top of `data.js` for reuse across endpoints. Add new schemas here when multiple endpoints share the same response shape.
+
+## Adding a New Command
+Commands are documented on a separate page `groups/characters/commands.html` via the global `COMMANDS` array in `docs/api/js/data.js`.
+
+1. Open `docs/api/js/data.js`.
+2. Add a new object to the `COMMANDS` array (in the correct category).
+3. Object fields: `id`, `type`, `category`, `categoryTitle`, `page`, `description`, `payload`, `payloadRequired`, `responseSchema`, `responseStatuses`.
+4. `type` — string command type, MUST match the value of `Handles` / handler registration string in `backend/campaign-service/Source/.../Program.cs` (e.g. `AddField`, `UpdateField`, `DeleteField`, `EquipItem`, `UnequipItem`).
+5. `page` — always `"groups/characters/commands.html"`.
+6. `payload` — JSON schema of the command body (real fields from C# models/parsers, e.g. `FieldCommandParser`).
+7. Implementation lives in `backend/campaign-service/Source/Models/Commands/`.
+
+Note: The actual HTTP endpoints for commands (single and batch) are documented as regular endpoints in `ENDPOINTS` on the same page; command operations are documented in `COMMANDS`.
