@@ -63,3 +63,5 @@ Commands are documented on a separate page `groups/characters/commands.html` via
 7. Implementation lives in `backend/campaign-service/Source/Models/Commands/`.
 
 Note: The actual HTTP endpoints for commands (single and batch) are documented as regular endpoints in `ENDPOINTS` on the same page; command operations are documented in `COMMANDS`.
+
+The `responseSchema` for a command must reflect the **actual** response of `CharacterData.ToDict` from campaign-service (the full character object, same shape as `GET /groups/{id}/characters/{charId}`), not a fictional `{ "character": object }` wrapper. The batch command endpoint returns `{ "results": [{ "type", "status", "success", "message"?:, "errors"?:, "data"?: <character object> }] }`.

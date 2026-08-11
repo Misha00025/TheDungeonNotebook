@@ -18,7 +18,10 @@ var SCHEMAS = {
   fullQuest: '{\n  "id": "int",\n  "header": "string",\n  "description": "string",\n  "reward": ["string"],\n  "status": ""active"" | ""completed"" | ""failed"" | ""cancelled"",\n  "objectives": [{"key": "string","description": "string","status": ""pending"" | ""completed"" | ""failed"" | ""cancelled""}],\n  "assignedCharacters": ["int"]\n}',
 
   // --- Поля персонажа (команды) ---
-  fieldCommandData: '{\n  "name"?: "string",\n  "description"?: "string",\n  "value"?: "int",\n  "maxValue"?: "int",\n  "formula"?: "string",\n  "modifierFormula"?: "string"\n}'
+  fieldCommandData: '{\n  "name"?: "string",\n  "description"?: "string",\n  "value"?: "int",\n  "maxValue"?: "int",\n  "formula"?: "string",\n  "modifierFormula"?: "string"\n}',
+
+  // --- Персонаж (ответ команд) ---
+  fullCharacter: '{\n  "id": "int",\n  "group": { "id": "int", "name": "string", "icon": "string | null" },\n  "name": "string | null",\n  "description": "string | null",\n  "fields": {"<ключ>": {"name": "string", "description": "string", "value": "int", "maxValue"?: "int", "formula"?: "string"}},\n  "templateId": "int"\n}'
 };
 
 const ENDPOINTS = [
@@ -1363,7 +1366,7 @@ const ENDPOINTS = [
     description: "Выполнение одной команды персонажа.",
     requestBody: '{\n  "type": "string",\n  "payload": "object",\n  "idempotencyKey"?: "string"\n}',
     requestBodyRequired: ["type"],
-    responseSchema: '{\n  "character": "object"\n}',
+    responseSchema: SCHEMAS.fullCharacter,
     responseStatuses: ["200 OK", "400 Bad Request", "403 Forbidden", "404 Not Found", "409 Conflict", "422 Unprocessable Entity"],
     params: null,
     special: ["commands"]
@@ -1380,7 +1383,7 @@ const ENDPOINTS = [
     description: "Выполнение батча команд персонажа.",
     requestBody: '[\n  {"type": "string", "payload": "object", "idempotencyKey"?: "string"}\n]',
     requestBodyRequired: null,
-    responseSchema: '{\n  "results": [{"success": "bool", "type": "string", "payload"?: "object", "statusCode": "int"}]\n}',
+    responseSchema: '{\n  "results": [{"type": "string", "status": "int", "success": "bool", "message"?: "string", "errors"?: ["string"], "data"?: {"<ключ>": "object"}}]\n}',
     responseStatuses: ["200 OK", "400 Bad Request", "403 Forbidden"],
     params: null,
     special: ["commands"]
@@ -1397,7 +1400,7 @@ var COMMANDS = [
     description: "Добавить поле персонажу. Если поле с таким ключом уже есть — конфликт (409). Если поле есть в шаблоне — копируется из шаблона.",
     payload: '{\n  "key": "string",\n  "field": ' + SCHEMAS.fieldCommandData + '\n}',
     payloadRequired: ["key"],
-    responseSchema: '{\n  "character": "object"\n}',
+    responseSchema: SCHEMAS.fullCharacter,
     responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found", "409 Conflict"]
   },
   {
@@ -1409,7 +1412,7 @@ var COMMANDS = [
     description: "Обновить существующее поле персонажа (передаются только изменяемые поля).",
     payload: '{\n  "key": "string",\n  "field": ' + SCHEMAS.fieldCommandData + '\n}',
     payloadRequired: ["key"],
-    responseSchema: '{\n  "character": "object"\n}',
+    responseSchema: SCHEMAS.fullCharacter,
     responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"]
   },
   {
@@ -1421,7 +1424,7 @@ var COMMANDS = [
     description: "Удалить поле персонажа по ключу.",
     payload: '{\n  "key": "string"\n}',
     payloadRequired: ["key"],
-    responseSchema: '{\n  "character": "object"\n}',
+    responseSchema: SCHEMAS.fullCharacter,
     responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"]
   },
   {
@@ -1433,7 +1436,7 @@ var COMMANDS = [
     description: "Экипировать предмет персонажа по itemId.",
     payload: '{\n  "itemId": "int"\n}',
     payloadRequired: ["itemId"],
-    responseSchema: '{\n  "character": "object"\n}',
+    responseSchema: SCHEMAS.fullCharacter,
     responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"]
   },
   {
@@ -1445,7 +1448,7 @@ var COMMANDS = [
     description: "Снять предмет с персонажа по itemId.",
     payload: '{\n  "itemId": "int"\n}',
     payloadRequired: ["itemId"],
-    responseSchema: '{\n  "character": "object"\n}',
+    responseSchema: '{\n  "id": "int",\n  "group": { "id": "int", "name": "string", "icon": "string | null" },\n  "name": "string | null",\n  "description": "string | null",\n  "fields": {"<ключ>": {"name": "string", "description": "string", "value": "int", "maxValue"?: "int", "formula"?: "string"}},\n  "templateId": "int"\n}',
     responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"]
   }
 ];
