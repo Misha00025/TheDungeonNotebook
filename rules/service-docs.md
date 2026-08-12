@@ -64,4 +64,12 @@ Commands are documented on a separate page `groups/characters/commands.html` via
 
 Note: The actual HTTP endpoints for commands (single and batch) are documented as regular endpoints in `ENDPOINTS` on the same page; command operations are documented in `COMMANDS`.
 
+### Character Log
+
+Каждая команда пишет в журнал персонажа запись, описываемую полем `log` карточки: `actionType` совпадает с `Handles`/именем команды, `details` — конкретные поля, зеркалит `_log.Log(...)` в хендлере команды.
+
 The `responseSchema` for a command must reflect the **actual** response of `CharacterData.ToDict` from campaign-service (the full character object, same shape as `GET /groups/{id}/characters/{charId}`), not a fictional `{ "character": object }` wrapper. The batch command endpoint returns `{ "results": [{ "type", "status", "success", "message"?:, "errors"?:, "data"?: <character object> }] }`.
+
+### Character Log
+
+`GET /groups/{id}/characters/{charId}/log` — журнал изменений персонажа. Записи имеют форму `{ timestamp, actorId, actionType, details }` (см. `CharacterLogEntryView` в campaign-service). `actionType` — одно из: `AddField`, `UpdateField`, `DeleteField`, `AddItem`, `UpdateItem`, `RemoveItem`, `AddSkill`, `RemoveSkill`, `EquipItem`, `UnequipItem`. `details` содержит `key`/`itemId`/`skillId` (по типу операции) + `oldValue` + `delta`. Записи создаются и командами, и REST-мутациями; при `actorId == -1` (админ/без субъекта) не логируются; пишутся только при реальном числовом изменении (`delta != 0` и т.п.). Схема описана в `SCHEMAS.characterLog` в `data.js`.

@@ -21,7 +21,10 @@ var SCHEMAS = {
   fieldCommandData: '{\n  "name"?: "string",\n  "description"?: "string",\n  "value"?: "int",\n  "maxValue"?: "int",\n  "formula"?: "string",\n  "modifierFormula"?: "string"\n}',
 
   // --- Персонаж (ответ команд) ---
-  fullCharacter: '{\n  "id": "int",\n  "group": { "id": "int", "name": "string", "icon": "string | null" },\n  "name": "string | null",\n  "description": "string | null",\n  "fields": {"<ключ>": {"name": "string", "description": "string", "value": "int", "maxValue"?: "int", "formula"?: "string"}},\n  "templateId": "int"\n}'
+  fullCharacter: '{\n  "id": "int",\n  "group": { "id": "int", "name": "string", "icon": "string | null" },\n  "name": "string | null",\n  "description": "string | null",\n  "fields": {"<ключ>": {"name": "string", "description": "string", "value": "int", "maxValue"?: "int", "formula"?: "string"}},\n  "templateId": "int"\n}',
+
+  // --- Журнал персонажа ---
+  characterLog: '{\n  "entries": [{"timestamp": "datetime", "actorId": "int", "actionType": "string", "details": {"<поле>": "string | int"}}],\n  "total": "int"\n}'
 };
 
 const ENDPOINTS = [
@@ -1387,6 +1390,26 @@ const ENDPOINTS = [
     responseStatuses: ["200 OK", "400 Bad Request", "403 Forbidden"],
     params: null,
     special: ["commands"]
+  },
+  {
+    id: "get-groups-id-characters-charId-log",
+    method: "GET",
+    url: "/groups/{id}/characters/{charId}/log",
+    category: "characters",
+    categoryTitle: "Персонажи",
+    page: "groups/characters/main.html",
+    auth: "required",
+    access: null,
+    description: "Журнал изменений персонажа (записи команд и мутаций полей/предметов/навыков/экипировки). Записи сортируются по времени убывания.",
+    requestBody: null,
+    requestBodyRequired: null,
+    responseSchema: SCHEMAS.characterLog,
+    responseStatuses: ["200 OK", "404 Not Found"],
+    params: [
+      { name: "limit", type: "int", description: "Максимум записей (default 50)" },
+      { name: "offset", type: "int", description: "Пропустить первых N записей (default 0)" }
+    ],
+    special: ["handler: character_log"]
   }
 ];
 
@@ -1401,7 +1424,12 @@ var COMMANDS = [
     payload: '{\n  "key": "string",\n  "field": ' + SCHEMAS.fieldCommandData + '\n}',
     payloadRequired: ["key"],
     responseSchema: SCHEMAS.fullCharacter,
-    responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found", "409 Conflict"]
+    responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found", "409 Conflict"],
+    log: {
+      actionType: "AddField",
+      details: '{\n  "key": "string",\n  "oldValue": "int",\n  "delta": "int"\n}',
+      note: "Пишется, только если actorId != -1 и значение поля изменилось (delta != 0)"
+    }
   },
   {
     id: "cmd-update-field",
@@ -1413,7 +1441,12 @@ var COMMANDS = [
     payload: '{\n  "key": "string",\n  "field": ' + SCHEMAS.fieldCommandData + '\n}',
     payloadRequired: ["key"],
     responseSchema: SCHEMAS.fullCharacter,
-    responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"]
+    responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"],
+    log: {
+      actionType: "UpdateField",
+      details: '{\n  "key": "string",\n  "oldValue": "int",\n  "delta": "int"\n}',
+      note: "Пишется, только если actorId != -1 и значение поля изменилось (delta != 0)"
+    }
   },
   {
     id: "cmd-delete-field",
@@ -1425,7 +1458,12 @@ var COMMANDS = [
     payload: '{\n  "key": "string"\n}',
     payloadRequired: ["key"],
     responseSchema: SCHEMAS.fullCharacter,
-    responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"]
+    responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"],
+    log: {
+      actionType: "DeleteField",
+      details: '{\n  "key": "string",\n  "oldValue": "int",\n  "delta": "int"\n}',
+      note: "Пишется, только если actorId != -1 и значение поля изменилось (delta != 0)"
+    }
   },
   {
     id: "cmd-equip-item",
@@ -1437,7 +1475,12 @@ var COMMANDS = [
     payload: '{\n  "itemId": "int"\n}',
     payloadRequired: ["itemId"],
     responseSchema: SCHEMAS.fullCharacter,
-    responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"]
+    responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"],
+    log: {
+      actionType: "EquipItem",
+      details: '{\n  "itemId": "int",\n  "oldValue": "int",\n  "delta": "int"\n}',
+      note: "Пишется, только если actorId != -1; при повторном экипировании команда возвращает конфликт (409)"
+    }
   },
   {
     id: "cmd-unequip-item",
@@ -1449,7 +1492,12 @@ var COMMANDS = [
     payload: '{\n  "itemId": "int"\n}',
     payloadRequired: ["itemId"],
     responseSchema: '{\n  "id": "int",\n  "group": { "id": "int", "name": "string", "icon": "string | null" },\n  "name": "string | null",\n  "description": "string | null",\n  "fields": {"<ключ>": {"name": "string", "description": "string", "value": "int", "maxValue"?: "int", "formula"?: "string"}},\n  "templateId": "int"\n}',
-    responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"]
+    responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"],
+    log: {
+      actionType: "UnequipItem",
+      details: '{\n  "itemId": "int",\n  "oldValue": "int",\n  "delta": "int"\n}',
+      note: "Пишется, только если actorId != -1; если предмет не экипирован — команда не выполняется (NoOp)"
+    }
   }
 ];
 

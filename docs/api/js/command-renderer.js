@@ -47,6 +47,18 @@
       html += '<div class="response-block"><h3>Ответ</h3><pre class="json-schema">' + escapeHtml(prettySchema(c.responseSchema)) + '</pre></div>';
     }
 
+    if (c.log && c.log.actionType) {
+      html += '<div class="log-block"><h3>Журнал</h3>';
+      html += '<span class="log-action-badge">' + c.log.actionType + '</span>';
+      if (c.log.details) {
+        html += '<pre class="json-schema">' + escapeHtml(prettySchema(c.log.details)) + '</pre>';
+      }
+      if (c.log.note) {
+        html += '<p class="log-note">' + c.log.note + '</p>';
+      }
+      html += '</div>';
+    }
+
     html += '<div class="status-codes">';
     c.responseStatuses.forEach(function(s) {
       var cls = getStatusClass(s);
