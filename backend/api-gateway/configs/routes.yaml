@@ -9,7 +9,7 @@
 base_path: ""
 
 auth:
-  strategy: rsa_jwt
+  strategy: hybrid_jwt
   public_key_path: ${PUBLIC_KEY_PATH:-/certs/public.pem}
   expected_issuer: "${OIDC_ISSUER}"
 
@@ -102,6 +102,8 @@ routes:
     proxy:
       service: campaign
       path: /groups
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     params:
       query:
@@ -116,15 +118,15 @@ routes:
     proxy:
       service: campaign
       path: /groups/{group_id}
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET:
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PATCH:
-        access: group_admin
+      PATCH: {}
 
   # ============================================================
   # Group Users (composite)
@@ -133,14 +135,14 @@ routes:
     methods: [GET]
     handler: group_users
     auth: required
-    access: group_member
 
   - path: /groups/{group_id}/users/{user_id}
     proxy:
       service: campaign
       path: /polices/groups
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
-    access: group_admin
     methods:
       PUT:
         params:
@@ -160,31 +162,30 @@ routes:
     proxy:
       service: campaign
       path: /groups/{group_id}/items
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET:
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      POST:
-        access: group_admin
+      POST: {}
 
   - path: /groups/{group_id}/items/{item_id}
     proxy:
       service: campaign
       path: /groups/{group_id}/items/{item_id}
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     params:
       query:
         userId: "{jwt.userId}"
     methods:
-      GET:
-        access: group_member
-      PUT:
-        access: group_admin
-      DELETE:
-        access: group_admin
+      GET: {}
+      PUT: {}
+      DELETE: {}
 
   # ============================================================
   # Group Notes
@@ -193,30 +194,29 @@ routes:
     proxy:
       service: campaign
       path: /groups/{group_id}/notes
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET:
-        access: group_member
         response:
           wrap: notes
         params:
           query:
             userId: "{jwt.userId}"
-      POST:
-        access: group_admin
+      POST: {}
 
   - path: /groups/{group_id}/notes/{note_id}
     proxy:
       service: campaign
       path: /groups/{group_id}/notes/{note_id}
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
-      GET:
-        access: group_admin
-      PUT:
-        access: group_admin
-      DELETE:
-        access: group_admin
+      GET: {}
+      PUT: {}
+      DELETE: {}
 
   # ============================================================
   # Group Skills
@@ -225,44 +225,43 @@ routes:
     proxy:
       service: campaign
       path: /groups/{group_id}/skills/attributes
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET:
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PUT:
-        access: group_admin
+      PUT: {}
 
   - path: /groups/{group_id}/skills
     proxy:
       service: campaign
       path: /groups/{group_id}/skills
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET:
-        access: group_member
         params:
           query: "*"
-      POST:
-        access: group_admin
+      POST: {}
 
   - path: /groups/{group_id}/skills/{skill_id}
     proxy:
       service: campaign
       path: /groups/{group_id}/skills/{skill_id}
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET:
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PUT:
-        access: group_admin
-      DELETE:
-        access: group_admin
+      PUT: {}
+      DELETE: {}
 
   # ============================================================
   # Group Schemas
@@ -271,57 +270,57 @@ routes:
     proxy:
       service: campaign
       path: /schemas/groups/{group_id}/items
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET:
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PUT:
-        access: group_admin
+      PUT: {}
 
   - path: /groups/{group_id}/schemas/skills
     proxy:
       service: campaign
       path: /schemas/groups/{group_id}/skills
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET:
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PUT:
-        access: group_admin
+      PUT: {}
 
   - path: /groups/{group_id}/schemas/template
     proxy:
       service: campaign
       path: /schemas/groups/{group_id}/template
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET:
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PUT:
-        access: group_admin
+      PUT: {}
 
   - path: /groups/{group_id}/schemas/characters/resources
     proxy:
       service: campaign
       path: /schemas/groups/{group_id}/characters/resources
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET:
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PUT:
-        access: group_admin
+      PUT: {}
 
   # ============================================================
   # Export / Import
@@ -330,13 +329,11 @@ routes:
     methods: [GET]
     handler: group_export
     auth: required
-    access: group_admin
 
   - path: /groups/{group_id}/import
     methods: [POST]
     handler: group_import
     auth: required
-    access: group_admin
 
   # ============================================================
   # Group Quests
@@ -345,31 +342,31 @@ routes:
     proxy:
       service: campaign
       path: /groups/{group_id}/quests
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET:
         params:
           query:
             userId: "{jwt.userId}"
-      POST:
-        access: group_admin
+      POST: {}
 
   - path: /groups/{group_id}/quests/{quest_id}
     proxy:
       service: campaign
       path: /groups/{group_id}/quests/{quest_id}
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET: {}
-      PUT:
-        access: group_admin
+      PUT: {}
       PATCH:
-        access: quest_writer
         params:
           query:
             userId: "{jwt.userId}"
-      DELETE:
-        access: group_admin
+      DELETE: {}
 
   - path: /groups/{group_id}/characters/{character_id}/quests
     methods:
@@ -377,8 +374,9 @@ routes:
         proxy:
           service: campaign
           path: /groups/{group_id}/quests
+          headers:
+            X-Subject: "{state.x_subject}"
         auth: required
-        access: character_viewer
         params:
           query:
             userId: "{jwt.userId}"
@@ -386,7 +384,6 @@ routes:
       POST:
         handler: quest_create_for_character
         auth: required
-        access: character_writer
 
   # ============================================================
   # Characters
@@ -395,31 +392,30 @@ routes:
     proxy:
       service: campaign
       path: /groups/{group_id}/characters
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET:
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      POST:
-        access: group_admin
+      POST: {}
 
   - path: /groups/{group_id}/characters/{character_id}
     proxy:
       service: campaign
       path: /groups/{group_id}/characters/{character_id}
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     params:
       query:
         userId: "{jwt.userId}"
     methods:
-      GET:
-        access: group_member
-      PATCH:
-        access: character_writer
-      DELETE:
-        access: character_writer
+      GET: {}
+      PATCH: {}
+      DELETE: {}
 
   # ============================================================
   # Character Users (composite)
@@ -428,16 +424,16 @@ routes:
     methods: [GET]
     handler: character_users
     auth: required
-    access: group_member
 
   - path: /groups/{group_id}/characters/{character_id}/users/{user_id}
     auth: required
-    access: character_admin
     methods:
       PUT:
         proxy:
           service: campaign
           path: /polices/groups/characters
+          headers:
+            X-Subject: "{state.x_subject}"
         params:
           body:
             groupId: "{path.group_id}"
@@ -447,6 +443,8 @@ routes:
         proxy:
           service: campaign
           path: /polices/groups
+          headers:
+            X-Subject: "{state.x_subject}"
         params:
           query:
             groupId: "{path.group_id}"
@@ -460,31 +458,30 @@ routes:
     proxy:
       service: campaign
       path: /groups/{group_id}/characters/templates
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET:
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      POST:
-        access: group_admin
-      PUT:
-        access: group_admin
+      POST: {}
+      PUT: {}
 
   - path: /groups/{group_id}/characters/templates/{template_id}
     proxy:
       service: campaign
       path: /groups/{group_id}/characters/templates/{template_id}
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET:
-        access: group_member
         params:
           query:
             userId: "{jwt.userId}"
-      PUT:
-        access: group_admin
+      PUT: {}
 
   # ============================================================
   # Character Items
@@ -493,31 +490,30 @@ routes:
     proxy:
       service: campaign
       path: /groups/{group_id}/characters/{character_id}/items
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     params:
       query:
         userId: "{jwt.userId}"
     methods:
-      GET:
-        access: character_viewer
-      POST:
-        access: character_writer
+      GET: {}
+      POST: {}
 
   - path: /groups/{group_id}/characters/{character_id}/items/{item_id}
     proxy:
       service: campaign
       path: /groups/{group_id}/characters/{character_id}/items/{item_id}
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     params:
       query:
         userId: "{jwt.userId}"
     methods:
-      GET:
-        access: character_viewer
-      PUT:
-        access: character_writer
-      DELETE:
-        access: character_writer
+      GET: {}
+      PUT: {}
+      DELETE: {}
 
   # ============================================================
   # Character Notes
@@ -526,27 +522,26 @@ routes:
     proxy:
       service: campaign
       path: /groups/{group_id}/characters/{character_id}/notes
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
       GET:
-        access: character_viewer
         response:
           wrap: notes
-      POST:
-        access: character_writer
+      POST: {}
 
   - path: /groups/{group_id}/characters/{character_id}/notes/{note_id}
     proxy:
       service: campaign
       path: /groups/{group_id}/characters/{character_id}/notes/{note_id}
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     methods:
-      GET:
-        access: character_viewer
-      PUT:
-        access: character_writer
-      DELETE:
-        access: character_writer
+      GET: {}
+      PUT: {}
+      DELETE: {}
 
   # ============================================================
   # Character Skills
@@ -557,8 +552,9 @@ routes:
         proxy:
           service: campaign
           path: /groups/{group_id}/characters/{character_id}/skills
+          headers:
+            X-Subject: "{state.x_subject}"
         auth: required
-        access: character_viewer
         params:
           query: "*"
 
@@ -566,16 +562,16 @@ routes:
     proxy:
       service: campaign
       path: /groups/{group_id}/characters/{character_id}/skills/{skill_id}
+      headers:
+        X-Subject: "{state.x_subject}"
       skip_body: true
     auth: required
     params:
       query:
         userId: "{jwt.userId}"
     methods:
-      PUT:
-        access: character_writer
-      DELETE:
-        access: character_writer
+      PUT: {}
+      DELETE: {}
 
   # ============================================================
   # Character Equipment
@@ -584,17 +580,39 @@ routes:
     proxy:
       service: campaign
       path: /groups/{group_id}/characters/{character_id}/equipment
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
     params:
       query:
         userId: "{jwt.userId}"
     methods:
-      GET:
-        access: character_viewer
-      PATCH:
-        access: character_writer
-      PUT:
-        access: character_writer
+      GET: {}
+      PATCH: {}
+      PUT: {}
+
+  # ============================================================
+  # Character Commands
+  # ============================================================
+  - path: /groups/{group_id}/characters/{character_id}/commands
+    proxy:
+      service: campaign
+      path: /groups/{group_id}/characters/{character_id}/commands
+      headers:
+        X-Subject: "{state.x_subject}"
+    auth: required
+    methods:
+      POST: {}
+
+  - path: /groups/{group_id}/characters/{character_id}/commands/batch
+    proxy:
+      service: campaign
+      path: /groups/{group_id}/characters/{character_id}/commands/batch
+      headers:
+        X-Subject: "{state.x_subject}"
+    auth: required
+    methods:
+      POST: {}
 
   # ============================================================
   # Character Log
@@ -604,5 +622,6 @@ routes:
     proxy:
       service: campaign
       path: /groups/{group_id}/characters/{character_id}/log
+      headers:
+        X-Subject: "{state.x_subject}"
     auth: required
-    access: character_viewer

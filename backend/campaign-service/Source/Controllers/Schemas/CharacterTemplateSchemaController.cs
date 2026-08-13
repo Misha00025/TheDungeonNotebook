@@ -1,5 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Tdn.Db.Contexts;
+using Tdn.Models.Access;
 using Tdn.Models.Providing;
+using Tdn.Models.DTOs;
+using Tdn.Models.Schemas;
 using Tdn.Models.Schemas.Templates;
 using Tdn.Models.Schemas.Templates.Conversion;
 
@@ -7,21 +11,37 @@ namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("schemas/groups/{groupId}/template")]
-public class CharacterTemplateSchemaController : BaseController
+public class CharacterTemplateSchemaController : GroupsBaseController
 {
-    private CharacterTemplateSchemaProvider _provider;
-    private GroupAccessHelper _accessHelper;
+    private GenericMongoProvider<TemplateSchemaMongoData> _provider;
 
-    public CharacterTemplateSchemaController(CharacterTemplateSchemaProvider provider, GroupAccessHelper accessHelper)
+    public CharacterTemplateSchemaController(
+        CampaignContext context,
+        GenericMongoProvider<TemplateSchemaMongoData> provider,
+        SubjectAccessHelper subjectAccessHelper,
+        ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
         _provider = provider;
-        _accessHelper = accessHelper;
     }
+
+    private static CategorySchemaMongoData AsData(CategorySchemaPostData category) => new()
+    {
+        Name = category.Name,
+        Fields = category.Fields,
+        Categories = category.Categories?.Select(AsData).ToList()
+    };
+
+    private static TemplateSchemaMongoData AsData(int groupId, TemplateSchemaPostData template) => new()
+    {
+        GroupId = groupId,
+        Type = "template",
+        Categories = template.Categories.Select(AsData).ToList()
+    };
     
     [HttpGet]
-    public ActionResult GetSchema(int groupId, [FromQuery] int? userId = null)
+    public ActionResult GetSchema(int groupId)
     {
-        if (userId != null && !_accessHelper.HasGroupAccess(groupId, userId.Value))
+        if (!CheckGroupAccess(groupId))
             return NotFound();
         var schema = _provider.GetSchema(groupId);
         if (schema != null)
@@ -30,11 +50,12 @@ public class CharacterTemplateSchemaController : BaseController
     }
     
     [HttpPut]
-    public ActionResult PutSchema(int groupId, TemplateSchemaPostData data, [FromQuery] int? userId = null)
+    public ActionResult PutSchema(int groupId, TemplateSchemaPostData data)
     {
-        if (userId != null && !_accessHelper.IsAdmin(groupId, userId.Value))
+        if (!SubjectAccess.IsAdmin(groupId))
             return Forbidden();
-        var ok = _provider.TrySaveSchema(groupId, data);
+        var mongoData = AsData(groupId, data);
+        var ok = _provider.TrySaveSchema(groupId, mongoData);
         var schema = _provider.GetSchema(groupId);
         return schema != null && ok ? Ok(schema.ToResponse()) : BadRequest();
     }

@@ -5,7 +5,7 @@ Monorepo with microservice architecture: API Gateway + 4 C# backend services + A
 
 ## Languages & Runtimes
 - Python 3.13 (api-gateway, admin-panel)
-- C# .NET 8 (auth-service, users-service, campaign-service, uploads-service)
+- C# .NET 8 (auth-service, users-service, campaign-service)
 - Docker Compose (orchestration)
 
 ## Service Map
@@ -16,7 +16,7 @@ Monorepo with microservice architecture: API Gateway + 4 C# backend services + A
 | auth-service | C# .NET 8 | 8080 | MySQL | Registration, login, JWT (RSA-256), refresh tokens, service tokens |
 | users-service | C# .NET 8 | 8080 | MySQL | User profile CRUD |
 | campaign-service | C# .NET 8 | 8080 | MySQL + MongoDB | Groups, characters, items, skills, notes, schemas, policies |
-| uploads-service | C# .NET 8 | 8080 | Filesystem | File/image uploads (multipart, 10MB max) |
+
 | admin-panel | Python/Flask | 8081 | — | Admin CRUD UI (Jinja2, not yet built) |
 
 notes-service is **deprecated** — its logic is merged into campaign-service.
@@ -36,7 +36,14 @@ docker compose up -d
 1. MySQL + MongoDB
 2. auth-service, users-service, campaign-service
 3. api-gateway
-4. uploads-service runs separately
+
+## Процессные правила (из опыта работы над проектом)
+
+1. **Не откатывать** — искать решение вперёд, не "как было", а "как должно быть"
+2. **Параллельность — только по смыслу** — независимые задачи можно, зависимые — последовательно
+3. **Архитектура не жертвуется тестам** — тесты в сервисах (C#) переделываем под новую архитектуру. Сквозные тесты (api-gateway) не правим без утверждения пользователем. Если падение сквозного теста — явная ошибка сервиса (500 вместо 200) — чиним сервис. Если поведение изменилось намеренно и тест устарел — это триггер для п.4.
+4. **Неясная проблема — консилиум** — при намеренном расхождении сквозного теста (п.3) запустить 2-3 Plan-агента с полярными позициями: один отстаивает тест, другой — сервис. С результатами — к пользователю.
+5. **Сквозные тесты** — `backend/api-gateway/tests/test.sh` (python, не dotnet)
 
 ## Gateway действий для агентов
 
@@ -44,6 +51,7 @@ docker compose up -d
 
 | Действие | Читать |
 |----------|--------|
+| Запланировать крупное изменение | `rules/tech-planning.md` |
 | Запустить тесты | `rules/tech-testing.md` |
 | Собрать / запустить docker-compose | `rules/tech-docker.md` |
 | Изменить Python-сервис | `rules/tech-python.md` + `<service>/rules.md` |
@@ -52,7 +60,7 @@ docker compose up -d
 | Изменить auth-service | `backend/auth-service/rules.md` |
 | Изменить users-service | `backend/users-service/rules.md` |
 | Изменить campaign-service | `backend/campaign-service/rules.md` |
-| Изменить uploads-service | `backend/uploads-service/rules.md` |
+
 | Просмотреть / актуализировать документацию API | `rules/service-docs.md` |
 | Настроить мониторинг | `rules/service-monitoring.md` |
 | Что-то с админ-панелью | `admin/rules.md` |
@@ -72,5 +80,5 @@ docker compose up -d
 - `backend/auth-service/rules.md` — RSA JWT, BCrypt, token endpoints
 - `backend/users-service/rules.md` — User profile CRUD
 - `backend/campaign-service/rules.md` — Groups, characters, items, skills, notes, schemas, policies
-- `backend/uploads-service/rules.md` — File uploads, MIME, multipart, Sources/ structure
+
 - `admin/rules.md` — Admin panel plan overview (see PLAN.md)

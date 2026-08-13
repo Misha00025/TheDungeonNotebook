@@ -1,45 +1,43 @@
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Bson;
-using Tdn.Db;
 using Tdn.Db.Contexts;
-using Tdn.Db.Entities;
 using Tdn.Models.Providing;
+using Tdn.Models.Access;
+using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("groups/{groupId}/characters/{characterId}/equipment")]
-public class CharacterEquipmentController : CharactersBaseController
+public class CharacterEquipmentController : GroupsBaseController
 {
     private CharacterEquipmentProvider _provider;
     private CharacterLogProvider _logProvider;
 
     public CharacterEquipmentController(
-        EntityContext context,
-        MongoDbContext mongo,
-        GroupContext groupContext,
-        GroupAccessHelper accessHelper,
+        CampaignContext context,
+        SubjectAccessHelper subjectAccessHelper,
         CharacterEquipmentProvider provider,
-        CharacterLogProvider logProvider)
-        : base(context, mongo, groupContext, accessHelper)
+        CharacterLogProvider logProvider,
+        ILogger<GroupsBaseController> logger)
+        : base(context, subjectAccessHelper, logger)
     {
         _provider = provider;
         _logProvider = logProvider;
     }
 
     [HttpGet]
-    public ActionResult GetEquipment(int groupId, int characterId, [FromQuery] int? userId = null)
+    public ActionResult GetEquipment(int groupId, int characterId)
     {
-        if (userId != null && !AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
+        if (!CheckCharacterAccess(groupId, characterId))
             return NotFound();
         var equipment = _provider.GetEquipment(groupId, characterId);
         return Ok(new { items = equipment });
     }
 
     [HttpPatch]
-    public ActionResult PatchEquipment(int groupId, int characterId, [FromBody] EquipmentPatchData data, [FromQuery] int? userId = null)
+    public ActionResult PatchEquipment(int groupId, int characterId, [FromBody] EquipmentPatchData data)
     {
-        if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+        if (!SubjectAccess.CanWriteCharacter(groupId, characterId))
             return Forbidden();
         bool ok;
         if (data.Action == "add")
@@ -52,21 +50,23 @@ public class CharacterEquipmentController : CharactersBaseController
         if (!ok)
             return BadRequest("Failed to update equipment");
 
-        if (userId != null)
+        int delta = data.Action == "add" ? 1 : -1;
+        int oldValue = data.Action == "add" ? 0 : 1;
+        _logProvider.Log(characterId, groupId, SubjectAccess.GetCurrentActorId(), data.Action == "add" ? "EquipItem" : "UnequipItem", new Dictionary<string, object?>
         {
-            int delta = data.Action == "add" ? 1 : -1;
-            int oldValue = data.Action == "add" ? 0 : 1;
-            _logProvider.LogEquipmentChange(characterId, groupId, userId.Value, data.ItemId, oldValue, delta);
-        }
+            ["itemId"] = data.ItemId,
+            ["oldValue"] = oldValue,
+            ["delta"] = delta
+        });
 
         var equipment = _provider.GetEquipment(groupId, characterId);
         return Ok(new { items = equipment });
     }
 
     [HttpPut]
-    public ActionResult PutEquipment(int groupId, int characterId, [FromBody] EquipmentPutData data, [FromQuery] int? userId = null)
+    public ActionResult PutEquipment(int groupId, int characterId, [FromBody] EquipmentPutData data)
     {
-        if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+        if (!SubjectAccess.CanWriteCharacter(groupId, characterId))
             return Forbidden();
         var ok = _provider.TrySaveEquipment(groupId, characterId, data.ItemIds);
         if (!ok)
@@ -74,15 +74,4 @@ public class CharacterEquipmentController : CharactersBaseController
         var equipment = _provider.GetEquipment(groupId, characterId);
         return Ok(new { items = equipment });
     }
-}
-
-public class EquipmentPatchData
-{
-    public string Action { get; set; } = "";
-    public int ItemId { get; set; }
-}
-
-public class EquipmentPutData
-{
-    public List<int> ItemIds { get; set; } = new();
 }

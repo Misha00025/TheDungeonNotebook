@@ -3,41 +3,34 @@ using Tdn.Db;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 using Tdn.Models.Conversions;
+using Tdn.Models.DTOs;
+using Tdn.Models.Schemas;
 using Tdn.Models.Schemas.Templates;
 
 namespace Tdn.Models.Providing;
 
 public class ExportImportProvider
 {
-    private readonly EntityContext _entityContext;
-    private readonly ItemsContext _itemsContext;
-    private readonly SkillsContext _skillsContext;
-    private readonly MongoDbContext _mongo;
-    private readonly SchemasMongoDbContext _schemasMongo;
+    private readonly CampaignContext _db;
+    private readonly IMongoDbContext _mongo;
+    private readonly ISchemasMongoDbContext _schemasMongo;
     private readonly AttributesProvider _attributesProvider;
-    private readonly CharacterTemplateSchemaProvider _schemaProvider;
-    private readonly GroupAccessHelper _accessHelper;
+    private readonly GenericMongoProvider<TemplateSchemaMongoData> _schemaProvider;
     private readonly ILogger<ExportImportProvider> _logger;
 
     public ExportImportProvider(
-        EntityContext entityContext,
-        ItemsContext itemsContext,
-        SkillsContext skillsContext,
-        MongoDbContext mongo,
-        SchemasMongoDbContext schemasMongo,
+        CampaignContext db,
+        IMongoDbContext mongo,
+        ISchemasMongoDbContext schemasMongo,
         AttributesProvider attributesProvider,
-        CharacterTemplateSchemaProvider schemaProvider,
-        GroupAccessHelper accessHelper,
+        GenericMongoProvider<TemplateSchemaMongoData> schemaProvider,
         ILogger<ExportImportProvider> logger)
     {
-        _entityContext = entityContext;
-        _itemsContext = itemsContext;
-        _skillsContext = skillsContext;
+        _db = db;
         _mongo = mongo;
         _schemasMongo = schemasMongo;
         _attributesProvider = attributesProvider;
         _schemaProvider = schemaProvider;
-        _accessHelper = accessHelper;
         _logger = logger;
     }
 
@@ -76,16 +69,16 @@ public class ExportImportProvider
             };
         }
 
-        var charlistDataSet = _entityContext.Set<CharlistData>();
-        var charlists = charlistDataSet.Where(e => e.GroupId == groupId).ToList();
-        if (charlists.Any())
+        var templateDataSet = _db.Set<TemplateData>();
+        var templates = templateDataSet.Where(e => e.GroupId == groupId).ToList();
+        if (templates.Any())
         {
-            export.Charlists = charlists.Select(cd =>
+            export.Templates = templates.Select(td =>
             {
-                var mongoData = _mongo.GetEntity<CharlistMongoData>(MongoCollections.Templates, cd.UUID);
-                return new CharlistExportData
+                var mongoData = _mongo.GetEntity<TemplateMongoData>(MongoCollections.Templates, td.UUID);
+                return new TemplateExportData
                 {
-                    OldId = cd.Id,
+                    OldId = td.Id,
                     Name = mongoData?.Name ?? "",
                     Description = mongoData?.Description ?? "",
                     Fields = mongoData?.Fields.ToDictionary(f => f.Key, f => MapField(f.Value)) ?? new()
@@ -96,11 +89,11 @@ public class ExportImportProvider
 
     private void ExportCharacters(int groupId, ExportData export)
     {
-        var characterDataSet = _entityContext.Set<CharacterData>();
+        var characterDataSet = _db.Set<CharacterData>();
         var characters = characterDataSet.Where(e => e.GroupId == groupId).ToList();
         if (!characters.Any()) return;
 
-        var charItemSet = _itemsContext.CharacterItems;
+        var charItemSet = _db.CharacterItems;
         var allCharItems = charItemSet.Where(ci => characters.Select(c => c.Id).Contains(ci.CharacterId)).ToList();
 
         export.Characters = characters.Select(cd =>
@@ -132,7 +125,7 @@ public class ExportImportProvider
 
     private void ExportItems(int groupId, ExportData export)
     {
-        var itemsDataSet = _itemsContext.Items;
+        var itemsDataSet = _db.Items;
         var items = itemsDataSet.Where(e => e.GroupId == groupId).ToList();
         if (!items.Any()) return;
 
@@ -158,7 +151,7 @@ public class ExportImportProvider
 
     private void ExportSkills(int groupId, ExportData export)
     {
-        var skillsDataSet = _skillsContext.Skills;
+        var skillsDataSet = _db.Skills;
         var skills = skillsDataSet.Where(e => e.GroupId == groupId).ToList();
         if (skills.Any())
         {
@@ -180,7 +173,7 @@ public class ExportImportProvider
             }).ToList();
         }
 
-        var charSkillSet = _skillsContext.CharacterSkills;
+        var charSkillSet = _db.CharacterSkills;
         var allCharSkills = charSkillSet.Where(cs => skills.Select(s => s.Id).Contains(cs.SkillId)).ToList();
         if (allCharSkills.Any())
         {
@@ -230,8 +223,8 @@ public class ExportImportProvider
             if (include.Contains("templates"))
             {
                 ImportTemplateSchema(groupId, data);
-                ImportCharlists(groupId, data, templateOldToNew);
-                result.Imported["templates"] = data.Charlists?.Count ?? 0;
+                ImportTemplates(groupId, data, templateOldToNew);
+                result.Imported["templates"] = data.Templates?.Count ?? 0;
             }
 
             if (include.Contains("skills"))
@@ -276,40 +269,47 @@ public class ExportImportProvider
     {
         if (data.TemplateSchema == null) return;
 
-        var postData = new TemplateSchemaPostData
+        var mongoData = new TemplateSchemaMongoData
         {
-            Categories = data.TemplateSchema.Categories.Select(c => MapCategoryPostData(c)).ToList()
+            GroupId = groupId,
+            Type = "template",
+            Categories = data.TemplateSchema.Categories.Select(c => new CategorySchemaMongoData
+            {
+                Name = c.Name,
+                Fields = c.Fields,
+                Categories = c.Categories?.Select(MapCategoryMongoData).ToList()
+            }).ToList()
         };
-        _schemaProvider.TrySaveSchema(groupId, postData);
+        _schemaProvider.TrySaveSchema(groupId, mongoData);
     }
 
-    private void ImportCharlists(int groupId, ExportData data, Dictionary<int, int> oldToNew)
+    private void ImportTemplates(int groupId, ExportData data, Dictionary<int, int> oldToNew)
     {
-        if (data.Charlists == null || !data.Charlists.Any()) return;
+        if (data.Templates == null || !data.Templates.Any()) return;
 
-        var charlistSet = _entityContext.Set<CharlistData>();
-        var collection = _mongo.GetCollection<CharlistMongoData>(MongoCollections.Templates);
+        var templateSet = _db.Set<TemplateData>();
+        var collection = _mongo.GetCollection<TemplateMongoData>(MongoCollections.Templates);
 
-        foreach (var ch in data.Charlists)
+        foreach (var t in data.Templates)
         {
-            var mongoItem = new CharlistMongoData
+            var mongoItem = new TemplateMongoData
             {
-                Name = ch.Name,
-                Description = ch.Description,
-                Fields = ch.Fields.ToDictionary(f => f.Key, f => CreateFieldMongoData(f.Value))
+                Name = t.Name,
+                Description = t.Description,
+                Fields = t.Fields.ToDictionary(f => f.Key, f => CreateFieldMongoData(f.Value))
             };
 
             collection.InsertOne(mongoItem);
 
-            var sqlData = new CharlistData
+            var sqlData = new TemplateData
             {
                 UUID = mongoItem.Id.ToString(),
                 GroupId = groupId
             };
-            charlistSet.Add(sqlData);
-            _entityContext.SaveChanges();
+            templateSet.Add(sqlData);
+            _db.SaveChanges();
 
-            oldToNew[ch.OldId] = sqlData.Id;
+            oldToNew[t.OldId] = sqlData.Id;
         }
     }
 
@@ -317,7 +317,7 @@ public class ExportImportProvider
     {
         if (data.Items == null || !data.Items.Any()) return;
 
-        var itemSet = _itemsContext.Items;
+        var itemSet = _db.Items;
         var collection = _mongo.GetCollection<ItemMongoData>(MongoCollections.Items);
 
         foreach (var item in data.Items)
@@ -344,7 +344,7 @@ public class ExportImportProvider
                 GroupId = groupId
             };
             itemSet.Add(sqlData);
-            _itemsContext.SaveChanges();
+            _db.SaveChanges();
 
             oldToNew[item.OldId] = sqlData.Id;
         }
@@ -354,7 +354,7 @@ public class ExportImportProvider
     {
         if (data.Skills == null || !data.Skills.Any()) return;
 
-        var skillSet = _skillsContext.Skills;
+        var skillSet = _db.Skills;
         var collection = _mongo.GetCollection<SkillMongoData>(MongoCollections.Skills);
 
         foreach (var skill in data.Skills)
@@ -379,7 +379,7 @@ public class ExportImportProvider
                 GroupId = groupId
             };
             skillSet.Add(sqlData);
-            _skillsContext.SaveChanges();
+            _db.SaveChanges();
 
             oldToNew[skill.OldId] = sqlData.Id;
         }
@@ -389,7 +389,7 @@ public class ExportImportProvider
     {
         if (data.Characters == null || !data.Characters.Any()) return;
 
-        var charSet = _entityContext.Set<CharacterData>();
+        var charSet = _db.Set<CharacterData>();
         var collection = _mongo.GetCollection<CharacterMongoData>(MongoCollections.Characters);
 
         foreach (var ch in data.Characters)
@@ -415,7 +415,7 @@ public class ExportImportProvider
                 OwnerId = ch.OwnerId
             };
             charSet.Add(sqlData);
-            _entityContext.SaveChanges();
+            _db.SaveChanges();
 
             charOldToNew[ch.OldId] = sqlData.Id;
         }
@@ -440,7 +440,7 @@ public class ExportImportProvider
     {
         if (data.CharacterItems == null || !data.CharacterItems.Any()) return;
 
-        var charItemSet = _itemsContext.CharacterItems;
+        var charItemSet = _db.CharacterItems;
         foreach (var link in data.CharacterItems)
         {
             if (!charOldToNew.ContainsKey(link.CharacterOldId) || !itemOldToNew.ContainsKey(link.ItemOldId))
@@ -453,14 +453,14 @@ public class ExportImportProvider
                 Amount = link.Amount
             });
         }
-        _itemsContext.SaveChanges();
+        _db.SaveChanges();
     }
 
     private void ImportCharacterSkillLinks(ExportData data, Dictionary<int, int> charOldToNew, Dictionary<int, int> skillOldToNew)
     {
         if (data.CharacterSkills == null || !data.CharacterSkills.Any()) return;
 
-        var charSkillSet = _skillsContext.CharacterSkills;
+        var charSkillSet = _db.CharacterSkills;
         foreach (var link in data.CharacterSkills)
         {
             if (!charOldToNew.ContainsKey(link.CharacterOldId) || !skillOldToNew.ContainsKey(link.SkillOldId))
@@ -472,7 +472,7 @@ public class ExportImportProvider
                 SkillId = skillOldToNew[link.SkillOldId]
             });
         }
-        _skillsContext.SaveChanges();
+        _db.SaveChanges();
     }
 
     private static CategorySchemaExportData MapCategorySchema(CategorySchemaMongoData cat)
@@ -493,6 +493,16 @@ public class ExportImportProvider
             Name = cat.Name,
             Fields = cat.Fields.ToList(),
             Categories = cat.Categories?.Select(MapCategoryPostData).ToList()
+        };
+    }
+
+    private static CategorySchemaMongoData MapCategoryMongoData(CategorySchemaExportData cat)
+    {
+        return new CategorySchemaMongoData
+        {
+            Name = cat.Name,
+            Fields = cat.Fields.ToList(),
+            Categories = cat.Categories?.Select(MapCategoryMongoData).ToList()
         };
     }
 

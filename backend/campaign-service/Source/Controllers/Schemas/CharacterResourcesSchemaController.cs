@@ -1,5 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Tdn.Db.Contexts;
+using Tdn.Models.Access;
 using Tdn.Models.Providing;
+using Tdn.Models.DTOs;
+using Tdn.Models.Schemas;
 using Tdn.Models.Schemas.Characters;
 using Tdn.Models.Schemas.Characters.Conversion;
 
@@ -7,21 +11,23 @@ namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("schemas/groups/{groupId}/characters/resources")]
-public class CharacterResourcesSchemaController : BaseController
+public class CharacterResourcesSchemaController : GroupsBaseController
 {
-    private CharacterResourcesSchemaProvider _provider;
-    private GroupAccessHelper _accessHelper;
+    private GenericMongoProvider<CharacterResourcesMongoData> _provider;
 
-    public CharacterResourcesSchemaController(CharacterResourcesSchemaProvider provider, GroupAccessHelper accessHelper)
+    public CharacterResourcesSchemaController(
+        CampaignContext context,
+        GenericMongoProvider<CharacterResourcesMongoData> provider,
+        SubjectAccessHelper subjectAccessHelper,
+        ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
         _provider = provider;
-        _accessHelper = accessHelper;
     }
     
     [HttpGet]
-    public ActionResult GetSchema(int groupId, [FromQuery] int? userId = null)
+    public ActionResult GetSchema(int groupId)
     {
-        if (userId != null && !_accessHelper.HasGroupAccess(groupId, userId.Value))
+        if (!CheckGroupAccess(groupId))
             return NotFound();
         var mongoData = _provider.GetSchema(groupId);
         var schema = mongoData != null
@@ -31,12 +37,18 @@ public class CharacterResourcesSchemaController : BaseController
     }
     
     [HttpPut]
-    public ActionResult PutSchema(int groupId, CharacterResourcesPostData data, [FromQuery] int? userId = null)
+    public ActionResult PutSchema(int groupId, CharacterResourcesPostData data)
     {
-        if (userId != null && !_accessHelper.IsAdmin(groupId, userId.Value))
+        if (!SubjectAccess.IsAdmin(groupId))
             return Forbidden();
         var schema = data.AsModel();
-        var ok = _provider.TrySaveSchema(groupId, schema);
+        var mongoData = new CharacterResourcesMongoData
+        {
+            GroupId = groupId,
+            Type = "characters",
+            Fields = schema.Fields
+        };
+        var ok = _provider.TrySaveSchema(groupId, mongoData);
         return ok ? Ok(schema.ToResponse()) : BadRequest();
     }
 }

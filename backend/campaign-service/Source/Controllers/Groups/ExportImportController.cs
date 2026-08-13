@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Tdn.Db.Contexts;
+using Tdn.Db.Entities;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
+using Tdn.Models.Access;
 
 namespace Tdn.Api.Controllers;
 
@@ -13,11 +15,12 @@ public class ExportImportController : GroupsBaseController
     private readonly ILogger<ExportImportController> _logger;
 
     public ExportImportController(
-        GroupContext groupContext,
-        GroupAccessHelper accessHelper,
+        CampaignContext groupContext,
+        SubjectAccessHelper subjectAccessHelper,
         ExportImportProvider provider,
-        ILogger<ExportImportController> logger)
-        : base(groupContext, accessHelper)
+        ILogger<ExportImportController> logger,
+        ILogger<GroupsBaseController> baseLogger)
+        : base(groupContext, subjectAccessHelper, baseLogger)
     {
         _provider = provider;
         _logger = logger;
@@ -25,10 +28,9 @@ public class ExportImportController : GroupsBaseController
 
     [HttpGet("export")]
     public ActionResult Export(int groupId,
-        [FromQuery] string include = "templates,characters,items,skills",
-        [FromQuery] int? userId = null)
+        [FromQuery] string include = "templates,characters,items,skills")
     {
-        if (userId != null && !AccessHelper.IsAdmin(groupId, userId.Value))
+        if (!SubjectAccess.IsAdmin(groupId))
             return Forbidden();
 
         if (!TryGetGroup(groupId, out var _))
@@ -42,10 +44,9 @@ public class ExportImportController : GroupsBaseController
     [HttpPost("import")]
     public ActionResult Import(int groupId,
         [FromBody] ExportData data,
-        [FromQuery] string include = "templates,characters,items,skills",
-        [FromQuery] int? userId = null)
+        [FromQuery] string include = "templates,characters,items,skills")
     {
-        if (userId != null && !AccessHelper.IsAdmin(groupId, userId.Value))
+        if (!SubjectAccess.IsAdmin(groupId))
             return Forbidden();
 
         if (!TryGetGroup(groupId, out var _))

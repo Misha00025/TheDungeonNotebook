@@ -1,23 +1,25 @@
 using Microsoft.AspNetCore.Mvc;
 using Tdn.Db.Contexts;
+using Tdn.Models.Access;
 using Tdn.Models.Providing;
 using Tdn.Models.Conversions;
+using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("/groups/{groupId}/notes")]
-public class GroupNotesController : BaseController
+public class GroupNotesController : GroupsBaseController
 {
     private NotesProvider _provider;
 
-    public GroupNotesController(NotesProvider provider)
+    public GroupNotesController(CampaignContext context, NotesProvider provider, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
         _provider = provider;
     }
 
     [HttpGet]
-    public ActionResult GetAll(int groupId, [FromQuery] string? userId = null)
+    public ActionResult GetAll(int groupId)
     {
         var notes = _provider.GetGroupNotes(groupId);
         return Ok(notes.Select(n => n.ToResponse()));
@@ -62,12 +64,5 @@ public class GroupNotesController : BaseController
         if (!_provider.TryDeleteGroupNote(groupId, noteId))
             return NotFound();
         return Ok();
-    }
-
-    [HttpGet("keywords")]
-    public ActionResult GetKeywords(int groupId)
-    {
-        var keywords = _provider.GetGroupKeywords(groupId);
-        return Ok(new { keywords });
     }
 }

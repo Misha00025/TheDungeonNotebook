@@ -28,6 +28,11 @@ public abstract class BaseController : ControllerBase
 		};
 	}
 	
+	public ActionResult Unprocessable(string message)
+	{
+	    return StatusCode(StatusCodes.Status422UnprocessableEntity, new { title = "UnprocessableEntity", message });
+	}
+	
 	public ActionResult Forbidden()
 	{
 	    return StatusCode(StatusCodes.Status403Forbidden);

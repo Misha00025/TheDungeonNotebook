@@ -11,7 +11,7 @@ API Gateway (FastAPI/PyApiGate, порт 5000) — единая точка вх�
 - **users-service** (C# .NET 8) — [README](backend/users-service/README.md)
 - **campaign-service** (C# .NET 8) — [README](backend/campaign-service/README.md)
 - **notes-service** (C# .NET 8) — [README](backend/notes-service/README.md)
-- **uploads-service** (C# .NET 8) — [README](backend/uploads-service/README.md)
+
 
 ### Базы данных
 
@@ -52,12 +52,18 @@ docker compose up -d
 2. auth-service, users-service, campaign-service, notes-service
 3. api-gateway
 
-### Запуск uploads-service (отдельно)
 
-```bash
-cd backend/uploads-service
-docker compose up -d
-```
+
+## Makefile (автоматизация)
+
+В корне проекта находится `Makefile` для часто используемых операций.
+
+| Команда | Описание |
+|---------|----------|
+| `make test` | Запуск интеграционных тестов. Выполняет `cd backend/tests && ./test.sh 5` — очищает БД, пересобирает контейнеры, генерирует свежие RSA-ключи, ждёт 5 секунд и прогоняет все сценарии. |
+| `make build` | Сборка всех Docker-образов: `cd backend && docker compose build`. |
+| `make certs` | Генерация RSA-ключей (2048 bit) в `backend/certs/private.pem` и `backend/certs/public.pem`. |
+| `make clean` | Удаление данных MongoDB и MySQL (`backend/mongo_data/`, `backend/mysql_data/`) с подтверждением. Требует sudo. |
 
 ## Мониторинг
 

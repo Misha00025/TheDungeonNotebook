@@ -8,7 +8,7 @@ public class GroupEntityData : IndexedData
 }
 
 public class ItemData : GroupEntityData {}
-public class CharlistData : GroupEntityData {}
+public class TemplateData : GroupEntityData {}
 public class SkillData : GroupEntityData {}
 
 public class CharacterData : GroupEntityData 
@@ -16,7 +16,7 @@ public class CharacterData : GroupEntityData
 	public int TemplateId { get; set; }
 	public int? OwnerId { get; set; }
 	
-	public CharlistData Template { get; set; } = null!;
+	public TemplateData Template { get; set; } = null!;
 }
 
 public class CharacterSkillData

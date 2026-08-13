@@ -1,41 +1,41 @@
+using Microsoft.Extensions.Logging;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 using Tdn.Models.Providing;
+using Tdn.Models.Access;
 
 namespace Tdn.Api.Controllers;
 
 public abstract class GroupsBaseController : BaseController
 {
-    private GroupContext _groupContext;
-    private GroupAccessHelper _accessHelper;
+    private CampaignContext _db;
+    private SubjectAccessHelper _subjectAccessHelper;
+    private ILogger<GroupsBaseController> _logger;
     
-    public GroupsBaseController(GroupContext context, GroupAccessHelper accessHelper)
+    public GroupsBaseController(CampaignContext context, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger)
     {
-        _groupContext = context;
-        _accessHelper = accessHelper;
+        _db = context;
+        _subjectAccessHelper = subjectAccessHelper;
+        _logger = logger;
     }
 
-    protected GroupContext GroupContext => _groupContext;
-    protected GroupAccessHelper AccessHelper => _accessHelper;
+    protected SubjectAccessHelper SubjectAccess => _subjectAccessHelper;
+    protected ILogger<GroupsBaseController> Logger => _logger;
 
     protected bool TryGetGroup(int groupId, out GroupData group)
     {
-        var tmp = GroupContext.Groups.Where(e => e.Id == groupId).FirstOrDefault();
+        var tmp = _db.Groups.Where(e => e.Id == groupId).FirstOrDefault();
         group = tmp!;
         return tmp != null;    
     }
     
-    protected bool CheckGroupAccess(int groupId, int? userId)
+    protected bool CheckGroupAccess(int groupId)
     {
-        if (userId == null)
-            return true;
-        return AccessHelper.HasGroupAccess(groupId, userId.Value);
+        return SubjectAccess.HasGroupAccess(groupId);
     }
     
-    protected bool CheckCharacterAccess(int groupId, int characterId, int? userId)
+    protected bool CheckCharacterAccess(int groupId, int characterId)
     {
-        if (userId == null)
-            return true;
-        return AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value);
+        return SubjectAccess.HasCharacterAccess(groupId, characterId);
     }
 }

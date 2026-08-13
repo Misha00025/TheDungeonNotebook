@@ -2,7 +2,7 @@
 
 ## Test Framework
 - Custom Python framework (not pytest-style assertions)
-- Location: `backend/api-gateway/tests/`
+- Location: `backend/tests/`
 - Entry point: `test.py` with argparse (`-c` compact, `-d` debug, `--server`, `-S` scenario filter)
 
 ## Test Structure
@@ -19,7 +19,7 @@ tests/
 
 ## Test Execution
 ```bash
-cd backend/api-gateway/tests
+cd backend/tests
 ./test.sh 15                     # Wait 15s, run all tests
 ./test.sh 15 -S GatewayMain      # Run only GatewayMain scenario
 ./venv/bin/python test.py        # Direct run (requires running stack)
@@ -92,8 +92,7 @@ CI script: `backend/api-gateway/tests/test-ci.sh`
    - Waits for api-gateway readiness
    - Runs all test scenarios
    - Prints summary and last gateway logs
-   - Stops all containers
-4. On failure: uploads test logs as a GitHub Actions artifact
+    - Stops all containers
 
 ### Local vs CI
 - **Local:** `./test.sh 15` — uses venv, sudo rm, colored summary

@@ -55,6 +55,7 @@
             { key: 'character-items', title: 'Предметы', page: 'groups/characters/items.html', icon: '🎒' },
             { key: 'character-notes', title: 'Заметки', page: 'groups/characters/notes.html', icon: '📓' },
             { key: 'character-skills', title: 'Навыки', page: 'groups/characters/skills.html', icon: '💪' },
+            { key: 'character-commands', title: 'Команды', page: 'groups/characters/commands.html', icon: '🎮' },
           ]
         },
       ]

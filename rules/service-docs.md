@@ -50,3 +50,26 @@ docs/api/
 
 ## SCHEMAS Object
 Common schemas are defined in `var SCHEMAS = { ... }` at the top of `data.js` for reuse across endpoints. Add new schemas here when multiple endpoints share the same response shape.
+
+## Adding a New Command
+Commands are documented on a separate page `groups/characters/commands.html` via the global `COMMANDS` array in `docs/api/js/data.js`.
+
+1. Open `docs/api/js/data.js`.
+2. Add a new object to the `COMMANDS` array (in the correct category).
+3. Object fields: `id`, `type`, `category`, `categoryTitle`, `page`, `description`, `payload`, `payloadRequired`, `responseSchema`, `responseStatuses`.
+4. `type` — string command type, MUST match the value of `Handles` / handler registration string in `backend/campaign-service/Source/.../Program.cs` (e.g. `AddField`, `UpdateField`, `DeleteField`, `EquipItem`, `UnequipItem`).
+5. `page` — always `"groups/characters/commands.html"`.
+6. `payload` — JSON schema of the command body (real fields from C# models/parsers, e.g. `FieldCommandParser`).
+7. Implementation lives in `backend/campaign-service/Source/Models/Commands/`.
+
+Note: The actual HTTP endpoints for commands (single and batch) are documented as regular endpoints in `ENDPOINTS` on the same page; command operations are documented in `COMMANDS`.
+
+### Character Log
+
+Каждая команда пишет в журнал персонажа запись, описываемую полем `log` карточки: `actionType` совпадает с `Handles`/именем команды, `details` — конкретные поля, зеркалит `_log.Log(...)` в хендлере команды.
+
+The `responseSchema` for a command must reflect the **actual** response of `CharacterData.ToDict` from campaign-service (the full character object, same shape as `GET /groups/{id}/characters/{charId}`), not a fictional `{ "character": object }` wrapper. The batch command endpoint returns `{ "results": [{ "type", "status", "success", "message"?:, "errors"?:, "data"?: <character object> }] }`.
+
+### Character Log
+
+`GET /groups/{id}/characters/{charId}/log` — журнал изменений персонажа. Записи имеют форму `{ timestamp, actorId, actionType, details }` (см. `CharacterLogEntryView` в campaign-service). `actionType` — одно из: `AddField`, `UpdateField`, `DeleteField`, `AddItem`, `UpdateItem`, `RemoveItem`, `AddSkill`, `RemoveSkill`, `EquipItem`, `UnequipItem`. `details` содержит `key`/`itemId`/`skillId` (по типу операции) + `oldValue` + `delta`. Записи создаются и командами, и REST-мутациями; при `actorId == -1` (админ/без субъекта) не логируются; пишутся только при реальном числовом изменении (`delta != 0` и т.п.). Схема описана в `SCHEMAS.characterLog` в `data.js`.

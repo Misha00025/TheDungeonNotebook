@@ -530,3 +530,75 @@ code {
     padding-top: 3.5rem;
   }
 }
+
+.command-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 1.25rem;
+  overflow: hidden;
+}
+
+.command-type-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  line-height: 1.4;
+  background: rgba(46, 204, 113, 0.2);
+  color: var(--method-get);
+}
+
+.command-url {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.payload-required {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+.log-block {
+  margin-top: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.9rem 1.1rem;
+}
+
+.log-block h3 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+}
+
+.log-action-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  line-height: 1.4;
+  background: rgba(124, 92, 252, 0.2);
+  color: #a78bfa;
+  display: inline-block;
+  margin-bottom: 0.6rem;
+}
+
+.log-note {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  margin-top: 0.5rem;
+  font-style: italic;
+}

@@ -1,13 +1,18 @@
 using Microsoft.EntityFrameworkCore;
 using Tdn.Configuration;
-using Tdn.Db.Configuers;
+using Tdn.Db.Configurers;
 using Tdn.Db.Contexts;
 using Tdn.Settings;
 using Tdn.Db;
 using Tdn.Models.Providing;
+using Tdn.Models.Access;
+using Tdn.Middleware;
+using Tdn.Models.Schemas;
 using Tdn.Models.Schemas.Items;
 using Tdn.Models.Schemas.Templates;
 using Tdn.Models.Schemas.Characters;
+using Tdn.Models.Commands;
+using Tdn.Models.Commands.Character;
 using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,28 +26,39 @@ builder.Services.AddLogging(e => e.AddConsole());
 // DataBase Contexts
 builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
 builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigurer>();
-builder.Services.AddDbContext<GroupContext>(config.ConfigDbConnections);
-builder.Services.AddDbContext<EntityContext>(config.ConfigDbConnections);
-builder.Services.AddDbContext<SkillsContext>(config.ConfigDbConnections);
-builder.Services.AddDbContext<ItemsContext>(config.ConfigDbConnections);
-builder.Services.AddDbContext<PolicesContext>(config.ConfigDbConnections);
 builder.Services.AddDbContext<CampaignContext>(config.ConfigDbConnections);
-builder.Services.AddScoped(_ => new MongoDbContext(config.GetMongoDbSettings()));
-builder.Services.AddScoped(_ => new SchemasMongoDbContext(config.GetSchemasMongoDbSettings()));
+builder.Services.AddScoped<IMongoDbContext>(_ => new MongoDbContext(config.GetMongoDbSettings()));
+builder.Services.AddScoped<ISchemasMongoDbContext>(_ => new SchemasMongoDbContext(config.GetSchemasMongoDbSettings()));
 
 // Providers
 builder.Services.AddScoped<GroupAccessHelper, GroupAccessHelper>();
+builder.Services.AddScoped<GroupPolicesProvider, GroupPolicesProvider>();
 builder.Services.AddScoped<AttributesProvider, AttributesProvider>();
 builder.Services.AddScoped<SkillsProvider, SkillsProvider>();
 builder.Services.AddScoped<ItemsProvider, ItemsProvider>();
-builder.Services.AddScoped<GroupSchemasProvider, GroupSchemasProvider>();
-builder.Services.AddScoped<CharacterTemplateSchemaProvider, CharacterTemplateSchemaProvider>();
+builder.Services.AddScoped(sp => new GenericMongoProvider<SkillsSchemaMongoData>(
+    sp.GetRequiredService<ISchemasMongoDbContext>(), "schemas", "skills"));
+builder.Services.AddScoped(sp => new GenericMongoProvider<ItemsSchemaMongoData>(
+    sp.GetRequiredService<ISchemasMongoDbContext>(), "schemas", "items"));
+builder.Services.AddScoped(sp => new GenericMongoProvider<TemplateSchemaMongoData>(
+    sp.GetRequiredService<ISchemasMongoDbContext>(), "templates", "template"));
 builder.Services.AddScoped<ExportImportProvider, ExportImportProvider>();
 builder.Services.AddScoped<NotesProvider, NotesProvider>();
-builder.Services.AddScoped<CharacterResourcesSchemaProvider, CharacterResourcesSchemaProvider>();
+builder.Services.AddScoped(sp => new GenericMongoProvider<CharacterResourcesMongoData>(
+    sp.GetRequiredService<ISchemasMongoDbContext>(), "schemas", "characters"));
 builder.Services.AddScoped<CharacterEquipmentProvider, CharacterEquipmentProvider>();
 builder.Services.AddScoped<CharacterLogProvider, CharacterLogProvider>();
+builder.Services.AddScoped<CharactersProvider, CharactersProvider>();
+builder.Services.AddScoped<ICommandHandler, AddFieldCommandHandler>();
+builder.Services.AddScoped<ICommandHandler, UpdateFieldCommandHandler>();
+builder.Services.AddScoped<ICommandHandler, DeleteFieldCommandHandler>();
+builder.Services.AddScoped<ICommandHandler, EquipItemCommandHandler>();
+builder.Services.AddScoped<ICommandHandler, UnequipItemCommandHandler>();
+builder.Services.AddScoped<ICommandDispatcher, CommandDispatcher>();
+builder.Services.AddScoped<CommandBatchProcessor, CommandBatchProcessor>();
+builder.Services.AddScoped<GroupProvider, GroupProvider>();
 builder.Services.AddScoped<QuestsProvider, QuestsProvider>();
+builder.Services.AddScoped<SubjectAccessHelper>();
 
 // General
 builder.Services.AddEndpointsApiExplorer();
@@ -72,6 +88,8 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseHttpMetrics();
+app.UseMiddleware<SubjectPresentMiddleware>();
+app.UseMiddleware<CampaignAccessMiddleware>();
 app.MapMetrics();
 app.MapControllers();
 app.Run();

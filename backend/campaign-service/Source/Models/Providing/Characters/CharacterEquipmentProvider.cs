@@ -2,24 +2,20 @@ using MongoDB.Driver;
 using Tdn.Db;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
-using Tdn.Models.Providing;
 
 namespace Tdn.Models.Providing;
 
 public class CharacterEquipmentProvider
 {
-    private readonly EntityContext _context;
-    private readonly MongoDbContext _mongo;
-    private readonly GroupAccessHelper _accessHelper;
+    private readonly CampaignContext _db;
+    private readonly IMongoDbContext _mongo;
 
     public CharacterEquipmentProvider(
-        EntityContext context,
-        MongoDbContext mongo,
-        GroupAccessHelper accessHelper)
+        CampaignContext context,
+        IMongoDbContext mongo)
     {
-        _context = context;
+        _db = context;
         _mongo = mongo;
-        _accessHelper = accessHelper;
     }
 
     public List<int> GetEquipment(int groupId, int characterId)
@@ -78,7 +74,7 @@ public class CharacterEquipmentProvider
 
     private CharacterMongoData? LoadCharacter(int groupId, int characterId)
     {
-        var charData = _context.Set<CharacterData>()
+        var charData = _db.Characters
             .FirstOrDefault(e => e.GroupId == groupId && e.Id == characterId);
         if (charData == null) return null;
         return _mongo.GetEntity<CharacterMongoData>(MongoCollections.Characters, charData.UUID);
@@ -86,7 +82,7 @@ public class CharacterEquipmentProvider
 
     private FilterDefinition<CharacterMongoData> BuildFilter(int groupId, int characterId)
     {
-        var charData = _context.Set<CharacterData>()
+        var charData = _db.Characters
             .FirstOrDefault(e => e.GroupId == groupId && e.Id == characterId);
         if (charData == null)
             return Builders<CharacterMongoData>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Empty);

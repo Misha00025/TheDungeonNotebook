@@ -3,11 +3,6 @@ namespace Tdn.Models.Schemas.Characters;
 using MongoDB.Bson.Serialization.Attributes;
 using Tdn.Db;
 
-public struct CharacterResourcesPostData
-{
-    public List<string> Fields { get; set; }
-}
-
 public class CharacterResourcesSchema
 {
     public string Type = "characters";

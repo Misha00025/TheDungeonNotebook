@@ -4,7 +4,21 @@ using Tdn.Settings;
 
 namespace Tdn.Db;
 
-public abstract class MongoDbContextBase
+public interface IMongoDbContext
+{
+    IMongoCollection<T> GetCollection<T>(string collectionName);
+    T? GetEntity<T>(string collectionName, string uuid) where T : MongoDbContextBase.MongoEntity;
+    IEnumerable<T> GetMany<T>(string collectionName, IEnumerable<string> uuids) where T : MongoDbContextBase.MongoEntity;
+}
+
+public interface ISchemasMongoDbContext
+{
+    IMongoCollection<T> GetCollection<T>(string collectionName);
+    T? GetEntity<T>(string collectionName, string uuid) where T : MongoDbContextBase.MongoEntity;
+    IEnumerable<T> GetMany<T>(string collectionName, IEnumerable<string> uuids) where T : MongoDbContextBase.MongoEntity;
+}
+
+public abstract class MongoDbContextBase : IMongoDbContext, ISchemasMongoDbContext
 {
     public class MongoEntity
     {

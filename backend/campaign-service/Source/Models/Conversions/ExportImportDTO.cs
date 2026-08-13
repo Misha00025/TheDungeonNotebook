@@ -22,7 +22,7 @@ public class ExportData
     public TemplateSchemaExportData? TemplateSchema { get; set; }
 
     [JsonPropertyName("charlists")]
-    public List<CharlistExportData>? Charlists { get; set; }
+    public List<TemplateExportData>? Templates { get; set; }
 
     [JsonPropertyName("characters")]
     public List<CharacterExportData>? Characters { get; set; }
@@ -64,7 +64,7 @@ public class CategorySchemaExportData
     public string Key { get; set; } = "";
 }
 
-public class CharlistExportData
+public class TemplateExportData
 {
     [JsonPropertyName("oldId")]
     public int OldId { get; set; }

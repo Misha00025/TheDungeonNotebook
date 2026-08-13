@@ -15,7 +15,16 @@ var SCHEMAS = {
   briefSkillObj: '{"id": "int","name": "string","description": "string","attributes": [{"key": "string","name": "string","description": "string"}],"isSecret": "bool"}',
 
   // --- Квесты ---
-  fullQuest: '{\n  "id": "int",\n  "header": "string",\n  "description": "string",\n  "reward": ["string"],\n  "status": ""active"" | ""completed"" | ""failed"" | ""cancelled"",\n  "objectives": [{"key": "string","description": "string","status": ""pending"" | ""completed"" | ""failed"" | ""cancelled""}],\n  "assignedCharacters": ["int"]\n}'
+  fullQuest: '{\n  "id": "int",\n  "header": "string",\n  "description": "string",\n  "reward": ["string"],\n  "status": ""active"" | ""completed"" | ""failed"" | ""cancelled"",\n  "objectives": [{"key": "string","description": "string","status": ""pending"" | ""completed"" | ""failed"" | ""cancelled""}],\n  "assignedCharacters": ["int"]\n}',
+
+  // --- Поля персонажа (команды) ---
+  fieldCommandData: '{\n  "name"?: "string",\n  "description"?: "string",\n  "value"?: "int",\n  "maxValue"?: "int",\n  "formula"?: "string",\n  "modifierFormula"?: "string"\n}',
+
+  // --- Персонаж (ответ команд) ---
+  fullCharacter: '{\n  "id": "int",\n  "group": { "id": "int", "name": "string", "icon": "string | null" },\n  "name": "string | null",\n  "description": "string | null",\n  "fields": {"<ключ>": {"name": "string", "description": "string", "value": "int", "maxValue"?: "int", "formula"?: "string"}},\n  "templateId": "int"\n}',
+
+  // --- Журнал персонажа ---
+  characterLog: '{\n  "entries": [{"timestamp": "datetime", "actorId": "int", "actionType": "string", "details": {"<поле>": "string | int"}}],\n  "total": "int"\n}'
 };
 
 const ENDPOINTS = [
@@ -1347,5 +1356,407 @@ const ENDPOINTS = [
     responseStatuses: ["201 Created", "400 Bad Request", "403 Forbidden"],
     params: null,
     special: ["handler: quest_create_for_character"]
+  },
+  {
+    id: "post-groups-id-characters-charId-commands",
+    method: "POST",
+    url: "/groups/{id}/characters/{charId}/commands",
+    category: "characters",
+    categoryTitle: "Персонажи",
+    page: "groups/characters/commands.html",
+    auth: "required",
+    access: "character_writer",
+    description: "Выполнение одной команды персонажа.",
+    requestBody: '{\n  "type": "string",\n  "payload": "object",\n  "idempotencyKey"?: "string"\n}',
+    requestBodyRequired: ["type"],
+    responseSchema: SCHEMAS.fullCharacter,
+    responseStatuses: ["200 OK", "400 Bad Request", "403 Forbidden", "404 Not Found", "409 Conflict", "422 Unprocessable Entity"],
+    params: null,
+    special: ["commands"]
+  },
+  {
+    id: "post-groups-id-characters-charId-commands-batch",
+    method: "POST",
+    url: "/groups/{id}/characters/{charId}/commands/batch",
+    category: "characters",
+    categoryTitle: "Персонажи",
+    page: "groups/characters/commands.html",
+    auth: "required",
+    access: "character_writer",
+    description: "Выполнение батча команд персонажа.",
+    requestBody: '[\n  {"type": "string", "payload": "object", "idempotencyKey"?: "string"}\n]',
+    requestBodyRequired: null,
+    responseSchema: '{\n  "results": [{"type": "string", "status": "int", "success": "bool", "message"?: "string", "errors"?: ["string"], "data"?: {"<ключ>": "object"}}]\n}',
+    responseStatuses: ["200 OK", "400 Bad Request", "403 Forbidden"],
+    params: null,
+    special: ["commands"]
+  },
+  {
+    id: "get-groups-id-characters-charId-log",
+    method: "GET",
+    url: "/groups/{id}/characters/{charId}/log",
+    category: "characters",
+    categoryTitle: "Персонажи",
+    page: "groups/characters/main.html",
+    auth: "required",
+    access: null,
+    description: "Журнал изменений персонажа (записи команд и мутаций полей/предметов/навыков/экипировки). Записи сортируются по времени убывания.",
+    requestBody: null,
+    requestBodyRequired: null,
+    responseSchema: SCHEMAS.characterLog,
+    responseStatuses: ["200 OK", "404 Not Found"],
+    params: [
+      { name: "limit", type: "int", description: "Максимум записей (default 50)" },
+      { name: "offset", type: "int", description: "Пропустить первых N записей (default 0)" }
+    ],
+    special: ["handler: character_log"]
   }
 ];
+
+var COMMANDS = [
+  {
+    id: "cmd-add-field",
+    type: "AddField",
+    category: "characters",
+    categoryTitle: "Персонажи",
+    page: "groups/characters/commands.html",
+    description: "Добавить поле персонажу. Если поле с таким ключом уже есть — конфликт (409). Если поле есть в шаблоне — копируется из шаблона.",
+    payload: '{\n  "key": "string",\n  "field": ' + SCHEMAS.fieldCommandData + '\n}',
+    payloadRequired: ["key"],
+    responseSchema: SCHEMAS.fullCharacter,
+    responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found", "409 Conflict"],
+    log: {
+      actionType: "AddField",
+      details: '{\n  "key": "string",\n  "oldValue": "int",\n  "delta": "int"\n}',
+      note: "Пишется, только если actorId != -1 и значение поля изменилось (delta != 0)"
+    }
+  },
+  {
+    id: "cmd-update-field",
+    type: "UpdateField",
+    category: "characters",
+    categoryTitle: "Персонажи",
+    page: "groups/characters/commands.html",
+    description: "Обновить существующее поле персонажа (передаются только изменяемые поля).",
+    payload: '{\n  "key": "string",\n  "field": ' + SCHEMAS.fieldCommandData + '\n}',
+    payloadRequired: ["key"],
+    responseSchema: SCHEMAS.fullCharacter,
+    responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"],
+    log: {
+      actionType: "UpdateField",
+      details: '{\n  "key": "string",\n  "oldValue": "int",\n  "delta": "int"\n}',
+      note: "Пишется, только если actorId != -1 и значение поля изменилось (delta != 0)"
+    }
+  },
+  {
+    id: "cmd-delete-field",
+    type: "DeleteField",
+    category: "characters",
+    categoryTitle: "Персонажи",
+    page: "groups/characters/commands.html",
+    description: "Удалить поле персонажа по ключу.",
+    payload: '{\n  "key": "string"\n}',
+    payloadRequired: ["key"],
+    responseSchema: SCHEMAS.fullCharacter,
+    responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"],
+    log: {
+      actionType: "DeleteField",
+      details: '{\n  "key": "string",\n  "oldValue": "int",\n  "delta": "int"\n}',
+      note: "Пишется, только если actorId != -1 и значение поля изменилось (delta != 0)"
+    }
+  },
+  {
+    id: "cmd-equip-item",
+    type: "EquipItem",
+    category: "characters",
+    categoryTitle: "Персонажи",
+    page: "groups/characters/commands.html",
+    description: "Экипировать предмет персонажа по itemId.",
+    payload: '{\n  "itemId": "int"\n}',
+    payloadRequired: ["itemId"],
+    responseSchema: SCHEMAS.fullCharacter,
+    responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"],
+    log: {
+      actionType: "EquipItem",
+      details: '{\n  "itemId": "int",\n  "oldValue": "int",\n  "delta": "int"\n}',
+      note: "Пишется, только если actorId != -1; при повторном экипировании команда возвращает конфликт (409)"
+    }
+  },
+  {
+    id: "cmd-unequip-item",
+    type: "UnequipItem",
+    category: "characters",
+    categoryTitle: "Персонажи",
+    page: "groups/characters/commands.html",
+    description: "Снять предмет с персонажа по itemId.",
+    payload: '{\n  "itemId": "int"\n}',
+    payloadRequired: ["itemId"],
+    responseSchema: '{\n  "id": "int",\n  "group": { "id": "int", "name": "string", "icon": "string | null" },\n  "name": "string | null",\n  "description": "string | null",\n  "fields": {"<ключ>": {"name": "string", "description": "string", "value": "int", "maxValue"?: "int", "formula"?: "string"}},\n  "templateId": "int"\n}',
+    responseStatuses: ["200 OK", "400 Bad Request", "404 Not Found"],
+    log: {
+      actionType: "UnequipItem",
+      details: '{\n  "itemId": "int",\n  "oldValue": "int",\n  "delta": "int"\n}',
+      note: "Пишется, только если actorId != -1; если предмет не экипирован — команда не выполняется (NoOp)"
+    }
+  }
+];
+
+function prettySchema(str) {
+  if (str == null || typeof str !== 'string') return str == null ? '' : String(str);
+  var S = str.trimStart();
+  if (!S || S[0] !== '{' && S[0] !== '[') return str.trimEnd();
+  var P = 0;
+  var N = S.length;
+
+  /* ── Step 1: Normalize ── */
+  function norm() {
+    // 1) Collapse consecutive " into single " (source convention: ""active"" → "active")
+    // 2) Convert \n/\r to space, collapse multiple spaces to one
+    var raw = '';
+    for (var i = 0; i < S.length; i++) {
+      var c = S[i];
+      if (i > 0 && c === '"' && S[i - 1] === '"') continue;
+      if (c === '\n' || c === '\r') c = ' ';
+      raw += c;
+    }
+    // Collapse multiple spaces into one
+    var result = '', hadSpace = false;
+    for (var i = 0; i < raw.length; i++) {
+      if (raw[i] === ' ') {
+        if (!hadSpace) { result += ' '; hadSpace = true; }
+      } else {
+        hadSpace = false;
+        result += raw[i];
+      }
+    }
+    return result;
+  }
+  S = norm();
+  N = S.length;
+  P = 0;
+
+  /* ── Helpers ── */
+  function skip() { while (P < N && S[P] === ' ') P++; }
+  function peek() { return P < N ? S[P] : ''; }
+  function eat(n) { P += n; }
+
+  function consumeQuoted() {
+    var start = P;
+    var esc = false;
+    P++;
+    while (P < N) {
+      if (S[P] === '\\') { esc = true; P++; continue; }
+      if (esc) { esc = false; P++; continue; }
+      if (S[P] === '"') { P++; return S.substring(start, P); }
+      P++;
+    }
+    return S.substring(start, N);
+  }
+
+  function collectAtom() {
+    if (S[P] === '"') return consumeQuoted();
+    var s = P;
+    while (P < N && ',{}[]:?| '.indexOf(S[P]) === -1) P++;
+    return S.substring(s, P);
+  }
+
+  function parseScalar() {
+    var parts = [collectAtom()];
+    skip();
+    while (P < N && S[P] === '|') {
+      P++; skip(); parts.push(collectAtom()); skip();
+    }
+    if (P < N && S[P] === '?') {
+      parts[parts.length - 1] += '?';
+      P++;
+    }
+    return parts.join(' | ');
+  }
+
+  /* ── Recursive descent ── */
+  function pad(n) { return n <= 0 ? '' : Array(n * 2 + 1).join(' '); }
+
+  // ── Object ──
+  // parseObject(d) consumes '{ ... }' and returns full output string
+  function parseObject(d) {
+    eat(1); // '{'
+    var out = pad(d) + '{\n';
+    for (;;) {
+      skip();
+      if (P >= N || peek() === '}') break;
+      var key = consumeQuoted();
+      skip();
+      var opt = '';
+      if (S[P] === '?') { opt = '?'; P++; skip(); }
+      if (S[P] === ':') { P++; skip(); }
+      var ind = pad(d + 1);
+      skip();
+      if (peek() === '{') {
+        eat(1); // consume '{'
+        skip();
+        if (peek() === '.' || peek() === '}') {
+          out += ind + key + opt + ': { ... }\n';
+          while (P < N && S[P] !== '}') P++;
+          if (P < N && S[P] === '}') P++;
+        } else {
+          out += ind + key + opt + ': {\n';
+          out += parseBodyObj(d + 2);
+        }
+      } else if (peek() === '[') {
+        eat(1); // consume '['
+        skip();
+        if (peek() === '.') {
+          out += ind + key + opt + ': [ ... ]\n';
+          while (P < N && S[P] !== ']') P++;
+          if (P < N && S[P] === ']') P++;
+        } else if (peek() === ']') {
+          out += ind + key + opt + ': []\n';
+          P++;
+        } else {
+          out += ind + key + opt + ': [\n';
+          out += parseBodyArr(d + 2);
+          if (peek() === ']') P++;
+          out += pad(d + 1) + ']\n';
+        }
+      } else {
+        out += ind + key + opt + ': ' + parseScalar() + '\n';
+      }
+      skip();
+      if (P >= N || peek() === '}') break;
+      if (S[P] === ',') {
+        out = out.substring(0, out.length - 1) + ',\n'; // replace trailing \n with ,\n
+        P++;
+      }
+    }
+    out = out.substring(0, out.length - 1); // strip trailing \n
+    return out + '\n' + pad(d) + '}';
+  }
+
+  // parseBodyObj(d): internal of '{ ... }', starting AFTER '{', ending BEFORE '}'
+  // Each pair is at indent d. The closing '}' is at indent d-1.
+  // Returns formatted content including the closing '}' + trailing '\n'.
+  function parseBodyObj(d) {
+    var out = '';
+    for (;;) {
+      skip();
+      if (P >= N || peek() === '}') break;
+      var key = consumeQuoted();
+      skip();
+      var opt = '';
+      if (S[P] === '?') { opt = '?'; P++; skip(); }
+      if (S[P] === ':') { P++; skip(); }
+      var ind = pad(d);
+      skip();
+      if (peek() === '{') {
+        eat(1); // consume '{'
+        skip();
+        if (peek() === '.' || peek() === '}') {
+          out += ind + key + opt + ': { ... }\n';
+          while (P < N && S[P] !== '}') P++;
+          if (P < N && S[P] === '}') P++;
+        } else {
+          out += ind + key + opt + ': {\n';
+          out += parseBodyObj(d + 1);
+        }
+      } else if (peek() === '[') {
+        eat(1); // consume '['
+        skip();
+        if (peek() === '.') {
+          out += ind + key + opt + ': [ ... ]\n';
+          while (P < N && S[P] !== ']') P++;
+          if (P < N && S[P] === ']') P++;
+        } else if (peek() === ']') {
+          out += ind + key + opt + ': []\n';
+          P++;
+        } else {
+          out += ind + key + opt + ': [\n';
+          out += parseBodyArr(d + 1);
+          if (peek() === ']') P++;
+          out += pad(d) + ']\n';
+        }
+      } else {
+        out += ind + key + opt + ': ' + parseScalar() + '\n';
+      }
+      skip();
+      if (P >= N || peek() === '}') break;
+      if (S[P] === ',') {
+        out = out.substring(0, out.length - 1) + ',\n';
+        P++;
+      }
+    }
+    if (P < N && S[P] === '}') P++;
+    out += pad(d - 1) + '}';
+    return out + '\n';
+  }
+
+  // ── Array ──
+  function parseArray(d) {
+    eat(1); // '['
+    skip();
+    if (peek() === ']') { P++; return pad(d) + '[]'; }
+    var out = pad(d) + '[\n' + parseBodyArr(d + 1);
+    if (peek() === ']') P++;
+    return out + pad(d - 1) + ']';
+  }
+
+  // parseBodyArr(d): internal of '[ ... ]', starting AFTER '[' has been consumed.
+  // Elements printed at indent d. Does NOT print the closing ']'.
+  // The caller is responsible for appending ']' at indent d-1.
+  function parseBodyArr(d) {
+    var out = '';
+    for (;;) {
+      skip();
+      if (P >= N || peek() === ']') break;
+      var vc = peek();
+      var ind = pad(d);
+      if (vc === '{') {
+        eat(1);
+        skip();
+        if (peek() === '.' || peek() === '}') {
+          out += ind + '{ ... }\n';
+          while (P < N && S[P] !== '}') P++;
+          if (P < N && S[P] === '}') P++;
+        } else {
+          out += ind + '{\n';
+          out += parseBodyObj(d + 1);
+          if (peek() === '}') P++;
+        }
+      } else if (vc === '[') {
+        eat(1);
+        skip();
+        if (peek() === '.') {
+          out += ind + '[ ... ]\n';
+          while (P < N && S[P] !== ']') P++;
+          if (P < N && S[P] === ']') P++;
+        } else if (peek() === ']') {
+          out += ind + '[]\n';
+          P++;
+        } else {
+          out += ind + '[\n';
+          out += parseBodyArr(d + 1);
+          if (peek() === ']') { P++; }
+        }
+      } else {
+        out += ind + parseScalar() + '\n';
+      }
+      skip();
+      if (P >= N || peek() === ']') break;
+      if (S[P] === ',') {
+        out = out.substring(0, out.length - 1) + ',\n';
+        P++;
+      }
+    }
+    return out;
+  }
+
+  function parseValue(d) {
+    skip();
+    var c = peek();
+    if (c === '{') return parseObject(d);
+    if (c === '[') return parseArray(d);
+    return parseScalar();
+  }
+
+  if (!S || N === 0) return '';
+  return parseValue(0);
+}

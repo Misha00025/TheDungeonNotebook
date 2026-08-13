@@ -1,48 +1,53 @@
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Driver;
 using Tdn.Db;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
 using Tdn.Models;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
+using Tdn.Models.Access;
+using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("/groups/{groupId}/characters/{characterId}/items")]
-public class CharacterItemsController : CharactersBaseController
+public class CharacterItemsController : GroupsBaseController
 {
 
     private ItemsProvider _provider;
     private CharacterLogProvider _logProvider;
+    private CharactersProvider _charactersProvider;
 
-    public CharacterItemsController(EntityContext context, MongoDbContext mongo, GroupContext groupContext, ItemsProvider itemsProvider, GroupAccessHelper accessHelper, CharacterLogProvider logProvider) : base(context, mongo, groupContext, accessHelper)
+    public CharacterItemsController(CampaignContext context, ItemsProvider itemsProvider, SubjectAccessHelper subjectAccessHelper, CharacterLogProvider logProvider, CharactersProvider charactersProvider, ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
             _provider = itemsProvider;
             _logProvider = logProvider;
+            _charactersProvider = charactersProvider;
     }
     
     [HttpGet]
-    public ActionResult GetAll(int groupId, int characterId, [FromQuery] int? userId = null)
+    public ActionResult GetAll(int groupId, int characterId)
     {
-        if (userId != null && !AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
+        if (!CheckCharacterAccess(groupId, characterId))
             return NotFound("Character not found");
-        if (TryGetCharacter(groupId, characterId, out var data, out var character))
+        var character = _charactersProvider.GetCharacter(groupId, characterId);
+        if (character != null)
         {
             var items = _provider.GetItems(groupId, characterId);
             var result = items.Select(e => e.ToResponse()).Concat(character.Items.ToDict()).ToList();
-            return Ok(new Dictionary<string, object>(){ {"items", result} });
+            return Ok(new { items = result });
         }
         return NotFound("Character not found");
     }
     
     [HttpPost]
-    public ActionResult PostItem(int groupId, int characterId, [FromBody] ItemPostData data, [FromQuery] int? userId = null)
+    public ActionResult PostItem(int groupId, int characterId, [FromBody] ItemPostData data)
     {
-        if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+        if (!SubjectAccess.CanWriteCharacter(groupId, characterId))
             return Forbidden();
-        if (TryGetCharacter(groupId, characterId, out var _, out var character))
+        var character = _charactersProvider.GetCharacter(groupId, characterId);
+        if (character != null)
         {
             var item = data.AsItem(groupId);
             item.IsSecret = true;
@@ -50,8 +55,13 @@ public class CharacterItemsController : CharactersBaseController
             {
                 if (_provider.TrySetItemToCharacter(item, characterId, item.Amount ?? 0))
                 {
-                    if (userId != null && item.Amount != null)
-                        _logProvider.LogItemChange(characterId, groupId, userId.Value, item.Id, 0, item.Amount ?? 0);
+                    if (item.Amount != null)
+                        _logProvider.Log(characterId, groupId, SubjectAccess.GetCurrentActorId(), "AddItem", new Dictionary<string, object?>
+                        {
+                            ["itemId"] = item.Id,
+                            ["oldValue"] = 0,
+                            ["delta"] = item.Amount ?? 0
+                        });
                     return Created($"groups/{groupId}/characters/{characterId}/items/{item.Id}", item.ToResponse());
                 }
             }
@@ -61,11 +71,12 @@ public class CharacterItemsController : CharactersBaseController
     }
     
     [HttpGet("{itemId}")]
-    public ActionResult GetItem(int groupId, int characterId, int itemId, [FromQuery] int? userId = null)
+    public ActionResult GetItem(int groupId, int characterId, int itemId)
     {
-        if (userId != null && !AccessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
+        if (!CheckCharacterAccess(groupId, characterId))
             return NotFound("Character not found");
-        if (TryGetCharacter(groupId, characterId, out var _, out var character))
+        var character = _charactersProvider.GetCharacter(groupId, characterId);
+        if (character != null)
         {
             var item = _provider.GetItem(groupId, itemId, characterId);
             if (item == null)
@@ -76,11 +87,12 @@ public class CharacterItemsController : CharactersBaseController
     }
     
     [HttpPut("{itemId}")]
-    public ActionResult PutItem(int groupId, int characterId, int itemId, [FromBody] ItemPostData data, [FromQuery] int? userId = null)
+    public ActionResult PutItem(int groupId, int characterId, int itemId, [FromBody] ItemPostData data)
     {
-        if (userId != null && !AccessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+        if (!SubjectAccess.CanWriteCharacter(groupId, characterId))
             return Forbidden();
-        if (TryGetCharacter(groupId, characterId, out var _, out var character))
+        var character = _charactersProvider.GetCharacter(groupId, characterId);
+        if (character != null)
         {
             var item = _provider.GetItem(groupId, itemId);
             if (item == null)
@@ -92,12 +104,14 @@ public class CharacterItemsController : CharactersBaseController
             item.Amount = newAmount;
             _provider.TrySetItemToCharacter(item, characterId, newAmount);
 
-            if (userId != null)
-            {
-                var delta = newAmount - oldAmount;
-                if (delta != 0)
-                    _logProvider.LogItemChange(characterId, groupId, userId.Value, itemId, oldAmount, delta);
-            }
+            var delta = newAmount - oldAmount;
+            if (delta != 0)
+                _logProvider.Log(characterId, groupId, SubjectAccess.GetCurrentActorId(), "UpdateItem", new Dictionary<string, object?>
+                {
+                    ["itemId"] = itemId,
+                    ["oldValue"] = oldAmount,
+                    ["delta"] = delta
+                });
 
             return Ok(item.ToResponse());
         }
@@ -105,9 +119,10 @@ public class CharacterItemsController : CharactersBaseController
     }
     
     [HttpDelete("{itemId}")]
-    public ActionResult DeleteItem(int groupId, int characterId, int itemId, [FromQuery] int? userId = null)
+    public ActionResult DeleteItem(int groupId, int characterId, int itemId)
     {
-        if (TryGetCharacter(groupId, characterId, out var _, out var character))
+        var character = _charactersProvider.GetCharacter(groupId, characterId);
+        if (character != null)
         {
             var item = _provider.GetItem(groupId, itemId, characterId);
             if (item == null)
@@ -116,8 +131,13 @@ public class CharacterItemsController : CharactersBaseController
             var oldAmount = item.Amount ?? 0;
             _provider.TryRemoveItemFromCharacter(item, characterId);
 
-            if (userId != null && oldAmount > 0)
-                _logProvider.LogItemChange(characterId, groupId, userId.Value, itemId, oldAmount, -oldAmount);
+            if (oldAmount > 0)
+                _logProvider.Log(characterId, groupId, SubjectAccess.GetCurrentActorId(), "RemoveItem", new Dictionary<string, object?>
+                {
+                    ["itemId"] = itemId,
+                    ["oldValue"] = oldAmount,
+                    ["delta"] = -oldAmount
+                });
 
             return Ok(item.ToResponse());
         }

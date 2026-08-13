@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
+using Tdn.Db.Contexts;
 using Tdn.Models;
+using Tdn.Models.Access;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
 
@@ -7,25 +9,23 @@ namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("groups/{groupId}/characters/{characterId}/skills")]
-public class CharacterSkillsController : BaseController
+public class CharacterSkillsController : GroupsBaseController
 {
     private SkillsProvider _provider;
-    private GroupAccessHelper _accessHelper;
     private CharacterLogProvider _logProvider;
 
-    public CharacterSkillsController(SkillsProvider skillsProvider, GroupAccessHelper accessHelper, CharacterLogProvider logProvider)
+    public CharacterSkillsController(CampaignContext context, SkillsProvider skillsProvider, CharacterLogProvider logProvider, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
         _provider = skillsProvider;
-        _accessHelper = accessHelper;
         _logProvider = logProvider;
     }
     
     private IEnumerable<Skill> ApplyFilters(IEnumerable<Skill> skills, Dictionary<string, string> filters) => _provider.ApplyFilters(skills, filters);
     
     [HttpGet]
-    public ActionResult GetSkills(int groupId, int characterId, [FromQuery] Dictionary<string, string>? filters = null, [FromQuery] int? userId = null)
+    public ActionResult GetSkills(int groupId, int characterId, [FromQuery] Dictionary<string, string>? filters = null)
     {
-        if (userId != null && !_accessHelper.HasCharacterAccess(groupId, characterId, userId.Value))
+        if (!CheckCharacterAccess(groupId, characterId))
             return NotFound();
             
         var skills = _provider.GetSkills(groupId, characterId);
@@ -39,9 +39,9 @@ public class CharacterSkillsController : BaseController
     }
     
     [HttpPut("{skillId}")]
-    public ActionResult PutSkill(int groupId, int characterId, int skillId, [FromQuery] int? userId = null)
+    public ActionResult PutSkill(int groupId, int characterId, int skillId)
     {
-        if (userId != null && !_accessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+        if (!SubjectAccess.CanWriteCharacter(groupId, characterId))
             return Forbidden();
 
         var skill = _provider.GetSkill(groupId, skillId);
@@ -49,8 +49,12 @@ public class CharacterSkillsController : BaseController
             return NotFound(new { error = $"Skill with id {skillId} not found in group {groupId}" });
         if (_provider.TryAddSkillToCharacter(skill, characterId))
         {
-            if (userId != null)
-                _logProvider.LogSkillChange(characterId, groupId, userId.Value, skillId, 0, 1);
+            _logProvider.Log(characterId, groupId, SubjectAccess.GetCurrentActorId(), "AddSkill", new Dictionary<string, object?>
+            {
+                ["skillId"] = skillId,
+                ["oldValue"] = 0,
+                ["delta"] = 1
+            });
             return Ok(skill.ToResponse());
         }
         else
@@ -58,9 +62,9 @@ public class CharacterSkillsController : BaseController
     }
     
     [HttpDelete("{skillId}")]
-    public ActionResult DeleteSkill(int groupId, int characterId, int skillId, [FromQuery] int? userId = null)
+    public ActionResult DeleteSkill(int groupId, int characterId, int skillId)
     {
-        if (userId != null && !_accessHelper.CanWriteCharacter(groupId, characterId, userId.Value))
+        if (!SubjectAccess.CanWriteCharacter(groupId, characterId))
             return Forbidden();
             
         var skill = _provider.GetSkill(groupId, skillId);
@@ -68,8 +72,12 @@ public class CharacterSkillsController : BaseController
             return NotFound(new { error = $"Skill with id {skillId} not found in group {groupId}" });
         if (_provider.TryRemoveSkillFromCharacter(skill, characterId))
         {
-            if (userId != null)
-                _logProvider.LogSkillChange(characterId, groupId, userId.Value, skillId, 1, -1);
+            _logProvider.Log(characterId, groupId, SubjectAccess.GetCurrentActorId(), "RemoveSkill", new Dictionary<string, object?>
+            {
+                ["skillId"] = skillId,
+                ["oldValue"] = 1,
+                ["delta"] = -1
+            });
             return Ok(skill.ToResponse());
         }
         else

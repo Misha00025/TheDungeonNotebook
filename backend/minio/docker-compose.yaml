@@ -1,0 +1,24 @@
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: minio-storage
+    command: server /data --console-address ":9001"
+    networks:
+      - backend_backend-network
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - "./minio_data:/data"
+    env_file:
+      - ../.env
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  backend_backend-network:
+    external: true

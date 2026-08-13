@@ -1,32 +1,28 @@
 using Microsoft.AspNetCore.Mvc;
+using Tdn.Db.Contexts;
 using Tdn.Models;
+using Tdn.Models.Access;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
+using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
 
 [ApiController]
 [Route("groups/{groupId}/skills/attributes")]
-public class GroupAttributesController : BaseController
+public class GroupAttributesController : GroupsBaseController
 {
     private AttributesProvider _provider;
-    private GroupAccessHelper _accessHelper;
-    
-    public struct PostData
-    {
-        public List<AttributePostData> attributes { get; set; }
-    }
 
-    public GroupAttributesController(AttributesProvider attributesProvider, GroupAccessHelper accessHelper)
+    public GroupAttributesController(CampaignContext context, AttributesProvider attributesProvider, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(context, subjectAccessHelper, logger)
     {
         _provider = attributesProvider;
-        _accessHelper = accessHelper;
     }
     
     [HttpGet]
-    public ActionResult GetAttributes(int groupId, [FromQuery] int? userId = null)
+    public ActionResult GetAttributes(int groupId)
     {
-        if (userId != null && !_accessHelper.HasGroupAccess(groupId, userId.Value))
+        if (!CheckGroupAccess(groupId))
             return NotFound("Group not found");
         var attributes = _provider.GetAttributes(groupId);
         return Ok(new 

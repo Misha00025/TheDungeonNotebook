@@ -6,6 +6,8 @@ using Tdn.Db.Entities;
 using Tdn.Models;
 using Tdn.Models.Conversions;
 using Tdn.Models.Providing;
+using Tdn.Models.Access;
+using Tdn.Models.DTOs;
 
 namespace Tdn.Api.Controllers;
 
@@ -15,7 +17,7 @@ public class GroupItemsController : GroupsBaseController
 {
     private ItemsProvider _provider;
     
-    public GroupItemsController(GroupContext groupContext, ItemsProvider provider, GroupAccessHelper accessHelper) : base(groupContext, accessHelper)
+    public GroupItemsController(CampaignContext groupContext, ItemsProvider provider, SubjectAccessHelper subjectAccessHelper, ILogger<GroupsBaseController> logger) : base(groupContext, subjectAccessHelper, logger)
     {
         _provider = provider;
     }
@@ -28,7 +30,7 @@ public class GroupItemsController : GroupsBaseController
             var items = _provider.GetItems(groupId);
             if (!withSecrets)
                 items = items.Where(e => !e.IsSecret).ToList();
-            return Ok(new Dictionary<string, object>(){{"items", items.Select(e => e.ToResponse())}});
+            return Ok(new { items = items.Select(e => e.ToResponse()).ToList() });
         }
         return NotFound("Group not found");
     }

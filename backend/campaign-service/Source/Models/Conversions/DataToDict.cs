@@ -1,9 +1,20 @@
 using Tdn.Db.Entities;
+using Tdn.Models;
 
 namespace Tdn.Models.Conversions;
 
 public static class DataToDictExtensions
-{    
+{
+    public static Dictionary<string, object?> ToDict(this Group group)
+    {
+        return new()
+        {
+            {"id", group.Id},
+            {"name", group.Name},
+            {"icon", group.Icon},
+        };
+    }
+
     public static Dictionary<string, object?> ToDict(this GroupData data)
     {
         return new()
@@ -59,24 +70,16 @@ public static class DataToDictExtensions
         };
     }
     
-    public static Dictionary<string, object?> ToDict(this GroupEntityData data, CharlistMongoData? mongoData)
+    public static Dictionary<string, object?> ToDict(this GroupEntityData data, TemplateMongoData? mongoData)
     {
         var result = data.ToDict(mongoData as GroupEntityMongoData);
         result.Add("fields", mongoData?.Fields.ToDict());
         return result;
     }
     
-    public static Dictionary<string, object?> ToDict(this GroupEntityData data, ItemMongoData? mongoData)
-    {
-        var result = data.ToDict(mongoData as GroupEntityMongoData);
-        result.Add("price", mongoData?.Price);
-        result.Add("image_link", mongoData?.Image);
-        return result;
-    }
-    
     public static Dictionary<string, object?> ToDict(this CharacterData data, CharacterMongoData? mongoData)
     {
-        var result = data.ToDict(mongoData as CharlistMongoData);
+        var result = data.ToDict(mongoData as TemplateMongoData);
         result.Add("templateId", data.TemplateId);
         return result;
     }

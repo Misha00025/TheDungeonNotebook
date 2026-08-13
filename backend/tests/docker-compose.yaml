@@ -1,0 +1,137 @@
+version: '3'
+
+x-common-resources: &common_resources
+  deploy:
+    resources:
+      limits:
+        cpus: '0.5'
+        memory: '256m'
+      reservations:
+        cpus: '0.25'
+        memory: '128m'
+
+services:
+  mongo:
+    image: mongo:latest
+    container_name: mongo-db-test
+    restart: always
+    networks:
+      - backend-network
+    volumes:
+      - ./mongo_data:/data/db
+    env_file:
+      - ./.env
+    healthcheck:
+      test: ["CMD", "echo", "db.runCommand(\"ping\").ok", "|", "mongosh", "mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@localhost:27017/?authSource=${MYSQL_DATABASE}", "--quiet"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-db-test
+    restart: always
+    networks:
+      - backend-network
+    env_file:
+      - ./.env
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+      - ../auth-service/init-auth.sh:/docker-entrypoint-initdb.d/0_auth.sh
+      - ../users-service/init-users.sh:/docker-entrypoint-initdb.d/1_users.sh
+      - ../campaign-service/init-campaign.sh:/docker-entrypoint-initdb.d/2_campaign.sh
+    healthcheck:
+      test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache-test
+    restart: always
+    networks:
+      - backend-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  users-service:
+    <<: *common_resources
+    build:
+      context: ../users-service
+    container_name: users-service-test
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - backend-network
+    env_file:
+      - ./.env
+    environment:
+      - MYSQL_CONNECTION_STRING=server=mysql;database=$USERS_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+
+  campaign-service:
+    <<: *common_resources
+    build:
+      context: ../campaign-service
+    container_name: campaign-service-test
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    networks:
+      - backend-network
+    env_file:
+      - ./.env
+    environment:
+      - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
+      - MYSQL_CONNECTION_STRING=server=mysql;database=$CAMPAIGN_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+
+  auth-service:
+    <<: *common_resources
+    build:
+      context: ../auth-service
+    container_name: auth-service-test
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend-network
+    volumes:
+      - ./certs:/certs:r
+    env_file:
+      - ./.env
+    environment:
+      - MYSQL_CONNECTION_STRING=server=mysql;database=$AUTH_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+
+  api-gateway:
+    build: ../api-gateway
+    container_name: api-gateway-test
+    depends_on:
+      auth-service:
+        condition: service_started
+      campaign-service:
+        condition: service_started
+      users-service:
+        condition: service_started
+    networks:
+      - backend-network
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./.env
+    volumes:
+      - ./certs:/certs:ro
+      - ./logs/gateway:/app/logs
+
+networks:
+  backend-network:
+    driver: bridge

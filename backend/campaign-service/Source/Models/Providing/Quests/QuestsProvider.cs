@@ -4,6 +4,7 @@ using MongoDB.Driver;
 using Tdn.Db;
 using Tdn.Db.Contexts;
 using Tdn.Db.Entities;
+using Tdn.Models.DTOs;
 
 namespace Tdn.Models.Providing;
 
@@ -11,16 +12,14 @@ public class QuestsProvider
 {
     private const string QUESTS_COLLECTION_NAME = "quests";
 
-    private EntityContext _sql;
-    private MongoDbContext _mongo;
-    private GroupAccessHelper _accessHelper;
+    private CampaignContext _db;
+    private IMongoDbContext _mongo;
     private ILogger<QuestsProvider> _logger;
 
-    public QuestsProvider(EntityContext context, MongoDbContext mongoDbContext, GroupAccessHelper accessHelper, ILogger<QuestsProvider> logger)
+    public QuestsProvider(CampaignContext context, IMongoDbContext mongoDbContext, ILogger<QuestsProvider> logger)
     {
-        _sql = context;
+        _db = context;
         _mongo = mongoDbContext;
-        _accessHelper = accessHelper;
         _logger = logger;
     }
 
@@ -45,7 +44,7 @@ public class QuestsProvider
             Description = o.Description,
             Status = o.Status
         }).ToList();
-        var assignments = _sql.QuestAssignments
+        var assignments = _db.QuestAssignments
             .Where(e => e.QuestId == data.Id)
             .ToList();
         quest.AssignedCharacters = assignments.Select(e => e.CharacterId).ToList();
@@ -60,17 +59,16 @@ public class QuestsProvider
         return ToQuest(data, mongoData);
     }
 
-    public List<Quest> GetQuests(int groupId, int? userId, int? characterId)
+    public List<Quest> GetQuests(int groupId, List<int>? accessibleCharacterIds, int? characterId)
     {
-        var query = _sql.Quests
+        var query = _db.Quests
             .Where(e => e.GroupId == groupId)
             .Include(e => e.Group)
             .AsQueryable();
 
-        if (userId != null && !_accessHelper.IsAdmin(groupId, userId.Value))
+        if (accessibleCharacterIds != null && accessibleCharacterIds.Count > 0)
         {
-            var accessibleCharacterIds = _accessHelper.GetAccessibleCharacterIds(groupId, userId.Value);
-            var questIdsWithAccess = _sql.QuestAssignments
+            var questIdsWithAccess = _db.QuestAssignments
                 .Where(a => accessibleCharacterIds.Contains(a.CharacterId))
                 .Select(a => a.QuestId)
                 .Distinct()
@@ -80,7 +78,7 @@ public class QuestsProvider
 
         if (characterId != null)
         {
-            var questIdsForCharacter = _sql.QuestAssignments
+            var questIdsForCharacter = _db.QuestAssignments
                 .Where(a => a.CharacterId == characterId.Value)
                 .Select(a => a.QuestId)
                 .Distinct()
@@ -97,7 +95,7 @@ public class QuestsProvider
 
     public Quest? GetQuest(int groupId, int questId)
     {
-        var data = _sql.Quests
+        var data = _db.Quests
             .Where(e => e.GroupId == groupId && e.Id == questId)
             .Include(e => e.Group)
             .FirstOrDefault();
@@ -108,9 +106,10 @@ public class QuestsProvider
 
     public bool TryCreateQuest(int groupId, Quest quest)
     {
+        QuestMongoData? mongoData = null;
         try
         {
-            var mongoData = new QuestMongoData()
+            mongoData = new QuestMongoData()
             {
                 Header = quest.Header,
                 Description = quest.Description,
@@ -132,24 +131,36 @@ public class QuestsProvider
                 Header = quest.Header,
                 Status = quest.Status
             };
-            _sql.Quests.Add(sqlData);
-            _sql.SaveChanges();
+            _db.Quests.Add(sqlData);
+            _db.SaveChanges();
             quest.Id = sqlData.Id;
 
             foreach (var characterId in quest.AssignedCharacters)
             {
-                _sql.QuestAssignments.Add(new QuestAssignmentData()
+                _db.QuestAssignments.Add(new QuestAssignmentData()
                 {
                     QuestId = sqlData.Id,
                     CharacterId = characterId
                 });
             }
-            _sql.SaveChanges();
+            _db.SaveChanges();
 
             return true;
         }
         catch (Exception e)
         {
+            if (mongoData != null)
+            {
+                try
+                {
+                    _mongo.GetCollection<QuestMongoData>(QUESTS_COLLECTION_NAME)
+                        .DeleteOne(Builders<QuestMongoData>.Filter.Eq(x => x.Id, mongoData.Id));
+                }
+                catch (Exception cleanupEx)
+                {
+                    _logger.LogWarning($"Failed to clean up Mongo orphan for quest: {cleanupEx}");
+                }
+            }
             _logger.LogWarning($"Error creating quest: {e}");
             return false;
         }
@@ -159,7 +170,7 @@ public class QuestsProvider
     {
         try
         {
-            var sqlData = _sql.Quests
+            var sqlData = _db.Quests
                 .FirstOrDefault(e => e.GroupId == groupId && e.Id == quest.Id);
             if (sqlData == null)
                 return false;
@@ -190,21 +201,21 @@ public class QuestsProvider
             sqlData.Header = quest.Header;
             sqlData.Status = quest.Status;
 
-            var oldAssignments = _sql.QuestAssignments
+            var oldAssignments = _db.QuestAssignments
                 .Where(e => e.QuestId == sqlData.Id)
                 .ToList();
-            _sql.QuestAssignments.RemoveRange(oldAssignments);
+            _db.QuestAssignments.RemoveRange(oldAssignments);
 
             foreach (var characterId in quest.AssignedCharacters)
             {
-                _sql.QuestAssignments.Add(new QuestAssignmentData()
+                _db.QuestAssignments.Add(new QuestAssignmentData()
                 {
                     QuestId = sqlData.Id,
                     CharacterId = characterId
                 });
             }
 
-            _sql.SaveChanges();
+            _db.SaveChanges();
             return true;
         }
         catch (Exception e)
@@ -218,14 +229,14 @@ public class QuestsProvider
     {
         try
         {
-            var sqlData = _sql.Quests
+            var sqlData = _db.Quests
                 .FirstOrDefault(e => e.GroupId == groupId && e.Id == questId);
             if (sqlData == null)
                 return false;
 
             var collection = _mongo.GetCollection<QuestMongoData>(QUESTS_COLLECTION_NAME);
-            _sql.Quests.Remove(sqlData);
-            _sql.SaveChanges();
+            _db.Quests.Remove(sqlData);
+            _db.SaveChanges();
 
             var mongoResult = collection.DeleteOne(
                 Builders<QuestMongoData>.Filter.Eq(x => x.Id, new ObjectId(sqlData.UUID)));
@@ -242,7 +253,7 @@ public class QuestsProvider
     {
         try
         {
-            var sqlData = _sql.Quests
+            var sqlData = _db.Quests
                 .FirstOrDefault(e => e.GroupId == groupId && e.Id == questId);
             if (sqlData == null)
                 return false;
@@ -309,14 +320,14 @@ public class QuestsProvider
 
             if (patch.AssignedCharacters != null)
             {
-                var oldAssignments = _sql.QuestAssignments
+                var oldAssignments = _db.QuestAssignments
                     .Where(e => e.QuestId == sqlData.Id)
                     .ToList();
-                _sql.QuestAssignments.RemoveRange(oldAssignments);
+                _db.QuestAssignments.RemoveRange(oldAssignments);
 
                 foreach (var characterId in patch.AssignedCharacters)
                 {
-                    _sql.QuestAssignments.Add(new QuestAssignmentData()
+                    _db.QuestAssignments.Add(new QuestAssignmentData()
                     {
                         QuestId = sqlData.Id,
                         CharacterId = characterId
@@ -324,39 +335,12 @@ public class QuestsProvider
                 }
             }
 
-            _sql.SaveChanges();
+            _db.SaveChanges();
             return true;
         }
         catch (Exception e)
         {
             _logger.LogWarning($"Error patching quest: {e}");
-            return false;
-        }
-    }
-
-    public bool TryUpdateObjectiveStatus(int groupId, int questId, string objectiveKey, string status)
-    {
-        try
-        {
-            var sqlData = _sql.Quests
-                .FirstOrDefault(e => e.GroupId == groupId && e.Id == questId);
-            if (sqlData == null)
-                return false;
-
-            var collection = _mongo.GetCollection<QuestMongoData>(QUESTS_COLLECTION_NAME);
-            var filter = Builders<QuestMongoData>.Filter.Eq(x => x.Id, new ObjectId(sqlData.UUID));
-            var update = Builders<QuestMongoData>.Update.Set("objectives.$[elem].status", status);
-            var arrayFilters = new List<ArrayFilterDefinition>
-            {
-                new BsonDocumentArrayFilterDefinition<BsonDocument>(
-                    new BsonDocument("elem.key", objectiveKey))
-            };
-            var result = collection.UpdateOne(filter, update, new UpdateOptions { ArrayFilters = arrayFilters });
-            return result.IsAcknowledged && result.ModifiedCount > 0;
-        }
-        catch (Exception e)
-        {
-            _logger.LogWarning($"Error updating objective status: {e}");
             return false;
         }
     }

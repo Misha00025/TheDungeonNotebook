@@ -95,7 +95,7 @@ namespace backend_cs.Migrations
                     b.ToTable("character_skill", (string)null);
                 });
 
-            modelBuilder.Entity("Tdn.Db.Entities.CharlistData", b =>
+            modelBuilder.Entity("Tdn.Db.Entities.TemplateData", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -371,7 +371,7 @@ namespace backend_cs.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Tdn.Db.Entities.CharlistData", "Template")
+                    b.HasOne("Tdn.Db.Entities.TemplateData", "Template")
                         .WithMany()
                         .HasForeignKey("TemplateId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -420,7 +420,7 @@ namespace backend_cs.Migrations
                     b.Navigation("Skill");
                 });
 
-            modelBuilder.Entity("Tdn.Db.Entities.CharlistData", b =>
+            modelBuilder.Entity("Tdn.Db.Entities.TemplateData", b =>
                 {
                     b.HasOne("Tdn.Db.Entities.GroupData", "Group")
                         .WithMany()

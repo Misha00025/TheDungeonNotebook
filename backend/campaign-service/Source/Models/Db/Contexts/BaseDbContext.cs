@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Tdn.Db.Configuers;
+using Tdn.Db.Configurers;
 
 namespace Tdn.Db.Contexts;
 
