@@ -1,7 +1,7 @@
 # users-service Rules
 
 ## Responsibility
-User profile CRUD. Simple service — single controller, single DbContext.
+User profile CRUD (MySQL) + per-user settings (MongoDB). No longer a strictly single-controller service.
 
 ## Project Structure
 ```
@@ -11,14 +11,22 @@ users-service/
 │   ├── DataToDict.cs             # ToDict() extension for UserData
 │   ├── Controllers/
 │   │   ├── BaseController.cs     # Same pattern as campaign-service
-│   │   └── UsersController.cs    # All user endpoints
-│   └── Db/
-│       ├── Contexts/
-│       │   ├── BaseDbContext.cs
-│       │   └── UserContext.cs     # Users DbSet
-│       ├── Entities/
-│       │   └── UserEntities.cs    # UserData (Id, Nickname, VisibleName, Image)
-│       └── EntityBuildersConfigurer.cs
+│   │   ├── UsersController.cs    # All user profile endpoints
+│   │   └── UserSettingsController.cs
+│   ├── Db/
+│   │   ├── Contexts/
+│   │   │   ├── BaseDbContext.cs
+│   │   │   └── UserContext.cs     # Users DbSet (MySQL)
+│   │   ├── Entities/
+│   │   │   ├── UserEntities.cs    # UserData (Id, Nickname, VisibleName, Image)
+│   │   │   └── UserSettingsMongoData.cs
+│   │   └── EntityBuildersConfigurer.cs
+│   ├── Providing/
+│   │   ├── IUserSettingsStorage.cs
+│   │   ├── UserSettingsProvider.cs
+│   │   └── UserSettingsStorage.cs
+│   └── Conversions/
+│       └── SettingsJsonHelper.cs   # BsonValue <-> JSON
 └── Program.cs
 ```
 
@@ -38,10 +46,26 @@ users-service/
 | PATCH | `/users/{userId}` | Update visibleName, imageLink |
 | DELETE | `/users/{userId}` | Delete user |
 
+## User Settings (MongoDB)
+
+- **Storage**: MongoDB, collection `settings`, one document per user (`user_id` + a map `settings` key → any JSON value). Database from env `MONGO_SETTINGS_DATABASE` (default `tdn-settings`).
+- **Env vars**: `MONGO_CONNECTION_STRING`, `MONGO_SETTINGS_DATABASE`.
+- **Endpoints** (through the gateway, `auth: required` + `access: self_only`):
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/users/{user_id}/settings` | Get all settings. `?keys=a,b` — only that batch (missing keys omitted). Response `{"settings": {...}}`. |
+| PUT | `/users/{user_id}/settings` | Body `{key: value, ...}`, upsert/merge. Response full `{"settings": {...}}`. |
+| DELETE | `/users/{user_id}/settings` | **REQUIRED** `?keys=`; removes only listed keys; without keys → 400. Response remaining `{"settings": {...}}`. |
+
+- **Access control**: owner only (`self_only`), enforced at the gateway.
+- **Testing**: unit tests in `Tests/` for `UserSettingsProvider` (via mocked `IUserSettingsStorage`) and `SettingsJsonHelper`.
+
 ## Program.cs specifics
-- Single DbContext: `UserContext`
-- No providers
-- Simple CRUD with no access control (admin-panel will handle that)
+- MySQL DbContext: `UserContext`
+- Scoped `IMongoDbContext` registered conditionally (when `MONGO_CONNECTION_STRING` is set)
+- Scoped `IUserSettingsStorage` and `UserSettingsProvider`
+- Single-DbContext statement now refers to MySQL (`UserContext`) only; MongoDB is used via `IMongoDbContext`
 
 ## Nickname Search
 ```

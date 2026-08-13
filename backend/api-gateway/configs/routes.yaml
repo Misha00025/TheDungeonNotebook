@@ -95,6 +95,19 @@ routes:
       PATCH:
         access: self_only
 
+  - path: /users/{user_id}/settings
+    proxy:
+      service: users
+      path: /users/{user_id}/settings
+    auth: required
+    methods:
+      GET:
+        access: self_only
+      PUT:
+        access: self_only
+      DELETE:
+        access: self_only
+
   # ============================================================
   # Groups
   # ============================================================
