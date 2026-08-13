@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Tdn.Configuration;
+using Tdn.Db;
 using Tdn.Db.Configuers;
 using Tdn.Db.Contexts;
+using Tdn.Models.Providing;
+using Tdn.Settings;
 using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +17,15 @@ builder.Services.AddLogging(e => e.AddConsole());
 
 builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigurer>();
 builder.Services.AddDbContext<UserContext>(config.ConfigDbConnections);
+
+MongoDbSettings? mongoDbSettings = config.GetMongoDbSettings();
+if (mongoDbSettings != null)
+{
+    builder.Services.AddScoped<IMongoDbContext>(_ => new MongoDbContext(mongoDbSettings));
+}
+
+builder.Services.AddScoped<IUserSettingsStorage, UserSettingsStorage>();
+builder.Services.AddScoped<UserSettingsProvider, UserSettingsProvider>();
 
 // General
 builder.Services.AddEndpointsApiExplorer();

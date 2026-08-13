@@ -1,4 +1,4 @@
-.PHONY: test build certs clean
+.PHONY: test build run certs clean
 
 # Запуск интеграционных тестов (5 секунд ожидания для старта сервисов)
 test:
@@ -7,6 +7,10 @@ test:
 # Сборка всех Docker-контейнеров
 build:
 	cd backend && docker compose build
+
+# Запуск
+run:
+	cd backend && docker compose up -d
 
 # Генерация RSA-ключей (2048 bit) для JWT в backend/certs/
 certs:
