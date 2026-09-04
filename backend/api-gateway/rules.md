@@ -66,9 +66,11 @@ ctx.services.campaign.post("/groups", json={...})
 
 ## ServiceRegistry
 ```python
-ctx.services.auth     # http://auth-service:8080
-ctx.services.users    # http://users-service:8080
-ctx.services.campaign # http://campaign-service:8080
+ctx.services.auth          # http://auth-service:8080
+ctx.services.users         # http://users-service:8080
+ctx.services.campaign      # http://campaign-service:8080
+ctx.services.game_systems  # http://game-systems-service:8080
+ctx.services.sync          # http://sync-service:8090
 ```
 
 ## Security

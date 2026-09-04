@@ -113,6 +113,8 @@ services:
   auth:      { base_url: "${AUTH_SERVICE_URL}" }
   users:     { base_url: "${USERS_SERVICE_URL}" }
   campaign:  { base_url: "${CAMPAIGN_SERVICE_URL}" }
+  game_systems: { base_url: "${GAME_SYSTEMS_SERVICE_URL}" }
+  sync:      { base_url: "${SYNC_SERVICE_URL}" }
 ```
 
 ### Подстановка параметров
@@ -248,6 +250,8 @@ api-gateway/
 | `AUTH_SERVICE_URL` | URL auth-service | Да |
 | `USERS_SERVICE_URL` | URL users-service | Да |
 | `CAMPAIGN_SERVICE_URL` | URL campaign-service | Да |
+| `GAME_SYSTEMS_SERVICE_URL` | URL game-systems-service | Да |
+| `SYNC_SERVICE_URL` | URL sync-service | Да |
 | `PUBLIC_KEY_PATH` | Путь к публичному RSA-ключу | Нет (default: `/certs/public.pem`) |
 | `OIDC_ISSUER` | Issuer для проверки JWT | Да |
 | `APP_CONFIG` | Путь к app.json | Нет (default: `/app/configs/app.json`) |
