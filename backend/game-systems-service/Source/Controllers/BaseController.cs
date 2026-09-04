@@ -1,0 +1,38 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
+
+namespace Tdn.Api.Controllers;
+
+public abstract class BaseController : ControllerBase
+{
+    // General
+    protected bool IsDebug() => Request.Query.TryGetValue("debug", out var debugStr) && bool.TryParse(debugStr, out var debug) && debug;
+
+    public override OkObjectResult Ok([ActionResultObjectValue] object? value)
+    {
+        return base.Ok(value);
+    }
+
+    public override CreatedResult Created(string? uri, [ActionResultObjectValue] object? value)
+    {
+        return base.Created(uri, value);
+    }
+
+    public ActionResult NotImplemented()
+    {
+        return new ObjectResult(new { Message = "This feature is not implemented yet." })
+        {
+            StatusCode = StatusCodes.Status501NotImplemented
+        };
+    }
+
+    public ActionResult Unprocessable(string message)
+    {
+        return StatusCode(StatusCodes.Status422UnprocessableEntity, new { title = "UnprocessableEntity", message });
+    }
+
+    public ActionResult Forbidden()
+    {
+        return StatusCode(StatusCodes.Status403Forbidden);
+    }
+}
