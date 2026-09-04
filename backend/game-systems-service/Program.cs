@@ -4,6 +4,9 @@ using Tdn.Db.Configurers;
 using Tdn.Db.Contexts;
 using Tdn.Settings;
 using Tdn.Db;
+using Tdn.Models.Providing;
+using Tdn.Models.Access;
+using Tdn.Middleware;
 using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,6 +22,11 @@ builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("Mo
 builder.Services.AddSingleton<IEntityBuildersConfigurer, EntityBuildersConfigurer>();
 builder.Services.AddDbContext<GameSystemsContext>(config.ConfigDbConnections);
 builder.Services.AddScoped<IMongoDbContext>(_ => new MongoDbContext(config.GetMongoDbSettings()));
+
+// Providers & Access
+builder.Services.AddScoped<SnapshotProvider, SnapshotProvider>();
+builder.Services.AddScoped<SystemProvider, SystemProvider>();
+builder.Services.AddScoped<SystemAccessHelper>();
 
 // General
 builder.Services.AddEndpointsApiExplorer();
@@ -48,6 +56,8 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseHttpMetrics();
+app.UseMiddleware<SubjectPresentMiddleware>();
+app.UseMiddleware<SystemAccessMiddleware>();
 app.MapMetrics();
 app.MapControllers();
 app.Run();

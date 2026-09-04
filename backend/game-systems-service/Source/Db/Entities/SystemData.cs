@@ -11,6 +11,8 @@ public class SystemData
 
     public string? Description { get; set; }
 
+    public string? Icon { get; set; }
+
     public long CreatedAt { get; set; }
 
     public long UpdatedAt { get; set; }

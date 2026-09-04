@@ -20,6 +20,7 @@ public class EntityBuildersConfigurer : IEntityBuildersConfigurer
         builder.Property(e => e.Id).HasColumnName("id").HasMaxLength(36);
         builder.Property(e => e.Name).HasColumnName("name").IsRequired();
         builder.Property(e => e.Description).HasColumnName("description").IsRequired(false);
+        builder.Property(e => e.Icon).HasColumnName("icon").IsRequired(false);
         builder.Property(e => e.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(e => e.UpdatedAt).HasColumnName("updated_at").IsRequired();
     }

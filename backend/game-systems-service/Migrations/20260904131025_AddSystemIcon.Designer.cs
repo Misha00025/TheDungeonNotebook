@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Tdn.Db.Contexts;
 
@@ -10,9 +11,11 @@ using Tdn.Db.Contexts;
 namespace game_systems_service.Migrations
 {
     [DbContext(typeof(GameSystemsContext))]
-    partial class GameSystemsContextModelSnapshot : ModelSnapshot
+    [Migration("20260904131025_AddSystemIcon")]
+    partial class AddSystemIcon
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
