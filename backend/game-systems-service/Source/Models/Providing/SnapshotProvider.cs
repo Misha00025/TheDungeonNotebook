@@ -39,4 +39,18 @@ public class SnapshotProvider
             .Find(e => e.Id == objectId)
             .FirstOrDefault();
     }
+
+    /// <summary>
+    /// Заменяет контент существующего снимка (CRUD контента внутри версии).
+    /// Возвращает false, если снимок не найден.
+    /// </summary>
+    public bool UpdateContent(string snapshotId, SnapshotContentData content)
+    {
+        if (!MongoDB.Bson.ObjectId.TryParse(snapshotId, out var objectId))
+            return false;
+        var update = Builders<SnapshotData>.Update.Set(e => e.Content, content);
+        var result = _mongo.GetCollection<SnapshotData>(CollectionName)
+            .UpdateOne(e => e.Id == objectId, update);
+        return result.ModifiedCount > 0;
+    }
 }
