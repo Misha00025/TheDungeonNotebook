@@ -5,13 +5,14 @@ x-common-resources: &common_resources
     resources:
       limits:
         cpus: '0.5'
-        memory: '256m'
+        memory: '512m'
       reservations:
         cpus: '0.25'
-        memory: '128m'
+        memory: '256m'
 
 services:
   mongo:
+    <<: *common_resources
     image: mongo:latest
     container_name: mongo-db-test
     restart: always
@@ -29,6 +30,7 @@ services:
       start_period: 30s
 
   mysql:
+    <<: *common_resources
     image: mysql:8.0
     container_name: mysql-db-test
     restart: always
@@ -41,6 +43,7 @@ services:
       - ../auth-service/init-auth.sh:/docker-entrypoint-initdb.d/0_auth.sh
       - ../users-service/init-users.sh:/docker-entrypoint-initdb.d/1_users.sh
       - ../campaign-service/init-campaign.sh:/docker-entrypoint-initdb.d/2_campaign.sh
+      - ../game-systems-service/init-game-systems.sh:/docker-entrypoint-initdb.d/3_game_systems.sh
     healthcheck:
       test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
       interval: 20s
@@ -49,6 +52,7 @@ services:
       start_period: 60s
 
   redis:
+    <<: *common_resources
     image: redis:7-alpine
     container_name: redis-cache-test
     restart: always
@@ -81,7 +85,8 @@ services:
   campaign-service:
     <<: *common_resources
     build:
-      context: ../campaign-service
+      context: ../
+      dockerfile: campaign-service/Dockerfile
     container_name: campaign-service-test
     depends_on:
       mongo:
@@ -95,6 +100,44 @@ services:
     environment:
       - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
       - MYSQL_CONNECTION_STRING=server=mysql;database=$CAMPAIGN_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+
+  game-systems-service:
+    <<: *common_resources
+    build:
+      context: ../
+      dockerfile: game-systems-service/Dockerfile
+    container_name: game-systems-service-test
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    networks:
+      - backend-network
+    env_file:
+      - ./.env
+    environment:
+      - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
+      - MYSQL_CONNECTION_STRING=server=mysql;database=$GAME_SYSTEMS_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+
+  sync-service:
+    <<: *common_resources
+    build:
+      context: ../sync-service
+    container_name: sync-service-test
+    depends_on:
+      game-systems-service:
+        condition: service_started
+      campaign-service:
+        condition: service_started
+    networks:
+      - backend-network
+    env_file:
+      - ./.env
+    environment:
+      - GAME_SYSTEMS_SERVICE_URL=http://game-systems-service:8080
+      - CAMPAIGN_SERVICE_URL=http://campaign-service:8080
+      - SYNC_STATE_FILE=/data/sync_state.json
 
   auth-service:
     <<: *common_resources
@@ -124,6 +167,10 @@ services:
       campaign-service:
         condition: service_started
       users-service:
+        condition: service_started
+      game-systems-service:
+        condition: service_started
+      sync-service:
         condition: service_started
     networks:
       - backend-network
