@@ -98,7 +98,7 @@ def register_game_systems_scenario():
         "content": {
             "items": [
                 {"name": "Longsword", "description": "A versatile blade", "price": 15, "rarity": "common",
-                 "properties": {"damage": "1d8"}}
+                 "properties": {"damage": "1d8", "weight": 3, "magical": True, "bonuses": {"attack": 1}}}
             ],
             "skills": [
                 {"name": "Athletics", "description": "Climb, jump, swim"}
@@ -147,7 +147,8 @@ def register_game_systems_scenario():
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="systems/{steps.11.id}/versions/{steps.12.id}/content/items", method="PUT",
         data=[
-            {"name": "Longsword", "description": "A versatile blade", "price": 15},
+            {"name": "Longsword", "description": "A versatile blade", "price": 15,
+             "properties": {"damage": "1d8", "weight": 3}},
             {"name": "Shield", "description": "Wooden shield", "price": 10}
         ],
         requirement=OK,

@@ -94,7 +94,7 @@ public class SystemContentController : BaseController
             Id = string.IsNullOrEmpty(data.Id) ? Guid.NewGuid().ToString() : data.Id,
             Name = data.Name,
             Description = data.Description,
-            Properties = data.Properties,
+            Properties = JsonElementConverter.ToPlain(data.Properties),
             Price = data.Price ?? 0,
             Rarity = data.Rarity
         };
