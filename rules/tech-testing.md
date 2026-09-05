@@ -78,10 +78,10 @@ cd backend/tests
 ## CI/CD Integration
 
 GitHub Actions workflow: `.github/workflows/tests.yml`
-CI script: `backend/api-gateway/tests/test-ci.sh`
+CI script: `backend/tests/test-ci.sh`
 
 ### Trigger
-- Pull request to `main` branch
+- Push and pull request to `master` branch (paths: api-gateway, auth-service, users-service, campaign-service)
 
 ### How it works
 1. Checkout code

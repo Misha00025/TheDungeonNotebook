@@ -2,7 +2,7 @@
 
 Единая точка входа в систему. Проксирует запросы к backend-сервисам, проверяет JWT-токены, управляет доступом.
 
-**Стек:** Python / FastAPI + Uvicorn, [PyApiGate 0.3.0](https://github.com/Misha00025/PyApiGate)
+**Стек:** Python / FastAPI + Uvicorn, [PyApiGate 0.4.0](https://github.com/Misha00025/PyApiGate)
 
 ---
 
@@ -28,7 +28,7 @@
 
 Gateway работает на **декларативном движке PyApiGate**: все маршруты, права доступа и правила проксирования описываются в YAML-конфиге.
 
-Движок живёт во внешнем образе `ghcr.io/misha00025/pyapi-gate:0.3.0`. В этом репозитории — только кастомный код:
+Движок живёт во внешнем образе `ghcr.io/misha00025/pyapi-gate:0.4.0`. В этом репозитории — только кастомный код:
 - `configs/routes.yaml` — декларативная конфигурация маршрутов
 - `handlers/` — кастомные access и response хендлеры
 - `main.py` — точка входа для uvicorn
@@ -227,13 +227,13 @@ async def my_handler(ctx: RouteContext) -> Response:
 ```
 api-gateway/
 ├── configs/
-│   └── routes.yaml              # ~130 endpoint'ов
+│   └── routes.yaml              # ~89 endpoint'ов
 ├── handlers/
 │   ├── __init__.py               # Явный импорт access + responses
 │   ├── access.py                 # group_member, group_admin, character_writer, ...
 │   └── responses.py              # whoami, group_users, export, import, ...
 ├── main.py                       # import handlers; create_app()
-├── Dockerfile                    # FROM ghcr.io/misha00025/pyapi-gate:0.3.0
+├── Dockerfile                    # FROM ghcr.io/misha00025/pyapi-gate:0.4.0
 ├── rules.md
 └── tests/
     ├── test.sh                   # Оркестратор тестов

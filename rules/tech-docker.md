@@ -15,11 +15,18 @@
 ### mysql
 - Image: `mysql:8.0`
 - Volumes: `./mysql_data:/var/lib/mysql`
-- Init SQL: numbered scripts mounted into `/docker-entrypoint-initdb.d/`
-  - `0_auth.sql` (auth-service)
-  - `2_users.sql` (users-service)
-  - `3_campaign.sql` (campaign-service)
+- Init scripts: numbered `.sh` scripts mounted into `/docker-entrypoint-initdb.d/`
+  - `0_auth.sh` (auth-service)
+  - `1_users.sh` (users-service)
+  - `2_campaign.sh` (campaign-service)
+  - `3_game_systems.sh` (game-systems-service)
 - Healthcheck: `mysqladmin ping`
+
+### redis
+- Image: `redis:7-alpine`
+- Volumes: `./redis_data:/data`
+- Healthcheck: `redis-cli ping`
+- auth-service depends on it (`condition: service_healthy`)
 
 ### C# services
 - Build context: `./<service>`
@@ -29,9 +36,9 @@
 
 ### api-gateway
 - Build context: `./api-gateway`
-- Depends on all C# services (`condition: service_started`)
+- Depends on all C# services + sync-service (`condition: service_started`)
 - Ports: `"5000:5000"`
-- Env: `AUTH_SERVICE_URL`, `USERS_SERVICE_URL`, `CAMPAIGN_SERVICE_URL`
+- Env: `AUTH_SERVICE_URL`, `USERS_SERVICE_URL`, `CAMPAIGN_SERVICE_URL`, `GAME_SYSTEMS_SERVICE_URL`, `SYNC_SERVICE_URL`
 
 
 
@@ -46,7 +53,8 @@
 | `AUTH_DATABASE` | MySQL database name for auth-service |
 | `USERS_DATABASE` | MySQL database name for users-service |
 | `CAMPAIGN_DATABASE` | MySQL database name for campaign-service |
-| `SERVICE_TOKEN` | Internal service auth token |
+| `GAME_SYSTEMS_DATABASE` | MySQL database name for game-systems-service |
+| `REDIS_CONNECTION_STRING` | Redis connection string |
 
 ## Certificates
 - RSA key pair at `backend/certs/private.pem` and `backend/certs/public.pem`

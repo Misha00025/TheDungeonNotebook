@@ -4,7 +4,7 @@
 ```
 api-gateway/
 ├── configs/
-│   └── routes.yaml               # ~67 declarative endpoints (корень сервиса)
+│   └── routes.yaml               # ~89 declarative endpoints (корень сервиса)
 ├── handlers/                     # Кастомные хендлеры
 │   ├── __init__.py               # Явный импорт access + responses
 │   ├── access.py                 # @register_access_handler("group_member"), etc.
@@ -14,7 +14,7 @@ api-gateway/
 ```
 
 ## Overview
-API Gateway теперь основан на **PyApiGate** — внешнем FastAPI-сервисе (образ `ghcr.io/misha00025/pyapi-gate:0.3.0`).
+API Gateway теперь основан на **PyApiGate** — внешнем FastAPI-сервисе (образ `ghcr.io/misha00025/pyapi-gate:0.4.0`).
 Движок и вся инфраструктура живут в образе. В этом репозитории — только кастомный код:
 - `configs/routes.yaml` — декларативная конфигурация маршрутов
 - `handlers/` — кастомные access и response хендлеры
@@ -88,7 +88,7 @@ ctx.services.sync          # http://sync-service:8090
 | `from app.status import ok` | `from app.engine.status import ok` |
 | Access handlers — любые | Access handlers — **синхронные** |
 | Response handlers — синхронные | Response handlers — **async** |
-| `build: context: ./api-gateway` | `image: ghcr.io/misha00025/pyapi-gate:0.3.0` |
+| `build: context: ./api-gateway` | `image: ghcr.io/misha00025/pyapi-gate:0.4.0` |
 | Свой `app/` (engine, security) | Engine в образе, только кастомный код в `handlers/` |
 
 ## Dependencies
