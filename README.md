@@ -10,13 +10,15 @@ API Gateway (FastAPI/PyApiGate, порт 5000) — единая точка вх�
 - **auth-service** (C# .NET 8) — [README](backend/auth-service/README.md)
 - **users-service** (C# .NET 8) — [README](backend/users-service/README.md)
 - **campaign-service** (C# .NET 8) — [README](backend/campaign-service/README.md)
-- **notes-service** (C# .NET 8) — [README](backend/notes-service/README.md)
+- **game-systems-service** (C# .NET 8) — [README](backend/game-systems-service/README.md)
+- **sync-service** (Python/FastAPI) — [README](backend/sync-service/README.md)
 
 
 ### Базы данных
 
-- **MySQL 8.0** — auth-service, users-service, campaign-service
-- **MongoDB** — campaign-service, notes-service
+- **MySQL 8.0** — auth-service, users-service, campaign-service, game-systems-service
+- **MongoDB** — campaign-service, users-service (settings), game-systems-service (snapshots)
+- **Redis** — кэш (auth-service)
 
 ## Переменные окружения (.env)
 
@@ -25,10 +27,13 @@ API Gateway (FastAPI/PyApiGate, порт 5000) — единая точка вх�
 | `MONGO_INITDB_ROOT_USERNAME` | Пользователь MongoDB |
 | `MONGO_INITDB_ROOT_PASSWORD` | Пароль MongoDB |
 | `MYSQL_ROOT_PASSWORD` | Root-пароль MySQL |
-| `MYSQL_DATABASE` | Имя базы данных MySQL |
 | `MYSQL_USER` | Пользователь MySQL |
 | `MYSQL_PASSWORD` | Пароль MySQL |
-| `SERVICE_TOKEN` | Сервисный токен |
+| `AUTH_DATABASE` | Имя БД MySQL для auth-service |
+| `USERS_DATABASE` | Имя БД MySQL для users-service |
+| `CAMPAIGN_DATABASE` | Имя БД MySQL для campaign-service |
+| `GAME_SYSTEMS_DATABASE` | Имя БД MySQL для game-systems-service |
+| `REDIS_CONNECTION_STRING` | Строка подключения к Redis |
 
 Также требуются RSA-ключи в `backend/certs/private.pem` и `backend/certs/public.pem`.
 
@@ -48,9 +53,10 @@ docker compose up -d
 - Metrics (Prometheus) доступны на `/metrics` у каждого сервиса
 
 Порядок запуска (docker-compose управляет автоматически через depends_on):
-1. MySQL + MongoDB
-2. auth-service, users-service, campaign-service, notes-service
-3. api-gateway
+1. MySQL + MongoDB + Redis
+2. auth-service, users-service, campaign-service, game-systems-service
+3. sync-service
+4. api-gateway
 
 
 
@@ -80,8 +86,9 @@ docs/api/
 ├── index.html              # Стартовая страница
 ├── css/style.css           # Стили (тёмная тема)
 ├── js/
-│   ├── data.js             # Массив ENDPOINTS со всеми 69 endpoint'ами
-│   └── sidebar.js          # Генератор сайдбара, поиск, навигация
+│   ├── data.js             # Массив ENDPOINTS со всеми 85 endpoint'ами
+│   ├── sidebar.js          # Генератор сайдбара, поиск, навигация
+│   └── command-renderer.js # Рендер карточек команд
 ├── system.html             # Системные endpoint'ы
 ├── auth.html               # Аутентификация
 ├── users.html              # Пользователи
@@ -91,13 +98,15 @@ docs/api/
     ├── notes.html          # Заметки группы
     ├── skills.html         # Навыки группы
     ├── schemas.html        # Схемы группы
+    ├── quests.html         # Квесты группы
     ├── export-import.html  # Экспорт/Импорт
     └── characters/
         ├── main.html       # Персонажи
         ├── templates.html  # Шаблоны персонажей
         ├── items.html      # Предметы персонажа
         ├── notes.html      # Заметки персонажа
-        └── skills.html     # Навыки персонажа
+        ├── skills.html     # Навыки персонажа
+        └── commands.html   # Команды персонажа
 ```
 
 ### Как добавить новый endpoint

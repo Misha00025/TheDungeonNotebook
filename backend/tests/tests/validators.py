@@ -20,6 +20,30 @@ def has_id():
     return validator
 
 
+def has_str_id():
+    """id присутствует и является непустой строкой (GUID-идентификаторы game-systems)."""
+    def validator(test: Test, res: Response):
+        data, err = _get_data(res)
+        if err:
+            return False, err
+        if "id" not in data or not isinstance(data["id"], str) or not data["id"]:
+            return False, f"Missing or invalid string 'id' in {data}"
+        return True, "OK"
+    return validator
+
+
+def is_list():
+    """Тело ответа — это JSON-массив (например, GET /systems возвращает голый список)."""
+    def validator(test: Test, res: Response):
+        data, err = _get_data(res)
+        if err:
+            return False, err
+        if not isinstance(data, list):
+            return False, f"Expected a JSON list, got {data}"
+        return True, "OK"
+    return validator
+
+
 def has_fields(**expected):
     def validator(test: Test, res: Response):
         data, err = _get_data(res)

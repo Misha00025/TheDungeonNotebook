@@ -14,9 +14,9 @@ auth:
   expected_issuer: "${OIDC_ISSUER}"
 
 services:
-  auth:      { base_url: "${AUTH_SERVICE_URL}" }
-  users:     { base_url: "${USERS_SERVICE_URL}" }
-  campaign:  { base_url: "${CAMPAIGN_SERVICE_URL}" }
+  auth:          { base_url: "${AUTH_SERVICE_URL}" }
+  users:         { base_url: "${USERS_SERVICE_URL}" }
+  campaign:      { base_url: "${CAMPAIGN_SERVICE_URL}" }
 
 routes:
 
@@ -638,3 +638,8 @@ routes:
       headers:
         X-Subject: "{state.x_subject}"
     auth: required
+
+  # ============================================================
+  # Game Systems & Sync — вынесены в configs/game-systems.yaml
+  # (отдельный домен, НЕ подключается в прод через app.json)
+  # ============================================================

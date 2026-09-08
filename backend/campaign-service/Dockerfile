@@ -3,13 +3,15 @@ WORKDIR /app
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-COPY ["backend-cs.csproj", "./"]
-RUN dotnet restore "backend-cs.csproj"
-COPY . .
-RUN dotnet build "backend-cs.csproj" --no-restore -c Release -o /app/build
+COPY ["campaign-service/backend-cs.csproj", "campaign-service/"]
+COPY ["Tdn.Shared/Tdn.Shared.csproj", "Tdn.Shared/"]
+RUN dotnet restore "campaign-service/backend-cs.csproj"
+COPY campaign-service/ campaign-service/
+COPY Tdn.Shared/ Tdn.Shared/
+RUN dotnet build "campaign-service/backend-cs.csproj" --no-restore -c Release -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "backend-cs.csproj" -c Release -o /app/publish
+RUN dotnet publish "campaign-service/backend-cs.csproj" -c Release -o /app/publish
 
 FROM base AS final
 WORKDIR /app

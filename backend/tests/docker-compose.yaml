@@ -5,13 +5,14 @@ x-common-resources: &common_resources
     resources:
       limits:
         cpus: '0.5'
-        memory: '256m'
+        memory: '512m'
       reservations:
         cpus: '0.25'
-        memory: '128m'
+        memory: '256m'
 
 services:
   mongo:
+    <<: *common_resources
     image: mongo:latest
     container_name: mongo-db-test
     restart: always
@@ -29,6 +30,7 @@ services:
       start_period: 30s
 
   mysql:
+    <<: *common_resources
     image: mysql:8.0
     container_name: mysql-db-test
     restart: always
@@ -49,6 +51,7 @@ services:
       start_period: 60s
 
   redis:
+    <<: *common_resources
     image: redis:7-alpine
     container_name: redis-cache-test
     restart: always
@@ -81,7 +84,8 @@ services:
   campaign-service:
     <<: *common_resources
     build:
-      context: ../campaign-service
+      context: ../
+      dockerfile: campaign-service/Dockerfile
     container_name: campaign-service-test
     depends_on:
       mongo:

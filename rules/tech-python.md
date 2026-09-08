@@ -1,14 +1,20 @@
 # Python Conventions
 
 ## Projects
-- `backend/api-gateway/` — Flask + Gunicorn (see `api-gateway/rules.md`)
-- `admin/` — Flask + Jinja2 (see `admin/rules.md`)
+- `backend/api-gateway/` — FastAPI + Uvicorn (PyApiGate engine, см. `api-gateway/rules.md`)
+- `backend/sync-service/` — FastAPI + Uvicorn (async orchestrator, см. `sync-service/README.md`)
+- `admin/` — Flask + Jinja2 (см. `admin/rules.md`)
 
-## Flask Setup
+## Flask Setup (admin-panel)
 - `application` (not `app`) is the Flask instance variable
 - Gunicorn entrypoint: `wsgi:application`
 - Dev mode: `python main.py` (debug=True)
 - `JSON_AS_ASCII = False` for Cyrillic support
+
+## FastAPI Setup (api-gateway, sync-service)
+- Uvicorn entrypoint: `uvicorn main:app --host 0.0.0.0 --port <port>`
+- api-gateway: `main.py` calls `create_app()` from the PyApiGate engine (in the image)
+- sync-service: FastAPI app with lifespan (initializes clients/engine)
 
 ## Docker
 ```dockerfile

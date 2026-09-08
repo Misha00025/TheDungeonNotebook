@@ -92,7 +92,8 @@ services:
 
   campaign-service:
     build:
-      context: ./campaign-service
+      context: ./backend
+      dockerfile: campaign-service/Dockerfile
     container_name: campaign-service
     depends_on:
       mongo:
