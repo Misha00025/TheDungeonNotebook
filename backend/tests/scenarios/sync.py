@@ -85,6 +85,16 @@ def items_count(n):
     return validator
 
 
+def job_not_found():
+    """sync-service возвращает FastAPI-ошибку вида {'detail': ...}."""
+    def validator(test, res):
+        data = res.json()
+        if "detail" not in data:
+            return False, f"Expected error detail, got {data}"
+        return True, "OK"
+    return validator
+
+
 def register_sync_scenario():
     admin_token, admin_id = generate_token()
     user_token, user_id = generate_token()
@@ -199,22 +209,22 @@ def register_sync_scenario():
     # 9. POST /sync (version 2 -> same group)
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="sync", method="POST",
-        data={"system_id": "{steps.3.id}", "version_id": "{steps.8.id}", "group_id": "{steps.2.id}"},
+        data={"system_id": "{steps.3.id}", "version_id": "{steps.12.id}", "group_id": "{steps.2.id}"},
         requirement=OK,
         is_valid=has_keys("job_id", "status")))
 
     # 10. Poll job -> completed; Longsword updated, Shield/Stealth created, previous_version_id = v1
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="sync/{steps.9.job_id}", method="GET", requirement=OK,
+        request="sync/{steps.13.job_id}", method="GET", requirement=OK,
         is_valid=job_status_completed()))
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="sync/{steps.9.job_id}", method="GET", requirement=OK,
+        request="sync/{steps.13.job_id}", method="GET", requirement=OK,
         is_valid=job_result_contains("updated", "item:Longsword")))
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="sync/{steps.9.job_id}", method="GET", requirement=OK,
+        request="sync/{steps.13.job_id}", method="GET", requirement=OK,
         is_valid=job_result_contains("created", "item:Shield", "skill:Stealth")))
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="sync/{steps.9.job_id}", method="GET", requirement=OK,
+        request="sync/{steps.13.job_id}", method="GET", requirement=OK,
         is_valid=job_previous_version("{steps.4.id}")))
 
     # 11. Verify group now has 2 items (Longsword updated + Shield added, no duplicates)
@@ -230,7 +240,7 @@ def register_sync_scenario():
     # 13. GET /sync/{nonexistent} -> 404
     tests.append(Test(headers={**h, "Authorization": "{at}"},
         request="sync/does-not-exist", method="GET", requirement=NOT_FOUND,
-        is_valid=is_error()))
+        is_valid=job_not_found()))
 
     steps = []
     for t in tests:

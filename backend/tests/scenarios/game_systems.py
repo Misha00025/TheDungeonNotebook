@@ -78,9 +78,9 @@ def register_game_systems_scenario():
         request="systems/{steps.2.id}", method="DELETE", requirement=OK,
         is_valid=has_str_id()))
 
-    # 10. GET /systems/{id} (after delete) -> 404
+    # 10. GET /systems/{id} (after delete) -> 403 (admin record removed with system, middleware denies)
     tests.append(Test(headers={**h, "Authorization": "{at}"},
-        request="systems/{steps.2.id}", method="GET", requirement=NOT_FOUND,
+        request="systems/{steps.2.id}", method="GET", requirement=FORBID,
         is_valid=is_error()))
 
     # === Версии и снимки ===
