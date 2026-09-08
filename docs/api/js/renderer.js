@@ -113,6 +113,8 @@
     { key: 'system', page: 'system.html' },
     { key: 'auth', page: 'auth.html' },
     { key: 'users', page: 'users.html' },
+    { key: 'game-systems', page: 'game-systems.html' },
+    { key: 'sync', page: 'sync.html' },
     { key: 'groups', page: 'groups/general.html' },
     { key: 'group-items', page: 'groups/items.html' },
     { key: 'group-notes', page: 'groups/notes.html' },

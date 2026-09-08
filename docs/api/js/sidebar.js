@@ -39,6 +39,8 @@
     { key: 'system', title: 'Системные', page: 'system.html', icon: '⚙️', children: null },
     { key: 'auth', title: 'Аутентификация', page: 'auth.html', icon: '🔐', children: null },
     { key: 'users', title: 'Пользователи', page: 'users.html', icon: '👤', children: null },
+    { key: 'game-systems', title: 'Игровые системы', page: 'game-systems.html', icon: '🎲', children: null },
+    { key: 'sync', title: 'Синхронизация', page: 'sync.html', icon: '🔄', children: null },
     {
       key: 'groups', title: 'Группы', icon: '📁', children: [
         { key: 'groups-main', title: 'Группы', page: 'groups/general.html', icon: '📁' },
