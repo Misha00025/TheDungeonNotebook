@@ -5,8 +5,10 @@ namespace Tdn.Middleware;
 
 /// <summary>
 /// Авторизация для game-systems-service. Одна роль — админ.
-/// Требует наличия X-Subject. Для путей, содержащих systemId,
-/// проверяет, что субъект является админом системы.
+/// Чтение (GET) открыто всем, включая неавторизованных.
+/// Мутации требуют аутентифицированного субъекта (X-Subject):
+/// коллекционный уровень — любой аутентифицированный субъект,
+/// уровень конкретной системы — только админ системы (или глобальный admin).
 /// </summary>
 public class SystemAccessMiddleware
 {
@@ -27,9 +29,17 @@ public class SystemAccessMiddleware
 
         _logger.LogInformation("[SYSTEM ACCESS] IN: {Method} {Path}, Subject={Subject}", method, path, subject);
 
+        // Чтение (GET) открыто всем, включая неавторизованных.
+        if (HttpMethods.IsGet(method))
+        {
+            _logger.LogInformation("[SYSTEM ACCESS] DECISION: allow - GET is public read");
+            await _next(context);
+            return;
+        }
+
         if (subject == null)
         {
-            _logger.LogWarning("[SYSTEM ACCESS] DECISION: 403 - no Subject present");
+            _logger.LogWarning("[SYSTEM ACCESS] DECISION: 403 - mutation without Subject");
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
         }
