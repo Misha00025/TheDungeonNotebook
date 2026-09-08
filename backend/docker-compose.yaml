@@ -31,7 +31,6 @@ services:
       - ./auth-service/init-auth.sh:/docker-entrypoint-initdb.d/0_auth.sh
       - ./users-service/init-users.sh:/docker-entrypoint-initdb.d/1_users.sh
       - ./campaign-service/init-campaign.sh:/docker-entrypoint-initdb.d/2_campaign.sh
-      - ./game-systems-service/init-game-systems.sh:/docker-entrypoint-initdb.d/3_game_systems.sh
     healthcheck:
       test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
       interval: 20s
@@ -111,45 +110,6 @@ services:
       - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
       - MYSQL_CONNECTION_STRING=server=mysql;database=$CAMPAIGN_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
-  game-systems-service:
-    build:
-      context: ./backend
-      dockerfile: game-systems-service/Dockerfile
-    container_name: game-systems-service
-    depends_on:
-      mongo:
-        condition: service_healthy
-      mysql:
-        condition: service_healthy
-    networks:
-      - backend-network
-    volumes:
-      - ./logs:/logs
-    env_file:
-      - ./.env
-    environment:
-      - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
-      - MYSQL_CONNECTION_STRING=server=mysql;database=$GAME_SYSTEMS_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
-
-  sync-service:
-    build:
-      context: ./sync-service
-    container_name: sync-service
-    depends_on:
-      game-systems-service:
-        condition: service_started
-      campaign-service:
-        condition: service_started
-    networks:
-      - backend-network
-    volumes:
-      - ./sync_data:/data
-    env_file:
-      - ./.env
-    environment:
-      - GAME_SYSTEMS_SERVICE_URL=http://game-systems-service:8080
-      - CAMPAIGN_SERVICE_URL=http://campaign-service:8080
-
   api-gateway:
     build: ./api-gateway
     container_name: api-gateway
@@ -157,10 +117,6 @@ services:
       campaign-service:
         condition: service_started
       users-service:
-        condition: service_started
-      game-systems-service:
-        condition: service_started
-      sync-service:
         condition: service_started
     networks:
       - backend-network

@@ -1,0 +1,141 @@
+# ============================================================
+# API Gateway — Game Systems & Sync маршруты (отдельный домен)
+# ============================================================
+# Самодостаточный файл конфигурации маршрутов для домена
+# game-systems и sync. Содержит собственные base_path, auth и
+# services, поэтому может загружаться независимо от routes.yaml.
+#
+# ВАЖНО: этот файл НЕ добавлен в routes.files в configs/app.json,
+# поэтому эндпоинты /systems* и /sync НЕ выкатываются в прод.
+# Файл предназначен для локальной разработки и тестирования.
+# ============================================================
+
+base_path: ""
+
+auth:
+  strategy: hybrid_jwt
+  public_key_path: ${PUBLIC_KEY_PATH:-/certs/public.pem}
+  expected_issuer: "${OIDC_ISSUER}"
+
+services:
+  game_systems:  { base_url: "${GAME_SYSTEMS_SERVICE_URL}" }
+  sync:          { base_url: "${SYNC_SERVICE_URL}" }
+
+routes:
+
+  # ============================================================
+  # Game Systems
+  # ============================================================
+  - path: /systems
+    proxy:
+      service: game_systems
+      path: /systems
+      headers:
+        X-Subject: "{state.x_subject}"
+    auth: required
+    methods:
+      GET: {}
+      POST: {}
+
+  - path: /systems/{system_id}
+    proxy:
+      service: game_systems
+      path: /systems/{system_id}
+      headers:
+        X-Subject: "{state.x_subject}"
+    auth: required
+    methods:
+      GET: {}
+      PATCH: {}
+      DELETE: {}
+
+  - path: /systems/{system_id}/versions
+    proxy:
+      service: game_systems
+      path: /systems/{system_id}/versions
+      headers:
+        X-Subject: "{state.x_subject}"
+    auth: required
+    methods:
+      GET: {}
+      POST: {}
+
+  - path: /systems/{system_id}/versions/{version_id}
+    proxy:
+      service: game_systems
+      path: /systems/{system_id}/versions/{version_id}
+      headers:
+        X-Subject: "{state.x_subject}"
+    auth: required
+    methods:
+      GET: {}
+
+  - path: /systems/{system_id}/versions/{version_id}/snapshot
+    proxy:
+      service: game_systems
+      path: /systems/{system_id}/versions/{version_id}/snapshot
+      headers:
+        X-Subject: "{state.x_subject}"
+    auth: required
+    methods:
+      GET: {}
+
+  - path: /systems/{system_id}/versions/{version_id}/content
+    proxy:
+      service: game_systems
+      path: /systems/{system_id}/versions/{version_id}/content
+      headers:
+        X-Subject: "{state.x_subject}"
+    auth: required
+    methods:
+      GET: {}
+
+  - path: /systems/{system_id}/versions/{version_id}/content/items
+    proxy:
+      service: game_systems
+      path: /systems/{system_id}/versions/{version_id}/content/items
+      headers:
+        X-Subject: "{state.x_subject}"
+    auth: required
+    methods:
+      PUT: {}
+
+  - path: /systems/{system_id}/versions/{version_id}/content/skills
+    proxy:
+      service: game_systems
+      path: /systems/{system_id}/versions/{version_id}/content/skills
+      headers:
+        X-Subject: "{state.x_subject}"
+    auth: required
+    methods:
+      PUT: {}
+
+  - path: /systems/{system_id}/versions/{version_id}/content/character_template
+    proxy:
+      service: game_systems
+      path: /systems/{system_id}/versions/{version_id}/content/character_template
+      headers:
+        X-Subject: "{state.x_subject}"
+    auth: required
+    methods:
+      PUT: {}
+
+  # ============================================================
+  # Sync
+  # ============================================================
+  - path: /sync
+    proxy:
+      service: sync
+      path: /sync
+    auth: required
+    methods:
+      POST: {}
+      GET: {}
+
+  - path: /sync/{job_id}
+    proxy:
+      service: sync
+      path: /sync/{job_id}
+    auth: required
+    methods:
+      GET: {}

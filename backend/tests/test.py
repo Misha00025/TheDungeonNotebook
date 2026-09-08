@@ -25,8 +25,6 @@ from scenarios.character_equipment_commands import register_character_equipment_
 from scenarios.character_commands_batch import register_character_commands_batch_scenario, scenarios as cb_scenarios
 from scenarios.character_log_commands import register_character_log_commands_scenario, scenarios as clc_scenarios
 from scenarios.character_log_crud import register_character_log_crud_scenario, scenarios as clcrud_scenarios
-from scenarios.game_systems import register_game_systems_scenario, scenarios as gsys_scenarios
-from scenarios.sync import register_sync_scenario, scenarios as sync_scenarios
 
 if __name__ == "__main__":
     import argparse
@@ -37,7 +35,7 @@ if __name__ == "__main__":
     p.add_argument("-c", "--compact", nargs='?', const=True, default=False)
     p.add_argument("-d", "--debug", nargs='?', const=True, default=False)
     p.add_argument("--server", type=str, help="Адрес сервера")
-    p.add_argument('-S', "--scenario", action='append', help=f'Добавляет сценарий для исполнения. Доступные значения: GatewayMain, UserProfile, GroupItemsLifecycle, CharacterLifecycle, GroupSkills, CharacterSkillsAssignment, ExportImport, Notes, LocalEndpoints, SchemasLifecycle, CharacterItemsAccess, CharacterFullAccess, OidcEndpoints, AuthFlow, DashboardConfig, CharacterLog, Quests, ServiceTokenAccess, CookieAuth, CharacterCommands, CharacterEquipmentCommands, CharacterCommandsBatch, CharacterLogCommands, CharacterLogCrud, GameSystems, Sync')
+    p.add_argument('-S', "--scenario", action='append', help=f'Добавляет сценарий для исполнения. Доступные значения: GatewayMain, UserProfile, GroupItemsLifecycle, CharacterLifecycle, GroupSkills, CharacterSkillsAssignment, ExportImport, Notes, LocalEndpoints, SchemasLifecycle, CharacterItemsAccess, CharacterFullAccess, OidcEndpoints, AuthFlow, DashboardConfig, CharacterLog, Quests, ServiceTokenAccess, CookieAuth, CharacterCommands, CharacterEquipmentCommands, CharacterCommandsBatch, CharacterLogCommands, CharacterLogCrud')
     args = p.parse_args()
 
     if args.server is not None:
@@ -96,10 +94,6 @@ if __name__ == "__main__":
                 register_character_log_commands_scenario()
             elif scenario == "CharacterLogCrud":
                 register_character_log_crud_scenario()
-            elif scenario == "GameSystems":
-                register_game_systems_scenario()
-            elif scenario == "Sync":
-                register_sync_scenario()
     else:
         register_gateway_main()
         register_user_profile_scenario()
@@ -124,8 +118,6 @@ if __name__ == "__main__":
         register_character_commands_batch_scenario()
         register_character_log_commands_scenario()
         register_character_log_crud_scenario()
-        register_game_systems_scenario()
-        register_sync_scenario()
 
-    all_scenarios = gw_scenarios + up_scenarios + gi_scenarios + cl_scenarios + gs_scenarios + cs_scenarios + ei_scenarios + notes_scenarios + le_scenarios + sl_scenarios + cia_scenarios + cfa_scenarios + af_scenarios + dc_scenarios + cl_log_scenarios + q_scenarios + sta_scenarios + ca_scenarios + cmd_scenarios + eq_scenarios + cb_scenarios + clc_scenarios + clcrud_scenarios + gsys_scenarios + sync_scenarios
+    all_scenarios = gw_scenarios + up_scenarios + gi_scenarios + cl_scenarios + gs_scenarios + cs_scenarios + ei_scenarios + notes_scenarios + le_scenarios + sl_scenarios + cia_scenarios + cfa_scenarios + af_scenarios + dc_scenarios + cl_log_scenarios + q_scenarios + sta_scenarios + ca_scenarios + cmd_scenarios + eq_scenarios + cb_scenarios + clc_scenarios + clcrud_scenarios
     main_test.start(all_scenarios)
