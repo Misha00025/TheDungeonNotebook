@@ -2,16 +2,41 @@
 
 Лучшая записная книжка любителя подземелий и других приключенческих штук :)
 
-## Архитектура
+## Карта репозитория
 
-API Gateway (FastAPI/PyApiGate, порт 5000) — единая точка входа. Проксирует запросы к микросервисам:
+Корень репозитория — основная платформа TDN, а не отдельное приложение `apps/notebook`.
 
-- **api-gateway** (Python/FastAPI) — [README](backend/api-gateway/README.md)
-- **auth-service** (C# .NET 8) — [README](backend/auth-service/README.md)
-- **users-service** (C# .NET 8) — [README](backend/users-service/README.md)
-- **campaign-service** (C# .NET 8) — [README](backend/campaign-service/README.md)
-- **game-systems-service** (C# .NET 8) — [README](backend/game-systems-service/README.md)
-- **sync-service** (Python/FastAPI) — [README](backend/sync-service/README.md)
+- `backend/` — API Gateway и несколько backend-сервисов; см. их README.
+- `web/apps/{hub,campaign,login,profile,game-systems}/` — приложения web workspace.
+- `web/packages/shared/` — общие frontend-пакеты.
+- `admin/` — административная панель.
+- `monitoring/` — конфигурация мониторинга.
+- `docs/` — документация, включая [документацию API](docs/api/) и [историю объединения](docs/repository-history.md).
+
+Подробности web-приложений: [web/README.md](web/README.md).
+
+### Подготовка и команды web
+
+```bash
+cp web/template.env web/.env
+npm ci --prefix web
+make check-web
+make build
+make run
+```
+
+Compose для web использует рабочий каталог `web/`; runtime `.env` обязателен. Build-переменные по умолчанию берутся из `web/template.env.build`; путь можно переопределить, например `make build WEB_BUILD_ENV=.env.build`. `make build` и `make run` также выполняют существующие backend-команды в `backend/`, поэтому требуют предварительно настроенного backend (см. следующий раздел).
+
+### Backend
+
+API Gateway (порт 5000) — входная точка backend:
+
+- **api-gateway** — [README](backend/api-gateway/README.md)
+- **auth-service** — [README](backend/auth-service/README.md)
+- **users-service** — [README](backend/users-service/README.md)
+- **campaign-service** — [README](backend/campaign-service/README.md)
+- **game-systems-service** — [правила сервиса](backend/game-systems-service/rules.md)
+- **sync-service** — [README](backend/sync-service/README.md)
 
 
 ### Базы данных
@@ -67,7 +92,15 @@ docker compose up -d
 | Команда | Описание |
 |---------|----------|
 | `make test` | Запуск интеграционных тестов. Выполняет `cd backend/tests && ./test.sh 5` — очищает БД, пересобирает контейнеры, генерирует свежие RSA-ключи, ждёт 5 секунд и прогоняет все сценарии. |
-| `make build` | Сборка всех Docker-образов: `cd backend && docker compose build`. |
+| `make build` | Backend и web: `make build-backend build-web`. Для отдельных частей используйте эти targets. |
+| `make run` | Запуск backend и web: `make run-backend run-web`; web требует `web/.env`. |
+| `make check-web` | Web typecheck, тесты и сборка. |
+| `make web-install` | Установка web workspace через `npm ci`. |
+| `make web-typecheck` | Typecheck web workspaces, где задан соответствующий script. |
+| `make web-test` / `make test-web` | Web tests (`npm run test:run`). |
+| `make web-build` | Сборка web workspaces, где задан соответствующий script. |
+| `make build-web` / `make run-web` | Сборка/запуск web Compose из `web/`; build env задаёт `WEB_BUILD_ENV`. |
+| `make build-backend` / `make run-backend` | Существующие backend Compose build/up команды из `backend/`. |
 | `make certs` | Генерация RSA-ключей (2048 bit) в `backend/certs/private.pem` и `backend/certs/public.pem`. |
 | `make clean` | Удаление данных MongoDB и MySQL (`backend/mongo_data/`, `backend/mysql_data/`) с подтверждением. Требует sudo. |
 

@@ -1,16 +1,44 @@
-.PHONY: test build run certs clean
+.PHONY: test build build-backend build-web run run-backend run-web web-install web-typecheck web-test web-build check-web test-web certs clean
+
+WEB_BUILD_ENV ?= template.env.build
 
 # Запуск интеграционных тестов (5 секунд ожидания для старта сервисов)
 test:
 	cd backend/tests && ./test.sh 5
 
 # Сборка всех Docker-контейнеров
-build:
+build: build-backend build-web
+
+build-backend:
 	cd backend && docker compose build
 
+build-web:
+	cd web && docker compose --env-file $(WEB_BUILD_ENV) build
+
 # Запуск
-run:
+run: run-backend run-web
+
+run-backend:
 	cd backend && docker compose up -d
+
+run-web:
+	cd web && docker compose --env-file $(WEB_BUILD_ENV) up -d
+
+web-install:
+	cd web && npm ci
+
+web-typecheck:
+	cd web && npm run typecheck --workspaces --if-present
+
+web-test:
+	cd web && npm run test:run
+
+web-build:
+	cd web && npm run build --workspaces --if-present
+
+check-web: web-typecheck web-test web-build
+
+test-web: web-test
 
 # Генерация RSA-ключей (2048 bit) для JWT в backend/certs/
 certs:

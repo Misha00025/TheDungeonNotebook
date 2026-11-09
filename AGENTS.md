@@ -1,5 +1,9 @@
 # The Dungeon Notebook — Agent Overview
 
+## Карта проекта и Web
+
+Корень репозитория — основная платформа TDN; backend, web, admin, monitoring и docs находятся в отдельных каталогах. Web workspace расположен в `web/`: Vite, React 19, TypeScript и npm workspaces (`apps/{hub,campaign,login,profile,game-systems}`, `packages/shared`). Руководствуйтесь `web/package.json` и [web/README.md](web/README.md); CI web находится в `.github/workflows/web.yml`. Не предполагайте, что game-systems включён в default Compose. Для build/run используйте targets Makefile и соответствующие каталоги Compose, не объединяя их контексты.
+
 ## Project Type
 Monorepo with microservice architecture: API Gateway + 4 C# backend services + sync-service (Python) + Admin Panel.
 
