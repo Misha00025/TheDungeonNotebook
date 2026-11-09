@@ -1,42 +1,34 @@
 # TDN Web workspace
 
-Web — frontend workspace платформы The Dungeon Notebook. Это Vite-приложения на React 19 и TypeScript, управляемые npm workspaces.
+Web workspace использует Vite, React и TypeScript с npm workspaces.
 
-## Структура
+## Установка и проверки
 
-- `apps/hub` — оболочка и навигация приложений.
-- `apps/campaign` — интерфейс кампаний.
-- `apps/login` — вход.
-- `apps/profile` — профиль.
-- `apps/game-systems` — интерфейс игровых систем; отключён в конфигурации default Compose, активная Compose-конфигурация для него не заявляется.
-- `packages/shared` — общие frontend-модули.
-
-## Установка и скрипты
-
-Из корня репозитория:
+Все команды можно запускать из корня монорепозитория:
 
 ```bash
 cp web/template.env web/.env
 npm ci --prefix web
 make check-web
+make web-install
+make web-typecheck
+make web-test
+make web-build
 ```
 
-Из каталога `web/` доступны `npm run typecheck --workspaces --if-present`, `npm run test:run` и `npm run build --workspaces --if-present`. Корневой `npm run build` собирает только hub; для сборки workspaces с соответствующим скриптом используется `npm run build --workspaces --if-present`. Typecheck workspaces вызывается аналогично. `make web-test` — alias для web tests.
+Доступны также `npm --prefix web run typecheck --workspaces --if-present`, `npm --prefix web run test:run` и `npm --prefix web run build --workspaces --if-present`. `make web-test` и `make test-web` запускают web tests. `make check-web` выполняет typecheck, тесты и сборку.
 
-## Docker Compose
-
-Рабочий каталог и Docker build context Compose — `web/`, не корень всего репозитория. Скопируйте runtime-конфигурацию из `template.env` в `web/.env`. Compose читает build-переменные из `template.env.build` (или переопределённого файла, например `.env.build`) посредством `--env-file`.
-
-Из корня репозитория:
+## Сборка и запуск в Docker
 
 ```bash
 cp web/template.env web/.env
 make build-web
 make run-web
-# Альтернативный build env:
 make build-web WEB_BUILD_ENV=.env.build
 ```
 
-`make run-web` запускает текущую Compose-конфигурацию из `web/`; не объединяйте её с backend Compose, у которого отдельный контекст и окружение.
+`WEB_BUILD_ENV` задаёт параметры web-сборки, по умолчанию используется шаблон. Runtime-запуск требует настроенного окружения. Используемые Compose-порты: campaign — 3000, profile — 3002, login — 3003, hub — 3004. Не делайте выводов о полноте runtime-платформы из этих параметров.
 
-Текущие порты: campaign — 3000, profile — 3002, login — 3003, hub — 3004. Game-systems не включён в default Compose. Эти сведения описывают конфигурацию Compose, а не утверждают, что полный стек автоматически обеспечивает все сервисы платформы.
+## Документация API
+
+[Публичная HTML-документация](../docs/api/index.html)
