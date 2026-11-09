@@ -15,6 +15,32 @@
 
 Подробности web-приложений: [web/README.md](web/README.md).
 
+### Сборка Docker-образов
+
+Для сборки образов отдельные runtime `.env` и RSA-сертификаты не нужны: сборочная конфигурация находится в корневом `docker-compose.build.yaml` и только собирает выбранные образы. Runtime `.env` нужен только командам запуска (`make run*`).
+
+В новых сборочных контекстах admin, api-gateway и sync-service `.env`-файлы и ключи исключены через локальные `.dockerignore`; это не распространяется на все контексты репозитория. `IMAGE_TAG` меняет тег для новой сборки, но не переключает runtime Compose; их настройки и теги можно настраивать отдельно. Теги backend/admin с `latest` совместимы с образами прежних Compose при стандартных project names `backend`/`admin`, но не гарантируют совместимость при произвольном `-p`.
+
+```bash
+make build SERVICE=auth-service       # ровно один образ
+make build                            # все 12 образов
+make build-backend                    # шесть backend
+make build-web                        # пять web, включая game-systems
+make build-admin                      # только admin-panel
+make build-web-campaign               # явный target одного образа
+make list-images
+```
+
+Реестр образов: `api-gateway`, `auth-service`, `users-service`, `campaign-service`, `game-systems-service`, `sync-service`, `admin-panel`, `web-hub`, `web-campaign`, `web-profile`, `web-login`, `web-game-systems`. Скачиваемые образы БД/мониторинга не входят в этот список; `shared` — библиотека, а не образ. `web-game-systems` собирается отдельно или через `build-web`, но не включается в runtime Compose.
+
+Параметры web-сборки по умолчанию берутся из `web/template.env.build`. Переопределить файл можно относительно `web/` или абсолютным путём: `make build-web WEB_BUILD_ENV=.env.build` либо `make build-web WEB_BUILD_ENV=/path/to/build.env`. `IMAGE_TAG` задаёт общий тег (по умолчанию `latest`), `BUILD_FLAGS` передаёт флаги Compose build:
+
+```bash
+make build SERVICE=web-hub IMAGE_TAG=ci-42 BUILD_FLAGS="--no-cache --pull"
+```
+
+`make help` выводит краткую справку. Runtime Compose и команды запуска остаются отдельными.
+
 ### Подготовка и команды web
 
 ```bash
@@ -25,7 +51,7 @@ make build
 make run
 ```
 
-Compose для web использует рабочий каталог `web/`; runtime `.env` обязателен. Build-переменные по умолчанию берутся из `web/template.env.build`; путь можно переопределить, например `make build WEB_BUILD_ENV=.env.build`. `make build` и `make run` также выполняют существующие backend-команды в `backend/`, поэтому требуют предварительно настроенного backend (см. следующий раздел).
+Runtime `.env` нужен для запуска web через `make run-web`. `make build` теперь использует отдельный корневой build compose и не запускает сервисы.
 
 ### Backend
 
@@ -92,15 +118,17 @@ docker compose up -d
 | Команда | Описание |
 |---------|----------|
 | `make test` | Запуск интеграционных тестов. Выполняет `cd backend/tests && ./test.sh 5` — очищает БД, пересобирает контейнеры, генерирует свежие RSA-ключи, ждёт 5 секунд и прогоняет все сценарии. |
-| `make build` | Backend и web: `make build-backend build-web`. Для отдельных частей используйте эти targets. |
+| `make build [SERVICE=<name>]` | Собирает один выбранный образ либо все 12 образов, если SERVICE не задан. |
 | `make run` | Запуск backend и web: `make run-backend run-web`; web требует `web/.env`. |
 | `make check-web` | Web typecheck, тесты и сборка. |
 | `make web-install` | Установка web workspace через `npm ci`. |
 | `make web-typecheck` | Typecheck web workspaces, где задан соответствующий script. |
 | `make web-test` / `make test-web` | Web tests (`npm run test:run`). |
 | `make web-build` | Сборка web workspaces, где задан соответствующий script. |
-| `make build-web` / `make run-web` | Сборка/запуск web Compose из `web/`; build env задаёт `WEB_BUILD_ENV`. |
-| `make build-backend` / `make run-backend` | Существующие backend Compose build/up команды из `backend/`. |
+| `make build-backend` / `make build-web` / `make build-admin` | Сборка соответствующей группы образов; `make build-<service>` собирает один образ. |
+| `make list-images` / `make help` | Список допустимых образов / краткие команды. |
+| `make run-web` | Запуск web runtime Compose из `web/`; runtime `.env` обязателен. `WEB_BUILD_ENV` остаётся параметром web Compose. |
+| `make run-backend` | Запуск backend runtime Compose из `backend/`; его настройки не изменены. |
 | `make certs` | Генерация RSA-ключей (2048 bit) в `backend/certs/private.pem` и `backend/certs/public.pem`. |
 | `make clean` | Удаление данных MongoDB и MySQL (`backend/mongo_data/`, `backend/mysql_data/`) с подтверждением. Требует sudo. |
 
