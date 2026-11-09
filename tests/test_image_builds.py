@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -11,6 +12,67 @@ SERVICES = (
     "api-gateway auth-service users-service campaign-service game-systems-service "
     "sync-service admin-panel web-hub web-campaign web-profile web-login web-game-systems"
 ).split()
+IMAGE_REPOSITORIES = {
+    "api-gateway": "backend-api-gateway",
+    "auth-service": "backend-auth-service",
+    "users-service": "backend-users-service",
+    "campaign-service": "backend-campaign-service",
+    "game-systems-service": "backend-game-systems-service",
+    "sync-service": "backend-sync-service",
+    "admin-panel": "admin-admin-panel",
+    "web-hub": "tdn-hub",
+    "web-campaign": "tdn-campaign",
+    "web-profile": "tdn-profile",
+    "web-login": "tdn-login",
+    "web-game-systems": "tdn-game-systems",
+}
+
+
+class ImageBuildComposeConfigTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.docker = shutil.which("docker")
+        if cls.docker is None:
+            raise unittest.SkipTest("Docker CLI is not installed")
+        version = subprocess.run(
+            [cls.docker, "compose", "version"], capture_output=True, text=True, check=False,
+        )
+        if version.returncode != 0:
+            raise unittest.SkipTest("Docker Compose is not installed")
+
+    def config(self, tag=None):
+        env = os.environ.copy()
+        env.pop("IMAGE_TAG", None)
+        if tag is not None:
+            env["IMAGE_TAG"] = tag
+        result = subprocess.run(
+            [self.docker, "compose", "--env-file", "web/template.env.build", "-f",
+             "docker-compose.build.yaml", "config", "--format", "json"],
+            cwd=ROOT, env=env, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def assert_config_tags(self, tag):
+        config = self.config(tag)
+        services = config["services"]
+        self.assertEqual(set(services), set(SERVICES))
+        self.assertEqual(len(services), 12)
+        for service_name, repository in IMAGE_REPOSITORIES.items():
+            with self.subTest(service=service_name, tag=tag):
+                service = services[service_name]
+                self.assertEqual(service["image"], f"{repository}:{tag or 'latest'}")
+                build_tags = service["build"]["tags"]
+                self.assertIn(f"{repository}:latest", build_tags)
+                self.assertTrue(all(value.split(":", 1)[0] == repository for value in build_tags))
+
+    def test_default_latest_tags(self):
+        self.assert_config_tags(None)
+
+    def test_custom_tags_also_include_latest(self):
+        for tag in ("1.2.3", "1.2.3-rc.1"):
+            with self.subTest(tag=tag):
+                self.assert_config_tags(tag)
 
 
 class ImageBuildMakeTests(unittest.TestCase):

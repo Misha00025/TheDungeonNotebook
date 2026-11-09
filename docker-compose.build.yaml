@@ -3,32 +3,46 @@ services:
   api-gateway:
     build:
       context: ./backend/api-gateway
+      tags:
+        - backend-api-gateway:latest
     image: backend-api-gateway:${IMAGE_TAG:-latest}
   auth-service:
     build:
       context: ./backend/auth-service
+      tags:
+        - backend-auth-service:latest
     image: backend-auth-service:${IMAGE_TAG:-latest}
   users-service:
     build:
       context: ./backend/users-service
+      tags:
+        - backend-users-service:latest
     image: backend-users-service:${IMAGE_TAG:-latest}
   campaign-service:
     build:
       context: ./backend
       dockerfile: campaign-service/Dockerfile
+      tags:
+        - backend-campaign-service:latest
     image: backend-campaign-service:${IMAGE_TAG:-latest}
   game-systems-service:
     build:
       context: ./backend
       dockerfile: game-systems-service/Dockerfile
+      tags:
+        - backend-game-systems-service:latest
     image: backend-game-systems-service:${IMAGE_TAG:-latest}
   sync-service:
     build:
       context: ./backend/sync-service
+      tags:
+        - backend-sync-service:latest
     image: backend-sync-service:${IMAGE_TAG:-latest}
   admin-panel:
     build:
       context: ./admin
+      tags:
+        - admin-admin-panel:latest
     image: admin-admin-panel:${IMAGE_TAG:-latest}
   web-hub:
     build:
@@ -40,6 +54,8 @@ services:
         VITE_REMOTE_GAME_SYSTEMS: ${VITE_REMOTE_GAME_SYSTEMS:-http://localhost:3001/assets/remoteEntry.js}
         VITE_REMOTE_PROFILE: ${VITE_REMOTE_PROFILE:-http://localhost:3002/assets/remoteEntry.js}
         VITE_REMOTE_LOGIN: ${VITE_REMOTE_LOGIN:-http://localhost:3003/assets/remoteEntry.js}
+      tags:
+        - tdn-hub:latest
     image: tdn-hub:${IMAGE_TAG:-latest}
   web-campaign:
     build:
@@ -47,6 +63,8 @@ services:
       dockerfile: apps/campaign/Dockerfile
       args:
         VITE_BASE: ${VITE_BASE_CAMPAIGN:-/}
+      tags:
+        - tdn-campaign:latest
     image: tdn-campaign:${IMAGE_TAG:-latest}
   web-profile:
     build:
@@ -54,6 +72,8 @@ services:
       dockerfile: apps/profile/Dockerfile
       args:
         VITE_BASE: ${VITE_BASE_PROFILE:-/}
+      tags:
+        - tdn-profile:latest
     image: tdn-profile:${IMAGE_TAG:-latest}
   web-login:
     build:
@@ -61,6 +81,8 @@ services:
       dockerfile: apps/login/Dockerfile
       args:
         VITE_BASE: ${VITE_BASE_LOGIN:-/}
+      tags:
+        - tdn-login:latest
     image: tdn-login:${IMAGE_TAG:-latest}
   web-game-systems:
     build:
@@ -68,4 +90,6 @@ services:
       dockerfile: apps/game-systems/Dockerfile
       args:
         VITE_BASE: ${VITE_BASE_GAME_SYSTEMS:-/}
+      tags:
+        - tdn-game-systems:latest
     image: tdn-game-systems:${IMAGE_TAG:-latest}

@@ -19,10 +19,12 @@
 
 Для сборки образов отдельные runtime `.env` и RSA-сертификаты не нужны: сборочная конфигурация находится в корневом `docker-compose.build.yaml` и только собирает выбранные образы. Runtime `.env` нужен только командам запуска (`make run*`).
 
-В новых сборочных контекстах admin, api-gateway и sync-service `.env`-файлы и ключи исключены через локальные `.dockerignore`; это не распространяется на все контексты репозитория. `IMAGE_TAG` меняет тег для новой сборки, но не переключает runtime Compose; их настройки и теги можно настраивать отдельно. Теги backend/admin с `latest` совместимы с образами прежних Compose при стандартных project names `backend`/`admin`, но не гарантируют совместимость при произвольном `-p`.
+В новых сборочных контекстах admin, api-gateway и sync-service `.env`-файлы и ключи исключены через локальные `.dockerignore`; это не распространяется на все контексты репозитория. `IMAGE_TAG` задаёт вручную дополнительный тег для сборки: образ получает и `<repository>:latest`, и `<repository>:<IMAGE_TAG>` из одной сборки (без push). Например, `IMAGE_TAG=1.2.3` обновляет `latest` и создаёт/обновляет `1.2.3`; так происходит при любом пользовательском значении, включая `dev`. Git tags автоматически не создаются. `IMAGE_TAG` не переключает runtime Compose; его настройки и теги можно настраивать отдельно. Теги backend/admin с `latest` совместимы с образами прежних Compose при стандартных project names `backend`/`admin`, но не гарантируют совместимость при произвольном `-p`.
 
 ```bash
 make build SERVICE=auth-service       # ровно один образ
+make build SERVICE=auth-service IMAGE_TAG=1.2.3 # backend-auth-service:latest и :1.2.3
+make build IMAGE_TAG=1.2.3             # все 12 образов: для каждого repository latest и 1.2.3
 make build                            # все 12 образов
 make build-backend                    # шесть backend
 make build-web                        # пять web, включая game-systems
@@ -39,7 +41,7 @@ make list-images
 make build SERVICE=web-hub IMAGE_TAG=ci-42 BUILD_FLAGS="--no-cache --pull"
 ```
 
-`make help` выводит краткую справку. Runtime Compose и команды запуска остаются отдельными.
+`make help` выводит краткую справку. Runtime Compose и команды запуска остаются отдельными; публикации образов нет.
 
 ### Подготовка и команды web
 
