@@ -1,0 +1,117 @@
+.stickyHeader {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--bg-primary, #fff);
+}
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #888);
+  padding: 0.5rem 1rem;
+}
+
+.breadcrumbLink {
+  color: var(--text-secondary, #888);
+  text-decoration: none;
+}
+
+.breadcrumbLink:hover {
+  text-decoration: underline;
+}
+
+.breadcrumbCurrent {
+  font-weight: 700;
+  color: var(--text-primary, #000);
+}
+
+.separator {
+  color: var(--text-secondary, #888);
+  user-select: none;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+}
+
+.headerImage {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.headerTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.headerSubtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #888);
+}
+
+.headerActions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tabBar {
+  display: flex;
+  flex-direction: row;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  overflow-x: auto;
+  background: var(--bg-primary, #fff);
+}
+
+.tabBarBottom {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-bottom: none;
+  border-top: 1px solid var(--border-color, #e0e0e0);
+  justify-content: space-around;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.tabItemBottom {
+  flex: 1;
+  text-align: center;
+  padding: 0.75rem 0.5rem;
+  border-bottom: none;
+}
+
+.tabItem {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--text-secondary, #888);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tabItem:hover {
+  color: var(--text-primary, #000);
+}
+
+.tabItemActive {
+  color: var(--accent-color, #1976d2);
+  border-bottom-color: var(--accent-color, #1976d2);
+  font-weight: 600;
+}
+
+.pageContent {
+  padding: 0 1rem 1rem;
+}

@@ -1,0 +1,94 @@
+/* ResourcePage.module.css */
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.headerButtons {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.schemaButton,
+.createButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  white-space: nowrap;
+}
+
+.gearIcon {
+  font-size: 1rem;
+}
+
+.plusIcon {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.createText,
+.schemaText {
+  display: inline;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.headerControls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.searchContainer {
+  flex: 1;
+  min-width: 300px;
+}
+
+.groupsContainer {
+  margin-top: 1rem;
+}
+
+/* Для мобильных устройств */
+@media (max-width: 768px) {
+  .pageHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .headerButtons {
+    justify-content: space-between;
+    width: 100%;
+  }
+  
+  .schemaText {
+    display: none;
+  }
+  
+  .createText {
+    display: none;
+  }
+  
+  .schemaButton,
+  .createButton {
+    padding: 0.5rem;
+    min-width: 44px;
+    justify-content: center;
+    flex: 1;
+  }
+  
+  .searchContainer {
+    min-width: 100%;
+  }
+}

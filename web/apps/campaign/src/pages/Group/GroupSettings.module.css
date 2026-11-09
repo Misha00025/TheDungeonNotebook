@@ -1,0 +1,22 @@
+.settingsSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.settingsList {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 320px;
+}
+
+.settingsList > *,
+.settingsList a,
+.settingsList button {
+  width: 100%;
+  text-align: center;
+  box-sizing: border-box;
+}

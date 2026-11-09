@@ -1,0 +1,156 @@
+/* components/Modals/SchemaModal/SchemaModal.module.css */
+.modal {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  
+  .schemaSection,
+  .availableSection,
+  .previewSection {
+    background-color: var(--bg-secondary);
+    border-radius: var(--border-radius-md);
+    padding: 1.5rem;
+  }
+  
+  .schemaHeader,
+  .availableSection h3,
+  .previewSection h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+  }
+  
+  .hint {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+  }
+  
+  .schemaList {
+    min-height: 100px;
+    border: 1px dashed var(--border-color);
+    border-radius: var(--border-radius-sm);
+    padding: 0.5rem;
+  }
+  
+  .schemaItem {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background-color: var(--bg-primary);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+    cursor: move;
+  }
+  
+  .schemaItem.dragging {
+    opacity: 0.5;
+    border-style: dashed;
+  }
+  
+  .dragHandle {
+    cursor: grab;
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    user-select: none;
+    padding: 0 0.5rem;
+  }
+  
+  .dragHandle:active {
+    cursor: grabbing;
+  }
+  
+  .schemaContent {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .levelIndicator {
+    font-size: 0.8rem;
+    color: var(--accent-primary);
+    font-weight: bold;
+    min-width: 70px;
+  }
+  
+  .attributeName {
+    font-weight: 500;
+  }
+  
+  .emptySchema {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-secondary);
+  }
+  
+  .emptySchema p {
+    margin: 0.5rem 0;
+  }
+  
+  .availableList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .availableItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--bg-primary);
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
+    flex: 1 0 calc(33.333% - 0.5rem);
+    min-width: 200px;
+  }
+  
+  .noAttributes {
+    text-align: center;
+    padding: 1rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    width: 100%;
+  }
+  
+  .preview {
+    padding: 1rem;
+    background-color: var(--bg-primary);
+    border-radius: var(--border-radius-sm);
+  }
+  
+  .previewTree {
+    font-family: 'Consolas', 'Monaco', monospace;
+    line-height: 1.8;
+    padding: 1rem;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    min-height: 100px;
+  }
+  
+  .previewLevel {
+    color: var(--text-primary);
+    white-space: pre;
+  }
+  
+  .noGrouping {
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+  
+  @media (max-width: 768px) {
+    .availableItem {
+      flex: 1 0 100%;
+    }
+    
+    .schemaContent {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+    }
+  }

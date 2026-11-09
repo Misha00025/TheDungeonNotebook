@@ -1,0 +1,13 @@
+.layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-gap, 0.75rem);
+}
+
+.layout > * {
+  flex: 1 1 auto;
+}
+
+.fullRow {
+  flex: 1 0 100%;
+}

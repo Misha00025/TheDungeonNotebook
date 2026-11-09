@@ -1,0 +1,115 @@
+/* components/Modals/SkillAttributesModal.module.css */
+.attributesTable {
+  margin-bottom: 2rem;
+}
+
+.tableContainer {
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+}
+
+.tableHeader {
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr 1.5fr 120px 100px;
+  gap: 0.5rem;
+  padding: 1rem;
+  background-color: var(--bg-primary);
+  font-weight: bold;
+  border-bottom: 1px solid var(--border-color);
+  align-items: center;
+}
+
+.tableRow {
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr 1.5fr 120px 100px;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tableRow:last-child {
+  border-bottom: none;
+}
+
+.columnOrder {
+  display: flex;
+  justify-content: center;
+}
+
+.orderControls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.columnKey,
+.columnName,
+.columnDescription {
+  min-width: 0; /* Предотвращает выход за границы */
+}
+
+.columnKey input,
+.columnName input,
+.columnDescription input {
+  width: 100%;
+  min-width: 0; /* Позволяет input сжиматься */
+}
+
+.columnFiltered {
+  display: flex;
+  justify-content: center;
+}
+
+.columnActions {
+  display: flex;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.addAttribute {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+}
+
+.newAttributeForm {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+  .tableHeader,
+  .tableRow {
+    grid-template-columns: 60px 1fr 1fr;
+    gap: 0.25rem;
+    padding: 0.5rem;
+  }
+  
+  .columnDescription,
+  .columnFiltered {
+    display: none; /* Скрываем менее важные колонки на мобильных */
+  }
+  
+  .newAttributeForm {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  
+  .orderControls {
+    flex-direction: row;
+  }
+}

@@ -1,0 +1,107 @@
+.statusBadge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.progressSection {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1rem 0.5rem;
+}
+
+.progressBar {
+  flex: 1;
+  height: 6px;
+  background-color: var(--border-color, #e0e0e0);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progressFillCompleted {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background-color: var(--accent-color, #6c5ce7);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  z-index: 1;
+}
+
+.progressFillFailed {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background-color: var(--danger-color, #e74c3c);
+  border-radius: 3px;
+  transition: width 0.3s ease, left 0.3s ease;
+  z-index: 1;
+}
+
+.progressText {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  min-width: 2rem;
+  text-align: right;
+}
+
+.failedMarker {
+  color: var(--danger-color, #e74c3c);
+  font-size: 0.8rem;
+  margin-left: 0.25rem;
+}
+
+.assignedAvatars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0 1rem 0.5rem;
+}
+
+.avatarCircle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: var(--accent-color);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.rewardPreview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0 1rem 1rem;
+}
+
+.rewardTag {
+  display: inline-block;
+  background-color: var(--accent-color);
+  color: white;
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  opacity: 0.85;
+}

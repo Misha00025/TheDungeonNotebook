@@ -1,0 +1,19 @@
+.characterCard {
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.characterName {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.characterDescription {
+  margin: 0 0 1rem 0;
+  color: var(--text-secondary);
+  flex: 1;
+}

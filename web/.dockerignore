@@ -1,0 +1,23 @@
+# Зависимости
+node_modules
+**/node_modules
+
+# Сборки
+build
+**/build
+dist
+**/dist
+
+# TypeScript
+*.tsbuildinfo
+
+# Локальные env / конфиги
+.env
+.env.*
+config.*.json
+
+# Git / прочее
+.git
+.DS_Store
+plans
+docs

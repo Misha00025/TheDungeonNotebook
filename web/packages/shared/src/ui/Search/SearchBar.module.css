@@ -1,0 +1,127 @@
+/* components/SearchBar/SearchBar.module.css */
+.container {
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+.searchWrapper {
+  position: relative;
+  width: 100%;
+  transition: all 0.2s ease;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0.75rem 0;
+  padding-right: 2.5rem;
+  border: none;
+  background-color: transparent;
+  font-size: 1rem;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.searchInput:focus {
+  outline: none;
+}
+
+.searchInput::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.underline {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.searchWrapper:hover .underline {
+  background-color: var(--border-color-dark);
+}
+
+.searchWrapper.focused .underline {
+  height: 2px;
+  background-color: var(--accent-color);
+  transform: scaleY(1.2);
+}
+
+.searchWrapper.focused .searchInput {
+  color: var(--text-primary);
+}
+
+.clearButton {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.clearButton:hover {
+  opacity: 1;
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
+}
+
+.clearIcon {
+  display: block;
+  pointer-events: none;
+}
+
+/* Анимация для появления/скрытия кнопки очистки */
+.searchWrapper.hasText .clearButton {
+  opacity: 0.7;
+  transform: translateY(-50%) scale(1);
+}
+
+.searchWrapper:not(.hasText) .clearButton {
+  opacity: 0;
+  transform: translateY(-50%) scale(0.8);
+  pointer-events: none;
+}
+
+/* Эффект затемнения при наведении на всю область */
+.searchWrapper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: transparent;
+  border-radius: var(--border-radius-sm);
+  transition: background-color 0.2s ease;
+  pointer-events: none;
+}
+
+.searchWrapper:hover::before {
+  background-color: var(--bg-hover);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .searchInput {
+    font-size: 0.95rem;
+    padding: 0.625rem 0;
+    padding-right: 2.25rem;
+  }
+  
+  .clearButton {
+    right: 0.25rem;
+  }
+}

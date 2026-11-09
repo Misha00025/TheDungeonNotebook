@@ -1,0 +1,355 @@
+.viewHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.viewStatusBadge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.descriptionBlock {
+  padding: 1rem;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+  overflow: auto;
+}
+
+.descriptionCollapsed {
+  max-height: 120px;
+  overflow: hidden;
+  border-radius: var(--border-radius-md) var(--border-radius-md) 0 0;
+  -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+}
+
+.descriptionExpanded {
+  border-radius: var(--border-radius-md);
+}
+
+.descriptionExpandPlate {
+  text-align: center;
+  cursor: pointer;
+  padding: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  background-color: color-mix(in srgb, var(--bg-secondary) 20%, transparent);
+  border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
+  user-select: none;
+  transition: background-color 0.15s ease;
+  /* border-top: 1px solid var(--border-color); */
+}
+
+.descriptionExpandPlate:hover {
+  background-color: color-mix(in srgb, var(--bg-secondary) 85%, transparent);
+}
+
+.descriptionCollapseBtn {
+  font-size: 0.85rem;
+  color: var(--accent-color);
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  padding: 0.25rem 0 0;
+}
+
+.descriptionCollapseBtn:hover {
+  text-decoration: underline;
+}
+
+.objectivesSection {
+  margin-bottom: 1rem;
+}
+
+.objectiveRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 0.25rem;
+  font-size: 1.1rem;
+  background-color: var(--bg-secondary);
+  transition: padding 0.15s ease, font-size 0.15s ease;
+}
+
+.objectiveCompact {
+  padding: 0.3rem 0.75rem;
+  font-size: 1rem;
+}
+
+.objectiveCompact .objectiveText {
+  gap: 0.15rem;
+}
+
+.objectiveRow:last-child {
+  margin-bottom: 0;
+}
+
+.objectiveStatus_completed.objectiveRow {
+  background-color: rgba(39, 174, 96, 0.1);
+}
+.objectiveStatus_failed.objectiveRow {
+  background-color: rgba(231, 76, 60, 0.1);
+}
+.objectiveStatus_cancelled.objectiveRow {
+  background-color: rgba(128, 128, 128, 0.07);
+}
+
+.objectiveText {
+  flex: 1;
+}
+
+.objectiveStatus_pending {
+  color: var(--text-primary);
+}
+
+.objectiveStatus_completed {
+  color: var(--success-color, #27ae60);
+}
+
+.objectiveStatus_failed {
+  color: var(--danger-color, #e74c3c);
+}
+
+.objectiveStatus_cancelled {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.objectiveCancelled {
+  opacity: 0.6;
+}
+
+.objectiveSelect {
+  width: auto;
+  min-width: 130px;
+  flex-shrink: 0;
+  font-size: 1rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.rewardsSection {
+  margin-bottom: 1rem;
+}
+
+.rewardTag {
+  display: inline-block;
+  background-color: var(--accent-color);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--border-radius-sm);
+  font-size: 0.8rem;
+  margin: 0.2rem;
+  white-space: nowrap;
+}
+
+/* Edit mode styles */
+.editorContainer {
+  margin-bottom: 0.5rem;
+}
+
+.markdownHint {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.section {
+  background: var(--bg-secondary);
+  padding: 1rem;
+  border-radius: var(--border-radius-md);
+  margin-bottom: 1rem;
+}
+
+.section h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+}
+
+.rewardList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.rewardRemove {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-left: 0.3rem;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.rewardRemove:hover {
+  opacity: 1;
+}
+
+.rewardInputRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.objectiveItem {
+  margin-bottom: 0.5rem;
+}
+
+.removeBtn {
+  background: none;
+  border: none;
+  color: var(--danger-color);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.characterList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.characterListItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  font-size: 1rem;
+}
+
+.characterRemoveBtn {
+  background: none;
+  border: none;
+  color: var(--danger-color);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.characterRemoveBtn:hover {
+  opacity: 1;
+}
+
+.noCharacters {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.completedToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.25rem;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  background-color: var(--bg-secondary);
+  user-select: none;
+  transition: background-color 0.15s ease;
+}
+
+.completedToggle:hover {
+  background-color: var(--border-color);
+}
+
+.completedToggle span:first-child {
+  font-size: 0.7rem;
+  width: 12px;
+  text-align: center;
+}
+
+.addObjectiveRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 0.25rem;
+  font-size: 1rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border: 1px dashed var(--border-color);
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+  user-select: none;
+}
+
+.addObjectiveRow:hover {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+  background-color: var(--bg-secondary);
+}
+
+.addObjectiveIcon {
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.objectivePlaceholder {
+  opacity: 0.4;
+  font-style: italic;
+}
+
+.addDescriptionPlaceholder {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: var(--border-radius-md);
+  border: 1px dashed var(--border-color);
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+  user-select: none;
+}
+
+.addDescriptionPlaceholder:hover {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+  background-color: var(--bg-secondary);
+}
+
+.descriptionEditBtnWrapper {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.descriptionEditBtnWrapper:hover {
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .objectiveRow {
+    flex-wrap: wrap;
+  }
+
+  .objectiveText {
+    flex-wrap: wrap;
+  }
+}

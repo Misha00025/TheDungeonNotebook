@@ -1,0 +1,62 @@
+/* src/components/common/CollapsibleGroup/CollapsibleGroup.module.css */
+.container {
+  margin-bottom: 0.5rem;
+}
+
+.header {
+  padding: 0.75rem 0 0.5rem 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.header:hover {
+  border-bottom-color: var(--border-color-dark);
+}
+
+.groupName {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.rootGroupName {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.caret {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  transition: transform 0.2s ease;
+  display: inline-block;
+  min-width: 16px;
+}
+
+.caretCollapsed {
+  transform: rotate(-90deg);
+}
+
+.content {
+  margin-top: 0.5rem;
+}
+
+.itemsContainer {
+  margin-bottom: 1rem;
+  padding-left: 16px; /* Отступ для элементов внутри группы */
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .rootGroupName {
+    font-size: 1.2rem;
+  }
+  
+  .groupName {
+    font-size: 1rem;
+  }
+}

@@ -1,0 +1,129 @@
+/* components/UsersManagement/CharacterUsersTable.module.css */
+.characterUsersTable {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+}
+
+.table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tableRow {
+  display: table-row;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tableRow:last-child {
+  border-bottom: none;
+}
+
+.characterCell {
+  display: table-cell;
+  padding: 1rem;
+  vertical-align: top;
+  width: 200px;
+  border-right: 1px solid var(--border-color);
+}
+
+.usersCell {
+  display: table-cell;
+  padding: 1rem;
+  vertical-align: top;
+  flex: 1;
+}
+
+.actionsCell {
+  display: table-cell;
+  padding: 1rem;
+  vertical-align: top;
+  width: 300px;
+}
+
+.addForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.select {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  width: 100%;
+}
+
+.formActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.formActions button {
+  flex: 1;
+}
+
+.addNewCharacter {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: var(--bg-primary);
+  border-radius: var(--border-radius-md);
+}
+
+.addNewCharacter h4 {
+  margin: 0 0 1rem 0;
+}
+
+.error {
+  color: var(--danger-color);
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background-color: rgba(248, 11, 11, 0.1);
+  border-radius: var(--border-radius-sm);
+}
+
+.success {
+  color: green;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background-color: rgba(0, 255, 0, 0.1);
+  border-radius: var(--border-radius-sm);
+}
+
+@media (max-width: 768px) {
+  .table {
+    display: block;
+  }
+  
+  .tableRow {
+    display: block;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background-color: var(--bg-primary);
+    border-radius: var(--border-radius-md);
+  }
+  
+  .characterCell,
+  .usersCell,
+  .actionsCell {
+    display: block;
+    width: 100%;
+    border: none;
+    padding: 0.5rem 0;
+  }
+  
+  .characterCell {
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+  }
+  
+  .addForm {
+    margin-top: 1rem;
+  }
+}

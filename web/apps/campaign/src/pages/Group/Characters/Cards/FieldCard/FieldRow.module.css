@@ -1,0 +1,56 @@
+.row {
+  composes: row from '@tdn/shared/styles/character-table.module.css';
+}
+
+.row[draggable="true"]:hover {
+  background-color: color-mix(in srgb, var(--accent-color) 10%, transparent);
+}
+
+.row.dragging {
+  opacity: 0.5;
+  background-color: color-mix(in srgb, var(--accent-color) 20%, transparent);
+}
+
+.nameCell {
+  composes: nameCell from '@tdn/shared/styles/character-table.module.css';
+}
+
+.nameContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fieldName {
+  composes: fieldName from '@tdn/shared/styles/character-table.module.css';
+}
+
+.valueCell {
+  composes: valueCell from '@tdn/shared/styles/character-table.module.css';
+}
+
+.value {
+  min-height: 1rem;
+}
+
+.editableValue {
+  composes: editableValue from '@tdn/shared/styles/character-table.module.css';
+}
+
+.editInput {
+  composes: editInput from '@tdn/shared/styles/character-table.module.css';
+}
+
+.progressContainer {
+  composes: progressContainer from '@tdn/shared/styles/character-table.module.css';
+}
+
+.progressBar {
+  composes: progressBar from '@tdn/shared/styles/character-table.module.css';
+}
+
+.progressText {
+  composes: progressText from '@tdn/shared/styles/character-table.module.css';
+}
+

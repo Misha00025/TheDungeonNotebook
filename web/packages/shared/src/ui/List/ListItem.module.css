@@ -1,0 +1,20 @@
+.listItem {
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+  padding: 1rem;
+  transition: var(--transition);
+}
+
+.listItem.clickable {
+  cursor: pointer;
+}
+
+.listItem.clickable:hover {
+  background-color: var(--bg-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.listItem.clickable:active {
+  transform: translateY(0);
+}

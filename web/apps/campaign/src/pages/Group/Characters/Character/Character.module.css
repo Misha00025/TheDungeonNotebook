@@ -1,0 +1,50 @@
+.fields {
+  margin-top: 2rem;
+}
+
+.error {
+  color: var(--danger-color);
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background-color: color-mix(in srgb, var(--danger-color) 10%, transparent);
+  border-radius: var(--border-radius-sm);
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* CharacterViewSwitcher.module.css */
+.viewHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.viewSwitcher {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.viewButton {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  height: 3rem;
+  width: 3rem;
+  font-size: 1.2rem;
+}
+
+.viewButton:hover {
+  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+}
+
+.viewButton.active {
+  background: var(--accent-color);
+  color: var(--text-on-accent, #ffffff);
+}

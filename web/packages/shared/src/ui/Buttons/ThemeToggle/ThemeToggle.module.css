@@ -1,0 +1,43 @@
+.toggle {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.35rem 0.5rem;
+    border-radius: var(--border-radius-sm);
+    transition: var(--transition);
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toggle:hover {
+    opacity: 0.8;
+    transform: scale(1.1);
+}
+
+/* Кнопка темы в свёрнутом рейле — маленькая и ненавязчивая:
+   ~34×34 (меньше пунктов навигации), без акцентного фона, приглушённый
+   цвет. Не должна перетягивать внимание. */
+.toggleRail {
+    width: 34px;
+    height: 34px;
+    font-size: 14px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    cursor: pointer;
+    border-radius: 10px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, opacity 0.2s;
+}
+
+.toggleRail:hover {
+    background: var(--bg-hover);
+    opacity: 1;
+}

@@ -1,0 +1,203 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal {
+  background-color: var(--bg-primary);
+  padding: 2rem;
+  border-radius: var(--border-radius-md);
+  width: 90%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.modalBody {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  margin: 0 -0.25rem;
+  padding: 0 0.25rem;
+}
+
+.formGroup {
+  margin-bottom: 1rem;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+.error {
+  color: red;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background-color: #ffeeee;
+  border-radius: var(--border-radius-sm);
+}
+
+.buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.topPanel {
+  flex-shrink: 0;
+  margin-bottom: 1rem;
+}
+
+.helpText {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+.iconSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.iconPreview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.iconImage {
+  max-width: 100px;
+  max-height: 100px;
+  border-radius: var(--border-radius-sm);
+}
+
+.iconPlaceholder {
+  padding: 0.5rem 1rem;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.fileInput {
+  padding: 0.5rem;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  color: var(--text-primary);
+}
+
+.uploadStatus {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.readOnlyField {
+  padding: 0.5rem;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  color: var(--text-primary);
+}
+
+.attributesSection {
+  margin: 2rem 0;
+  padding: 1rem;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+}
+
+.attributeItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  background-color: var(--bg-primary);
+  border-radius: var(--border-radius-sm);
+}
+
+.attributeContent {
+  flex: 1;
+}
+
+.attributeHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.attributeName {
+  font-weight: bold;
+}
+
+.addAttribute {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.attributeActions {
+  margin-top: 1rem;
+}
+
+.attributeValueContainer {
+  display: flex;
+  width: 100%;
+}
+
+.customInputContainer {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  align-items: center;
+}
+
+.customInputContainer input {
+  flex: 1;
+}
+
+.customInputContainer button {
+  padding: 0.25rem 0.5rem;
+  height: auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .modal {
+    padding: 1rem;
+    width: 95%;
+  }
+
+  .buttons {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .buttons > * {
+    flex: 1;
+    min-width: 0;
+  }
+}

@@ -1,0 +1,75 @@
+/* components/Views/CharacterTableView/CategoryTable.module.css */
+.tableView {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  row-gap: 0.5rem;
+  column-gap: 0.5rem;
+}
+
+.categorySection {
+  margin-bottom: 0;
+  background: var(--bg-primary);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  transition: all 0.3s ease;
+  min-height: 100px;
+}
+
+.categorySection.subcategory {
+  margin-bottom: 0.25rem;
+  border: 0px;
+}
+
+.categorySection.dragOver {
+  background-color: color-mix(in srgb, var(--accent-color) 15%, transparent);
+  border: 2px dashed var(--accent-color);
+  transform: scale(1.02);
+}
+
+.categoryTitle {
+  composes: sectionTitle from '@tdn/shared/styles/character-table.module.css';
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+
+.categorySection.dragOver .categoryTitle {
+  background-color: color-mix(in srgb, var(--accent-color) 80%, #ff9800);
+}
+
+.titleCenter {
+  flex: 1;
+  text-align: center;
+}
+
+.addButtonContainer {
+  position: absolute;
+  right: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.table {
+  composes: table from '@tdn/shared/styles/character-table.module.css';
+}
+
+.dragging {
+  opacity: 0.5;
+}
+
+/* Мобильная версия */
+@media (max-width: 768px) {
+  .tableView {
+    gap: 0.75rem;
+  }
+  
+  .categorySection {
+    padding: 0.75rem;
+  }
+  
+  .categorySection.subcategory {
+    padding-left: 0.5rem;
+  }
+}

@@ -1,0 +1,21 @@
+.itemPrice {
+  margin: 0.5rem 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.selectedItem {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+  border: 2px solid var(--accent-color);
+}
+
+.selectedItem h3 {
+  margin-bottom: 0.5rem;
+  color: var(--accent-color);
+}
+
+

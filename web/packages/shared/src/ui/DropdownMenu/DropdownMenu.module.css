@@ -1,0 +1,102 @@
+/* components/commons/DropdownMenu/DropdownMenu.module.css */
+.dropdownMenu {
+    position: relative;
+    display: inline-block;
+  }
+  
+  .menuButton {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--border-radius-sm);
+    line-height: 1;
+    min-width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .menuButton:hover:not(:disabled) {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+  }
+  
+  .menuButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .menu {
+    position: absolute;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    min-width: 180px;
+    overflow: hidden;
+    margin-top: 0.25rem;
+  }
+  
+  .menu.align-right {
+    right: 0;
+  }
+  
+  .menu.align-left {
+    left: 0;
+  }
+  
+  .menu.position-top {
+    bottom: 100%;
+    top: auto;
+    margin-top: 0;
+    margin-bottom: 0.25rem;
+  }
+  
+  .menu.position-bottom {
+    top: 100%;
+    bottom: auto;
+  }
+  
+  .menuItem {
+    width: 100%;
+    padding: 0.5rem 1rem;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    transition: background-color 0.2s ease;
+  }
+  
+  .menuItem:hover:not(.disabled) {
+    background-color: var(--bg-primary);
+  }
+  
+  .menuItem.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .menuItem.variant-danger {
+    color: var(--danger-color, #dc3545);
+  }
+  
+  .menuItem.variant-danger:hover:not(.disabled) {
+    background-color: color-mix(in srgb, var(--danger-color, #dc3545) 10%, transparent);
+    color: var(--danger-color, #dc3545);
+  }
+  
+  .menuIcon {
+    font-size: 0.9rem;
+    width: 16px;
+    text-align: center;
+  }

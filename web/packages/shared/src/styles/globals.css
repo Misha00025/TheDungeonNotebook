@@ -1,0 +1,306 @@
+:root {
+    /* Общие переменные */
+    --border-radius-sm: 4px;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+    --transition: all 0.3s ease;
+    --text-on-accent: #ffffff;
+    --text-shadow: none;
+    --progress-bar-from: #e53935;
+    --progress-bar-to: #66bb6a;
+
+    /* Каркас боковой панели (тикет #36) */
+    --rail-width: 60px;
+    --drawer-width: 300px;
+    --topbar-height: 52px;
+
+    /* Hover/active — производные от текста, а не от чёрного фолбэка.
+       Раньше --bg-hover/--bg-active нигде не были объявлены, поэтому
+       в тёмных темах hover/active получались чёрными и почти невидимыми.
+       color-mix резолвит var(--text-primary) в контексте элемента-потребителя,
+       поэтому работает в любой теме. */
+    --bg-hover: color-mix(in srgb, var(--text-primary) 8%, transparent);
+    --bg-active: color-mix(in srgb, var(--text-primary) 14%, transparent);
+  }
+  
+
+/* Чистая тема */
+[data-theme="clean"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --text-primary: #000000;
+  --text-secondary: #555555;
+  --accent-color: #2c2c2c;
+  --border-color: #d0d0d0;
+  --danger-color: #d93025;
+  --text-on-accent: #ffffff;
+  --text-shadow: none;
+  --progress-bar-from: #e53935;
+  --progress-bar-to: #66bb6a;
+}
+
+  /* Тёмная тема (нейтральная) */
+  [data-theme="dark"] {
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2d2d2d;
+    --text-primary: #ffffff;
+    --text-secondary: #aaaaaa;
+    --accent-color: #545454;
+    --border-color: #444444;
+    --danger-color: #c00000;
+    --text-on-accent: #ffffff;
+    --text-shadow: 0 0 2px rgba(0, 0, 0, 1);
+    --progress-bar-from: #e53935;
+    --progress-bar-to: #43a047;
+  }
+
+  /* Базовые стили */
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    transition: var(--transition);
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  }
+
+  /* Стили для формы */
+  .form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 400px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background-color: var(--bg-secondary);
+    border-radius: var(--border-radius-md);
+  }
+
+html, body {
+  overflow-x: clip;
+  max-width: 100%;
+  width: 100%;
+}
+
+/* Рабочая область приложения (обёртка <main>).
+   ПК: занимает остаток окна справа от постоянного рейла.
+   Мобильный: рейл скрыт, сверху липкая плашка — контент получает padding-top. */
+.app-content {
+  padding: 20px;
+  margin-left: var(--rail-width);
+}
+
+@media (max-width: 768px) {
+  .app-content {
+    margin-left: 0;
+    padding-top: calc(var(--topbar-height) + 16px);
+  }
+}
+
+.container {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Предотвращаем выход контента за пределы экрана */
+* {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+/* Исправления для GroupSection */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+    width: 100%;
+    overflow-x: hidden;
+  }
+  
+  /* Убедитесь, что отступы не создают горизонтальную прокрутку */
+  .group-section {
+    margin-left: 0 !important;
+    padding: 0 10px;
+  }
+  
+  /* Исправления для SkillCard */
+  .skillCard {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  
+  .attributesPreview {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  
+  .attributeTag {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
+  }
+}
+
+/* Океан */
+[data-theme="ocean"] {
+  --bg-primary: #e8f4f8;
+  --bg-secondary: #b8d4e8;
+  --text-primary: #1a3a4a;
+  --text-secondary: #4a6a7a;
+  --accent-color: #2e86ab;
+  --border-color: #8ab4c8;
+  --danger-color: #c0392b;
+  --text-on-accent: #ffffff;
+  --text-shadow: none;
+  --progress-bar-from: #e53935;
+  --progress-bar-to: #66bb6a;
+}
+
+/* Лес */
+[data-theme="forest"] {
+  --bg-primary: #eaf7e1;
+  --bg-secondary: #c5dfb0;
+  --text-primary: #2d3e1f;
+  --text-secondary: #5a7050;
+  --accent-color: #4a7c3f;
+  --border-color: #a0b88a;
+  --danger-color: #a33b20;
+  --text-on-accent: #ffffff;
+  --text-shadow: none;
+  --progress-bar-from: #e53935;
+  --progress-bar-to: #66bb6a;
+}
+
+/* Закат */
+[data-theme="sunset"] {
+  --bg-primary: #fdf0e0;
+  --bg-secondary: #f5d4b8;
+  --text-primary: #4a2512;
+  --text-secondary: #7a5540;
+  --accent-color: #c96b3e;
+  --border-color: #d4a88a;
+  --danger-color: #b83030;
+  --text-on-accent: #ffffff;
+  --text-shadow: none;
+  --progress-bar-from: #e53935;
+  --progress-bar-to: #66bb6a;
+}
+
+/* Лаванда */
+[data-theme="lavender"] {
+  --bg-primary: #f3eef9;
+  --bg-secondary: #ddd0ef;
+  --text-primary: #2e1a47;
+  --text-secondary: #5e4a77;
+  --accent-color: #7a4fa0;
+  --border-color: #b8a0d0;
+  --danger-color: #a04060;
+  --text-on-accent: #ffffff;
+  --text-shadow: none;
+  --progress-bar-from: #e53935;
+  --progress-bar-to: #66bb6a;
+}
+
+/* Тёмный лес (теперь как нейтральная тёмная) */
+[data-theme="forest-dark"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --accent-color: #4aa334;
+  --border-color: #444444;
+  --danger-color: #c00000;
+  --text-on-accent: #ffffff;
+  --text-shadow: 0 0 2px rgba(0, 0, 0, 1);
+  --progress-bar-from: #e53935;
+  --progress-bar-to: #43a047;
+}
+
+/* Тёмный океан */
+[data-theme="ocean-dark"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --text-primary: #d0e4f0;
+  --text-secondary: #90b0c8;
+  --accent-color: #3a9ec4;
+  --border-color: #2a4a60;
+  --danger-color: #c0392b;
+  --text-on-accent: #ffffff;
+  --text-shadow: 0 0 2px rgba(0, 0, 0, 1);
+  --progress-bar-from: #e53935;
+  --progress-bar-to: #43a047;
+}
+
+/* Тёмный закат */
+[data-theme="sunset-dark"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --text-primary: #f0ddd0;
+  --text-secondary: #c0a090;
+  --accent-color: #d08040;
+  --border-color: #5a3a2a;
+  --danger-color: #b83030;
+  --text-on-accent: #ffffff;
+  --text-shadow: 0 0 2px rgba(0, 0, 0, 1);
+  --progress-bar-from: #e53935;
+  --progress-bar-to: #43a047;
+}
+
+/* Тёмная лаванда */
+[data-theme="lavender-dark"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --text-primary: #ddd0f0;
+  --text-secondary: #a090c0;
+  --accent-color: #9060c0;
+  --border-color: #4a3a6a;
+  --danger-color: #b04070;
+  --text-on-accent: #ffffff;
+  --text-shadow: 0 0 2px rgba(0, 0, 0, 1);
+  --progress-bar-from: #e53935;
+  --progress-bar-to: #43a047;
+}
+
+/* === Markdown Editor - тёмная тема === */
+[data-color-mode="dark"] .w-md-editor,
+[data-color-mode="dark"] .wmde-markdown,
+[data-color-mode="dark"] .wmde-markdown-var {
+  --color-canvas-default: var(--bg-primary) !important;
+  --color-canvas-subtle: var(--bg-secondary) !important;
+  --color-border-default: var(--border-color) !important;
+  --color-border-muted: var(--border-color) !important;
+  --color-fg-default: var(--text-primary) !important;
+  --color-fg-muted: var(--text-secondary) !important;
+  --color-fg-subtle: var(--text-secondary) !important;
+  --color-neutral-muted: rgba(128, 128, 128, 0.15) !important;
+  --color-accent-fg: var(--accent-color) !important;
+  --color-accent-emphasis: var(--accent-color) !important;
+  --color-prettylights-syntax-comment: var(--text-secondary) !important;
+  --color-prettylights-syntax-constant: var(--accent-color) !important;
+  --color-prettylights-syntax-entity: var(--accent-color) !important;
+  --color-prettylights-syntax-keyword: var(--danger-color) !important;
+  --color-prettylights-syntax-string: var(--accent-color) !important;
+  --color-prettylights-syntax-variable: var(--text-primary) !important;
+  --color-prettylights-syntax-markup-heading: var(--accent-color) !important;
+  --color-prettylights-syntax-markup-bold: var(--text-primary) !important;
+  --md-editor-background-color: var(--bg-primary) !important;
+  --md-editor-box-shadow-color: var(--border-color) !important;
+}
+
+/* === Markdown Editor - светлая тема === */
+[data-color-mode="light"] .w-md-editor,
+[data-color-mode="light"] .wmde-markdown,
+[data-color-mode="light"] .wmde-markdown-var {
+  --color-canvas-default: var(--bg-primary) !important;
+  --color-canvas-subtle: var(--bg-secondary) !important;
+  --color-border-default: var(--border-color) !important;
+  --color-border-muted: var(--border-color) !important;
+  --color-fg-default: var(--text-primary) !important;
+  --color-fg-muted: var(--text-secondary) !important;
+  --color-fg-subtle: var(--text-secondary) !important;
+  --color-neutral-muted: rgba(128, 128, 128, 0.15) !important;
+  --color-accent-fg: var(--accent-color) !important;
+  --color-accent-emphasis: var(--accent-color) !important;
+  --md-editor-background-color: var(--bg-primary) !important;
+  --md-editor-box-shadow-color: var(--border-color) !important;
+}

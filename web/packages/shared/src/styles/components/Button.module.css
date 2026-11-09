@@ -1,0 +1,20 @@
+  .button {
+      border-radius: var(--border-radius-lg);
+      padding: 0.75rem 1.5rem;
+      border: none;
+      background-color: var(--accent-color);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: small;
+    }
+    
+  .button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+
+  .button:active {
+    transform: translateY(0);
+  }
