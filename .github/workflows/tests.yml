@@ -4,17 +4,17 @@ on:
   push:
     branches: [master]
     paths:
-      - 'backend/api-gateway/**'
-      - 'backend/auth-service/**'
-      - 'backend/users-service/**'
-      - 'backend/campaign-service/**'
+      - 'apps/backend/api-gateway/**'
+      - 'apps/backend/auth-service/**'
+      - 'apps/backend/users-service/**'
+      - 'apps/backend/campaign-service/**'
   pull_request:
     branches: [master]
     paths:
-      - 'backend/api-gateway/**'
-      - 'backend/auth-service/**'
-      - 'backend/users-service/**'
-      - 'backend/campaign-service/**'
+      - 'apps/backend/api-gateway/**'
+      - 'apps/backend/auth-service/**'
+      - 'apps/backend/users-service/**'
+      - 'apps/backend/campaign-service/**'
 
 jobs:
   dotnet-build:
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - run: dotnet build backend/${{ matrix.service }}
+      - run: dotnet build apps/backend/${{ matrix.service }}
 
   integration-tests:
     needs: [dotnet-build]
@@ -40,4 +40,4 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run integration tests
-        run: cd backend/tests && bash test-ci.sh -c
+        run: cd apps/backend/tests && bash test-ci.sh -c

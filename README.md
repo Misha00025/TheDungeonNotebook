@@ -2,6 +2,10 @@
 
 Лучшая записная книжка любителя подземелий и других приключенческих штук :)
 
+## Структура репозитория
+
+Каталоги `admin`, `backend` и `web` расположены в `apps/`. Makefile и инфраструктурные каталоги остаются в корне; npm workspace по-прежнему находится во внутреннем каталоге `apps/web`.
+
 ## Сборка Docker-образов
 
 `make build` собирает все 12 образов; `SERVICE=<name>` выбирает один образ из списка `make list-images`. Группы доступны через `make build-backend` (шесть backend-образов), `make build-web` (пять web-образов) и `make build-admin` (admin-panel). `make help` выводит краткую справку.
@@ -20,10 +24,10 @@ make list-images
 ## Подготовка и запуск
 
 ```bash
-cp template.env backend/.env
-cp web/template.env web/.env
+cp template.env apps/backend/.env
+cp apps/web/template.env apps/web/.env
 make certs
-npm ci --prefix web
+npm ci --prefix apps/web
 make check-web
 make run-backend
 make run-web
@@ -48,6 +52,12 @@ make web-build
 make check-web
 make clean
 cd monitoring && docker compose up -d
+```
+
+Восстановление из существующей резервной копии (из корня репозитория):
+
+```bash
+(cd apps/backend && ../../scripts/restore.sh -f docker-compose.yaml -b /path/to/backup)
 ```
 
 ## API

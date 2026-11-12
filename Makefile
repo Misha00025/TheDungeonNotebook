@@ -10,7 +10,7 @@ BUILD_FLAGS ?=
 IMAGE_TAG ?= latest
 export IMAGE_TAG
 IMAGE_SERVICES := api-gateway auth-service users-service campaign-service game-systems-service sync-service admin-panel web-hub web-campaign web-profile web-login web-game-systems
-WEB_BUILD_ENV_FILE := $(if $(filter /%,$(WEB_BUILD_ENV)),$(WEB_BUILD_ENV),web/$(WEB_BUILD_ENV))
+WEB_BUILD_ENV_FILE := $(if $(filter /%,$(WEB_BUILD_ENV)),$(WEB_BUILD_ENV),apps/web/$(WEB_BUILD_ENV))
 
 ifneq ($(strip $(SERVICE)),)
 ifneq ($(words $(SERVICE)),1)
@@ -23,7 +23,7 @@ endif
 
 # Интеграционные тесты
 test:
-	cd backend/tests && ./test.sh 5
+	cd apps/backend/tests && ./test.sh 5
 
 # Изолированные сборки образов (не запускают контейнеры).
 build: $(if $(strip $(SERVICE)),build-$(SERVICE),build-all)
@@ -77,37 +77,36 @@ help:
 run: run-backend run-web
 
 run-backend:
-	cd backend && docker compose up -d
+	cd apps/backend && docker compose up -d
 
 run-web:
-	cd web && docker compose --env-file "$(WEB_BUILD_ENV)" up -d
+	cd apps/web && docker compose --env-file "$(WEB_BUILD_ENV)" up -d
 
 web-install:
-	cd web && npm ci
+	cd apps/web && npm ci
 
 web-typecheck:
-	cd web && npm run typecheck --workspaces --if-present
+	cd apps/web && npm run typecheck --workspaces --if-present
 
 web-test:
-	cd web && npm run test:run
+	cd apps/web && npm run test:run
 
 web-build:
-	cd web && npm run build --workspaces --if-present
+	cd apps/web && npm run build --workspaces --if-present
 
 check-web: web-typecheck web-test web-build
 
 test-web: web-test
 
-# Генерация RSA-ключей (2048 bit) для JWT в backend/certs/
 certs:
-	@mkdir -p backend/certs
-	@openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out backend/certs/private.pem
-	@openssl pkey -in backend/certs/private.pem -pubout -out backend/certs/public.pem
+	@mkdir -p apps/backend/certs
+	@openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out apps/backend/certs/private.pem
+	@openssl pkey -in apps/backend/certs/private.pem -pubout -out apps/backend/certs/public.pem
 
 # Очистка данных базы (MongoDB и MySQL) с подтверждением
 clean:
 	@read -p "Are you sure? [y/N] " answer && \
 	case $$answer in \
-		[yY]*) sudo rm -rf backend/mongo_data backend/mysql_data ;; \
+		[yY]*) sudo rm -rf apps/backend/mongo_data apps/backend/mysql_data ;; \
 		*) echo "Aborted." && exit 1 ;; \
 	esac

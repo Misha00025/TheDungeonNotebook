@@ -6,4 +6,4 @@
 make build-users-service
 ```
 
-[Публичная HTML-документация API](../../docs/api/users.html)
+[Публичная HTML-документация API](../../../docs/api/users.html)

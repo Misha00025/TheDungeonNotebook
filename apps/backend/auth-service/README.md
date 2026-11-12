@@ -6,4 +6,4 @@
 make build-auth-service
 ```
 
-[Публичная HTML-документация API](../../docs/api/auth.html)
+[Публичная HTML-документация API](../../../docs/api/auth.html)

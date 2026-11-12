@@ -2,8 +2,6 @@
 set -euo pipefail
 
 # Restore MySQL databases from a single dump file or full backup directory (MySQL + MongoDB).
-# Usage: cd backend && ../scripts/restore.sh -f docker-compose.yaml -d <dump-file>
-#        cd backend && ../scripts/restore.sh -f docker-compose.yaml -b <backup-dir>
 
 COMPOSE_FILE=""
 DUMP=""

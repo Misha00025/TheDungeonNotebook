@@ -92,7 +92,7 @@ services:
 
   campaign-service:
     build:
-      context: ./backend
+      context: .
       dockerfile: campaign-service/Dockerfile
     container_name: campaign-service
     depends_on:
@@ -126,7 +126,7 @@ services:
       - ./.env
     volumes:
       - ./certs:/certs:ro
-      - ../logs:/app/logs
+      - ../../logs:/app/logs
 
 networks:
   backend-network:

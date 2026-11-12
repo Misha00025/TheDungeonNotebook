@@ -7,8 +7,8 @@ Web workspace использует Vite, React и TypeScript с npm workspaces.
 Все команды можно запускать из корня монорепозитория:
 
 ```bash
-cp web/template.env web/.env
-npm ci --prefix web
+cp apps/web/template.env apps/web/.env
+npm ci --prefix apps/web
 make check-web
 make web-install
 make web-typecheck
@@ -16,12 +16,12 @@ make web-test
 make web-build
 ```
 
-Доступны также `npm --prefix web run typecheck --workspaces --if-present`, `npm --prefix web run test:run` и `npm --prefix web run build --workspaces --if-present`. `make web-test` и `make test-web` запускают web tests. `make check-web` выполняет typecheck, тесты и сборку.
+Доступны также `npm --prefix apps/web run typecheck --workspaces --if-present`, `npm --prefix apps/web run test:run` и `npm --prefix apps/web run build --workspaces --if-present`. `make web-test` и `make test-web` запускают web tests. `make check-web` выполняет typecheck, тесты и сборку.
 
 ## Сборка и запуск в Docker
 
 ```bash
-cp web/template.env web/.env
+cp apps/web/template.env apps/web/.env
 make build-web
 make run-web
 make build-web WEB_BUILD_ENV=.env.build
@@ -31,4 +31,4 @@ make build-web WEB_BUILD_ENV=.env.build
 
 ## Документация API
 
-[Публичная HTML-документация](../docs/api/index.html)
+[Публичная HTML-документация](../../docs/api/index.html)

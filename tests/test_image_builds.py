@@ -26,6 +26,28 @@ IMAGE_REPOSITORIES = {
     "web-login": "tdn-login",
     "web-game-systems": "tdn-game-systems",
 }
+BUILD_CONTEXTS = {
+    "api-gateway": ("apps/backend/api-gateway", "Dockerfile"),
+    "auth-service": ("apps/backend/auth-service", "Dockerfile"),
+    "users-service": ("apps/backend/users-service", "Dockerfile"),
+    "campaign-service": ("apps/backend", "campaign-service/Dockerfile"),
+    "game-systems-service": ("apps/backend", "game-systems-service/Dockerfile"),
+    "sync-service": ("apps/backend/sync-service", "Dockerfile"),
+    "admin-panel": ("apps/admin", "Dockerfile"),
+    "web-hub": ("apps/web", "apps/hub/Dockerfile"),
+    "web-campaign": ("apps/web", "apps/campaign/Dockerfile"),
+    "web-profile": ("apps/web", "apps/profile/Dockerfile"),
+    "web-login": ("apps/web", "apps/login/Dockerfile"),
+    "web-game-systems": ("apps/web", "apps/game-systems/Dockerfile"),
+}
+
+
+class RepositoryLayoutTests(unittest.TestCase):
+    def test_application_directories_are_under_apps(self):
+        for name in ("admin", "backend", "web"):
+            with self.subTest(name=name):
+                self.assertFalse((ROOT / name).exists())
+                self.assertTrue((ROOT / "apps" / name).is_dir())
 
 
 class ImageBuildComposeConfigTests(unittest.TestCase):
@@ -46,7 +68,7 @@ class ImageBuildComposeConfigTests(unittest.TestCase):
         if tag is not None:
             env["IMAGE_TAG"] = tag
         result = subprocess.run(
-            [self.docker, "compose", "--env-file", "web/template.env.build", "-f",
+            [self.docker, "compose", "--env-file", "apps/web/template.env.build", "-f",
              "docker-compose.build.yaml", "config", "--format", "json"],
             cwd=ROOT, env=env, capture_output=True, text=True, check=False,
         )
@@ -74,6 +96,38 @@ class ImageBuildComposeConfigTests(unittest.TestCase):
             with self.subTest(tag=tag):
                 self.assert_config_tags(tag)
 
+    def test_build_contexts_and_dockerfiles_match_layout(self):
+        services = self.config()["services"]
+        self.assertEqual(set(BUILD_CONTEXTS), set(services))
+        for service_name, (relative_context, expected_dockerfile) in BUILD_CONTEXTS.items():
+            with self.subTest(service=service_name):
+                build = services[service_name]["build"]
+                context = Path(build["context"])
+                self.assertEqual(context.resolve(), (ROOT / relative_context).resolve())
+                self.assertTrue(context.is_dir())
+                self.assertEqual(build.get("dockerfile", "Dockerfile"), expected_dockerfile)
+                self.assertTrue((context / expected_dockerfile).is_file())
+
+    def test_backend_runtime_compose_config_uses_migrated_paths(self):
+        result = subprocess.run(
+            [self.docker, "compose", "--env-file", str(ROOT / "template.env"), "-f",
+             str(ROOT / "apps/backend/docker-compose.yaml"), "config",
+             "--no-env-resolution", "--format", "json"],
+            cwd=ROOT, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        config = json.loads(result.stdout)
+        services = config["services"]
+        campaign_build = services["campaign-service"]["build"]
+        self.assertEqual(Path(campaign_build["context"]).resolve(), (ROOT / "apps/backend").resolve())
+        self.assertEqual(campaign_build["dockerfile"], "campaign-service/Dockerfile")
+        logs_volume = next(
+            volume for volume in services["api-gateway"]["volumes"]
+            if volume.get("target") == "/app/logs"
+        )
+        self.assertEqual(Path(logs_volume["source"]).resolve(), (ROOT / "logs").resolve())
+        self.assertEqual(config["networks"]["backend-network"]["name"], "backend_backend-network")
+
 
 class ImageBuildMakeTests(unittest.TestCase):
     def setUp(self):
@@ -86,7 +140,7 @@ class ImageBuildMakeTests(unittest.TestCase):
             "#!/usr/bin/env python3\n"
             "import json, os, sys\n"
             "with open(os.environ['DOCKER_LOG'], 'a') as log:\n"
-            " log.write(json.dumps({'argv': sys.argv[1:], 'image_tag': os.environ.get('IMAGE_TAG')}) + '\\n')\n"
+            " log.write(json.dumps({'argv': sys.argv[1:], 'image_tag': os.environ.get('IMAGE_TAG'), 'cwd': os.getcwd()}) + '\\n')\n"
         )
         docker.chmod(0o755)
         self.env = os.environ.copy()
@@ -163,12 +217,12 @@ class ImageBuildMakeTests(unittest.TestCase):
 
     def test_web_env_default_relative_and_absolute(self):
         call = self.assert_build_services(["build", "SERVICE=web-hub"], ["web-hub"])
-        self.assertEqual(call["argv"][call["argv"].index("--env-file") + 1], "web/template.env.build")
+        self.assertEqual(call["argv"][call["argv"].index("--env-file") + 1], "apps/web/template.env.build")
         self.log.unlink()
         call = self.assert_build_services(
             ["build", "SERVICE=web-login", "WEB_BUILD_ENV=.env.build"], ["web-login"]
         )
-        self.assertEqual(call["argv"][call["argv"].index("--env-file") + 1], "web/.env.build")
+        self.assertEqual(call["argv"][call["argv"].index("--env-file") + 1], "apps/web/.env.build")
         self.log.unlink()
         absolute = str(self.directory / "params with spaces.env")
         call = self.assert_build_services(
@@ -188,6 +242,22 @@ class ImageBuildMakeTests(unittest.TestCase):
             ["build", "SERVICE=auth-service"], ["auth-service"], env={"IMAGE_TAG": "from-env"}
         )
         self.assertEqual(call["image_tag"], "from-env")
+
+    def test_run_targets_use_migrated_working_directories(self):
+        backend = self.make("run-backend")
+        self.assertEqual(backend.returncode, 0, backend.stderr)
+        calls = self.records()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["cwd"], str(ROOT / "apps/backend"))
+        self.assertEqual(calls[0]["argv"], ["compose", "up", "-d"])
+
+        self.log.unlink()
+        web = self.make("run-web")
+        self.assertEqual(web.returncode, 0, web.stderr)
+        calls = self.records()
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0]["cwd"], str(ROOT / "apps/web"))
+        self.assertEqual(calls[0]["argv"], ["compose", "--env-file", "template.env.build", "up", "-d"])
 
 
 if __name__ == "__main__":

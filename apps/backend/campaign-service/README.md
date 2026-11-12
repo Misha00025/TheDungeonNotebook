@@ -6,4 +6,4 @@
 make build-campaign-service
 ```
 
-[Публичная HTML-документация API](../../docs/api/groups/general.html)
+[Публичная HTML-документация API](../../../docs/api/groups/general.html)
