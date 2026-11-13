@@ -79,9 +79,12 @@ cleanup() {
 }
 trap cleanup 0
 trap 'exit 1' HUP INT TERM
-mkdir "$stage/import" || fail 'could not create staging directory'
+managed_dirs='import themes themes/tdn themes/tdn/login themes/tdn/login/resources themes/tdn/login/resources/css themes/tdn/login/resources/img themes/tdn/login/messages'
+for name in $managed_dirs; do
+    mkdir -p "$stage/$name" || fail "could not create staging directory: $name"
+done
 
-artifacts='docker-compose.yml import/shared-local-realm.json .env.example .gitignore README.md'
+artifacts='docker-compose.yml import/shared-local-realm.json .env.example .gitignore README.md themes/tdn/login/theme.properties themes/tdn/login/resources/css/tdn.css themes/tdn/login/resources/img/tdn-mark.svg themes/tdn/login/messages/messages_ru.properties themes/tdn/login/messages/messages_en.properties'
 if [ "$ref_set" = yes ]; then
     base=https://raw.githubusercontent.com/Misha00025/TheDungeonNotebook/$ref/deploy/keycloak
     for name in $artifacts; do
@@ -125,8 +128,11 @@ for name in $artifacts; do
     [ "$size" -gt 0 ] && [ "$size" -le 1048576 ] || fail "invalid staged artifact size: $name"
 done
 
-if [ -L "$directory/import" ]; then fail "managed path cannot be a symlink: $directory/import"; fi
-[ ! -e "$directory/import" ] || [ -d "$directory/import" ] || fail "managed path must be a directory: $directory/import"
+for name in $managed_dirs; do
+    path=$directory/$name
+    [ ! -L "$path" ] || fail "managed path cannot be a symlink: $path"
+    [ ! -e "$path" ] || [ -d "$path" ] || fail "managed path must be a directory: $path"
+done
 
 for name in $artifacts; do
     path=$directory/$name
@@ -195,10 +201,13 @@ if [ ! -d "$directory" ]; then
     (umask 077; mkdir -p "$directory") || fail "could not create target directory: $directory"
     chmod 700 "$directory" || fail "could not protect target directory: $directory"
 fi
-if [ ! -d "$directory/import" ]; then
-    mkdir "$directory/import" || fail "could not create import directory: $directory/import"
-    chmod 755 "$directory/import" || fail "could not set import directory permissions: $directory/import"
-fi
+for name in $managed_dirs; do
+    path=$directory/$name
+    if [ ! -d "$path" ]; then
+        mkdir "$path" || fail "could not create managed directory: $path"
+        chmod 755 "$path" || fail "could not set managed directory permissions: $path"
+    fi
+done
 
 if [ "$env_exists" = no ]; then
     (umask 077; set -C; cat "$stage/.env" > "$env_path") || fail "could not create .env: $env_path"

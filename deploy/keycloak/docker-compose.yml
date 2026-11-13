@@ -42,6 +42,7 @@ services:
     mem_limit: 2g
     volumes:
       - ./import:/opt/keycloak/data/import:ro
+      - ./themes:/opt/keycloak/themes:ro
     healthcheck:
       test:
         - CMD
