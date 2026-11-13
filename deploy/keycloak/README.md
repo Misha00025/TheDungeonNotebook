@@ -14,14 +14,15 @@
 sh scripts/setup-keycloak.sh --start
 ```
 
-Без `--start` скрипт только подготовит каталог. По умолчанию это `$HOME/apps/keycloack`. Параметр `--directory PATH` задаёт другой каталог.
+Без `--start` скрипт только подготовит каталог. По умолчанию это `$HOME/apps/keycloack`. Параметр `--directory PATH` задаёт другой каталог. PostgreSQL хранит данные в `data/postgres` внутри папки установки; `--directory` меняет расположение вместе для конфигурации и данных.
 
 Для локального набора файлов можно передать `--source-dir PATH`; для загрузки пяти файлов с репозитория — `--ref REF`, например `--ref master`. Эти параметры взаимоисключающие. Указанный ref должен быть опубликованной веткой, тегом или commit: и установщик, и остальные файлы комплекта загружаются именно из него. Для воспроизводимого запуска вместо `master` можно указать полный SHA commit. Локальные непубликуемые изменения checkout удалённому установщику недоступны.
 
-На чистой машине установщик можно скачать во временный файл и запустить одной shell-командой:
+На чистой машине установщик можно скачать и запустить:
 
 ```sh
-(set -eu; ref=master; installer=$(mktemp); trap 'rm -f "$installer"' 0; curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' "https://raw.githubusercontent.com/Misha00025/TheDungeonNotebook/$ref/scripts/setup-keycloak.sh" -o "$installer"; sh "$installer" --ref "$ref" --start)
+curl -fsSLo setup-keycloak.sh https://raw.githubusercontent.com/Misha00025/TheDungeonNotebook/master/scripts/setup-keycloak.sh &&
+sh setup-keycloak.sh --ref master --start
 ```
 
 `--start` после подготовки проверяет Compose-конфигурацию и запускает контейнеры с ожиданием healthcheck; без него Docker не вызывается.

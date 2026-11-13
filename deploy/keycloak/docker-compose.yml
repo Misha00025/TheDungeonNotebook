@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run the Keycloak setup script first}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
       interval: 5s
@@ -54,9 +54,6 @@ services:
       start_period: 30s
     networks:
       - keycloak_local
-
-volumes:
-  postgres_data:
 
 networks:
   keycloak_local:
