@@ -8,17 +8,17 @@
 
 ## Запуск
 
-Из checkout репозитория:
+Из checkout репозитория используйте отдельный каталог установки, чтобы не смешивать файлы Keycloak с файлами репозитория:
 
 ```sh
-sh scripts/setup-keycloak.sh --start
+sh scripts/setup-keycloak.sh --directory ../keycloak --start
 ```
 
-Без `--start` скрипт только подготовит каталог. По умолчанию это `$HOME/apps/keycloack`. Параметр `--directory PATH` задаёт другой каталог. PostgreSQL хранит данные в `data/postgres` внутри папки установки; `--directory` меняет расположение вместе для конфигурации и данных.
+Без `--start` скрипт только подготовит каталог. По умолчанию установка выполняется в текущий рабочий каталог; `--directory PATH` переопределяет его. Файлы конфигурации, `.env`, импорт realm и темы размещаются в каталоге установки; PostgreSQL хранит данные в `./data/postgres` там же.
 
 Для локального набора файлов можно передать `--source-dir PATH`; для загрузки комплекта, включая тему tdn, с репозитория — `--ref REF`, например `--ref master`. Эти параметры взаимоисключающие. Указанный ref должен быть опубликованной веткой, тегом или commit: и установщик, и остальные файлы комплекта загружаются именно из него. Для воспроизводимого запуска вместо `master` можно указать полный SHA commit. Локальные непубликуемые изменения checkout удалённому установщику недоступны.
 
-На чистой машине установщик можно скачать и запустить:
+На чистой машине выполните команды в каталоге, куда устанавливаете Keycloak:
 
 ```sh
 curl -fsSLo setup-keycloak.sh https://raw.githubusercontent.com/Misha00025/TheDungeonNotebook/master/scripts/setup-keycloak.sh &&
@@ -37,13 +37,13 @@ sh setup-keycloak.sh --ref master --start
 
 В комплект входят готовые файлы темы `themes/tdn`; установщик доставляет их, а Compose автоматически подключает каталог темы. Чтобы включить оформление, в своём realm (не `master`) выберите **Realm settings → Themes → Login theme → tdn → Save**. Доступны русские и английские подписи. Для русских форм при необходимости откройте **Realm settings → Localization**, установите **Internationalization enabled: On**, добавьте **ru** и **en** в **Supported locales**, задайте **Default locale: ru** и нажмите **Save**.
 
-Для существующей установки перенесите тему из checkout:
+Для существующей установки запустите из каталога установки (подставив путь к checkout репозитория вместо `/path/to/TheDungeonNotebook`):
 
 ```sh
-cp -R deploy/keycloak/themes ~/apps/keycloack/
+cp -R /path/to/TheDungeonNotebook/deploy/keycloak/themes .
 ```
 
-В `~/apps/keycloack/docker-compose.yml` добавьте в volumes сервиса `keycloak` строку `./themes:/opt/keycloak/themes:ro`, если её ещё нет. Затем из `~/apps/keycloack` выполните `docker compose up -d --no-deps keycloak` и выберите тему в UI. Установщик намеренно не перезаписывает отличающиеся существующие конфигурационные файлы; если Compose-конфигурация отличается, не следует просто повторно запускать установщик.
+В местном `docker-compose.yml` добавьте в volumes сервиса `keycloak` строку `./themes:/opt/keycloak/themes:ro`, если её ещё нет. Затем в каталоге установки выполните `docker compose up -d --no-deps keycloak` и выберите тему в UI. Установщик намеренно не перезаписывает отличающиеся существующие конфигурационные файлы; если Compose-конфигурация отличается, не следует просто повторно запускать установщик.
 
 ## Только логин и пароль
 

@@ -10,10 +10,10 @@ fail() {
 }
 
 usage() {
-    printf '%s\n' 'Usage: sh scripts/setup-keycloak.sh [--directory PATH] [--source-dir PATH | --ref REF] [--start]'
+    printf '%s\n' 'Usage: sh scripts/setup-keycloak.sh [--directory PATH] [--source-dir PATH | --ref REF] [--start] (default: current working directory)'
 }
 
-directory=${HOME:?HOME is not set}/apps/keycloack
+directory=$(pwd)
 source_dir=
 ref=
 start=no
