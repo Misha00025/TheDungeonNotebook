@@ -34,11 +34,11 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Run the Keycloak setup script first}
       KC_HTTP_ENABLED: "true"
-      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME: ${KEYCLOAK_URL:?Run the Keycloak setup script first}
       KC_HEALTH_ENABLED: "true"
       KC_CACHE: local
     ports:
-      - "127.0.0.1:8180:8080"
+      - "${KEYCLOAK_BIND_ADDRESS:-0.0.0.0}:8180:8080"
     mem_limit: 2g
     volumes:
       - ./import:/opt/keycloak/data/import:ro
