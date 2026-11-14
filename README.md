@@ -8,7 +8,7 @@
 
 ## Сборка Docker-образов
 
-`make build` собирает все 12 образов; `SERVICE=<name>` выбирает один образ из списка `make list-images`. Группы доступны через `make build-backend` (шесть backend-образов), `make build-web` (пять web-образов) и `make build-admin` (admin-panel). `make help` выводит краткую справку.
+`make build` собирает все 13 образов; `SERVICE=<name>` выбирает один образ из списка `make list-images`. Группы доступны через `make build-backend` (семь backend-образов), `make build-web` (пять web-образов) и `make build-admin` (admin-panel). `make help` выводит краткую справку.
 
 ```bash
 make build
@@ -34,7 +34,7 @@ make run-web
 make run
 ```
 
-Для запуска backend нужны настройки окружения и сертификаты. `make certs` генерирует RSA-ключи. Для web runtime требуется настроенный файл окружения. `make run` запускает backend и web.
+До запуска заполните пустые обязательные настройки в `apps/backend/.env`: `ACCOUNT_SERVICE_KEY`, `INTERNAL_SERVICE_KEY`, `ACCOUNTS_MYSQL_PASSWORD`, `Oidc__Providers__0__Issuer` и `Oidc__Providers__0__Audiences__0`; настройте также имя и пользователя accounts database при необходимости. Перед включением нового account-ID потока на существующих данных оператор должен выбрать свободный диапазон выше всех legacy user references. Подробности и ограничения — в [руководстве Account service](apps/backend/account-service/README.md). `make certs` генерирует RSA-ключи для legacy group tokens и не настраивает OIDC. Для web runtime требуется настроенный файл окружения. `make run` запускает backend и web.
 
 ## Keycloak
 
@@ -43,6 +43,8 @@ make run
 ```sh
 sh scripts/setup-keycloak.sh --directory ../keycloak
 ```
+
+Account service и настройка внешних JWT issuer описаны в [apps/backend/account-service/README.md](apps/backend/account-service/README.md). Перед запуском требуется настроить провайдера и отдельный ключ Gateway→Account service. Команда `make certs` относится к legacy group tokens и сама по себе не настраивает OIDC.
 
 По умолчанию установщик использует текущий каталог, определяет IPv4 основного интерфейса и запускает публичный HTTP на `0.0.0.0:8180`; домен и proxy не нужны. Данные PostgreSQL хранятся в `data/postgres` выбранного каталога. HTTP не шифрует пароли: используйте его для тестов; доверенный TLS для постоянной эксплуатации настраивается отдельно. Core Keycloak может отдельно требовать HTTPS для `master` или Admin UI; установщик эту политику не меняет. В комплект входит тема входа `tdn`; подробности — в [документации Keycloak](deploy/keycloak/README.md). При первой настройке вручную замените временную bootstrap-учётную запись администратора через Keycloak UI.
 
@@ -53,6 +55,8 @@ sh scripts/setup-keycloak.sh --directory ../keycloak
 **Внимание:** `make clean` удаляет локальные данные MongoDB и MySQL после подтверждения; действие требует `sudo`.
 
 **Внимание:** `make` без цели запускает цель по умолчанию `test` и имеет тот же эффект очистки тестовых данных. Не запускайте `make` без цели, если данные должны сохраниться.
+
+Для текущего OIDC/account-service интеграционного сценария используйте `make test-oidc`: он запускает изолированный harness. Не запускайте legacy `make test` против ценных данных.
 
 ```bash
 make web-install

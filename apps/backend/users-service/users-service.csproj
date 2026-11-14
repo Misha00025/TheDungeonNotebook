@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Tdn.Shared\Tdn.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="Tests\**\*.cs" />
     <Content Remove="Tests\**\*" />
     <EmbeddedResource Remove="Tests\**\*" />

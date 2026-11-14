@@ -12,7 +12,9 @@
   <nav id="sidebar"></nav>
   <main id="content">
     <h1 class="page-title">🔐 Аутентификация</h1>
-    <p class="page-subtitle">Регистрация, вход и обновление JWT-токенов.</p>
+    <p class="page-subtitle">Входящие Bearer access tokens проверяются через Gateway и Account service. Старые браузерные auth-маршруты намеренно возвращают 410; они не являются API для входа.</p>
+
+    <p>Клиент передаёт Bearer-токен Gateway. Gateway вызывает внутренний <code>POST /internal/auth/validate</code> Account service с отдельным confidential caller key; этот внутренний endpoint не предназначен для браузеров. Поддерживаются настроенные JWT access tokens, а не opaque tokens. Регистрация, выдача и обновление токенов через старые маршруты здесь не реализованы.</p>
 
     <div id="endpoints-container" data-page="auth.html"></div>
   </main>

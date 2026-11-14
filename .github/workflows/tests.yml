@@ -7,14 +7,28 @@ on:
       - 'apps/backend/api-gateway/**'
       - 'apps/backend/auth-service/**'
       - 'apps/backend/users-service/**'
+      - 'apps/backend/account-service/**'
       - 'apps/backend/campaign-service/**'
+      - 'apps/backend/game-systems-service/**'
+      - 'apps/backend/Tdn.Shared/**'
+      - 'apps/backend/tests/oidc/**'
+      - 'template.env'
+      - 'Makefile'
+      - 'docker-compose.build.yaml'
   pull_request:
     branches: [master]
     paths:
       - 'apps/backend/api-gateway/**'
       - 'apps/backend/auth-service/**'
       - 'apps/backend/users-service/**'
+      - 'apps/backend/account-service/**'
       - 'apps/backend/campaign-service/**'
+      - 'apps/backend/game-systems-service/**'
+      - 'apps/backend/Tdn.Shared/**'
+      - 'apps/backend/tests/oidc/**'
+      - 'template.env'
+      - 'Makefile'
+      - 'docker-compose.build.yaml'
 
 jobs:
   dotnet-build:
@@ -24,7 +38,9 @@ jobs:
         service:
           - auth-service
           - users-service
+          - account-service
           - campaign-service
+          - game-systems-service
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -33,11 +49,37 @@ jobs:
       - run: dotnet build apps/backend/${{ matrix.service }}
 
   integration-tests:
-    needs: [dotnet-build]
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run integration tests
-        run: cd apps/backend/tests && bash test-ci.sh -c
+      - name: Run isolated OIDC integration harness
+        run: bash apps/backend/tests/oidc/run.sh
+
+  dotnet-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Run .NET unit tests
+        run: |
+          dotnet test apps/backend/account-service/Tests/account-service.Tests.csproj
+          dotnet test apps/backend/Tdn.Shared/Tests/Tdn.Shared.Tests.csproj
+          dotnet test apps/backend/users-service/Tests/users-service.Tests.csproj
+          dotnet test apps/backend/campaign-service/Tests/backend-cs.Tests.csproj
+
+  gateway-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run gateway unit tests in engine image
+        run: >-
+          docker run --rm
+          -v "$GITHUB_WORKSPACE/apps/backend/api-gateway:/workspace/apps/backend/api-gateway:ro"
+          -w /workspace/apps/backend/api-gateway
+          --entrypoint python
+          ghcr.io/misha00025/pyapi-gate:0.4.0
+          -m unittest discover -s tests -v

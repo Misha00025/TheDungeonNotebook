@@ -9,11 +9,10 @@
 base_path: ""
 
 auth:
-  strategy: hybrid_jwt
-  public_key_path: ${PUBLIC_KEY_PATH:-/certs/public.pem}
-  expected_issuer: "${OIDC_ISSUER}"
+  strategy: account_service
 
 services:
+  account:      { base_url: "${ACCOUNT_SERVICE_URL}" }
   auth:          { base_url: "${AUTH_SERVICE_URL}" }
   users:         { base_url: "${USERS_SERVICE_URL}" }
   campaign:      { base_url: "${CAMPAIGN_SERVICE_URL}" }
@@ -38,37 +37,27 @@ routes:
   # ============================================================
   - path: /auth/register
     methods: [POST]
-    proxy:
-      service: auth
-      path: /register
+    handler: legacy_auth_unavailable
     auth: none
 
   - path: /auth/check
     methods: [GET]
-    proxy:
-      service: auth
-      path: /check
+    handler: legacy_auth_unavailable
     auth: none
 
   - path: /auth/reset-password/confirm
     methods: [POST]
-    proxy:
-      service: auth
-      path: /reset-password/confirm
+    handler: legacy_auth_unavailable
     auth: none
 
   - path: /auth/token
     methods: [POST]
-    proxy:
-      service: auth
-      path: /token
+    handler: legacy_auth_unavailable
     auth: none
 
   - path: /.well-known/jwks.json
     methods: [GET]
-    proxy:
-      service: auth
-      path: /.well-known/jwks.json
+    handler: legacy_auth_unavailable
     auth: none
 
   # ============================================================
@@ -80,6 +69,7 @@ routes:
         proxy:
           service: users
           path: /users
+        pre_request_handler: trusted_upstream
         auth: none
       POST:
         handler: user_create
@@ -89,6 +79,7 @@ routes:
     proxy:
       service: users
       path: /users/{user_id}
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET: {}
@@ -99,6 +90,7 @@ routes:
     proxy:
       service: users
       path: /users/{user_id}/settings
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -117,6 +109,7 @@ routes:
       path: /groups
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     params:
       query:
@@ -133,6 +126,7 @@ routes:
       path: /groups/{group_id}
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -155,6 +149,7 @@ routes:
       path: /polices/groups
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       PUT:
@@ -177,6 +172,7 @@ routes:
       path: /groups/{group_id}/items
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -191,6 +187,7 @@ routes:
       path: /groups/{group_id}/items/{item_id}
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     params:
       query:
@@ -209,6 +206,7 @@ routes:
       path: /groups/{group_id}/notes
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -225,6 +223,7 @@ routes:
       path: /groups/{group_id}/notes/{note_id}
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET: {}
@@ -240,6 +239,7 @@ routes:
       path: /groups/{group_id}/skills/attributes
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -254,6 +254,7 @@ routes:
       path: /groups/{group_id}/skills
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -267,6 +268,7 @@ routes:
       path: /groups/{group_id}/skills/{skill_id}
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -285,6 +287,7 @@ routes:
       path: /schemas/groups/{group_id}/items
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -299,6 +302,7 @@ routes:
       path: /schemas/groups/{group_id}/skills
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -313,6 +317,7 @@ routes:
       path: /schemas/groups/{group_id}/template
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -327,6 +332,7 @@ routes:
       path: /schemas/groups/{group_id}/characters/resources
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -357,6 +363,7 @@ routes:
       path: /groups/{group_id}/quests
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -371,6 +378,7 @@ routes:
       path: /groups/{group_id}/quests/{quest_id}
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET: {}
@@ -389,6 +397,7 @@ routes:
           path: /groups/{group_id}/quests
           headers:
             X-Subject: "{state.x_subject}"
+        pre_request_handler: trusted_upstream
         auth: required
         params:
           query:
@@ -407,6 +416,7 @@ routes:
       path: /groups/{group_id}/characters
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -421,6 +431,7 @@ routes:
       path: /groups/{group_id}/characters/{character_id}
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     params:
       query:
@@ -447,6 +458,7 @@ routes:
           path: /polices/groups/characters
           headers:
             X-Subject: "{state.x_subject}"
+        pre_request_handler: trusted_upstream
         params:
           body:
             groupId: "{path.group_id}"
@@ -458,6 +470,7 @@ routes:
           path: /polices/groups
           headers:
             X-Subject: "{state.x_subject}"
+        pre_request_handler: trusted_upstream
         params:
           query:
             groupId: "{path.group_id}"
@@ -473,6 +486,7 @@ routes:
       path: /groups/{group_id}/characters/templates
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -488,6 +502,7 @@ routes:
       path: /groups/{group_id}/characters/templates/{template_id}
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -505,6 +520,7 @@ routes:
       path: /groups/{group_id}/characters/{character_id}/items
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     params:
       query:
@@ -519,6 +535,7 @@ routes:
       path: /groups/{group_id}/characters/{character_id}/items/{item_id}
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     params:
       query:
@@ -537,6 +554,7 @@ routes:
       path: /groups/{group_id}/characters/{character_id}/notes
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET:
@@ -550,6 +568,7 @@ routes:
       path: /groups/{group_id}/characters/{character_id}/notes/{note_id}
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET: {}
@@ -567,6 +586,7 @@ routes:
           path: /groups/{group_id}/characters/{character_id}/skills
           headers:
             X-Subject: "{state.x_subject}"
+        pre_request_handler: trusted_upstream
         auth: required
         params:
           query: "*"
@@ -578,6 +598,7 @@ routes:
       headers:
         X-Subject: "{state.x_subject}"
       skip_body: true
+    pre_request_handler: trusted_upstream
     auth: required
     params:
       query:
@@ -595,6 +616,7 @@ routes:
       path: /groups/{group_id}/characters/{character_id}/equipment
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     params:
       query:
@@ -613,6 +635,7 @@ routes:
       path: /groups/{group_id}/characters/{character_id}/commands
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       POST: {}
@@ -623,6 +646,7 @@ routes:
       path: /groups/{group_id}/characters/{character_id}/commands/batch
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       POST: {}
@@ -637,6 +661,7 @@ routes:
       path: /groups/{group_id}/characters/{character_id}/log
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
 
   # ============================================================

@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := test
-.PHONY: test build build-all build-backend build-web build-admin list-images help \
-	build-api-gateway build-auth-service build-users-service build-campaign-service \
+.PHONY: test test-oidc build build-all build-backend build-web build-admin list-images help \
+	build-api-gateway build-auth-service build-users-service build-account-service build-campaign-service \
 	build-game-systems-service build-sync-service build-admin-panel build-web-hub \
 	build-web-campaign build-web-profile build-web-login build-web-game-systems \
 	run run-backend run-web web-install web-typecheck web-test web-build check-web test-web certs clean
@@ -9,7 +9,7 @@ WEB_BUILD_ENV ?= template.env.build
 BUILD_FLAGS ?=
 IMAGE_TAG ?= latest
 export IMAGE_TAG
-IMAGE_SERVICES := api-gateway auth-service users-service campaign-service game-systems-service sync-service admin-panel web-hub web-campaign web-profile web-login web-game-systems
+IMAGE_SERVICES := api-gateway auth-service users-service account-service campaign-service game-systems-service sync-service admin-panel web-hub web-campaign web-profile web-login web-game-systems
 WEB_BUILD_ENV_FILE := $(if $(filter /%,$(WEB_BUILD_ENV)),$(WEB_BUILD_ENV),apps/web/$(WEB_BUILD_ENV))
 
 ifneq ($(strip $(SERVICE)),)
@@ -25,6 +25,9 @@ endif
 test:
 	cd apps/backend/tests && ./test.sh 5
 
+test-oidc:
+	bash apps/backend/tests/oidc/run.sh
+
 # Изолированные сборки образов (не запускают контейнеры).
 build: $(if $(strip $(SERVICE)),build-$(SERVICE),build-all)
 
@@ -32,7 +35,7 @@ build-all:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) $(IMAGE_SERVICES)
 
 build-backend:
-	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) api-gateway auth-service users-service campaign-service game-systems-service sync-service
+	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) api-gateway auth-service users-service account-service campaign-service game-systems-service sync-service
 
 build-web:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) web-hub web-campaign web-profile web-login web-game-systems
@@ -46,6 +49,8 @@ build-auth-service:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) auth-service
 build-users-service:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) users-service
+build-account-service:
+	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) account-service
 build-campaign-service:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) campaign-service
 build-game-systems-service:

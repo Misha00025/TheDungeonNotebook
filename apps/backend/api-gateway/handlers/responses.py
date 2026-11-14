@@ -2,12 +2,15 @@ from app.engine.context import RouteContext
 from app.engine.registry import register_response_handler
 from app.engine.status import ok, unauthorized, forbidden, not_found
 from starlette.responses import Response
+from handlers.trusted import trusted_headers
 
 
 def get_user_id(jwt_payload: dict | None) -> str | None:
     if jwt_payload is None:
         return None
-    return jwt_payload.get("userId") or jwt_payload.get("sub")
+    if jwt_payload.get("groupId") is not None:
+        return None
+    return jwt_payload.get("accountId") or jwt_payload.get("userId")
 
 
 @register_response_handler("get_api")
@@ -18,33 +21,37 @@ async def handle_get_api(ctx: RouteContext):
     })
 
 
+@register_response_handler("legacy_auth_unavailable")
+async def handle_legacy_auth_unavailable(ctx: RouteContext):
+    return Response(content='{"error":"external_identity_required"}', status_code=410, media_type="application/json")
+
+
 @register_response_handler("whoami")
 async def handle_whoami(ctx: RouteContext):
     jwt_payload = ctx.jwt or {}
     gid = jwt_payload.get("groupId")
 
-    # Service token: есть groupId, нет userId
     if gid is not None:
         return ok({
             "id": int(gid),
             "type": "group",
             "userId": None,
             "sub": jwt_payload.get("sub"),
+            "accountId": None,
             "groupId": gid,
         })
 
-    # User token
     uid = get_user_id(jwt_payload)
     if uid is not None:
         return ok({
             "id": int(uid),
             "type": "user",
             "userId": uid,
+            "accountId": jwt_payload.get("accountId"),
             "sub": jwt_payload.get("sub"),
             "groupId": None,
         })
 
-    # Anonymous
     return ok({
         "id": None,
         "type": "anonymous",
@@ -61,14 +68,14 @@ async def handle_group_users(ctx: RouteContext):
     pres = ctx.services.campaign.get(
         "/polices/groups",
         params={"groupId": group_id},
-        headers={"X-Subject": ctx.state.get("x_subject")}
+        headers=trusted_headers(ctx)
     )
     if not pres.ok:
         return not_found({"error": "Not found"})
 
     group_users = []
     for entry in pres.json().get("users", []):
-        user_resp = ctx.services.users.get(f"/users/{entry['userId']}")
+        user_resp = ctx.services.users.get(f"/users/{entry['userId']}", headers=trusted_headers(ctx, False))
         if user_resp.ok:
             group_users.append({
                 "user": user_resp.json(),
@@ -89,14 +96,14 @@ async def handle_character_users(ctx: RouteContext):
             "groupId": group_id,
             "characterId": character_id,
         },
-        headers={"X-Subject": ctx.state.get("x_subject")}
+        headers=trusted_headers(ctx)
     )
     if not pres.ok:
         return not_found({"error": "Not found"})
 
     character_users = []
     for entry in pres.json().get("users", []):
-        user_resp = ctx.services.users.get(f"/users/{entry['userId']}")
+        user_resp = ctx.services.users.get(f"/users/{entry['userId']}", headers=trusted_headers(ctx, False))
         if user_resp.ok:
             character_users.append({
                 "user": user_resp.json(),
@@ -119,7 +126,7 @@ async def handle_group_export(ctx: RouteContext):
     result = ctx.services.campaign.get(
         f"/groups/{group_id}/export",
         params=params,
-        headers={"X-Subject": ctx.state.get("x_subject")}
+        headers=trusted_headers(ctx)
     )
 
     resp = ok(result.json() if result.ok else {})
@@ -145,7 +152,7 @@ async def handle_group_import(ctx: RouteContext):
         f"/groups/{group_id}/import",
         json=body_data,
         params=params,
-        headers={"X-Subject": ctx.state.get("x_subject")}
+        headers=trusted_headers(ctx)
     )
 
     return Response(content=result.content, status_code=result.status_code, media_type="application/json")
@@ -160,7 +167,7 @@ async def handle_user_create(ctx: RouteContext):
     data = ctx.request.json or {}
     data["id"] = int(uid)
 
-    result = ctx.services.users.post("/users", json=data)
+    result = ctx.services.users.post("/users", json=data, headers=trusted_headers(ctx))
 
     return Response(content=result.content, status_code=result.status_code, media_type="application/json")
 
@@ -180,7 +187,7 @@ async def handle_quest_create_for_character(ctx: RouteContext):
         f"/groups/{group_id}/quests",
         json=data,
         params={"userId": get_user_id(ctx.jwt)},
-        headers={"X-Subject": ctx.state.get("x_subject")}
+        headers=trusted_headers(ctx)
     )
 
     return Response(content=result.content, status_code=result.status_code, media_type="application/json")

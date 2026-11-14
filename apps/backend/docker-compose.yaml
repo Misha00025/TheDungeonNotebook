@@ -31,6 +31,7 @@ services:
       - ./auth-service/init-auth.sh:/docker-entrypoint-initdb.d/0_auth.sh
       - ./users-service/init-users.sh:/docker-entrypoint-initdb.d/1_users.sh
       - ./campaign-service/init-campaign.sh:/docker-entrypoint-initdb.d/2_campaign.sh
+      - ./account-service/init-accounts.sh:/docker-entrypoint-initdb.d/3_accounts.sh
     healthcheck:
       test: ["CMD", "mysqladmin", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD", "ping"]
       interval: 20s
@@ -54,7 +55,8 @@ services:
 
   auth-service:
     build:
-      context: ./auth-service
+      context: .
+      dockerfile: auth-service/Dockerfile
     container_name: auth-service
     depends_on:
       mysql:
@@ -73,7 +75,8 @@ services:
 
   users-service:
     build:
-      context: ./users-service
+      context: .
+      dockerfile: users-service/Dockerfile
     container_name: users-service
     depends_on:
       mongo:
@@ -89,6 +92,7 @@ services:
     environment:
       - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
       - MYSQL_CONNECTION_STRING=server=mysql;database=$USERS_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+      - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY:?INTERNAL_SERVICE_KEY is required}
 
   campaign-service:
     build:
@@ -109,6 +113,24 @@ services:
     environment:
       - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
       - MYSQL_CONNECTION_STRING=server=mysql;database=$CAMPAIGN_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
+      - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY:?INTERNAL_SERVICE_KEY is required}
+
+  account-service:
+    build:
+      context: ./account-service
+    container_name: account-service
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - backend-network
+    volumes:
+      - ./certs:/certs:ro
+    env_file:
+      - ./.env
+    environment:
+      - MYSQL_CONNECTION_STRING=server=mysql;database=${ACCOUNTS_DATABASE};user=${ACCOUNTS_MYSQL_USER};password=${ACCOUNTS_MYSQL_PASSWORD};
+      - InternalAuth__ApiKey=${ACCOUNT_SERVICE_KEY:?ACCOUNT_SERVICE_KEY is required}
 
   api-gateway:
     build: ./api-gateway
@@ -117,6 +139,8 @@ services:
       campaign-service:
         condition: service_started
       users-service:
+        condition: service_started
+      account-service:
         condition: service_started
     networks:
       - backend-network
@@ -127,6 +151,10 @@ services:
     volumes:
       - ./certs:/certs:ro
       - ../../logs:/app/logs
+    environment:
+      - ACCOUNT_SERVICE_URL=${ACCOUNT_SERVICE_URL:-http://account-service:8080}
+      - ACCOUNT_SERVICE_KEY=${ACCOUNT_SERVICE_KEY:?ACCOUNT_SERVICE_KEY is required}
+      - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY:?INTERNAL_SERVICE_KEY is required}
 
 networks:
   backend-network:

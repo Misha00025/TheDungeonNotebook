@@ -1,0 +1,16 @@
+**/bin
+**/obj
+Tests
+.git
+.env
+.env.*
+**/.env
+**/.env.*
+*.pem
+**/*.pem
+secrets/
+**/secrets/
+backups/
+**/backups/
+logs/
+**/logs/

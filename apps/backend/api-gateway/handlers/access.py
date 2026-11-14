@@ -6,7 +6,9 @@ from app.engine.status import forbidden
 def get_user_id(jwt_payload: dict | None) -> str | None:
     if jwt_payload is None:
         return None
-    return jwt_payload.get("userId") or jwt_payload.get("sub")
+    if jwt_payload.get("groupId") is not None:
+        return None
+    return jwt_payload.get("accountId") or jwt_payload.get("userId")
 
 
 @register_access_handler("self_only")

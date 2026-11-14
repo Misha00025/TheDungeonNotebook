@@ -1,0 +1,2 @@
+requests==2.32.3
+PyMySQL[rsa]==1.1.1

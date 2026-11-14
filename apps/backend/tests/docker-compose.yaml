@@ -66,7 +66,8 @@ services:
   users-service:
     <<: *common_resources
     build:
-      context: ../users-service
+      context: ..
+      dockerfile: users-service/Dockerfile
     container_name: users-service-test
     depends_on:
       mongo:
@@ -103,7 +104,8 @@ services:
   auth-service:
     <<: *common_resources
     build:
-      context: ../auth-service
+      context: ..
+      dockerfile: auth-service/Dockerfile
     container_name: auth-service-test
     depends_on:
       mysql:

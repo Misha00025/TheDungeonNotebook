@@ -32,6 +32,7 @@ routes:
       path: /systems
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET: {}
@@ -43,6 +44,7 @@ routes:
       path: /systems/{system_id}
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET: {}
@@ -55,6 +57,7 @@ routes:
       path: /systems/{system_id}/versions
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET: {}
@@ -66,6 +69,7 @@ routes:
       path: /systems/{system_id}/versions/{version_id}
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET: {}
@@ -76,6 +80,7 @@ routes:
       path: /systems/{system_id}/versions/{version_id}/snapshot
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET: {}
@@ -86,6 +91,7 @@ routes:
       path: /systems/{system_id}/versions/{version_id}/content
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET: {}
@@ -96,6 +102,7 @@ routes:
       path: /systems/{system_id}/versions/{version_id}/content/items
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       PUT: {}
@@ -106,6 +113,7 @@ routes:
       path: /systems/{system_id}/versions/{version_id}/content/skills
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       PUT: {}
@@ -116,6 +124,7 @@ routes:
       path: /systems/{system_id}/versions/{version_id}/content/character_template
       headers:
         X-Subject: "{state.x_subject}"
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       PUT: {}
@@ -127,6 +136,7 @@ routes:
     proxy:
       service: sync
       path: /sync
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       POST: {}
@@ -136,6 +146,7 @@ routes:
     proxy:
       service: sync
       path: /sync/{job_id}
+    pre_request_handler: trusted_upstream
     auth: required
     methods:
       GET: {}

@@ -8,16 +8,24 @@ services:
     image: backend-api-gateway:${IMAGE_TAG:-latest}
   auth-service:
     build:
-      context: ./apps/backend/auth-service
+      context: ./apps/backend
+      dockerfile: auth-service/Dockerfile
       tags:
         - backend-auth-service:latest
     image: backend-auth-service:${IMAGE_TAG:-latest}
   users-service:
     build:
-      context: ./apps/backend/users-service
+      context: ./apps/backend
+      dockerfile: users-service/Dockerfile
       tags:
         - backend-users-service:latest
     image: backend-users-service:${IMAGE_TAG:-latest}
+  account-service:
+    build:
+      context: ./apps/backend/account-service
+      tags:
+        - backend-account-service:latest
+    image: backend-account-service:${IMAGE_TAG:-latest}
   campaign-service:
     build:
       context: ./apps/backend

@@ -8,6 +8,7 @@ using Tdn.Models.Providing;
 using Tdn.Models.Access;
 using Tdn.Middleware;
 using Prometheus;
+using Tdn.Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = new ConfigParser();
@@ -33,6 +34,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddControllers();
 
 var app = builder.Build();
+app.UseInternalServiceAuthentication(builder.Configuration);
 
 // Apply pending migrations with retry (wait for MySQL to be ready)
 using (var scope = app.Services.CreateScope())
