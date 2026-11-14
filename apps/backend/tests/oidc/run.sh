@@ -20,8 +20,29 @@ python3 "$script_dir/generate_fixtures.py" --directory "$work_dir"
 export OIDC_SMOKE_DIR="$work_dir"
 cd "$repo_root"
 "${compose[@]}" build runner upstream account-service api-gateway
+"${compose[@]}" run --rm --no-deps account-service true
+startup_log="$work_dir/account-startup.log"
+if "${compose[@]}" run --rm --no-deps account-service > "$startup_log" 2>&1; then
+  printf '%s\n' 'OIDC smoke failed: blank account configuration unexpectedly started the service.' >&2
+  exit 1
+else
+  startup_status=$?
+fi
+if [ "$startup_status" -ne 1 ] || ! grep -Fq 'Account service startup failed. Check ACCOUNT_CONFIG, required environment and dependencies.' "$startup_log"; then
+  printf '%s\n' 'OIDC smoke failed: blank account configuration did not produce the expected controlled startup failure.' >&2
+  exit 1
+fi
+"${compose[@]}" run --rm --no-deps runner python runner.py config-bootstrap
+"${compose[@]}" run --rm --no-deps account-service true
+"${compose[@]}" run --rm --no-deps runner python runner.py config-preserved
 "${compose[@]}" up -d mysql postgres idp account-service upstream api-gateway
 "${compose[@]}" run --rm --no-deps runner python runner.py normal
+"${compose[@]}" run --rm --no-deps runner python runner.py config-restrict
+"${compose[@]}" restart account-service >/dev/null
+"${compose[@]}" run --rm --no-deps runner python runner.py config-restricted
+"${compose[@]}" run --rm --no-deps runner python runner.py config-restore
+"${compose[@]}" restart account-service >/dev/null
+"${compose[@]}" run --rm --no-deps runner python runner.py config-reloaded
 "${compose[@]}" run --rm --no-deps runner python runner.py provider-checks
 "${compose[@]}" exec -T postgres pg_dump -U keycloak keycloak > "$work_dir/idp.sql"
 "${compose[@]}" stop idp >/dev/null

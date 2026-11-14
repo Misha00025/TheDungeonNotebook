@@ -7,4 +7,7 @@ RUN dotnet publish account-service.csproj -c Release -o /out --no-restore
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 COPY --from=build /out .
-ENTRYPOINT ["dotnet", "account-service.dll"]
+COPY entrypoint.sh /app/entrypoint.sh
+COPY config/accounts.template.json /app/config/accounts.template.json
+ENTRYPOINT ["sh", "/app/entrypoint.sh"]
+CMD ["dotnet", "account-service.dll"]

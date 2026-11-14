@@ -1,0 +1,21 @@
+{
+  "Accounts": {
+    "FirstAccountId": 1
+  },
+  "Oidc": {
+    "TimeoutSeconds": 10,
+    "Providers": [
+      {
+        "Issuer": "",
+        "Audiences": [],
+        "AllowedAlgorithms": ["RS256"],
+        "ValidHeaderTypes": ["at+jwt", "application/at+jwt"],
+        "RequiredScopes": [],
+        "AllowHttpForDevelopment": false
+      }
+    ]
+  },
+  "LegacyGroups": {
+    "Enabled": false
+  }
+}

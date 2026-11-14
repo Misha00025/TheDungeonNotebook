@@ -34,7 +34,7 @@ make run-web
 make run
 ```
 
-До запуска заполните пустые обязательные настройки в `apps/backend/.env`: `ACCOUNT_SERVICE_KEY`, `INTERNAL_SERVICE_KEY`, `ACCOUNTS_MYSQL_PASSWORD`, `Oidc__Providers__0__Issuer` и `Oidc__Providers__0__Audiences__0`; настройте также имя и пользователя accounts database при необходимости. Перед включением нового account-ID потока на существующих данных оператор должен выбрать свободный диапазон выше всех legacy user references. Подробности и ограничения — в [руководстве Account service](apps/backend/account-service/README.md). `make certs` генерирует RSA-ключи для legacy group tokens и не настраивает OIDC. Для web runtime требуется настроенный файл окружения. `make run` запускает backend и web.
+До запуска заполните обязательные пустые ключи и пароль accounts database в `apps/backend/.env` (в частности `ACCOUNT_SERVICE_KEY`, `INTERNAL_SERVICE_KEY` и `ACCOUNTS_MYSQL_PASSWORD`). Compose автоматически создаст OIDC-конфиг Account service в `apps/backend/account-config/accounts.json` из безопасного шаблона; вручную создавать или копировать файл не нужно. Настройте провайдера в этом JSON перед запуском сервиса. Быстрый порядок настройки и ограничения описаны в [руководстве Account service](apps/backend/account-service/README.md). Перед включением нового account-ID потока на существующих данных оператор должен выбрать свободный диапазон выше всех legacy user references. `make certs` генерирует RSA-ключи для legacy group tokens и не настраивает OIDC. Для web runtime требуется настроенный файл окружения. `make run` запускает backend и web.
 
 ## Keycloak
 

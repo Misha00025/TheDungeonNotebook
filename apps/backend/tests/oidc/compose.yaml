@@ -53,20 +53,9 @@ services:
       ASPNETCORE_URLS: http://+:8080
       MYSQL_CONNECTION_STRING: Server=mysql;Database=accounts;User=accounts;Password=${MYSQL_PASSWORD}
       InternalAuth__ApiKey: ${ACCOUNT_SERVICE_KEY}
-      Oidc__Providers__0__Issuer: http://idp:8080/realms/smoke-a
-      Oidc__Providers__0__Audiences__0: tdn-smoke-api
-      Oidc__Providers__0__ValidHeaderTypes__0: JWT
-      Oidc__Providers__0__AccessTokenTypeClaim: typ
-      Oidc__Providers__0__AccessTokenTypeValues__0: Bearer
-      Oidc__Providers__0__AllowHttpForDevelopment: "true"
-      Oidc__Providers__1__Issuer: http://idp:8080/realms/smoke-b
-      Oidc__Providers__1__Audiences__0: tdn-smoke-api
-      Oidc__Providers__1__ValidHeaderTypes__0: JWT
-      Oidc__Providers__1__AccessTokenTypeClaim: typ
-      Oidc__Providers__1__AccessTokenTypeValues__0: Bearer
-      Oidc__Providers__1__AllowHttpForDevelopment: "true"
-      LegacyGroups__Enabled: "false"
-      Accounts__FirstAccountId: "1"
+      ACCOUNT_CONFIG: /run/account-config/accounts.json
+    volumes:
+      - ${OIDC_SMOKE_DIR}/account-config:/run/account-config
     depends_on:
       mysql:
         condition: service_healthy

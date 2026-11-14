@@ -23,6 +23,22 @@ def main():
     directory.chmod(0o700)
     realms = directory / "realms"
     realms.mkdir(mode=0o755)
+    account_config = directory / "account-config"
+    account_config.mkdir(mode=0o700)
+    configured = {
+        "Accounts": {"FirstAccountId": 1},
+        "Oidc": {"TimeoutSeconds": 10, "Providers": [
+            {"Issuer": "http://idp:8080/realms/smoke-a", "Audiences": ["tdn-smoke-api"],
+             "AllowedAlgorithms": ["RS256"], "ValidHeaderTypes": ["JWT"],
+             "AccessTokenTypeClaim": "typ", "AccessTokenTypeValues": ["Bearer"],
+             "AllowHttpForDevelopment": True},
+            {"Issuer": "http://idp:8080/realms/smoke-b", "Audiences": ["tdn-smoke-api"],
+             "AllowedAlgorithms": ["RS256"], "ValidHeaderTypes": ["JWT"],
+             "AccessTokenTypeClaim": "typ", "AccessTokenTypeValues": ["Bearer"],
+             "AllowHttpForDevelopment": True}]},
+        "LegacyGroups": {"Enabled": False}
+    }
+    write_secret(directory / "configured-accounts.json", json.dumps(configured, indent=2) + "\n")
     root = Path(__file__).resolve().parents[4]
     base = json.loads((root / "deploy/keycloak/import/shared-local-realm.json").read_text())
     values = {name: secrets.token_urlsafe(32) for name in (

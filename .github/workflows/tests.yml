@@ -8,6 +8,8 @@ on:
       - 'apps/backend/auth-service/**'
       - 'apps/backend/users-service/**'
       - 'apps/backend/account-service/**'
+      - 'apps/backend/docker-compose.yaml'
+      - 'apps/backend/.dockerignore'
       - 'apps/backend/campaign-service/**'
       - 'apps/backend/game-systems-service/**'
       - 'apps/backend/Tdn.Shared/**'
@@ -22,6 +24,8 @@ on:
       - 'apps/backend/auth-service/**'
       - 'apps/backend/users-service/**'
       - 'apps/backend/account-service/**'
+      - 'apps/backend/docker-compose.yaml'
+      - 'apps/backend/.dockerignore'
       - 'apps/backend/campaign-service/**'
       - 'apps/backend/game-systems-service/**'
       - 'apps/backend/Tdn.Shared/**'
@@ -64,6 +68,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - name: Run account bootstrap tests
+        run: python3 -m unittest discover -s apps/backend/account-service/Tests/Bootstrap -v
       - name: Run .NET unit tests
         run: |
           dotnet test apps/backend/account-service/Tests/account-service.Tests.csproj

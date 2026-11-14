@@ -24,6 +24,9 @@ ISSUER_B = os.environ.get("OIDC_ISSUER_B", "http://idp:8080/realms/smoke-b")
 GATEWAY = os.environ.get("GATEWAY_URL", "http://api-gateway:5000")
 ACCOUNT = os.environ.get("ACCOUNT_SERVICE_URL", "http://account-service:8080")
 UPSTREAM = os.environ.get("UPSTREAM_URL", "http://upstream:8080")
+ACTIVE_CONFIG = DIR / "account-config" / "accounts.json"
+CONFIGURED_CONFIG = DIR / "configured-accounts.json"
+CONFIG_STATE = DIR / "config-state.json"
 
 
 class CheckFailure(Exception):
@@ -33,6 +36,51 @@ class CheckFailure(Exception):
 def require(condition, label):
     if not condition:
         raise CheckFailure(label)
+
+
+def read_json(path, label):
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        raise CheckFailure(label) from None
+
+
+def write_json_in_place(path, value, label):
+    try:
+        mode = path.stat().st_mode & 0o777
+        with path.open("w") as stream:
+            json.dump(value, stream, indent=2)
+            stream.write("\n")
+        path.chmod(mode)
+    except Exception:
+        raise CheckFailure(label) from None
+
+
+def no_config_temps(label):
+    require(list(ACTIVE_CONFIG.parent.glob(".accounts.json.*")) == [], label)
+
+
+def save_config_state():
+    try:
+        info = ACTIVE_CONFIG.stat()
+        state = {"inode": info.st_ino, "mode": info.st_mode & 0o777,
+                 "sha256": hashlib.sha256(ACTIVE_CONFIG.read_bytes()).hexdigest()}
+        CONFIG_STATE.write_text(json.dumps(state))
+        CONFIG_STATE.chmod(0o600)
+    except Exception:
+        raise CheckFailure("config-state-write") from None
+
+
+def assert_config_state(label):
+    state = read_json(CONFIG_STATE, label)
+    try:
+        info = ACTIVE_CONFIG.stat()
+        content = ACTIVE_CONFIG.read_bytes()
+    except Exception:
+        raise CheckFailure(label) from None
+    require(info.st_ino == state.get("inode") and info.st_mode & 0o777 == state.get("mode") and
+            hashlib.sha256(content).hexdigest() == state.get("sha256"), label)
+    no_config_temps(label + "-temp-files")
 
 
 class FormParser(HTMLParser):
@@ -464,9 +512,80 @@ def phase_idp_down():
     require(response.status_code == 503, "idp-down-unavailable")
 
 
+def phase_config_bootstrap():
+    value = read_json(ACTIVE_CONFIG, "config-bootstrap-active-missing-or-invalid")
+    require((ACTIVE_CONFIG.stat().st_mode & 0o777) == 0o600, "config-bootstrap-mode")
+    providers = value.get("Oidc", {}).get("Providers", [])
+    require(len(providers) == 1 and providers[0].get("Issuer") == "" and
+            providers[0].get("Audiences") == [], "config-bootstrap-placeholder")
+    no_config_temps("config-bootstrap-temp-files")
+    write_json_in_place(ACTIVE_CONFIG, read_json(CONFIGURED_CONFIG, "config-bootstrap-fixture-missing"),
+                        "config-bootstrap-copy")
+    save_config_state()
+
+
+def phase_config_preserved():
+    assert_config_state("config-preserved-state")
+
+
+def phase_config_restrict():
+    saved = load_saved()
+    require(gateway("GET", "/whoami", saved["access_token"]).status_code == 200,
+            "config-restrict-before-restart")
+    configured = read_json(CONFIGURED_CONFIG, "config-restrict-fixture-missing")
+    providers = configured.get("Oidc", {}).get("Providers", [])
+    require(len(providers) == 2 and providers[1].get("Issuer") == ISSUER_B,
+            "config-restrict-fixture-providers")
+    configured["Oidc"]["Providers"] = [providers[1]]
+    write_json_in_place(ACTIVE_CONFIG, configured, "config-restrict-write")
+    response = gateway("GET", "/whoami", saved["access_token"])
+    require(response.status_code == 200 and
+            response.json().get("accountId", response.json().get("userId")) == saved["account_id"] and
+            counts() == (2, 3), "config-restrict-not-applied-before-restart")
+
+
+def phase_config_restricted():
+    saved = load_saved()
+    ready(ACCOUNT + "/health/ready", "config-restricted-account-readiness")
+    require(gateway("GET", "/whoami", saved["access_token"]).status_code == 401,
+            "config-restricted-provider-a-denied")
+    access_b, _, _ = login(ISSUER_B)
+    response = gateway("GET", "/whoami", access_b)
+    require(response.status_code == 200, "config-restricted-provider-b-accepted")
+    identity = response.json()
+    require(identity.get("accountId", identity.get("userId")) == saved["account_id"],
+            "config-restricted-account-stable")
+    require(counts() == (2, 3), "config-restricted-cardinality")
+
+
+def phase_config_restore():
+    configured = read_json(CONFIGURED_CONFIG, "config-restore-fixture-missing")
+    write_json_in_place(ACTIVE_CONFIG, configured, "config-restore-write")
+
+
+def phase_config_reloaded():
+    saved = load_saved()
+    ready(ACCOUNT + "/health/ready", "config-reloaded-account-readiness")
+    access_a, _, _ = login(ISSUER_A)
+    response = gateway("GET", "/whoami", access_a)
+    require(response.status_code == 200, "config-reloaded-provider-a-accepted")
+    identity = response.json()
+    require(identity.get("accountId", identity.get("userId")) == saved["account_id"],
+            "config-reloaded-account-stable")
+    require(counts() == (2, 3), "config-reloaded-cardinality")
+    try:
+        require(ACTIVE_CONFIG.read_bytes() == CONFIGURED_CONFIG.read_bytes(), "config-reloaded-restored-config")
+    except Exception:
+        raise CheckFailure("config-reloaded-file-read") from None
+    no_config_temps("config-reloaded-temp-files")
+
+
 PHASES = {"normal": normal, "account-down": phase_account_down,
           "account-ready": phase_account_ready, "idp-down": phase_idp_down,
-          "provider-checks": provider_checks, "restore-check": restore_check}
+          "provider-checks": provider_checks, "restore-check": restore_check,
+          "config-bootstrap": phase_config_bootstrap, "config-preserved": phase_config_preserved,
+          "config-restrict": phase_config_restrict, "config-restricted": phase_config_restricted,
+          "config-restore": phase_config_restore, "config-reloaded": phase_config_reloaded}
 
 
 def main():

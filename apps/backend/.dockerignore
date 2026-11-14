@@ -1,6 +1,7 @@
 **/bin/
 **/obj/
 **/certs
+account-config/
 **/*_data
 **/logs/
 .env
