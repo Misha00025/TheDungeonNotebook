@@ -1,0 +1,95 @@
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Abstractions;
+using Microsoft.AspNetCore.Mvc.Routing;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Options;
+using Tdn.Bff.Configuration;
+using Tdn.Bff.Errors;
+using Tdn.Bff.Security;
+using Tdn.Bff.Sessions;
+
+namespace Tdn.Bff.Endpoints;
+
+public static class BffEndpointRouteBuilderExtensions
+{
+    public static IEndpointRouteBuilder MapBffEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var options = endpoints.ServiceProvider.GetRequiredService<IOptions<BffOptions>>().Value;
+        endpoints.MapGet(options.Endpoints.Login, async (HttpContext context, IUrlHelperFactory urlHelperFactory) =>
+        {
+            var returnUrl = context.Request.Query.TryGetValue("returnUrl", out var requestedReturnUrl)
+                ? requestedReturnUrl.ToString()
+                : "/";
+            await HandleLoginAsync(context, returnUrl, urlHelperFactory).ConfigureAwait(false);
+        });
+
+        endpoints.MapGet(options.Endpoints.Session, async (HttpContext context, IAntiforgery antiforgery, IOptions<AntiforgeryOptions> antiforgeryOptions) =>
+            await HandleSessionAsync(context, antiforgery, antiforgeryOptions.Value.HeaderName ?? "X-CSRF-TOKEN").ConfigureAwait(false));
+
+        endpoints.MapPost(options.Endpoints.Logout, async (HttpContext context, IAntiforgeryRequestValidator antiforgeryValidator) =>
+            await HandleLogoutAsync(context, antiforgeryValidator).ConfigureAwait(false))
+            .RequireAuthorization();
+
+        return endpoints;
+    }
+
+    public static async Task HandleLoginAsync(HttpContext context, string? returnUrl, IUrlHelperFactory urlHelperFactory)
+    {
+        SetNoStore(context.Response);
+        returnUrl ??= "/";
+        var actionContext = new ActionContext(context, new RouteData(), new ActionDescriptor());
+        var urlHelper = urlHelperFactory.GetUrlHelper(actionContext);
+        if (!urlHelper.IsLocalUrl(returnUrl))
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsJsonAsync(new { code = "invalid_return_url" }, context.RequestAborted).ConfigureAwait(false);
+            return;
+        }
+
+        var redirectUri = returnUrl.StartsWith("~/", StringComparison.Ordinal) ? urlHelper.Content(returnUrl) : returnUrl;
+        await context.ChallengeAsync(BffAuthenticationDefaults.Oidc, new AuthenticationProperties { RedirectUri = redirectUri }).ConfigureAwait(false);
+    }
+
+    public static async Task HandleSessionAsync(HttpContext context, IAntiforgery antiforgery, string csrfHeaderName)
+    {
+        SetNoStore(context.Response);
+        var authentication = await context.AuthenticateAsync(BffAuthenticationDefaults.Cookies).ConfigureAwait(false);
+        if (!authentication.Succeeded || authentication.Principal is null)
+        {
+            await context.Response.WriteAsJsonAsync(new
+            {
+                authenticated = false,
+                csrfToken = (string?)null,
+                csrfHeaderName
+            }, context.RequestAborted).ConfigureAwait(false);
+            return;
+        }
+
+        context.User = authentication.Principal;
+        if (context.User.FindFirst(BffAuthenticationDefaults.SessionClaim) is null)
+            throw new AuthenticationRequiredException();
+
+        var tokens = antiforgery.GetAndStoreTokens(context);
+        await context.Response.WriteAsJsonAsync(new
+        {
+            authenticated = true,
+            csrfToken = tokens.RequestToken,
+            csrfHeaderName
+        }, context.RequestAborted).ConfigureAwait(false);
+    }
+
+    public static async Task HandleLogoutAsync(HttpContext context, IAntiforgeryRequestValidator antiforgeryValidator)
+    {
+        SetNoStore(context.Response);
+        await antiforgeryValidator.ValidateUnsafeRequestAsync(context).ConfigureAwait(false);
+        await context.SignOutAsync(BffAuthenticationDefaults.Cookies).ConfigureAwait(false);
+        context.Response.StatusCode = StatusCodes.Status204NoContent;
+    }
+
+    private static void SetNoStore(HttpResponse response)
+    {
+        response.Headers.CacheControl = "no-store";
+    }
+}

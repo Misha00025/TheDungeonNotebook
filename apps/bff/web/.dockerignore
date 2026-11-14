@@ -1,0 +1,15 @@
+bin/
+obj/
+Tests/
+data/
+.env
+.env.*
+**/.env
+**/.env.*
+**/secrets/
+**/*secrets*.json
+config/appsettings.*.local.json
+**/*.pfx
+**/*.key
+**/*.pem
+.git/

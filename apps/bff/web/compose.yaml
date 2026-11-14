@@ -1,0 +1,23 @@
+services:
+  bff:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${BFF_PORT:-5080}:8080"
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      Bff__Redis__ConnectionString: "${REDIS_CONNECTION_STRING:-redis:6379,abortConnect=false}"
+      Bff__DataProtection__KeyDirectory: /var/lib/tdn-bff/keys
+    depends_on:
+      redis:
+        condition: service_started
+    volumes:
+      - "${BFF_CONFIG_DIRECTORY:-./data/config}:/app/config"
+      - "${BFF_KEY_DIRECTORY:-./data/keys}:/var/lib/tdn-bff/keys"
+
+  redis:
+    image: redis:8.2-alpine
+    command: ["redis-server", "--appendonly", "${REDIS_APPENDONLY:-yes}"]
+    volumes:
+      - "${REDIS_DATA_DIRECTORY:-./data/redis}:/data"
