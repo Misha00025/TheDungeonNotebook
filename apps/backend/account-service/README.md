@@ -44,16 +44,15 @@ The service requires `MYSQL_CONNECTION_STRING`. It loads `appsettings.json`, opt
 | `LegacyGroups:PublicKeyPath` | Required path to the legacy group-token verification public key when enabled. |
 | `LegacyGroups:ClockSkewSeconds` | Legacy token clock skew, 0–300 seconds. |
 
-The root `template.env` provides these deployment settings. Fill the blank database passwords and keys before startup:
+The root `template.env` provides these deployment settings. Fill the shared MySQL password and required keys before startup:
 
 | Root environment variable | Purpose |
 | --- | --- |
 | `ACCOUNT_SERVICE_KEY` | Required confidential Gateway→Account service key; separate from `INTERNAL_SERVICE_KEY`. |
 | `INTERNAL_SERVICE_KEY` | Required Gateway→domain-services key; not the Account service key. |
 | `ACCOUNTS_DATABASE` | Dedicated accounts database name. |
-| `ACCOUNTS_MYSQL_USER` | Dedicated accounts database user. |
-| `ACCOUNTS_MYSQL_PASSWORD` | Password for that database user. |
-| `ACCOUNT_SERVICE_URL` | Gateway's Account service URL. |
+| `MYSQL_USER` | Shared MySQL user used by Users, Campaign, and Account services. |
+| `MYSQL_PASSWORD` | Password for the shared MySQL user. |
 
 The standard Compose deployment passes `MYSQL_CONNECTION_STRING` and `InternalAuth:ApiKey` to Account service, but does not forward the shared `.env` wholesale. Provider settings and `Accounts:FirstAccountId` are read from the JSON file. Custom deployments may still use .NET environment-variable overrides; this is not the standard Compose configuration path. Choose a safe first account ID range as described below before enabling this flow against existing domain data.
 
@@ -110,15 +109,7 @@ docker compose up -d --no-deps account-service
 
 ## Deployment and account ID allocation
 
-The backend Compose configuration uses `ACCOUNTS_DATABASE`, `ACCOUNTS_MYSQL_USER`, and `ACCOUNTS_MYSQL_PASSWORD` for a separate database/user. `ACCOUNT_SERVICE_KEY` configures the gateway's confidential caller credential and is passed to the service as `InternalAuth:ApiKey`; keep it separate from `INTERNAL_SERVICE_KEY`. Provider settings are supplied through the mounted JSON file described above. `LegacyGroups` remains a separate optional validator for historical JWTs, not an OIDC provider or issuer; when enabled, it uses the existing public key at the configured `PublicKeyPath`.
-
-The MySQL initialization script at `apps/backend/account-service/init-accounts.sh` is run automatically only when MySQL initializes a fresh data directory. An existing MySQL data volume is not initialized automatically. After explicitly configuring the account database/user variables in the MySQL service environment, run the script manually inside the MySQL container:
-
-```sh
-docker compose exec -T mysql bash /docker-entrypoint-initdb.d/3_accounts.sh
-```
-
-If the MySQL service's environment file changed, recreate that container using the deployment's normal safe procedure before running the command; do not bring the whole stack down with volume-removal options. Never delete `mysql_data` or its data. `CREATE USER IF NOT EXISTS` does not change the password of an existing MySQL user. An administrator must synchronize configured and server-side credentials separately.
+The backend Compose configuration uses the shared `MYSQL_USER` and `MYSQL_PASSWORD` for Users, Campaign, and Account services, with `ACCOUNTS_DATABASE` as Account's separate database. On a fresh MySQL initialization, the init script creates that database if needed and grants the already-created shared user access to it. Existing MySQL databases are not changed by editing `.env`; for an existing database, the shared user must already have the required privileges on `ACCOUNTS_DATABASE`. This transition does not change database users or passwords, alter existing privileges, or delete data. Start and stop services using the deployment's normal Compose procedure. `ACCOUNT_SERVICE_KEY` configures the gateway's confidential caller credential and is passed to the service as `InternalAuth:ApiKey`; keep it separate from `INTERNAL_SERVICE_KEY`. Provider settings are supplied through the mounted JSON file described above. `LegacyGroups` remains a separate optional validator for historical JWTs, not an OIDC provider or issuer; when enabled, it uses the existing public key at the configured `PublicKeyPath`.
 
 `FirstAccountId` must be a positive integer in the database's supported integer range. Its default of `1` is appropriate only for a fresh, empty domain with no legacy ID collisions. Existing legacy profiles or campaign grants may reference the same integer IDs, including references outside the legacy authentication table. Do not enable the new account-ID flow until an operator allocates a free range above every legacy user reference and configures the initial ID accordingly. There is no automatic migration, merging, or deletion of legacy data. Changing `FirstAccountId` does not rename IDs already issued.
 

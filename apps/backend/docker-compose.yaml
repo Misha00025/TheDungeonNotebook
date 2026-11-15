@@ -95,7 +95,7 @@ services:
       - ./certs:/certs:ro
       - ./account-config:/run/account-config
     environment:
-      - MYSQL_CONNECTION_STRING=server=mysql;database=${ACCOUNTS_DATABASE};user=${ACCOUNTS_MYSQL_USER};password=${ACCOUNTS_MYSQL_PASSWORD};
+      - MYSQL_CONNECTION_STRING=server=mysql;database=${ACCOUNTS_DATABASE};user=${MYSQL_USER};password=${MYSQL_PASSWORD};
       - InternalAuth__ApiKey=${ACCOUNT_SERVICE_KEY:?ACCOUNT_SERVICE_KEY is required}
       - ACCOUNT_CONFIG=/run/account-config/accounts.json
       - ASPNETCORE_URLS=http://+:8080
