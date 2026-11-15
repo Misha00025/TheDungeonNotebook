@@ -1,99 +1,96 @@
-# BFF Web
+# BFF
 
-ASP.NET Core 10 BFF: вход OIDC Authorization Code + PKCE, серверное хранение cookie-ticket в Redis, привязанный к сессии antiforgery и обновление токена по требованию. YARP проксирует запросы в Gateway. Доменная логика, пользовательский профиль, политика прав и браузерный интерфейс сюда не входят; маршруты и адреса Gateway задаются нативной конфигурацией YARP.
+## Что даёт BFF
 
-## Требования и локальный запуск
+BFF даёт браузеру вход через Keycloak, хранит OAuth-токены только на сервере и обращается к API Gateway от имени вошедшего пользователя. Он обновляет access token при необходимости, защищает изменяющие запросы CSRF-проверкой и позволяет завершить локальную BFF-сессию.
 
-Нужны .NET 10 SDK, OIDC-провайдер и Gateway. Основной Compose запускает отдельный Redis для BFF; при прямом `dotnet run` Redis должен быть доступен хост-процессу отдельно.
+BFF не содержит предметных прав и профиля. Существующий Web пока не переключён на BFF.
 
-Из корня репозитория:
+## Единственный штатный запуск
 
-```sh
-cd apps/bff/web
-Oidc__ClientSecret='<client-secret-from-your-IdP>' \
-ReverseProxy__Clusters__gateway__Destinations__gateway__Address=http://localhost:5000/ \
-dotnet run --no-launch-profile --urls http://localhost:5080
-```
+Используется основной Compose всего backend-проекта. Он запускает BFF вместе с отдельным Redis BFF и подключает BFF к уже имеющемуся Gateway в общей Docker-сети. Ручное подключение сетей не требуется. Нужны Docker Compose, подготовленный `apps/backend/.env`, настроенный внешний Keycloak и конфигурация Account service. Требования backend и Account service описаны в [корневом README](../../../README.md) и [README Account service](../../backend/account-service/README.md).
 
-Пример конфигурации указывает на Redis `localhost:6379` для host-запуска и содержит примерный OIDC URL `http://localhost:8080/realms/tdn-example`; это не готовые параметры входа. Container Gateway default — `http://api-gateway:5000/`. Основной и standalone Compose передают соответствующий Gateway address через `BFF_GATEWAY_ADDRESS`, поэтому менять его для штатного main запуска не требуется. Для другого backend topology переопределите `BFF_GATEWAY_ADDRESS`; при прямом host `dotnet run` используйте показанный выше localhost override, поскольку имя `api-gateway` на хосте обычно не разрешается. Задайте реальные `Oidc:Authority`, `Oidc:ClientId`, `Oidc:ClientSecret` и `Bff:ClientAuthentication` через конфиг или стандартные environment overrides. Запрашивается scope `offline_access`; выдача refresh token зависит от настроек IdP и его клиента.
+Если `apps/backend/.env` ещё не создан, создайте его в редакторе на основе `template.env` в корне репозитория и заполните настройки основного backend. Не передавайте весь этот файл BFF и не помещайте реальные секреты в документацию.
 
-Для host-примера зарегистрируйте в IdP точный callback URI `http://localhost:5080/bff/callback`. Для Compose callback должен использовать доступный браузеру адрес BFF, например `http://<BFF-host>:5080/bff/callback`. Прямой HTTP не требует nginx или сертификата. HTTPS метаданных IdP и HTTP/HTTPS listener самого BFF — независимые настройки.
-
-Login принимает локальные адреса для перехода, в том числе с query и fragment:
-
-```text
-/bff/login
-/bff/login?returnUrl=%2Fcampaigns%3Ftab%3Dactive%23notes
-/bff/login?returnUrl=~%2Fgroups%3Fsort%3Dname%23recent
-```
-
-Для HTTPS listener используйте штатную настройку сертификата Kestrel, например:
+Из корня репозитория запустите весь backend вместе с BFF:
 
 ```sh
-ASPNETCORE_Kestrel__Certificates__Default__Path=/path/to/dev-certificate.pfx \
-ASPNETCORE_Kestrel__Certificates__Default__Password="$KESTREL_CERT_PASSWORD" \
-Cookie__Cookie__SecurePolicy=Always \
-Oidc__RequireHttpsMetadata=false \
-dotnet run --no-launch-profile --urls https://localhost:5443
+docker compose --env-file apps/backend/.env -f apps/backend/docker-compose.yaml up -d
 ```
 
-Задайте `Oidc__RequireHttpsMetadata` в соответствии со схемой URL метаданных IdP: `false` для локального HTTP IdP, `true` для HTTPS. Эта настройка не управляет listener BFF. Для HTTPS callback с `form_post` задайте `Oidc__ResponseMode=form_post`, `Oidc__CorrelationCookie__SameSite=None`, `Oidc__NonceCookie__SameSite=None`, `Oidc__CorrelationCookie__SecurePolicy=Always` и `Oidc__NonceCookie__SecurePolicy=Always`. HTTP query-mode defaults используют `SameSite=Lax` и `SameAsRequest`.
-
-## Runtime-конфигурация
-
-`config/appsettings.json` — пример без действительных credentials. После него загружается необязательный `config/appsettings.{Environment}.json`; переменные окружения и аргументы командной строки имеют более высокий приоритет. Используются стандартные имена конфигурации .NET, например `Oidc__ClientSecret`, `Bff__Redis__ConnectionString` и `ReverseProxy__Clusters__gateway__Destinations__gateway__Address`. Вместо этого можно подключить или заменить `config/appsettings.json`; изменения конфигурации не требуют изменения кода или пересборки.
-
-### Основной запуск с backend
-
-Из корня репозитория используйте основной runtime Compose:
+Для выключения всего backend, включая BFF:
 
 ```sh
-make build SERVICE=bff-web
-make run-backend
+docker compose --env-file apps/backend/.env -f apps/backend/docker-compose.yaml down
 ```
 
-`make run-backend` запускает существующий backend Compose, включая `bff-web` и отдельный `bff-redis`. BFF подключён к `api-gateway` через общую `backend-network` и к своему Redis через частную BFF-сеть; вручную подключать Docker-сети не нужно. BFF публикуется на `http://localhost:${BFF_PORT:-5080}`. Этот runtime wiring не переключает Web на BFF.
+BFF доступен на `http://localhost:5080` по умолчанию. Для host-порта используется `BFF_PORT`.
 
-По умолчанию main Compose монтирует конфигурацию с `../bff/web/data/config` и key ring с `../bff/web/data/keys` относительно `apps/backend`; `bff-redis` хранит данные в `../bff/web/data/redis`. Все три пути указывают на соответствующие каталоги `apps/bff/web/data/`. При первом старте entrypoint создаёт `apps/bff/web/data/config/appsettings.json` из стандартной копии, только если host-файл отсутствует; существующая конфигурация не перезаписывается.
+## Первоначальный конфиг и данные
 
-Main Compose намеренно передаёт `BFF_REDIS_CONNECTION_STRING` и `BFF_GATEWAY_ADDRESS` поверх JSON: defaults направляют BFF к `bff-redis:6379` и `api-gateway:5000`, поэтому сохранённый config с `localhost` не ломает контейнерное подключение. Для другого Gateway задайте `BFF_GATEWAY_ADDRESS`; env override имеет приоритет над JSON. Изменения переменных Compose требуют пересоздания BFF, например `docker compose -f apps/backend/docker-compose.yaml up -d bff-web`; для изменений host JSON достаточно `docker compose -f apps/backend/docker-compose.yaml restart bff-web`.
+При первом старте основной Compose создаёт host-каталоги и конфиг BFF. Entrypoint копирует стандартный конфиг из образа в `apps/bff/web/data/config/appsettings.json`, только если файл ещё отсутствует. Существующий конфиг при рестарте и обновлении образа не перезаписывается.
 
-### Внешний OIDC-провайдер
+По умолчанию используются только host bind paths:
 
-Значения OIDC в `config/appsettings.json` — только примеры. Keycloak bundle из `scripts/setup-keycloak.sh` создаёт realm `shared-local`, но не регистрирует BFF client. Настройте внешний OIDC client для Authorization Code + PKCE S256, выберите его client authentication и задайте реальные client ID/secret; регистрация клиента автоматически не выполняется. `Authority` должен быть настоящим URL issuer, доступным и браузеру, и BFF. Если используется Keycloak, установленный штатным setup script, возьмите базовый URL, напечатанный установщиком, и добавьте `/realms/shared-local`; не используйте `localhost` внутри контейнера или внутреннее имя, недоступное браузеру.
+| Данные | Каталог на хосте |
+| --- | --- |
+| Конфиг BFF | `apps/bff/web/data/config` |
+| Ключи защиты сессий | `apps/bff/web/data/keys` |
+| Данные Redis BFF | `apps/bff/web/data/redis` |
 
-Точный redirect URI должен соответствовать адресу BFF, например `http://<BFF-host>:5080/bff/callback`. Issuer должен совпадать с настроенным `Oidc:Providers[*].Issuer` Account service, а audience access token — входить в настроенный список `Audiences`. Не путайте audience ID token (обычно client ID) с audience access token, который проверяет API. Сведения о существующей конфигурации Account service и prerequisites backend см. в [README Account service](../../backend/account-service/README.md) и [корневом README](../../../README.md); реальные env values здесь не дублируются. Указанные предусловия не означают, что примерный config обеспечивает end-to-end вход.
+Именованных Docker volumes нет. Обычное выключение Compose не удаляет эти каталоги и их данные. Для настройки откройте файл `apps/bff/web/data/config/appsettings.json` в редакторе. Удобный порядок: первый запуск создаёт файл, выключите Compose указанной выше командой, измените JSON и снова запустите Compose. Для обычных изменений JSON достаточно перезапустить сервис обычным циклом запуска; пересборка исходников не нужна.
 
-Штатный YARP route принимает `/bff/api/{**remainder}` и удаляет префикс `/bff/api` перед отправкой. Например, `GET /bff/api/groups?x=1` уходит в Gateway как `GET /groups?x=1`. YARP передаёт body потоком: JSON, form и multipart не преобразуются. Request/response headers пересылаются только если указаны в `Bff:Transport:RequestHeaders` и `Bff:Transport:ResponseHeaders`. Обязательные browser credentials, identity headers и настроенный CSRF header блокируются независимо от allowlist. В примере указаны распространённые API headers; список можно расширять через конфигурацию.
+В основном Compose `BFF_GATEWAY_ADDRESS` и `BFF_REDIS_CONNECTION_STRING` намеренно имеют приоритет над адресами из JSON: штатные значения направляют BFF на `api-gateway:5000` и `bff-redis:6379`. Сохранённый старый JSON с `localhost` поэтому не ломает основное подключение. Для другого backend измените `BFF_GATEWAY_ADDRESS` в `apps/backend/.env`; он задаёт адрес Gateway для BFF и переопределяет JSON.
 
-В YARP 2.3.0 автоматическое следование upstream redirects выключено по умолчанию. Адрес назначения задаётся на сервере, клиент не выбирает URL. Status и body Gateway передаются без обработки; response headers и trailers фильтруются allowlist. Ошибки BFF включают `401 authentication_required`, `403` при запрете доступа, `400 csrf_invalid` и `503 dependency_unavailable`; транспортные ошибки YARP могут дать `502` или `504`. Kestrel, лимиты body и параметры YARP настраиваются штатными средствами этих компонентов.
+Необязательные BFF-параметры в `apps/backend/.env`:
 
-## Сессия и CSRF
+| Параметр | Значение по умолчанию |
+| --- | --- |
+| `BFF_PORT` | `5080` |
+| `BFF_GATEWAY_ADDRESS` | `http://api-gateway:5000/` |
+| `BFF_REDIS_CONNECTION_STRING` | `bff-redis:6379,abortConnect=false` |
+| `BFF_CONFIG_DIRECTORY` | `../bff/web/data/config` |
+| `BFF_KEY_DIRECTORY` | `../bff/web/data/keys` |
+| `BFF_REDIS_DATA_DIRECTORY` | `../bff/web/data/redis` |
+| `BFF_REDIS_APPENDONLY` | `yes` |
 
-`GET /bff/session` возвращает только `authenticated`, `csrfToken` и `csrfHeaderName`; claims, OAuth tokens и серверный session key не выдаются. Session cookie имеет `HttpOnly=true`. Для unsafe-запросов к `/bff/api` и `POST /bff/logout` передавайте полученный токен в указанном header (по умолчанию `X-CSRF-TOKEN`). Logout завершает только локальную BFF-сессию и не вызывает IdP/SSO logout. Завершение сессии на IdP само по себе не завершает уже созданную BFF-сессию.
+Пути указаны относительно `apps/backend/docker-compose.yaml`. Эти переменные задают Compose wiring; остальные параметры BFF, в частности OIDC, редактируются в host-конфигурации либо явно передаются через Compose override. `apps/backend/.env` целиком в BFF не передаётся.
 
-Redis tickets защищены ASP.NET Core Data Protection; key ring не хранится в Redis с tickets. Для нескольких BFF instances нужен общий key ring; при необходимости защищайте его штатными средствами Data Protection. `Bff:DataProtection:KeyDirectory` необязателен. Compose подключает key ring через host bind mount: `BFF_KEY_DIRECTORY` задаёт путь, по умолчанию `./data/keys` относительно `compose.yaml`.
+## Настройка Keycloak
 
-Основной рекомендуемый способ выше использует backend Compose. Дополнительный standalone Compose предназначен только для подключения BFF к уже существующей backend-сети:
+Настройте client в существующем realm; скрипт установки Keycloak не создаёт BFF client автоматически.
 
-```sh
-docker compose -f apps/bff/web/compose.yaml up --build
-```
+- Protocol: OpenID Connect; Client ID, например `tdn-bff`.
+- Включите Client authentication и Standard flow; выключите Direct access grants, Implicit flow и Service accounts.
+- Включите PKCE с методом S256.
+- Добавьте точный redirect URI `http://<BFF-host>:5080/bff/callback` (если изменён `BFF_PORT`, используйте этот порт).
+- Client secret возьмите из настроек этого client. Web origins для серверного BFF не нужны; global/back-channel logout не настраивается.
 
-По умолчанию он использует внешнюю сеть `backend_backend-network`; при другом Compose project name задайте `BFF_BACKEND_NETWORK` с фактическим именем backend network. BFF подключается к ней и к своей default-сети, а его Redis остаётся только в default-сети. Не запускайте standalone вариант одновременно с основным BFF на том же host port и bind-путях. Ручной `docker network connect` не требуется.
+Если используете Keycloak из `scripts/setup-keycloak.sh`, возьмите базовый URL, напечатанный установщиком, и добавьте `/realms/shared-local`. Не используйте `localhost` внутри контейнера или адрес, недоступный браузеру: URL issuer должен быть доступен и браузеру, и BFF.
 
-Оба варианта Compose используют те же три host-каталога `apps/bff/web/data/{config,keys,redis}`. В main Compose defaults заданы относительно `apps/backend`, в standalone — относительно `apps/bff/web/compose.yaml`. При необходимости пути задаются переменными `BFF_CONFIG_DIRECTORY`, `BFF_KEY_DIRECTORY`, `BFF_REDIS_DATA_DIRECTORY`; `BFF_REDIS_APPENDONLY` выбирает append-only persistence, `BFF_REDIS_CONNECTION_STRING` и `BFF_GATEWAY_ADDRESS` переопределяют адреса подключения. Подготовьте каталоги до запуска:
+Account service проверяет issuer и audience access token согласно своей конфигурации. Issuer должен совпадать с `Oidc:Providers[*].Issuer`, а audience access token — входить в `Audiences`. Audience ID token (обычно Client ID) не заменяет audience API access token. Если провайдер не выдаёт подходящий audience, настройте отдельный client scope с Audience mapper: Included Custom Audience должен совпадать с допустимым API audience; включите добавление в access token и выключите добавление в ID token. Названия меню могут различаться между версиями Keycloak.
 
-```sh
-mkdir -p apps/bff/web/data/config apps/bff/web/data/keys apps/bff/web/data/redis
-```
+## Настройки OIDC в конфиге BFF
 
-При первом старте entrypoint копирует стандартный `/app/default-config/appsettings.json` в `/app/config/appsettings.json`, только если host-конфигурация отсутствует. Копирование не перезаписывает существующий файл; реальные secrets не генерируются. Редактируйте конфигурацию на host-пути `apps/bff/web/data/config/appsettings.json`; для применения изменений перезапустите BFF. Код и образ пересобирать не нужно. Каталоги должны быть доступны контейнерному пользователю для нужных операций; если переопределяете user контейнера, обеспечьте ему права записи на соответствующие host paths.
+Редактируйте отдельные поля в `apps/bff/web/data/config/appsettings.json`, сохраняя остальные настройки:
 
-При первой настройке нужно задать реальные OIDC Authority/ClientId/ClientSecret и client authentication; без настроенного IdP-вход не заработает. Gateway destination уже связан с `api-gateway:5000` в штатном Compose и не требует замены; для другого Gateway задайте `BFF_GATEWAY_ADDRESS`, который в Compose имеет приоритет над JSON. Secrets можно передать нативными переменными окружения через Compose override или Docker CLI; отдельный secret-файл не обязателен.
+| Полный путь | Значение |
+| --- | --- |
+| `Oidc.Authority` | Реальный URL issuer realm, например `https://sso.example.org/realms/my-realm`; не URL административной консоли и не `localhost` внутри контейнера. |
+| `Oidc.ClientId` | ID настроенного BFF client, например `tdn-bff`. |
+| `Oidc.ClientSecret` | Secret этого client, если выбран confidential client; не помещайте действительное значение в исходники или общий репозиторий. |
+| `Oidc.CallbackPath` | `/bff/callback`; путь должен совпасть с зарегистрированным redirect URI. |
+| `Oidc.RequireHttpsMetadata` | `true` для HTTPS metadata; `false` только если намеренно используется HTTP IdP. Это не настройка HTTP/HTTPS самого BFF. |
+| `Oidc.Scope` | Для обычного входа достаточно `openid` и `profile`. `offline_access` необязателен для обычного refresh в Keycloak. |
+| `Bff.ClientAuthentication` | `PostBody` для стандартного client secret; значение должно соответствовать настройке client в IdP. |
 
-### Прямой host-запуск и Redis
+Примерные значения в исходном JSON не являются действительным Keycloak client или рабочей OIDC-конфигурацией. Реальные OIDC параметры можно задать в host JSON либо явным environment override Compose. Основной Compose не передаёт BFF весь `apps/backend/.env`; запись `Oidc__ClientSecret` в этот файл сама по себе не передаст secret BFF.
 
-Для прямого host `dotnet run` требуется Redis, доступный хост-процессу по адресу из `Bff:Redis:ConnectionString`. Redis из Compose не публикует host port: чтобы использовать именно его с локальным процессом .NET, заранее опубликуйте Redis-порт отдельным Compose override и укажите опубликованный адрес в connection string. OIDC values/secrets остаются в mounted JSON или стандартных environment overrides; отдельный secret-файл не обязателен.
+## Сессия и запросы
 
-Предусмотренный scope автоматизированной проверки — unit tests. Этот README не утверждает, что проводились браузерные или end-to-end проверки.
+- `GET /bff/session` показывает состояние входа и CSRF token, но не возвращает OAuth-токены, claims или ключ сессии.
+- Для изменяющих запросов к `/bff/api/...` и `POST /bff/logout` передавайте CSRF token в header `X-CSRF-TOKEN`.
+- `GET /bff/login?returnUrl=/bff/session` начинает вход и после возврата из Keycloak ведёт на указанный локальный адрес.
+- Logout завершает только локальную BFF-сессию; он не выполняет выход из Keycloak.
+
+Без настроенного существующего Keycloak client вход не заработает. Даже успешный вход требует согласованной настройки issuer и access-token audience в Account service. Web пока не подключён к BFF.
