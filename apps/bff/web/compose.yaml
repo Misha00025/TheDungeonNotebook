@@ -3,21 +3,31 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: tdn-bff-web:${IMAGE_TAG:-latest}
     ports:
       - "${BFF_PORT:-5080}:8080"
+    networks:
+      - default
+      - backend-network
     environment:
       ASPNETCORE_URLS: http://+:8080
-      Bff__Redis__ConnectionString: "${REDIS_CONNECTION_STRING:-redis:6379,abortConnect=false}"
+      Bff__Redis__ConnectionString: "${BFF_REDIS_CONNECTION_STRING:-bff-redis:6379,abortConnect=false}"
       Bff__DataProtection__KeyDirectory: /var/lib/tdn-bff/keys
+      ReverseProxy__Clusters__gateway__Destinations__gateway__Address: "${BFF_GATEWAY_ADDRESS:-http://api-gateway:5000/}"
     depends_on:
-      redis:
+      bff-redis:
         condition: service_started
     volumes:
       - "${BFF_CONFIG_DIRECTORY:-./data/config}:/app/config"
       - "${BFF_KEY_DIRECTORY:-./data/keys}:/var/lib/tdn-bff/keys"
 
-  redis:
+  bff-redis:
     image: redis:8.2-alpine
-    command: ["redis-server", "--appendonly", "${REDIS_APPENDONLY:-yes}"]
+    command: ["redis-server", "--appendonly", "${BFF_REDIS_APPENDONLY:-yes}"]
     volumes:
-      - "${REDIS_DATA_DIRECTORY:-./data/redis}:/data"
+      - "${BFF_REDIS_DATA_DIRECTORY:-./data/redis}:/data"
+
+networks:
+  backend-network:
+    external: true
+    name: "${BFF_BACKEND_NETWORK:-backend_backend-network}"

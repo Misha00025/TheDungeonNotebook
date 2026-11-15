@@ -157,6 +157,40 @@ services:
       - ACCOUNT_SERVICE_KEY=${ACCOUNT_SERVICE_KEY:?ACCOUNT_SERVICE_KEY is required}
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY:?INTERNAL_SERVICE_KEY is required}
 
+  bff-web:
+    build:
+      context: ../bff/web
+      dockerfile: Dockerfile
+    image: tdn-bff-web:${IMAGE_TAG:-latest}
+    depends_on:
+      api-gateway:
+        condition: service_started
+      bff-redis:
+        condition: service_started
+    networks:
+      - backend-network
+      - bff-network
+    ports:
+      - "${BFF_PORT:-5080}:8080"
+    volumes:
+      - "${BFF_CONFIG_DIRECTORY:-../bff/web/data/config}:/app/config"
+      - "${BFF_KEY_DIRECTORY:-../bff/web/data/keys}:/var/lib/tdn-bff/keys"
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      Bff__Redis__ConnectionString: "${BFF_REDIS_CONNECTION_STRING:-bff-redis:6379,abortConnect=false}"
+      Bff__DataProtection__KeyDirectory: /var/lib/tdn-bff/keys
+      ReverseProxy__Clusters__gateway__Destinations__gateway__Address: "${BFF_GATEWAY_ADDRESS:-http://api-gateway:5000/}"
+
+  bff-redis:
+    image: redis:8.2-alpine
+    command: ["redis-server", "--appendonly", "${BFF_REDIS_APPENDONLY:-yes}"]
+    networks:
+      - bff-network
+    volumes:
+      - "${BFF_REDIS_DATA_DIRECTORY:-../bff/web/data/redis}:/data"
+
 networks:
   backend-network:
+    driver: bridge
+  bff-network:
     driver: bridge

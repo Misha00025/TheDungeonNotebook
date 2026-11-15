@@ -101,3 +101,10 @@ services:
       tags:
         - tdn-game-systems:latest
     image: tdn-game-systems:${IMAGE_TAG:-latest}
+  bff-web:
+    build:
+      context: ./apps/bff/web
+      dockerfile: Dockerfile
+      tags:
+        - tdn-bff-web:latest
+    image: tdn-bff-web:${IMAGE_TAG:-latest}

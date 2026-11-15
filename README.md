@@ -4,17 +4,19 @@
 
 ## Структура репозитория
 
-Каталоги `admin`, `backend` и `web` расположены в `apps/`. Makefile и инфраструктурные каталоги остаются в корне; npm workspace по-прежнему находится во внутреннем каталоге `apps/web`.
+Каталоги `admin`, `backend`, `bff` и `web` расположены в `apps/`. Makefile и инфраструктурные каталоги остаются в корне; npm workspace по-прежнему находится во внутреннем каталоге `apps/web`.
 
 ## Сборка Docker-образов
 
-`make build` собирает все 13 образов; `SERVICE=<name>` выбирает один образ из списка `make list-images`. Группы доступны через `make build-backend` (семь backend-образов), `make build-web` (пять web-образов) и `make build-admin` (admin-panel). `make help` выводит краткую справку.
+`make build` собирает все 14 образов; `SERVICE=<name>` выбирает один образ из списка `make list-images`. Группы доступны через `make build-backend` (семь backend-образов), `make build-web` (пять web-образов), `make build-admin` (admin-panel) и отдельную группу `make build-bff`. Образ BFF также можно собрать как `make build SERVICE=bff-web`. `make help` выводит краткую справку.
 
 ```bash
 make build
 make build SERVICE=auth-service
 make build IMAGE_TAG=1.2.3
 make build SERVICE=web-hub IMAGE_TAG=ci-42 BUILD_FLAGS="--no-cache --pull"
+make build SERVICE=bff-web
+make build-bff
 make build-web WEB_BUILD_ENV=.env.build
 make list-images
 ```
@@ -34,7 +36,11 @@ make run-web
 make run
 ```
 
-До запуска заполните обязательные пустые ключи и пароль accounts database в `apps/backend/.env` (в частности `ACCOUNT_SERVICE_KEY`, `INTERNAL_SERVICE_KEY` и `ACCOUNTS_MYSQL_PASSWORD`). Compose автоматически создаст OIDC-конфиг Account service в `apps/backend/account-config/accounts.json` из безопасного шаблона; вручную создавать или копировать файл не нужно. Настройте провайдера в этом JSON перед запуском сервиса. Быстрый порядок настройки и ограничения описаны в [руководстве Account service](apps/backend/account-service/README.md). Перед включением нового account-ID потока на существующих данных оператор должен выбрать свободный диапазон выше всех legacy user references. `make certs` генерирует RSA-ключи для legacy group tokens и не настраивает OIDC. Для web runtime требуется настроенный файл окружения. `make run` запускает backend и web.
+До запуска заполните обязательные пустые ключи и пароль accounts database в `apps/backend/.env` (в частности `ACCOUNT_SERVICE_KEY`, `INTERNAL_SERVICE_KEY` и `ACCOUNTS_MYSQL_PASSWORD`). Compose автоматически создаст OIDC-конфиг Account service в `apps/backend/account-config/accounts.json` из безопасного шаблона; вручную создавать или копировать файл не нужно. Настройте провайдера в этом JSON перед запуском сервиса. Быстрый порядок настройки и ограничения описаны в [руководстве Account service](apps/backend/account-service/README.md). Перед включением нового account-ID потока на существующих данных оператор должен выбрать свободный диапазон выше всех legacy user references. `make certs` генерирует RSA-ключи для legacy group tokens и не настраивает OIDC. Для web runtime требуется настроенный файл окружения. `make run-backend` запускает backend, BFF и его отдельный Redis; `make run` дополнительно запускает существующий Web, который пока не переключён на BFF.
+
+### BFF
+
+Основной запуск через `make run-backend` подключает `bff-web` к существующему `api-gateway` в `backend-network` и к отдельному `bff-redis` в частной сети BFF; вручную подключать Docker-сети не нужно. BFF доступен на `http://localhost:${BFF_PORT:-5080}`. Конфигурация при первом запуске создаётся в `apps/bff/web/data/config/appsettings.json`; key ring и Redis data хранятся в `apps/bff/web/data/keys` и `apps/bff/web/data/redis`. Это bind mounts, не named volumes. Подробнее о настройке внешнего OIDC-клиента и BFF — в [README BFF](apps/bff/web/README.md).
 
 ## Keycloak
 
