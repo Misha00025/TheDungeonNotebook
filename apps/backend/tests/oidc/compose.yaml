@@ -81,7 +81,6 @@ services:
       ACCOUNT_SERVICE_URL: http://account-service:8080
       USERS_SERVICE_URL: http://upstream:8080
       CAMPAIGN_SERVICE_URL: http://upstream:8080
-      AUTH_SERVICE_URL: http://upstream:8080
     depends_on:
       - account-service
       - upstream

@@ -1,15 +1,15 @@
 .DEFAULT_GOAL := test
-.PHONY: test test-oidc build build-all build-backend build-web build-admin list-images help \
-	build-api-gateway build-auth-service build-users-service build-account-service build-campaign-service \
-	build-game-systems-service build-sync-service build-admin-panel build-web-hub build-bff build-bff-web \
+.PHONY: test test-oidc build build-all build-backend build-web list-images help \
+	build-api-gateway build-users-service build-account-service build-campaign-service \
+	build-game-systems-service build-sync-service build-web-hub build-bff build-bff-web \
 	build-web-campaign build-web-profile build-web-login build-web-game-systems \
-	run run-backend run-web web-install web-typecheck web-test web-build check-web test-web certs clean
+	run run-backend run-web web-install web-typecheck web-test web-build check-web test-web clean
 
 WEB_BUILD_ENV ?= template.env.build
 BUILD_FLAGS ?=
 IMAGE_TAG ?= latest
 export IMAGE_TAG
-IMAGE_SERVICES := api-gateway auth-service users-service account-service campaign-service game-systems-service sync-service admin-panel web-hub web-campaign web-profile web-login web-game-systems bff-web
+IMAGE_SERVICES := api-gateway users-service account-service campaign-service game-systems-service sync-service web-hub web-campaign web-profile web-login web-game-systems bff-web
 WEB_BUILD_ENV_FILE := $(if $(filter /%,$(WEB_BUILD_ENV)),$(WEB_BUILD_ENV),apps/web/$(WEB_BUILD_ENV))
 
 ifneq ($(strip $(SERVICE)),)
@@ -35,18 +35,13 @@ build-all:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) $(IMAGE_SERVICES)
 
 build-backend:
-	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) api-gateway auth-service users-service account-service campaign-service game-systems-service sync-service
+	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) api-gateway users-service account-service campaign-service game-systems-service sync-service
 
 build-web:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) web-hub web-campaign web-profile web-login web-game-systems
 
-build-admin:
-	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) admin-panel
-
 build-api-gateway:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) api-gateway
-build-auth-service:
-	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) auth-service
 build-users-service:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) users-service
 build-account-service:
@@ -57,8 +52,6 @@ build-game-systems-service:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) game-systems-service
 build-sync-service:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) sync-service
-build-admin-panel:
-	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) admin-panel
 build-web-hub:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) web-hub
 build-web-campaign:
@@ -78,7 +71,7 @@ list-images:
 
 help:
 	@printf '%s\n' 'make build [SERVICE=<name>] [BUILD_FLAGS="--no-cache"] [IMAGE_TAG=<tag>]'
-	@printf '%s\n' 'make build-backend | build-web | build-admin | build-all | build-<service>'
+	@printf '%s\n' 'make build-backend | build-web | build-all | build-<service>'
 	@printf '%s\n' 'make build-bff | build-bff-web'
 	@printf '%s\n' 'make list-images; WEB_BUILD_ENV=<path> (default template.env.build)'
 
@@ -106,11 +99,6 @@ web-build:
 check-web: web-typecheck web-test web-build
 
 test-web: web-test
-
-certs:
-	@mkdir -p apps/backend/certs
-	@openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out apps/backend/certs/private.pem
-	@openssl pkey -in apps/backend/certs/private.pem -pubout -out apps/backend/certs/public.pem
 
 # Очистка данных базы (MongoDB и MySQL) с подтверждением
 clean:

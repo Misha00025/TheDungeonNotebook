@@ -40,7 +40,6 @@ services:
       - ./.env
     volumes:
       - ./mysql_data:/var/lib/mysql
-      - ../auth-service/init-auth.sh:/docker-entrypoint-initdb.d/0_auth.sh
       - ../users-service/init-users.sh:/docker-entrypoint-initdb.d/1_users.sh
       - ../campaign-service/init-campaign.sh:/docker-entrypoint-initdb.d/2_campaign.sh
     healthcheck:
@@ -49,19 +48,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
-
-  redis:
-    <<: *common_resources
-    image: redis:7-alpine
-    container_name: redis-cache-test
-    restart: always
-    networks:
-      - backend-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   users-service:
     <<: *common_resources
@@ -101,32 +87,10 @@ services:
       - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
       - MYSQL_CONNECTION_STRING=server=mysql;database=$CAMPAIGN_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
 
-  auth-service:
-    <<: *common_resources
-    build:
-      context: ..
-      dockerfile: auth-service/Dockerfile
-    container_name: auth-service-test
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - backend-network
-    volumes:
-      - ./certs:/certs:r
-    env_file:
-      - ./.env
-    environment:
-      - MYSQL_CONNECTION_STRING=server=mysql;database=$AUTH_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
-
   api-gateway:
     build: ../api-gateway
     container_name: api-gateway-test
     depends_on:
-      auth-service:
-        condition: service_started
       campaign-service:
         condition: service_started
       users-service:

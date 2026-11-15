@@ -29,10 +29,9 @@ if [ -f .env ]; then
 fi
 
 # Определяем имена БД (с дефолтами)
-AUTH_DB="${AUTH_DATABASE:-tdn_auth}"
 USERS_DB="${USERS_DATABASE:-tdn_users}"
 CAMPAIGN_DB="${CAMPAIGN_DATABASE:-tdn_campaign}"
-DBS="$AUTH_DB $USERS_DB $CAMPAIGN_DB"
+DBS="$USERS_DB $CAMPAIGN_DB"
 MONGO_USER="${MONGO_INITDB_ROOT_USERNAME:-root}"
 MONGO_PASS="${MONGO_INITDB_ROOT_PASSWORD:-}"
 

@@ -16,7 +16,7 @@ def generate_token(user_id: int | None = None, expires_in: int = 3600) -> tuple[
     payload = {
         "sub": str(user_id),
         "userId": user_id,
-        "iss": "http://auth-service:8080",
+        "iss": "https://issuer.example.test",
         "auth_time": int(time.time()),
         "aud": "api-gateway",
         "iat": int(time.time()),

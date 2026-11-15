@@ -6,13 +6,6 @@ services:
       tags:
         - backend-api-gateway:latest
     image: backend-api-gateway:${IMAGE_TAG:-latest}
-  auth-service:
-    build:
-      context: ./apps/backend
-      dockerfile: auth-service/Dockerfile
-      tags:
-        - backend-auth-service:latest
-    image: backend-auth-service:${IMAGE_TAG:-latest}
   users-service:
     build:
       context: ./apps/backend
@@ -46,12 +39,6 @@ services:
       tags:
         - backend-sync-service:latest
     image: backend-sync-service:${IMAGE_TAG:-latest}
-  admin-panel:
-    build:
-      context: ./apps/admin
-      tags:
-        - admin-admin-panel:latest
-    image: admin-admin-panel:${IMAGE_TAG:-latest}
   web-hub:
     build:
       context: ./apps/web

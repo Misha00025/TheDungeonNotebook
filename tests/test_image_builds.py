@@ -9,42 +9,42 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVICES = (
-    "api-gateway auth-service users-service campaign-service game-systems-service "
-    "sync-service admin-panel web-hub web-campaign web-profile web-login web-game-systems"
+    "api-gateway users-service account-service campaign-service game-systems-service "
+    "sync-service web-hub web-campaign web-profile web-login web-game-systems bff-web"
 ).split()
 IMAGE_REPOSITORIES = {
     "api-gateway": "backend-api-gateway",
-    "auth-service": "backend-auth-service",
     "users-service": "backend-users-service",
+    "account-service": "backend-account-service",
     "campaign-service": "backend-campaign-service",
     "game-systems-service": "backend-game-systems-service",
     "sync-service": "backend-sync-service",
-    "admin-panel": "admin-admin-panel",
     "web-hub": "tdn-hub",
     "web-campaign": "tdn-campaign",
     "web-profile": "tdn-profile",
     "web-login": "tdn-login",
     "web-game-systems": "tdn-game-systems",
+    "bff-web": "tdn-bff-web",
 }
 BUILD_CONTEXTS = {
     "api-gateway": ("apps/backend/api-gateway", "Dockerfile"),
-    "auth-service": ("apps/backend/auth-service", "Dockerfile"),
-    "users-service": ("apps/backend/users-service", "Dockerfile"),
+    "users-service": ("apps/backend", "users-service/Dockerfile"),
+    "account-service": ("apps/backend/account-service", "Dockerfile"),
     "campaign-service": ("apps/backend", "campaign-service/Dockerfile"),
     "game-systems-service": ("apps/backend", "game-systems-service/Dockerfile"),
     "sync-service": ("apps/backend/sync-service", "Dockerfile"),
-    "admin-panel": ("apps/admin", "Dockerfile"),
     "web-hub": ("apps/web", "apps/hub/Dockerfile"),
     "web-campaign": ("apps/web", "apps/campaign/Dockerfile"),
     "web-profile": ("apps/web", "apps/profile/Dockerfile"),
     "web-login": ("apps/web", "apps/login/Dockerfile"),
     "web-game-systems": ("apps/web", "apps/game-systems/Dockerfile"),
+    "bff-web": ("apps/bff/web", "Dockerfile"),
 }
 
 
 class RepositoryLayoutTests(unittest.TestCase):
     def test_application_directories_are_under_apps(self):
-        for name in ("admin", "backend", "web"):
+        for name in ("backend", "bff", "web"):
             with self.subTest(name=name):
                 self.assertFalse((ROOT / name).exists())
                 self.assertTrue((ROOT / "apps" / name).is_dir())
@@ -192,7 +192,7 @@ class ImageBuildMakeTests(unittest.TestCase):
         self.assertEqual(self.records(), [])
 
     def test_build_service_and_each_explicit_target(self):
-        self.assert_build_services(["build", "SERVICE=auth-service"], ["auth-service"])
+        self.assert_build_services(["build", "SERVICE=users-service"], ["users-service"])
         for service in SERVICES:
             with self.subTest(service=service):
                 self.log.unlink(missing_ok=True)
@@ -201,14 +201,14 @@ class ImageBuildMakeTests(unittest.TestCase):
     def test_group_targets_and_default_build(self):
         self.assert_build_services(["build-backend"], SERVICES[:6])
         self.log.unlink()
-        self.assert_build_services(["build-admin"], ["admin-panel"])
+        self.assert_build_services(["build-web"], SERVICES[6:11])
         self.log.unlink()
-        self.assert_build_services(["build-web"], SERVICES[7:])
+        self.assert_build_services(["build-bff"], SERVICES[11:])
         self.log.unlink()
         self.assert_build_services(["build"], SERVICES)
 
     def test_invalid_and_multiple_service_fail_before_docker(self):
-        for service in ("not-a-service", "auth-service users-service"):
+        for service in ("not-a-service", "users-service campaign-service"):
             with self.subTest(service=service):
                 result = self.make("build", f"SERVICE={service}")
                 self.assertNotEqual(result.returncode, 0)
@@ -232,14 +232,14 @@ class ImageBuildMakeTests(unittest.TestCase):
 
     def test_build_flags_and_image_tag(self):
         call = self.assert_build_services(
-            ["build", "SERVICE=auth-service", "BUILD_FLAGS=--no-cache --pull", "IMAGE_TAG=ci"],
-            ["auth-service"],
+            ["build", "SERVICE=users-service", "BUILD_FLAGS=--no-cache --pull", "IMAGE_TAG=ci"],
+            ["users-service"],
         )
         self.assertEqual(call["image_tag"], "ci")
 
     def test_image_tag_environment(self):
         call = self.assert_build_services(
-            ["build", "SERVICE=auth-service"], ["auth-service"], env={"IMAGE_TAG": "from-env"}
+            ["build", "SERVICE=users-service"], ["users-service"], env={"IMAGE_TAG": "from-env"}
         )
         self.assertEqual(call["image_tag"], "from-env")
 

@@ -13,7 +13,6 @@ auth:
 
 services:
   account:      { base_url: "${ACCOUNT_SERVICE_URL}" }
-  auth:          { base_url: "${AUTH_SERVICE_URL}" }
   users:         { base_url: "${USERS_SERVICE_URL}" }
   campaign:      { base_url: "${CAMPAIGN_SERVICE_URL}" }
 

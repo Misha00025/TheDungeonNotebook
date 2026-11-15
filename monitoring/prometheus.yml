@@ -39,12 +39,6 @@ scrape_configs:
   #   static_configs:
   #       - targets: [ 'policy-service:8080' ]
 
-  - job_name: 'auth-service'
-    metrics_path: /metrics
-    scheme: http
-    static_configs:
-      - targets: [ 'auth-service:8080' ]
-
   # - job_name: 'mysql-exporter'
   #   static_configs:
   #     - targets: ['mysql-exporter:9104']

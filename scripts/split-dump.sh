@@ -35,7 +35,6 @@ OUTPUT_DIR="${OUTPUT_DIR:-./split_dump/$TIMESTAMP}"
 mkdir -p "$OUTPUT_DIR"
 
 # Determine database names (with defaults)
-AUTH_DB="${AUTH_DATABASE:-tdn_auth}"
 USERS_DB="${USERS_DATABASE:-tdn_users}"
 CAMPAIGN_DB="${CAMPAIGN_DATABASE:-tdn_campaign}"
 
@@ -60,7 +59,6 @@ echo "=== Splitting dump by service ==="
 
 # Table-to-service mapping
 declare -A TABLE_MAP
-TABLE_MAP["auth_data"]="auth"
 TABLE_MAP["user"]="users"
 TABLE_MAP["linked_services"]="users"
 TABLE_MAP["group"]="campaign"
@@ -107,7 +105,6 @@ in_header == 1 {
         print current_block > (dir "/table-" current_table ".tmp")
     }
     # Extract name between backticks in table structure line
-    # Line format: -- Table structure for table `auth_data`
     start = index($0, "`")
     if (start > 0) {
         end = index(substr($0, start + 1), "`")
@@ -178,7 +175,6 @@ in_header == 1 {
 ' "$DUMP_FILE")
 
 echo "=== Assembling output files ==="
-assemble_output "auth" "AUTH_DB"
 assemble_output "users" "USERS_DB"
 assemble_output "campaign" "CAMPAIGN_DB"
 
