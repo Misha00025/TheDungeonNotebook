@@ -1,0 +1,252 @@
+services:
+  mongo:
+    image: mongo:latest
+    restart: always
+    networks:
+      - backend-network
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?Set MONGO_INITDB_ROOT_PASSWORD in .env}
+    volumes:
+      - ./data/mongo:/data/db
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --quiet --username "$${MONGO_INITDB_ROOT_USERNAME}" --password "$${MONGO_INITDB_ROOT_PASSWORD}" --authenticationDatabase admin --eval 'quit(db.adminCommand({ ping: 1 }).ok ? 0 : 1)'
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  mysql:
+    image: mysql:8.0
+    restart: always
+    networks:
+      - backend-network
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_USER: ${MYSQL_USER:-mysql_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_DATABASE: ${AUTH_DATABASE:-tdn_auth}
+      AUTH_DATABASE: ${AUTH_DATABASE:-tdn_auth}
+      USERS_DATABASE: ${USERS_DATABASE:-tdn_users}
+      CAMPAIGN_DATABASE: ${CAMPAIGN_DATABASE:-tdn_campaign}
+      ACCOUNTS_DATABASE: ${ACCOUNTS_DATABASE:-tdn_accounts}
+      ACCOUNTS_MYSQL_USER: ${ACCOUNTS_MYSQL_USER:-tdn_accounts}
+      ACCOUNTS_MYSQL_PASSWORD: ${ACCOUNTS_MYSQL_PASSWORD:?Set ACCOUNTS_MYSQL_PASSWORD in .env}
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+    configs:
+      - source: auth-init
+        target: /docker-entrypoint-initdb.d/0_auth.sh
+        mode: 0444
+      - source: users-init
+        target: /docker-entrypoint-initdb.d/1_users.sh
+        mode: 0444
+      - source: campaign-init
+        target: /docker-entrypoint-initdb.d/2_campaign.sh
+        mode: 0444
+      - source: accounts-init
+        target: /docker-entrypoint-initdb.d/3_accounts.sh
+        mode: 0444
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping --protocol=TCP --host=127.0.0.1 --user=\"$${MYSQL_USER}\" --password=\"$${MYSQL_PASSWORD}\""]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    networks:
+      - backend-network
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    image: backend-auth-service:latest
+    pull_policy: "${APP_PULL_POLICY:-never}"
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend-network
+    volumes:
+      - ./certs:/certs
+      - ./logs:/logs
+    environment:
+      MYSQL_CONNECTION_STRING: server=mysql;database=${AUTH_DATABASE:-tdn_auth};user=${MYSQL_USER:-mysql_user};password=${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env};
+      REDIS_CONNECTION_STRING: redis:6379
+      PRIVATE_KEY_PATH: /certs/private.pem
+      PUBLIC_KEY_PATH: /certs/public.pem
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-http://auth-service:8080}
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:?Set INTERNAL_SERVICE_KEY in .env}
+      ASPNETCORE_URLS: http://+:8080;http://+:8081
+
+  users-service:
+    image: backend-users-service:latest
+    pull_policy: "${APP_PULL_POLICY:-never}"
+    restart: always
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    networks:
+      - backend-network
+    volumes:
+      - ./logs:/logs
+    environment:
+      MONGO_CONNECTION_STRING: mongodb://${MONGO_INITDB_ROOT_USERNAME:-root}:${MONGO_INITDB_ROOT_PASSWORD:?Set MONGO_INITDB_ROOT_PASSWORD in .env}@mongo:27017/?authSource=admin
+      MONGO_SETTINGS_DATABASE: ${MONGO_SETTINGS_DATABASE:-tdn-settings}
+      MYSQL_CONNECTION_STRING: server=mysql;database=${USERS_DATABASE:-tdn_users};user=${MYSQL_USER:-mysql_user};password=${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env};
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:?Set INTERNAL_SERVICE_KEY in .env}
+      ASPNETCORE_URLS: http://+:8080;http://+:8081
+
+  campaign-service:
+    image: backend-campaign-service:latest
+    pull_policy: "${APP_PULL_POLICY:-never}"
+    restart: always
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    networks:
+      - backend-network
+    volumes:
+      - ./logs:/logs
+    environment:
+      MONGO_CONNECTION_STRING: mongodb://${MONGO_INITDB_ROOT_USERNAME:-root}:${MONGO_INITDB_ROOT_PASSWORD:?Set MONGO_INITDB_ROOT_PASSWORD in .env}@mongo:27017/?authSource=admin
+      MONGO_DATABASE: ${MONGO_DATABASE:-tdn}
+      MONGO_SCHEMAS_DATABASE: ${MONGO_SCHEMAS_DATABASE:-tdn-schemas}
+      MYSQL_CONNECTION_STRING: server=mysql;database=${CAMPAIGN_DATABASE:-tdn_campaign};user=${MYSQL_USER:-mysql_user};password=${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env};
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:?Set INTERNAL_SERVICE_KEY in .env}
+      ASPNETCORE_URLS: http://+:8080;http://+:8081
+
+  account-service:
+    image: backend-account-service:latest
+    pull_policy: "${APP_PULL_POLICY:-never}"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - backend-network
+    volumes:
+      - ./certs:/certs:ro
+      - ./config/account:/run/account-config
+    environment:
+      MYSQL_CONNECTION_STRING: server=mysql;database=${ACCOUNTS_DATABASE:-tdn_accounts};user=${ACCOUNTS_MYSQL_USER:-tdn_accounts};password=${ACCOUNTS_MYSQL_PASSWORD:?Set ACCOUNTS_MYSQL_PASSWORD in .env};
+      InternalAuth__ApiKey: ${ACCOUNT_SERVICE_KEY:?Set ACCOUNT_SERVICE_KEY in .env}
+      ACCOUNT_CONFIG: /run/account-config/accounts.json
+      ASPNETCORE_URLS: http://+:8080
+
+  api-gateway:
+    image: backend-api-gateway:latest
+    pull_policy: "${APP_PULL_POLICY:-never}"
+    depends_on:
+      auth-service:
+        condition: service_started
+      users-service:
+        condition: service_started
+      campaign-service:
+        condition: service_started
+      account-service:
+        condition: service_started
+    networks:
+      - backend-network
+    ports:
+      - "${GATEWAY_PORT:-5000}:5000"
+    volumes:
+      - ./certs:/certs:ro
+      - ./logs:/app/logs
+    environment:
+      AUTH_SERVICE_URL: http://auth-service:8080
+      USERS_SERVICE_URL: http://users-service:8080
+      CAMPAIGN_SERVICE_URL: http://campaign-service:8080
+      ACCOUNT_SERVICE_URL: ${ACCOUNT_SERVICE_URL:-http://account-service:8080}
+      ACCOUNT_SERVICE_KEY: ${ACCOUNT_SERVICE_KEY:?Set ACCOUNT_SERVICE_KEY in .env}
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:?Set INTERNAL_SERVICE_KEY in .env}
+      ACCOUNT_SERVICE_TIMEOUT_SECONDS: ${ACCOUNT_SERVICE_TIMEOUT_SECONDS:-10}
+      APP_CONFIG: /app/configs/app.json
+      PUBLIC_KEY_PATH: /certs/public.pem
+      CORS_ENABLED: ${CORS_ENABLED:-1}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+
+  bff-web:
+    image: tdn-bff-web:latest
+    pull_policy: "${APP_PULL_POLICY:-never}"
+    depends_on:
+      api-gateway:
+        condition: service_started
+      bff-redis:
+        condition: service_started
+    networks:
+      - backend-network
+      - bff-network
+    ports:
+      - "${BFF_PORT:-5080}:8080"
+    volumes:
+      - ./config/bff:/app/config
+      - ./data/bff-keys:/var/lib/tdn-bff/keys
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      Bff__Redis__ConnectionString: ${BFF_REDIS_CONNECTION_STRING:-bff-redis:6379,abortConnect=false}
+      Bff__DataProtection__KeyDirectory: /var/lib/tdn-bff/keys
+      ReverseProxy__Clusters__gateway__Destinations__gateway__Address: ${BFF_GATEWAY_ADDRESS:-http://api-gateway:5000/}
+
+  bff-redis:
+    image: redis:8.2-alpine
+    command: ["redis-server", "--appendonly", "${BFF_REDIS_APPENDONLY:-yes}"]
+    networks:
+      - bff-network
+    volumes:
+      - ./data/bff-redis:/data
+
+configs:
+  auth-init:
+    content: |-
+      #!/bin/bash
+      mysql -u root -p"$${MYSQL_ROOT_PASSWORD}" \
+        -e "CREATE DATABASE IF NOT EXISTS \`$${AUTH_DATABASE}\`; GRANT ALL PRIVILEGES ON \`$${AUTH_DATABASE}\`.* TO '$${MYSQL_USER}'@'%';"
+  users-init:
+    content: |-
+      #!/bin/bash
+      mysql -u root -p"$${MYSQL_ROOT_PASSWORD}" \
+        -e "CREATE DATABASE IF NOT EXISTS \`$${USERS_DATABASE}\`; GRANT ALL PRIVILEGES ON \`$${USERS_DATABASE}\`.* TO '$${MYSQL_USER}'@'%';"
+  campaign-init:
+    content: |-
+      #!/bin/bash
+      mysql -u root -p"$${MYSQL_ROOT_PASSWORD}" \
+        -e "CREATE DATABASE IF NOT EXISTS \`$${CAMPAIGN_DATABASE}\`; GRANT ALL PRIVILEGES ON \`$${CAMPAIGN_DATABASE}\`.* TO '$${MYSQL_USER}'@'%';"
+  accounts-init:
+    content: |-
+      #!/bin/bash
+      set -euo pipefail
+
+      : "$${ACCOUNTS_DATABASE:?ACCOUNTS_DATABASE is required}"
+      : "$${ACCOUNTS_MYSQL_USER:?ACCOUNTS_MYSQL_USER is required}"
+      : "$${ACCOUNTS_MYSQL_PASSWORD:?ACCOUNTS_MYSQL_PASSWORD is required}"
+      : "$${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}"
+
+      [[ "$${ACCOUNTS_DATABASE}" =~ ^[A-Za-z0-9_]+$ ]]
+      [[ "$${ACCOUNTS_MYSQL_USER}" =~ ^[A-Za-z0-9_]+$ ]]
+      escaped_password=$${ACCOUNTS_MYSQL_PASSWORD//\'/\'\'}
+      sql="CREATE DATABASE IF NOT EXISTS \`$${ACCOUNTS_DATABASE}\`; CREATE USER IF NOT EXISTS '$${ACCOUNTS_MYSQL_USER}'@'%' IDENTIFIED BY '$${escaped_password}'; GRANT ALL PRIVILEGES ON \`$${ACCOUNTS_DATABASE}\`.* TO '$${ACCOUNTS_MYSQL_USER}'@'%';"
+      mysql -u root -p"$${MYSQL_ROOT_PASSWORD}" -e "SET SESSION sql_mode = CONCAT_WS(',', @@sql_mode, 'NO_BACKSLASH_ESCAPES'); $${sql}"
+
+networks:
+  backend-network:
+    driver: bridge
+  bff-network:
+    driver: bridge
