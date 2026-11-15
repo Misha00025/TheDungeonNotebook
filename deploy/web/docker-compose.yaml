@@ -1,0 +1,31 @@
+services:
+  campaign:
+    image: tdn-campaign:latest
+    pull_policy: "${APP_PULL_POLICY:-never}"
+    restart: unless-stopped
+    ports:
+      - "${CAMPAIGN_PORT:-3000}:3000"
+
+  profile:
+    image: tdn-profile:latest
+    pull_policy: "${APP_PULL_POLICY:-never}"
+    restart: unless-stopped
+    ports:
+      - "${PROFILE_PORT:-3002}:3000"
+
+  login:
+    image: tdn-login:latest
+    pull_policy: "${APP_PULL_POLICY:-never}"
+    restart: unless-stopped
+    ports:
+      - "${LOGIN_PORT:-3003}:3000"
+
+  hub:
+    image: tdn-hub:latest
+    pull_policy: "${APP_PULL_POLICY:-never}"
+    restart: unless-stopped
+    ports:
+      - "${HUB_PORT:-3004}:3000"
+    environment:
+      BFF_BASE: "${BFF_BASE:-http://localhost:5080/bff}"
+      API_BASE: "${API_BASE:-}"

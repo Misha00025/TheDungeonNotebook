@@ -39,6 +39,8 @@ make run
 
 Web использует BFF через Hub-owned cookie session и CSRF transport. Подготовьте `apps/web/.env` с `BFF_BASE=http://localhost:5080/bff` и `API_BASE=http://localhost:5080/bff/api` (либо укажите browser-reachable BFF URL). Hub работает на `http://localhost:3004`; при локальной настройке BFF задайте `Bff:Web:PublicOrigin=http://localhost:3004` и `Bff:Web:AllowedOrigins[0]=http://localhost:3004`. Если ещё не зарегистрирован у IdP, callback BFF должен быть `http://localhost:5080/bff/callback`. Пользователь настраивает эти BFF/IdP параметры самостоятельно; запуск/сборка Web их не меняет. Подробности runtime config, remote preview и локального запуска приведены в [Web README](apps/web/README.md).
 
+Для запуска готовых Web-образов без checkout используйте [переносимый Web-комплект](deploy/web/README.md).
+
 ### BFF
 
 Основной запуск через `make run-backend` подключает `bff-web` к существующему `api-gateway` в `backend-network` и к отдельному `bff-redis` в частной сети BFF; вручную подключать Docker-сети не нужно. BFF доступен на `http://localhost:${BFF_PORT:-5080}`. Конфигурация при первом запуске создаётся в `apps/bff/web/data/config/appsettings.json`; key ring и Redis data хранятся в `apps/bff/web/data/keys` и `apps/bff/web/data/redis`. Это bind mounts, не named volumes. Подробнее о настройке внешнего OIDC-клиента и BFF — в [README BFF](apps/bff/web/README.md).

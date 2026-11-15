@@ -58,6 +58,8 @@ Hub загружает `public/config.json` относительно Vite base U
 
 `apps/web/.env` передаёт `BFF_BASE` и `API_BASE` только Hub. При первом старте Hub создаёт `build/config.json`, только если такого файла ещё нет; отсутствующий `API_BASE` выводится из `BFF_BASE`. Имеющийся файл не перезаписывается. Remotes не загружают runtime config и раздают статические federation файлы с CORS.
 
+Для запуска готовых Web-образов из переносимого каталога без checkout используйте [`deploy/web`](../../deploy/web/README.md).
+
 Общий Compose по умолчанию публикует campaign на порту 3000, profile на 3002, login на 3003 и Hub на 3004. Game-systems в нём выключен. `make build-web` собирает Web-образы, `make run-web` запускает настроенные Compose-сервисы.
 
 ## BFF, вход и профиль
