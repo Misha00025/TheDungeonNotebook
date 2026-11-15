@@ -40,21 +40,19 @@ BFF доступен на `http://localhost:5080` по умолчанию. Дл�
 
 Именованных Docker volumes нет. Обычное выключение Compose не удаляет эти каталоги и их данные. Для настройки откройте файл `apps/bff/web/data/config/appsettings.json` в редакторе. Удобный порядок: первый запуск создаёт файл, выключите Compose указанной выше командой, измените JSON и снова запустите Compose. Для обычных изменений JSON достаточно перезапустить сервис обычным циклом запуска; пересборка исходников не нужна.
 
-В основном Compose `BFF_GATEWAY_ADDRESS` и `BFF_REDIS_CONNECTION_STRING` намеренно имеют приоритет над адресами из JSON: штатные значения направляют BFF на `api-gateway:5000` и `bff-redis:6379`. Сохранённый старый JSON с `localhost` поэтому не ломает основное подключение. Для другого backend измените `BFF_GATEWAY_ADDRESS` в `apps/backend/.env`; он задаёт адрес Gateway для BFF и переопределяет JSON.
+Связи BFF с `api-gateway` и `bff-redis`, включая их внутренние порты, заданы основным Compose и администратору настраивать их не нужно. BFF всегда обращается к `http://api-gateway:5000/` и `bff-redis:6379,abortConnect=false`. Эти значения передаются через native environment и имеют приоритет над соответствующими полями server JSON.
 
 Необязательные BFF-параметры в `apps/backend/.env`:
 
 | Параметр | Значение по умолчанию |
 | --- | --- |
 | `BFF_PORT` | `5080` |
-| `BFF_GATEWAY_ADDRESS` | `http://api-gateway:5000/` |
-| `BFF_REDIS_CONNECTION_STRING` | `bff-redis:6379,abortConnect=false` |
 | `BFF_CONFIG_DIRECTORY` | `../bff/web/data/config` |
 | `BFF_KEY_DIRECTORY` | `../bff/web/data/keys` |
 | `BFF_REDIS_DATA_DIRECTORY` | `../bff/web/data/redis` |
 | `BFF_REDIS_APPENDONLY` | `yes` |
 
-Пути указаны относительно `apps/backend/docker-compose.yaml`. Эти переменные задают Compose wiring; остальные параметры BFF, в частности OIDC, редактируются в host-конфигурации либо явно передаются через Compose override. `apps/backend/.env` целиком в BFF не передаётся.
+Пути указаны относительно `apps/backend/docker-compose.yaml`; директории bind mounts можно менять для выбора места хранения. `BFF_REDIS_APPENDONLY` — настраиваемый операционный параметр Redis. Остальные параметры BFF, в частности OIDC, редактируются в host-конфигурации либо явно передаются через Compose override. `apps/backend/.env` целиком в BFF не передаётся.
 
 ## Настройка Keycloak
 

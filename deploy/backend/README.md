@@ -16,7 +16,7 @@
 
 ## Настройки и файлы
 
-Обязательные значения-пароли и ключи в `.env` оставлены пустыми в образце: задайте их до запуска. `ACCOUNT_SERVICE_KEY` и `INTERNAL_SERVICE_KEY` — разные ключи, каждый не короче 32 байт согласно текущему контракту. Остальные значения в образце соответствуют Compose defaults. В частности, `BFF_GATEWAY_ADDRESS` по умолчанию указывает на gateway внутри Compose-сети, а `BFF_REDIS_CONNECTION_STRING` — на `bff-redis`.
+Статическая топология сервисов и container paths заданы в Compose. `.env` предназначен для паролей, ключей, имён баз данных, опубликованных host-портов, внешних origins и выбранных оператором эксплуатационных настроек. Обязательные пароли и ключи в образце оставлены пустыми: задайте их до запуска. `ACCOUNT_SERVICE_KEY` и `INTERNAL_SERVICE_KEY` — разные ключи, каждый не короче 32 байт согласно текущему контракту. Оператор также может выбирать `APP_PULL_POLICY`, `ACCOUNT_SERVICE_TIMEOUT_SECONDS` и `BFF_REDIS_APPENDONLY`; это параметры эксплуатации, а не адреса внутренних сервисов.
 
 Настройки внешнего IdP и BFF client заранее не создаются и должны быть предоставлены оператором. Account настраивается в `config/account/accounts.json` через `Oidc.Providers` (issuer и audiences); BFF — в `config/bff/appsettings.json` через `Oidc.Authority`, `Oidc.ClientId`, `Oidc.ClientSecret` и `Bff.ClientAuthentication`. BFF использует внешний OIDC как единственный вход. Пользовательские поля Keycloak — внешний контур и в этот Compose не входят.
 

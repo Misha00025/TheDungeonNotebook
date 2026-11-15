@@ -131,7 +131,7 @@ services:
     environment:
       USERS_SERVICE_URL: http://users-service:8080
       CAMPAIGN_SERVICE_URL: http://campaign-service:8080
-      ACCOUNT_SERVICE_URL: ${ACCOUNT_SERVICE_URL:-http://account-service:8080}
+      ACCOUNT_SERVICE_URL: http://account-service:8080
       ACCOUNT_SERVICE_KEY: ${ACCOUNT_SERVICE_KEY:?Set ACCOUNT_SERVICE_KEY in .env}
       INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:?Set INTERNAL_SERVICE_KEY in .env}
       ACCOUNT_SERVICE_TIMEOUT_SECONDS: ${ACCOUNT_SERVICE_TIMEOUT_SECONDS:-10}
@@ -158,9 +158,9 @@ services:
       - ./data/bff-keys:/var/lib/tdn-bff/keys
     environment:
       ASPNETCORE_URLS: http://+:8080
-      Bff__Redis__ConnectionString: ${BFF_REDIS_CONNECTION_STRING:-bff-redis:6379,abortConnect=false}
+      Bff__Redis__ConnectionString: bff-redis:6379,abortConnect=false
       Bff__DataProtection__KeyDirectory: /var/lib/tdn-bff/keys
-      ReverseProxy__Clusters__gateway__Destinations__gateway__Address: ${BFF_GATEWAY_ADDRESS:-http://api-gateway:5000/}
+      ReverseProxy__Clusters__gateway__Destinations__gateway__Address: http://api-gateway:5000/
 
   bff-redis:
     image: redis:8.2-alpine

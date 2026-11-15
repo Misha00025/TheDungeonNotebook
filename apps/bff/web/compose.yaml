@@ -11,9 +11,9 @@ services:
       - backend-network
     environment:
       ASPNETCORE_URLS: http://+:8080
-      Bff__Redis__ConnectionString: "${BFF_REDIS_CONNECTION_STRING:-bff-redis:6379,abortConnect=false}"
+      Bff__Redis__ConnectionString: bff-redis:6379,abortConnect=false
       Bff__DataProtection__KeyDirectory: /var/lib/tdn-bff/keys
-      ReverseProxy__Clusters__gateway__Destinations__gateway__Address: "${BFF_GATEWAY_ADDRESS:-http://api-gateway:5000/}"
+      ReverseProxy__Clusters__gateway__Destinations__gateway__Address: http://api-gateway:5000/
     depends_on:
       bff-redis:
         condition: service_started

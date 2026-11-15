@@ -58,6 +58,7 @@ services:
       - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
       - MYSQL_CONNECTION_STRING=server=mysql;database=$USERS_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY:?INTERNAL_SERVICE_KEY is required}
+      - ASPNETCORE_URLS=http://0.0.0.0:8080;http://0.0.0.0:8081
 
   campaign-service:
     build:
@@ -79,6 +80,7 @@ services:
       - MONGO_CONNECTION_STRING=mongodb://$MONGO_INITDB_ROOT_USERNAME:$MONGO_INITDB_ROOT_PASSWORD@mongo:27017/
       - MYSQL_CONNECTION_STRING=server=mysql;database=$CAMPAIGN_DATABASE;user=$MYSQL_USER;password=$MYSQL_PASSWORD;
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY:?INTERNAL_SERVICE_KEY is required}
+      - ASPNETCORE_URLS=http://0.0.0.0:8080;http://0.0.0.0:8081
 
   account-service:
     build:
@@ -111,16 +113,20 @@ services:
     networks:
       - backend-network
     ports:
-      - "5000:5000"
+      - "${GATEWAY_PORT:-5000}:5000"
     env_file:
       - ./.env
     volumes:
       - ./certs:/certs:ro
       - ../../logs:/app/logs
     environment:
-      - ACCOUNT_SERVICE_URL=${ACCOUNT_SERVICE_URL:-http://account-service:8080}
+      - USERS_SERVICE_URL=http://users-service:8080
+      - CAMPAIGN_SERVICE_URL=http://campaign-service:8080
+      - ACCOUNT_SERVICE_URL=http://account-service:8080
       - ACCOUNT_SERVICE_KEY=${ACCOUNT_SERVICE_KEY:?ACCOUNT_SERVICE_KEY is required}
       - INTERNAL_SERVICE_KEY=${INTERNAL_SERVICE_KEY:?INTERNAL_SERVICE_KEY is required}
+      - APP_CONFIG=${APP_CONFIG:-/app/configs/app.json}
+      - PUBLIC_KEY_PATH=/certs/public.pem
 
   bff-web:
     build:
@@ -142,9 +148,9 @@ services:
       - "${BFF_KEY_DIRECTORY:-../bff/web/data/keys}:/var/lib/tdn-bff/keys"
     environment:
       ASPNETCORE_URLS: http://+:8080
-      Bff__Redis__ConnectionString: "${BFF_REDIS_CONNECTION_STRING:-bff-redis:6379,abortConnect=false}"
+      Bff__Redis__ConnectionString: bff-redis:6379,abortConnect=false
       Bff__DataProtection__KeyDirectory: /var/lib/tdn-bff/keys
-      ReverseProxy__Clusters__gateway__Destinations__gateway__Address: "${BFF_GATEWAY_ADDRESS:-http://api-gateway:5000/}"
+      ReverseProxy__Clusters__gateway__Destinations__gateway__Address: http://api-gateway:5000/
 
   bff-redis:
     image: redis:8.2-alpine
