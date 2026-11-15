@@ -16,21 +16,15 @@ vi.mock('@tdn/shared/auth/AuthContext', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   RemoteAuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useAuth: () => ({
-    accessToken: 'mock-token',
+    status: 'authenticated',
+    authenticated: true,
     userId: 1,
-    login: vi.fn(),
-    register: vi.fn(),
-    logout: vi.fn(),
-  }),
-}));
-
-vi.mock('@tdn/shared/auth/useProfile', () => ({
-  useProfile: () => ({
-    profile: null,
-    loading: false,
     error: null,
-    profileNotFound: false,
-    fetchProfile: vi.fn(),
+    config: { BFF_BASE: '/bff', API_BASE: '/bff/api' },
+    request: vi.fn(),
+    login: vi.fn(),
+    logout: vi.fn(),
+    refreshSession: vi.fn(),
   }),
 }));
 
@@ -92,7 +86,7 @@ describe('App', () => {
   it('renders without crashing', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
-        <App />
+        <App auth={{ status: 'authenticated', authenticated: true, userId: 1, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request: vi.fn(), login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }} />
       </MemoryRouter>
     );
     expect(document.body).toBeInTheDocument();

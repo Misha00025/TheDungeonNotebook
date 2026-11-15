@@ -1,64 +1,64 @@
-// src/hooks/useProfile.ts
-import { useState, useCallback, useEffect } from 'react';
-import { WhoAmIResponse, UserProfile } from './types';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import type { UserProfile } from './types';
 import { makeAuthenticatedRequest } from './api';
+import { useAuth } from './AuthContext';
 
-export const useProfile = (fetchOnMount: boolean = false) => {
+export const useProfile = (fetchOnMount = false) => {
+  const { authenticated, userId } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(fetchOnMount);
+  const [profileUserId, setProfileUserId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(fetchOnMount && authenticated && userId !== null);
   const [error, setError] = useState<string | null>(null);
   const [profileNotFound, setProfileNotFound] = useState(false);
+  const requestId = useRef(0);
 
   const fetchProfile = useCallback(async (): Promise<void> => {
+    if (!authenticated || userId === null) {
+      setProfile(null);
+      setProfileUserId(null);
+      setProfileNotFound(false);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+    const currentRequest = ++requestId.current;
     setLoading(true);
     setError(null);
     setProfileNotFound(false);
-
     try {
-      // Первый запрос: whoami
-      const whoamiResponse = await makeAuthenticatedRequest('/whoami');
-
-      if (whoamiResponse.status === 401) {
-        throw new Error('Session expired. Please login again.');
-      }
-
-      if (!whoamiResponse.ok) {
-        throw new Error('Failed to fetch user info');
-      }
-
-      const whoamiData: WhoAmIResponse = await whoamiResponse.json();
-
-      // Второй запрос: данные пользователя
-      const profileResponse = await makeAuthenticatedRequest(`/users/${whoamiData.id}`);
-
-      if (profileResponse.status === 404) {
+      const response = await makeAuthenticatedRequest(`/users/${userId}`);
+      if (currentRequest !== requestId.current) return;
+      if (response.status === 404) {
+        setProfile(null);
+        setProfileUserId(userId);
         setProfileNotFound(true);
         return;
       }
-
-      if (profileResponse.status === 401) {
-        throw new Error('Session expired. Please login again.');
+      if (!response.ok) throw new Error(`Failed to fetch profile: ${response.status}`);
+      const data: UserProfile = await response.json();
+      if (currentRequest === requestId.current) {
+        setProfile(data);
+        setProfileUserId(userId);
+        setProfileNotFound(false);
       }
-
-      if (!profileResponse.ok) {
-        throw new Error('Failed to fetch profile');
-      }
-
-      const profileData: UserProfile = await profileResponse.json();
-      setProfile(profileData);
-      setProfileNotFound(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+    } catch (reason) {
+      if (currentRequest === requestId.current) setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
-  }, []);
+  }, [authenticated, userId]);
 
   useEffect(() => {
-    if (fetchOnMount) {
-      fetchProfile();
-    }
-  }, [fetchOnMount, fetchProfile]);
+    requestId.current++;
+    setProfile(null);
+    setProfileUserId(null);
+    setError(null);
+    setProfileNotFound(false);
+    setLoading(fetchOnMount && authenticated && userId !== null);
+    if (fetchOnMount && authenticated && userId !== null) void fetchProfile();
+  }, [authenticated, userId, fetchOnMount, fetchProfile]);
 
-  return { profile, loading, error, profileNotFound, fetchProfile };
+  const currentUserProfile = authenticated && profileUserId === userId ? profile : null;
+  const currentUserNotFound = authenticated && profileUserId === userId && profileNotFound;
+  return { profile: currentUserProfile, loading, error, profileNotFound: currentUserNotFound, fetchProfile };
 };

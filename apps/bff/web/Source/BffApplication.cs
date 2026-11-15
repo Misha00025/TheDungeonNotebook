@@ -22,6 +22,7 @@ public static class BffApplication
         var app = builder.Build();
         app.UseMiddleware<BffExceptionMiddleware>();
         app.UseRouting();
+        app.UseCors();
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapBffEndpoints();

@@ -25,6 +25,19 @@ public static class BffServiceCollectionExtensions
         services.AddSingleton<IValidateOptions<BffOptions>, BffOptionsValidator>();
         services.AddOptions<BffOptions>().Bind(bffSection).ValidateOnStart();
 
+        var webOptions = bffSection.GetSection("Web").Get<WebOptions>() ?? new WebOptions();
+        var exposedHeaders = (bffSection.GetSection("Transport:ResponseHeaders").Get<List<string>>() ?? [])
+            .Where(header => !string.Equals(header, "Set-Cookie", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        services.AddCors(options => options.AddDefaultPolicy(policy =>
+        {
+            policy.WithOrigins(webOptions.AllowedOrigins.Select(origin => origin.TrimEnd('/')).ToArray())
+                .AllowCredentials()
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .WithExposedHeaders(exposedHeaders);
+        }));
+
         var dataProtectionOptions = bffSection.GetSection("DataProtection").Get<DataProtectionOptions>() ?? new DataProtectionOptions();
         var dataProtection = services.AddDataProtection().SetApplicationName(dataProtectionOptions.ApplicationName);
         if (!string.IsNullOrWhiteSpace(dataProtectionOptions.KeyDirectory))

@@ -2,8 +2,11 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Tdn.Bff.Configuration;
@@ -105,6 +108,132 @@ public sealed class BffRegistrationAndOptionsTests
 
         Assert.True(validator.Validate(null, valid).Succeeded);
         Assert.False(validator.Validate(null, invalid).Succeeded);
+    }
+
+    [Fact]
+    public void OptionsValidatorAcceptsExactHttpOriginsAndRejectsNonOrigins()
+    {
+        var validator = new BffOptionsValidator();
+        var valid = new BffOptions
+        {
+            Redis = new RedisOptions { ConnectionString = "redis", KeyPrefix = "prefix:" },
+            Web = new WebOptions { PublicOrigin = "http://hub.example:8081/", AllowedOrigins = ["https://web.example:9443", "http://localhost:5173/"] }
+        };
+        Assert.True(validator.Validate(null, valid).Succeeded);
+
+        foreach (var origin in new[] { "*", "https://user:password@example.com", "https://example.com/path", "https://example.com?x=1", "https://example.com#fragment" })
+        {
+            var invalid = new BffOptions
+            {
+                Redis = new RedisOptions { ConnectionString = "redis", KeyPrefix = "prefix:" },
+                Web = new WebOptions { AllowedOrigins = [origin] }
+            };
+            Assert.False(validator.Validate(null, invalid).Succeeded);
+        }
+    }
+
+    [Fact]
+    public void CorsDefaultPolicyAllowsConfiguredCredentialedOriginAndExposesTransportHeaders()
+    {
+        using var provider = CreateCorsProvider("https://web.example/");
+        var cors = provider.GetRequiredService<ICorsService>();
+        var corsOptions = provider.GetRequiredService<IOptions<CorsOptions>>().Value;
+        var policy = corsOptions.GetPolicy(corsOptions.DefaultPolicyName)!;
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Options;
+        context.Request.Headers.Origin = "https://web.example";
+        context.Request.Headers.AccessControlRequestMethod = "POST";
+        context.Request.Headers.AccessControlRequestHeaders = "X-CSRF-TOKEN, Content-Type";
+
+        var result = cors.EvaluatePolicy(context, policy);
+
+        Assert.True(result.IsPreflightRequest);
+        Assert.True(result.SupportsCredentials);
+        Assert.Equal("https://web.example", result.AllowedOrigin);
+        Assert.Contains("X-CSRF-TOKEN", result.AllowedHeaders);
+        Assert.Contains("Content-Disposition", result.AllowedExposedHeaders);
+        Assert.Contains("ETag", result.AllowedExposedHeaders);
+        Assert.DoesNotContain(result.AllowedExposedHeaders, header => string.Equals(header, "Set-Cookie", StringComparison.OrdinalIgnoreCase));
+
+        context.Request.Headers.Origin = "https://unknown.example";
+        result = cors.EvaluatePolicy(context, policy);
+        Assert.False(result.IsOriginAllowed);
+    }
+
+    [Fact]
+    public async Task CorsMiddlewareHandlesAllowedPreflightWithoutCallingNext()
+    {
+        using var provider = CreateCorsProvider("https://web.example/");
+        var nextCalled = false;
+        var middleware = new CorsMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            provider.GetRequiredService<ICorsService>(),
+            provider.GetRequiredService<ILoggerFactory>());
+        var context = CreatePreflightContext("https://web.example");
+
+        await middleware.Invoke(context, provider.GetRequiredService<ICorsPolicyProvider>());
+
+        Assert.False(nextCalled);
+        Assert.Equal(StatusCodes.Status204NoContent, context.Response.StatusCode);
+        Assert.Equal("https://web.example", context.Response.Headers.AccessControlAllowOrigin.ToString());
+        Assert.Equal("true", context.Response.Headers.AccessControlAllowCredentials.ToString());
+        Assert.Contains("X-CSRF-TOKEN", context.Response.Headers.AccessControlAllowHeaders.ToString().Split(',').Select(header => header.Trim()), StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("https://unknown.example", "https://web.example")]
+    [InlineData("https://web.example", "")]
+    public async Task CorsMiddlewareDoesNotAllowUnknownOrUnconfiguredOrigins(string requestOrigin, string configuredOrigin)
+    {
+        using var provider = CreateCorsProvider(configuredOrigin);
+        var nextCalled = false;
+        var middleware = new CorsMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            provider.GetRequiredService<ICorsService>(),
+            provider.GetRequiredService<ILoggerFactory>());
+        var context = CreatePreflightContext(requestOrigin);
+
+        await middleware.Invoke(context, provider.GetRequiredService<ICorsPolicyProvider>());
+
+        Assert.False(nextCalled);
+        Assert.False(context.Response.Headers.ContainsKey("Access-Control-Allow-Origin"));
+        Assert.False(context.Response.Headers.ContainsKey("Access-Control-Allow-Credentials"));
+    }
+
+    private static ServiceProvider CreateCorsProvider(string configuredOrigin)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["Bff:Redis:ConnectionString"] = "unused-redis:6379",
+            ["Bff:Transport:ResponseHeaders:0"] = "Content-Disposition",
+            ["Bff:Transport:ResponseHeaders:1"] = "ETag",
+            ["Bff:Transport:ResponseHeaders:2"] = "Set-Cookie"
+        };
+        if (!string.IsNullOrEmpty(configuredOrigin))
+            values["Bff:Web:AllowedOrigins:0"] = configuredOrigin;
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddBffServices(configuration);
+        return services.BuildServiceProvider();
+    }
+
+    private static DefaultHttpContext CreatePreflightContext(string origin)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Options;
+        context.Request.Headers.Origin = origin;
+        context.Request.Headers.AccessControlRequestMethod = HttpMethods.Post;
+        context.Request.Headers.AccessControlRequestHeaders = "X-CSRF-TOKEN, Content-Type";
+        return context;
     }
 
     private static ServiceProvider CreateProvider(IDictionary<string, string?> overrides)

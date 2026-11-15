@@ -63,8 +63,7 @@ describe('PermissionsContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    (useAuth as Mock).mockReturnValue({ accessToken: 'token' });
-    localStorage.setItem('userId', '1');
+    (useAuth as Mock).mockReturnValue({ authenticated: true, userId: 1 });
     (useGroupUsers as Mock).mockReturnValue(defaultMock);
   });
 
@@ -124,8 +123,8 @@ describe('PermissionsContext', () => {
     });
   });
 
-  it('при отсутствии accessToken все права false', async () => {
-    (useAuth as Mock).mockReturnValue({ accessToken: null });
+  it('при отсутствии авторизации все права false', async () => {
+    (useAuth as Mock).mockReturnValue({ authenticated: false, userId: null });
 
     renderAtPath('/groups/5');
 

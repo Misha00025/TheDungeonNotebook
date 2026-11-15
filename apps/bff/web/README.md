@@ -4,7 +4,7 @@
 
 BFF даёт браузеру вход через Keycloak, хранит OAuth-токены только на сервере и обращается к API Gateway от имени вошедшего пользователя. Он обновляет access token при необходимости, защищает изменяющие запросы CSRF-проверкой и позволяет завершить локальную BFF-сессию.
 
-BFF не содержит предметных прав и профиля. Существующий Web пока не переключён на BFF.
+BFF не содержит предметных прав и TDN-профиля. Web Hub использует endpoints BFF-сессии и передаёт cookie-based transport remotes campaign, profile и login. Вход в IdP и создание TDN-профиля — отдельные шаги.
 
 ## Единственный штатный запуск
 
@@ -86,9 +86,15 @@ Account service проверяет issuer и audience access token соглас�
 
 ## Сессия и запросы
 
+### Прямой Web с другого origin
+
+Для подключения Web с отдельного origin поддерживаются `Bff:Web:PublicOrigin` и `Bff:Web:AllowedOrigins` в `apps/bff/web/data/config/appsettings.json`. `PublicOrigin` — доверенный абсолютный HTTP(S) origin хаба (с optional port); при входе локальный `returnUrl` после проверки перенаправляется на этот origin. Если параметр `null`, сохраняется прежний локальный redirect. `AllowedOrigins` — список точных HTTP(S) origins браузерного Web; пустой список не включает cross-origin доступ. Допускаются значения с завершающим `/`, нормализуемым при использовании.
+
+BFF разрешает credentials, методы и заголовки запросов, в том числе настроенный CSRF header; доступ применим только к указанным origins. Из ответных заголовков доступны браузеру только значения `Bff:Transport:ResponseHeaders`. Hub Web использует этот контракт; пользователь самостоятельно задаёт реальные origins BFF и runtime URL Web.
+
 - `GET /bff/session` показывает состояние входа и CSRF token, но не возвращает OAuth-токены, claims или ключ сессии.
 - Для изменяющих запросов к `/bff/api/...` и `POST /bff/logout` передавайте CSRF token в header `X-CSRF-TOKEN`.
 - `GET /bff/login?returnUrl=/bff/session` начинает вход и после возврата из Keycloak ведёт на указанный локальный адрес.
 - Logout завершает только локальную BFF-сессию; он не выполняет выход из Keycloak.
 
-Без настроенного существующего Keycloak client вход не заработает. Даже успешный вход требует согласованной настройки issuer и access-token audience в Account service. Web пока не подключён к BFF.
+Web выполняет вход перенаправлением браузера через BFF и использует cookie credentials с CSRF header для изменяющих API-запросов. Исходный API response возвращается вызывающему сервису; автоматического повтора запроса нет. Logout завершает только локальную BFF-сессию, не SSO IdP. Без настроенного Keycloak client вход не заработает. Даже успешный вход требует согласованной настройки issuer и access-token audience в Account service.

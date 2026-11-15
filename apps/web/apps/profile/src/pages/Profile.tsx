@@ -1,4 +1,3 @@
-// Profile.tsx
 import React, { useEffect, useState } from 'react';
 import { useProfile } from '@tdn/shared/auth/useProfile';
 import { userAPI } from '@tdn/shared';
@@ -7,10 +6,12 @@ import inputStyles from '@tdn/shared/styles/components/Input.module.css';
 import styles from '@tdn/shared/styles/common.module.css';
 import { useAuth } from '@tdn/shared/auth/AuthContext';
 import { uploadAPI } from '../services/api';
+import { useNavigate } from 'react-router-dom';
 
 const Profile: React.FC = () => {
-  const { profile, loading, error, fetchProfile } = useProfile();
+  const { profile, loading, error, fetchProfile } = useProfile(true);
   const { logout } = useAuth();
+  const navigate = useNavigate();
   
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
@@ -19,12 +20,8 @@ const Profile: React.FC = () => {
   });
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  useEffect(() => {
-    fetchProfile();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Инициализируем форму данными профиля
   useEffect(() => {
     if (profile) {
       setFormData({
@@ -43,14 +40,12 @@ const Profile: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Проверка типа файла
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
       alert('Недопустимый формат файла. Разрешены: JPEG, PNG, GIF, BMP, WebP.');
       return;
     }
 
-    // Проверка размера файла (например, максимум 5MB)
     if (file.size > 5 * 1024 * 1024) {
       alert('Файл слишком большой. Максимальный размер: 5MB.');
       return;
@@ -76,7 +71,7 @@ const Profile: React.FC = () => {
         visibleName: formData.visibleName,
         imageLink: formData.imageLink || undefined
       });
-      await fetchProfile(); // Обновляем данные профиля
+      await fetchProfile();
       setEditMode(false);
     } catch (error) {
       alert('Ошибка сохранения профиля');
@@ -99,6 +94,18 @@ const Profile: React.FC = () => {
     setFormData(prev => ({ ...prev, imageLink: 'none' }));
   };
 
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } catch {
+      return;
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
   if (loading) return <div className={styles.container}>Загрузка...</div>;
   if (error) return <div className={styles.container}>Ошибка: {error}</div>;
 
@@ -108,7 +115,6 @@ const Profile: React.FC = () => {
       
       {profile && (
         <div className={styles.profile}>
-          {/* Аватар */}
           <div className={styles.avatarSection}>
             {formData.imageLink ? (
               <img 
@@ -146,7 +152,6 @@ const Profile: React.FC = () => {
             )}
           </div>
 
-          {/* Информация */}
           <div className={styles.info}>
             <div className={styles.field}>
               <strong>ID:</strong> {profile.id}
@@ -206,7 +211,8 @@ const Profile: React.FC = () => {
             </button>
             <button 
               className={buttonStyles.button} 
-              onClick={logout}
+              onClick={handleLogout}
+              disabled={loggingOut}
               style={{backgroundColor: 'var(--danger-color)'}}
             >
               Выйти

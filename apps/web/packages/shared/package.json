@@ -10,6 +10,8 @@
     "./*": "./src/*"
   },
   "scripts": {
+    "test": "vitest",
+    "test:run": "vitest run",
     "typecheck": "tsc --noEmit"
   }
 }

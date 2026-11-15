@@ -1,101 +1,17 @@
-// src/pages/Login.tsx
-// Страница входа — отдельный remote-домен логина.
-//
-// Полностью независима от остальных приложений (не сшита с профилем и т.д.).
-// Переиспользует общий AuthContext из @tdn/shared: login() пишет токен в
-// общее хранилище сессии (shared-синглтон tokenManager), которое разделяют
-// все приложения. После успешного входа навигируем на корень приложения.
 import React from 'react';
 import { useAuth } from '@tdn/shared';
-import { useTheme } from '@tdn/shared';
 import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
-import inputStyles from '@tdn/shared/styles/components/Input.module.css';
-import modalStyles from '@tdn/shared/styles/modal.module.css';
-import { useLoginNavigate } from '../navigation';
 
 const Login: React.FC = () => {
-  const [username, setUsername] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
   const { login } = useAuth();
-  const navigate = useLoginNavigate();
-  const { setPreset } = useTheme();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    try {
-      await login(username, password);
-      navigate('/', { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
-      setLoading(false);
-    }
-  };
-
   return (
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '100vh',
-        background: 'var(--bg-primary)',
-      }}
-    >
-      <form
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1rem',
-          width: '100%',
-          maxWidth: '360px',
-          backgroundColor: 'var(--bg-secondary)',
-          padding: '1.5rem',
-          borderRadius: 'var(--border-radius-md)',
-        }}
-        onSubmit={handleSubmit}
-      >
-        <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          Вход в систему
-        </h2>
-
-        {error && <div className={modalStyles.error}>{error}</div>}
-
-        <input
-          className={inputStyles.input}
-          type="text"
-          placeholder="Имя пользователя"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          required
-        />
-        <input
-          className={inputStyles.input}
-          type="password"
-          placeholder="Пароль"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-
-        <button className={buttonStyles.button} type="submit" disabled={loading}>
-          {loading ? 'Загрузка...' : 'Войти'}
-        </button>
-
-        <button
-          type="button"
-          className={buttonStyles.button}
-          onClick={() => setPreset('dark')}
-          style={{ marginTop: '0.5rem' }}
-        >
-          Переключить тему (dark)
-        </button>
-      </form>
-    </div>
+    <main style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+      <section style={{ display: 'grid', gap: '1rem', width: 'min(100% - 2rem, 360px)', padding: '1.5rem', background: 'var(--bg-secondary)', borderRadius: 'var(--border-radius-md)' }}>
+        <h2>Вход в The Dungeon Notebook</h2>
+        <p>Вход и регистрация выполняются у провайдера учётных записей.</p>
+        <button className={buttonStyles.button} type="button" onClick={() => login()}>Войти</button>
+      </section>
+    </main>
   );
 };
 

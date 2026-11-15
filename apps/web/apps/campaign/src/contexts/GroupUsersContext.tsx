@@ -34,7 +34,7 @@ const GroupUsersContext = createContext<GroupUsersContextType | null>(null);
 const GroupUsersProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { accessToken } = useAuth();
+  const { authenticated, userId } = useAuth();
   const location = useLocation();
   const { groupId } = getGroupAndCharacterIds(location.pathname);
 
@@ -46,7 +46,10 @@ const GroupUsersProvider: React.FC<{ children: React.ReactNode }> = ({
   const [groupUsersLoadedAt, setGroupUsersLoadedAt] = useState<number | null>(
     null,
   );
-  const prevGroupIdRef = useRef<number | undefined>(undefined);
+  const sessionKey = `${authenticated ? 'yes' : 'no'}:${userId ?? 'none'}:${groupId ?? 'none'}`;
+  const activeSessionKey = useRef(sessionKey);
+  activeSessionKey.current = sessionKey;
+  const previousSessionKey = useRef<string | null>(null);
 
   const [characterUsersLoadedAt, setCharacterUsersLoadedAt] = useState<
     Record<number, number>
@@ -59,28 +62,32 @@ const GroupUsersProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const loadGroupUsers = useCallback(async () => {
-    if (!accessToken || !groupId) return;
+    if (!authenticated || userId === null || !groupId) return;
+    const requestKey = sessionKey;
     setGroupUsersLoading(true);
     try {
       const data = await groupUsersAPI.getGroupUsers(groupId);
+      if (requestKey !== activeSessionKey.current) return;
       setGroupUsers(data);
       setGroupUsersLoadedAt(Date.now());
       setError(null);
     } catch (err) {
-      console.error('Failed to load group users:', err);
+      if (requestKey === activeSessionKey.current) console.error('Failed to load group users:', err);
     } finally {
-      setGroupUsersLoading(false);
+      if (requestKey === activeSessionKey.current) setGroupUsersLoading(false);
     }
-  }, [accessToken, groupId]);
+  }, [authenticated, userId, groupId, sessionKey]);
 
   const loadCharacterUsers = useCallback(
     async (characterId: number) => {
-      if (!accessToken || !groupId) return;
+      if (!authenticated || userId === null || !groupId) return;
+      const requestKey = sessionKey;
       try {
         const data = await characterUsersAPI.getCharacterUsers(
           groupId,
           characterId,
         );
+        if (requestKey !== activeSessionKey.current) return;
         setCharacterUsers((prev) => ({ ...prev, [characterId]: data }));
         setCharacterUsersLoadedAt((prev) => ({
           ...prev,
@@ -88,10 +95,10 @@ const GroupUsersProvider: React.FC<{ children: React.ReactNode }> = ({
         }));
         setError(null);
       } catch (err) {
-        console.error('Failed to load character users:', err);
+        if (requestKey === activeSessionKey.current) console.error('Failed to load character users:', err);
       }
     },
-    [accessToken, groupId],
+    [authenticated, userId, groupId, sessionKey],
   );
 
   const ensureGroupUsers = useCallback(() => {
@@ -133,21 +140,16 @@ const GroupUsersProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   useEffect(() => {
-    if (!accessToken) return;
-
-    if (prevGroupIdRef.current !== groupId) {
-      // Группа сменилась (или первый вход) — сбрасываем кэш и грузим заново
-      prevGroupIdRef.current = groupId;
-      setGroupUsers([]);
-      setGroupUsersLoadedAt(null);
-      setCharacterUsers({});
-      setCharacterUsersLoadedAt({});
-      if (groupId) {
-        loadGroupUsers();
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId, accessToken]);
+    if (previousSessionKey.current === sessionKey) return;
+    previousSessionKey.current = sessionKey;
+    setGroupUsers([]);
+    setGroupUsersLoading(Boolean(authenticated && userId !== null && groupId));
+    setGroupUsersLoadedAt(null);
+    setCharacterUsers({});
+    setCharacterUsersLoadedAt({});
+    setError(null);
+    if (authenticated && userId !== null && groupId) void loadGroupUsers();
+  }, [sessionKey, groupId, authenticated, userId, loadGroupUsers]);
 
   const value = useMemo(
     () => ({

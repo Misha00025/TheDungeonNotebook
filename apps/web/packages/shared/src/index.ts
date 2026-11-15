@@ -4,12 +4,10 @@
 // --- auth ---
 export { AuthProvider, useAuth, RemoteAuthProvider, AuthContext } from './auth/AuthContext';
 export type { AuthContextType } from './auth/AuthContext';
-export { authAPI, makeAuthenticatedRequest, userAPI, userSettingsAPI } from './auth/api';
-export { default as tokenManager } from './auth/tokenManager';
+export { makeAuthenticatedRequest, setAuthenticatedRequest, userAPI, userSettingsAPI } from './auth/api';
+export { createBffClient, BffRequestError } from './auth/bffClient';
+export type { AuthenticatedRequest, BffSession } from './auth/bffClient';
 export type {
-  LoginRequest,
-  RegisterRequest,
-  TokenResponse,
   WhoAmIResponse,
   UserProfile,
   CreateProfileRequest,
@@ -70,6 +68,8 @@ export { generateKey } from './utils/generateKey';
 export { storage } from './utils/storage';
 
 // --- config ---
-export { loadConfig, getApiBase, setApiBase, joinApiUrl } from './config';
+export { loadConfig, getConfig, setConfig, getApiBase, setApiBase, joinApiUrl } from './config';
+export type { AppConfig } from './config';
+export type { HubRemoteProps } from './auth/AuthContext';
 export { names } from './config/names';
 export type { NamesConfig } from './config/names';

@@ -1,6 +1,6 @@
 // Общие (auth/user/settings) клиенты и makeAuthenticatedRequest переехали в @tdn/shared.
-import { authAPI, makeAuthenticatedRequest, userAPI, userSettingsAPI } from '@tdn/shared';
-export { authAPI, makeAuthenticatedRequest, userAPI, userSettingsAPI };
+import { makeAuthenticatedRequest, userAPI, userSettingsAPI } from '@tdn/shared';
+export { makeAuthenticatedRequest, userAPI, userSettingsAPI };
 
 import { CreateGroupRequest, Group, GroupsResponse } from '../types/group';
 import { GroupUser, GroupUsersResponse, SearchUsersResponse, User } from '../types/groupUsers';

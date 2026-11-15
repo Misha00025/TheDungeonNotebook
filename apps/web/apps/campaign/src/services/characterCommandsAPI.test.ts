@@ -1,63 +1,49 @@
-import { characterCommandsAPI, makeAuthenticatedRequest } from './api';
-import type { Mock, Mocked } from 'vitest';
+import { createBffClient, setAuthenticatedRequest } from '@tdn/shared';
+import { characterCommandsAPI } from './api';
 
-vi.mock('@tdn/shared/auth/tokenManager', () => ({
-  __esModule: true,
-  default: {
-    ensureToken: vi.fn(),
-    invalidateAccessToken: vi.fn(),
-    clear: vi.fn(),
-  },
-}));
-
-import tokenManager from '@tdn/shared/auth/tokenManager';
+const config = { BFF_BASE: 'http://localhost:5080/bff', API_BASE: 'http://localhost:5080/bff/api' };
+const session = { authenticated: true, csrfToken: 'csrf-test', csrfHeaderName: 'X-CSRF-CUSTOM' };
 
 describe('characterCommandsAPI.executeCommand', () => {
   const mockFetch = vi.fn();
 
-  beforeAll(() => {
-    global.fetch = mockFetch;
-  });
-
   beforeEach(() => {
-    vi.clearAllMocks();
-    (tokenManager.ensureToken as Mock).mockResolvedValue('fake-token');
+    vi.stubGlobal('fetch', mockFetch);
+    mockFetch.mockReset();
+    setAuthenticatedRequest(createBffClient(config).request);
   });
 
-  afterAll(() => {
-    delete (global as any).fetch;
+  afterEach(() => {
+    setAuthenticatedRequest(null);
+    vi.unstubAllGlobals();
   });
 
-  it('отправляет команду на правильный endpoint с телом команды', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        id: 1,
-        name: 'Иван',
-        description: '',
-        fields: { hp: { name: 'Здоровье', value: 20, description: '' } },
-        group: { id: 2, name: 'G', icon: null },
-        templateId: 3,
-      }),
-    });
-
+  it('sends the command to the correct endpoint with cookie credentials and dynamic CSRF', async () => {
+    const character = {
+      id: 1,
+      name: 'Иван',
+      description: '',
+      fields: { hp: { name: 'Здоровье', value: 20, description: '' } },
+      group: { id: 2, name: 'G', icon: null },
+      templateId: 3,
+    };
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify(session))).mockResolvedValueOnce(new Response(JSON.stringify(character)));
     const command = { type: 'UpdateField' as const, payload: { key: 'hp', field: { value: 5 } } };
     const result = await characterCommandsAPI.executeCommand(2, 7, command);
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('/groups/2/characters/7/commands'),
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({ Authorization: 'Bearer fake-token' }),
-        body: JSON.stringify(command),
-      })
-    );
-    expect(result.name).toBe('Иван');
+    const [url, options] = mockFetch.mock.calls[1];
+    expect(url).toBe(`${config.API_BASE}/groups/2/characters/7/commands`);
+    expect(options.method).toBe('POST');
+    expect(options.body).toBe(JSON.stringify(command));
+    expect(options.credentials).toBe('include');
+    expect(options.headers).toBeInstanceOf(Headers);
+    expect(options.headers.get('Content-Type')).toBe('application/json');
+    expect(options.headers.get('X-CSRF-CUSTOM')).toBe('csrf-test');
+    expect(options.headers.has('Authorization')).toBe(false);
+    expect(result).toEqual(character);
   });
 
-  it('пробрасывает ошибку при неудачном запросе', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false });
-
+  it('throws when the command request fails', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify(session))).mockResolvedValueOnce(new Response('', { status: 500 }));
     await expect(characterCommandsAPI.executeCommand(2, 7, { type: 'DeleteField', payload: { key: 'hp' } }))
       .rejects.toThrow('Failed to execute character command');
   });

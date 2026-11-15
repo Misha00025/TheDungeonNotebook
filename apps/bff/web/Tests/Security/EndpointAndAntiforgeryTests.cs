@@ -92,6 +92,38 @@ public sealed class EndpointAndAntiforgeryTests
         Assert.Equal("/", challengeProperties?.RedirectUri);
     }
 
+    [Fact]
+    public async Task LoginUsesConfiguredPublicOriginForLocalReturnUrl()
+    {
+        var (context, authentication) = CreateContext();
+        AuthenticationProperties? challengeProperties = null;
+        authentication.Setup(service => service.ChallengeAsync(context, BffAuthenticationDefaults.Oidc, It.IsAny<AuthenticationProperties?>()))
+            .Callback<HttpContext, string?, AuthenticationProperties?>((_, _, properties) => challengeProperties = properties)
+            .Returns(Task.CompletedTask);
+
+        await BffEndpointRouteBuilderExtensions.HandleLoginAsync(context, "~/groups?tab=active#notes", new UrlHelperFactory(), "https://hub.example:8443/");
+
+        Assert.Equal("https://hub.example:8443/groups?tab=active#notes", challengeProperties?.RedirectUri);
+    }
+
+    [Fact]
+    public async Task LoginUsesConfiguredPublicOriginForRootAndRejectsExternalReturnUrl()
+    {
+        var (context, authentication) = CreateContext();
+        AuthenticationProperties? challengeProperties = null;
+        authentication.Setup(service => service.ChallengeAsync(context, BffAuthenticationDefaults.Oidc, It.IsAny<AuthenticationProperties?>()))
+            .Callback<HttpContext, string?, AuthenticationProperties?>((_, _, properties) => challengeProperties = properties)
+            .Returns(Task.CompletedTask);
+
+        await BffEndpointRouteBuilderExtensions.HandleLoginAsync(context, null, new UrlHelperFactory(), "https://hub.example");
+        Assert.Equal("https://hub.example/", challengeProperties?.RedirectUri);
+
+        var (invalidContext, invalidAuthentication) = CreateContext();
+        await BffEndpointRouteBuilderExtensions.HandleLoginAsync(invalidContext, "https://evil.example/path", new UrlHelperFactory(), "https://hub.example");
+        Assert.Equal(StatusCodes.Status400BadRequest, invalidContext.Response.StatusCode);
+        invalidAuthentication.Verify(service => service.ChallengeAsync(It.IsAny<HttpContext>(), It.IsAny<string?>(), It.IsAny<AuthenticationProperties?>()), Times.Never);
+    }
+
     [Theory]
     [InlineData("//evil.example")]
     [InlineData("/\\evil.example")]

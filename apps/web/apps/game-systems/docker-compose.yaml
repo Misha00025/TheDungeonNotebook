@@ -1,6 +1,5 @@
 # @tdn/game-systems — отдельный контейнер.
-# Запуск из КОРНЯ монорепо (context: ../..), т.к. приложение зависит от packages/shared:
-#   cp template.env .env && docker compose -f apps/game-systems/docker-compose.yaml up -d --build
+# Запуск из корня apps/web для статической раздачи federation assets.
 services:
   game-systems:
     build:
@@ -12,9 +11,4 @@ services:
     container_name: tdn-game-systems
     ports:
       - "${GAME_SYSTEMS_PORT:-3001}:3000"
-    env_file:
-      - .env
     restart: unless-stopped
-    # Чтобы подложить свой config.json (заменит ENV):
-    # volumes:
-    #   - ./config.json:/app/build/config.json:ro

@@ -10,6 +10,7 @@ public sealed class BffOptions
     public RedisOptions Redis { get; set; } = new();
     public SessionOptions Session { get; set; } = new();
     public TransportOptions Transport { get; set; } = new();
+    public WebOptions Web { get; set; } = new();
     public DataProtectionOptions DataProtection { get; set; } = new();
     public ClientAuthentication ClientAuthentication { get; set; } = ClientAuthentication.PostBody;
 }
@@ -41,6 +42,12 @@ public sealed class TransportOptions
 {
     public List<string> RequestHeaders { get; set; } = [];
     public List<string> ResponseHeaders { get; set; } = [];
+}
+
+public sealed class WebOptions
+{
+    public string? PublicOrigin { get; set; }
+    public List<string> AllowedOrigins { get; set; } = [];
 }
 
 public sealed class DataProtectionOptions
@@ -80,6 +87,10 @@ public sealed class BffOptionsValidator : IValidateOptions<BffOptions>
         ValidateLocalPath(options.Endpoints.Session, "Bff:Endpoints:Session", errors);
         ValidateLocalPath(options.Endpoints.Logout, "Bff:Endpoints:Logout", errors);
 
+        ValidateOrigin(options.Web.PublicOrigin, "Bff:Web:PublicOrigin", errors);
+        foreach (var origin in options.Web.AllowedOrigins)
+            ValidateOrigin(origin, "Bff:Web:AllowedOrigins", errors);
+
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
     }
 
@@ -105,5 +116,18 @@ public sealed class BffOptionsValidator : IValidateOptions<BffOptions>
 
         if (!value.StartsWith('/') || value.StartsWith("//", StringComparison.Ordinal) || value.Contains('?') || value.Contains('#'))
             errors.Add($"{name} must be a non-empty local path.");
+    }
+
+    private static void ValidateOrigin(string? value, string name, ICollection<string> errors)
+    {
+        if (value is null && name.EndsWith("PublicOrigin", StringComparison.Ordinal))
+            return;
+
+        if (string.IsNullOrWhiteSpace(value) || !Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
+            string.IsNullOrEmpty(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo) ||
+            !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment) || value.Contains('?') || value.Contains('#') ||
+            (uri.AbsolutePath != "/" && uri.AbsolutePath.Length != 0) || value.Contains('*'))
+            errors.Add($"{name} must be an absolute HTTP or HTTPS origin without credentials, query, fragment, or path.");
     }
 }

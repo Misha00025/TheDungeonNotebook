@@ -1,114 +1,26 @@
-import { userSettingsAPI } from './api';
-import type { Mock, Mocked } from 'vitest';
-
-vi.mock('./tokenManager', () => ({
-  __esModule: true,
-  default: {
-    ensureToken: vi.fn(),
-    invalidateAccessToken: vi.fn(),
-    clear: vi.fn(),
-  },
-}));
-
-import tokenManager from './tokenManager';
+import { userSettingsAPI, setAuthenticatedRequest } from './api';
 
 describe('userSettingsAPI', () => {
-  const mockFetch = vi.fn();
+  const handler = vi.fn();
+  beforeEach(() => { handler.mockReset(); setAuthenticatedRequest(handler); });
+  afterEach(() => setAuthenticatedRequest(null));
 
-  beforeAll(() => {
-    global.fetch = mockFetch;
+  it('gets settings and adds the optional keys query', async () => {
+    handler.mockResolvedValue(new Response(JSON.stringify({ settings: { theme: 'dark' } })));
+    await userSettingsAPI.getSettings(42, ['theme', 'density']);
+    expect(handler).toHaveBeenCalledWith('/users/42/settings?keys=theme%2Cdensity', {}, 'application/json');
   });
 
-  beforeEach(() => {
-    vi.clearAllMocks();
+  it('updates settings with a JSON PUT', async () => {
+    handler.mockResolvedValue(new Response(JSON.stringify({ settings: { theme: 'dark' } })));
+    await userSettingsAPI.updateSettings(42, { theme: 'dark' });
+    expect(handler).toHaveBeenCalledWith('/users/42/settings', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ theme: 'dark' }) }), 'application/json');
   });
 
-  afterAll(() => {
-    delete (global as any).fetch;
-  });
-
-  it('getSettings without keys calls correct endpoint', async () => {
-    (tokenManager.ensureToken as Mock).mockResolvedValue('my-token');
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({ settings: { theme: 'dark', fontSize: 14 } }),
-    });
-
-    const result = await userSettingsAPI.getSettings(42);
-
-    expect(result).toEqual({ settings: { theme: 'dark', fontSize: 14 } });
-    expect(mockFetch).toHaveBeenCalledWith(
-      'http://localhost:5000/users/42/settings',
-      expect.any(Object)
-    );
-  });
-
-  it('getSettings with keys appends keys query param', async () => {
-    (tokenManager.ensureToken as Mock).mockResolvedValue('my-token');
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({ settings: { theme: 'light' } }),
-    });
-
-    await userSettingsAPI.getSettings(7, ['theme']);
-
-    const calledUrl = mockFetch.mock.calls[0][0];
-    expect(calledUrl).toContain('keys=theme');
-  });
-
-  it('updateSettings sends PUT with JSON body', async () => {
-    (tokenManager.ensureToken as Mock).mockResolvedValue('my-token');
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => ({ settings: { theme: 'dark', fontSize: 16 } }),
-    });
-
-    const result = await userSettingsAPI.updateSettings(42, { theme: 'dark', fontSize: 16 as any });
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      'http://localhost:5000/users/42/settings',
-      expect.objectContaining({
-        method: 'PUT',
-        headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ theme: 'dark', fontSize: 16 }),
-      })
-    );
-    expect(result).toEqual({ settings: { theme: 'dark', fontSize: 16 } });
-  });
-
-  it('getSettings throws on error response', async () => {
-    (tokenManager.ensureToken as Mock).mockResolvedValue('my-token');
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      json: async () => ({ detail: 'Settings not found' }),
-    });
-
-    await expect(userSettingsAPI.getSettings(99)).rejects.toThrow('Settings not found');
-  });
-
-  it('getSettings throws with generic message when error body is empty', async () => {
-    (tokenManager.ensureToken as Mock).mockResolvedValue('my-token');
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      json: async () => ({}),
-    });
-
-    await expect(userSettingsAPI.getSettings(99)).rejects.toThrow('Failed to fetch user settings');
-  });
-
-  it('updateSettings throws on error response', async () => {
-    (tokenManager.ensureToken as Mock).mockResolvedValue('my-token');
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 422,
-      json: async () => ({ detail: 'Invalid setting value' }),
-    });
-
-    await expect(userSettingsAPI.updateSettings(42, { theme: null })).rejects.toThrow('Invalid setting value');
+  it('reports API errors from response details', async () => {
+    handler.mockResolvedValue(new Response(JSON.stringify({ detail: 'Settings not found' }), { status: 404 }));
+    await expect(userSettingsAPI.getSettings(42)).rejects.toThrow('Settings not found');
+    handler.mockResolvedValue(new Response(JSON.stringify({ detail: 'Invalid setting' }), { status: 422 }));
+    await expect(userSettingsAPI.updateSettings(42, { theme: null })).rejects.toThrow('Invalid setting');
   });
 });

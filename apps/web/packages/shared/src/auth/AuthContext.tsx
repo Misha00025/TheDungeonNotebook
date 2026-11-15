@@ -1,139 +1,175 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { TokenResponse, WhoAmIResponse } from './types';
-import { authAPI, makeAuthenticatedRequest } from './api';
-import tokenManager from './tokenManager';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  ReactNode,
+} from 'react';
+import { getConfig, setConfig } from '../config';
+import type { AppConfig } from '../config';
+import { AuthenticatedRequest, createBffClient } from './bffClient';
+import { setAuthenticatedRequest } from './api';
+import type { WhoAmIResponse } from './types';
 
 export interface AuthContextType {
-  accessToken: string | null;
+  status: 'loading' | 'anonymous' | 'authenticated' | 'error';
+  authenticated: boolean;
   userId: number | null;
-  login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  error: string | null;
+  config: AppConfig;
+  request: AuthenticatedRequest;
+  login: (returnUrl?: string) => void;
+  logout: () => Promise<void>;
+  refreshSession: () => Promise<void>;
 }
+
+export type HubRemoteProps = { auth: AuthContextType };
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const config = getConfig();
+  const [status, setStatus] = useState<AuthContextType['status']>('loading');
   const [userId, setUserId] = useState<number | null>(null);
-  const [initializing, setInitializing] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const generation = useRef(0);
+  const mounted = useRef(false);
+  const init = useRef<Promise<void> | null>(null);
+  const client = useRef<ReturnType<typeof createBffClient> | null>(null);
 
-  useEffect(() => {
-    const initAuth = async () => {
-      const token = await tokenManager.ensureToken();
-
-      if (token) {
-        try {
-          const whoamiResponse = await makeAuthenticatedRequest('/whoami');
-          if (whoamiResponse.ok) {
-            const whoamiData: WhoAmIResponse = await whoamiResponse.json();
-            setUserId(whoamiData.id);
-            localStorage.setItem('userId', whoamiData.id.toString());
-          }
-        } catch (error) {
-          console.error('Session restore failed:', error);
-          tokenManager.clear();
-          localStorage.removeItem('userId');
-        }
+  if (!client.current) {
+    client.current = createBffClient(config, () => {
+      generation.current++;
+      if (mounted.current) {
+        setUserId(null);
+        setStatus('anonymous');
+        setError(null);
       }
-
-      setInitializing(false);
-    };
-
-    initAuth();
-  }, []);
-
-  const login = async (username: string, password: string) => {
-    try {
-      const tokenData: TokenResponse = await authAPI.login({ username, password });
-      tokenManager.setTokens(tokenData.access_token, tokenData.refresh_token);
-
-      const whoamiResponse = await makeAuthenticatedRequest('/whoami');
-      if (whoamiResponse.ok) {
-        const whoamiData: WhoAmIResponse = await whoamiResponse.json();
-        setUserId(whoamiData.id);
-        localStorage.setItem('userId', whoamiData.id.toString());
-      }
-    } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
-    }
-  };
-
-  const register = async (username: string, password: string) => {
-    try {
-      const tokenData: TokenResponse = await authAPI.register({ username, password });
-      tokenManager.setTokens(tokenData.access_token, tokenData.refresh_token);
-
-      const whoamiResponse = await makeAuthenticatedRequest('/whoami');
-      if (whoamiResponse.ok) {
-        const whoamiData: WhoAmIResponse = await whoamiResponse.json();
-        setUserId(whoamiData.id);
-        localStorage.setItem('userId', whoamiData.id.toString());
-      }
-    } catch (error) {
-      console.error('Registration failed:', error);
-      throw error;
-    }
-  };
-
-  const logout = () => {
-    setUserId(null);
-    tokenManager.clear();
-    localStorage.removeItem('userId');
-  };
-
-  if (initializing) {
-    return null;
+    });
   }
 
-  return (
-    <AuthContext.Provider value={{
-      accessToken: tokenManager.getAccessToken(),
-      userId,
-      login,
-      register,
-      logout,
-    }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const bff = client.current;
+  setAuthenticatedRequest(bff.request);
+
+  const refreshSession = useCallback((): Promise<void> => {
+    if (init.current) return init.current;
+
+    const current = generation.current;
+    const pending = (async () => {
+      try {
+        const session = await bff.getSession();
+        if (!session.authenticated) {
+          if (mounted.current && current === generation.current) {
+            setUserId(null);
+            setStatus('anonymous');
+            setError(null);
+          }
+          return;
+        }
+
+        const response = await bff.request('/whoami');
+        if (!response.ok) {
+          throw new Error(`Whoami request failed: ${response.status}`);
+        }
+
+        const user: WhoAmIResponse = await response.json();
+        if (typeof user.id !== 'number' || user.type !== 'user') {
+          throw new Error('Malformed whoami response');
+        }
+
+        if (mounted.current && current === generation.current) {
+          setUserId(user.id);
+          setStatus('authenticated');
+          setError(null);
+        }
+      } catch (reason) {
+        if (mounted.current && current === generation.current) {
+          setStatus('error');
+          setError(reason instanceof Error ? reason.message : String(reason));
+        }
+      }
+    })().finally(() => {
+      if (init.current === pending) init.current = null;
+    });
+
+    init.current = pending;
+    return pending;
+  }, [bff]);
+
+  useEffect(() => {
+    mounted.current = true;
+    setAuthenticatedRequest(bff.request);
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('userId');
+    void refreshSession();
+
+    return () => {
+      mounted.current = false;
+      setAuthenticatedRequest(null);
+    };
+  }, [bff, refreshSession]);
+
+  const logout = useCallback(async () => {
+    const previous = { id: userId, status, error };
+    const current = generation.current;
+
+    try {
+      await bff.logout();
+      if (mounted.current && current === generation.current) {
+        generation.current++;
+        setUserId(null);
+        setStatus('anonymous');
+        setError(null);
+      }
+    } catch (reason) {
+      if (mounted.current && current === generation.current) {
+        setUserId(previous.id);
+        setStatus(previous.status);
+        setError(reason instanceof Error ? reason.message : String(reason));
+      }
+      throw reason;
+    }
+  }, [bff, error, status, userId]);
+
+  const login = useCallback((returnUrl?: string) => {
+    const localReturnPath = returnUrl ??
+      `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.location.assign(bff.getLoginUrl(localReturnPath));
+  }, [bff]);
+
+  const value: AuthContextType = {
+    status,
+    authenticated: status === 'authenticated',
+    userId,
+    error,
+    config,
+    request: bff.request,
+    login,
+    logout,
+    refreshSession,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
 
-/**
- * RemoteAuthProvider — провайдер auth для remote-модулей, монтируемых хабом.
- *
- * Хаб владеет сессией (AuthProvider) и прокидывает в remote-компонент
- * auth (accessToken/login/logout/userId) через пропс. Remote НЕ бандлит
- * собственный AuthProvider (иначе useAuth внутри remote ищет свой контекст,
- * которого нет) — вместо этого он оборачивает своё дерево в этот провайдер,
- * который «подсовывает» переданный хабом auth в общий AuthContext.
- *
- * Если auth не передан (автономный запуск) — провайдер ничего не делает,
- * и дерево использует AuthProvider из main.tsx (standalone).
- */
-export const RemoteAuthProvider: React.FC<{
-  auth?: Partial<AuthContextType>;
-  children: ReactNode;
-}> = ({ auth, children }) => {
+export const RemoteAuthProvider: React.FC<HubRemoteProps & { children: ReactNode }> = ({
+  auth,
+  children,
+}) => {
   if (!auth) {
-    return <>{children}</>;
+    throw new Error('RemoteAuthProvider requires Hub auth');
   }
-
-  const value: AuthContextType = {
-    accessToken: auth.accessToken ?? null,
-    userId: auth.userId ?? null,
-    login: auth.login ?? (async () => {}),
-    register: auth.register ?? (async () => {}),
-    logout: auth.logout ?? (() => {}),
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  setConfig(auth.config);
+  setAuthenticatedRequest(auth.request);
+  return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>;
 };

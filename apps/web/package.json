@@ -40,8 +40,8 @@
     "build:hub": "npm run build --workspace @tdn/hub",
     "build:profile": "npm run build --workspace @tdn/profile",
     "build:login": "npm run build --workspace @tdn/login",
-    "test": "npm run test --workspace @tdn/campaign",
-    "test:run": "npm run test:run --workspace @tdn/campaign"
+    "test": "npm run test --workspaces --if-present",
+    "test:run": "npm run test:run --workspaces --if-present"
   },
   "browserslist": {
     "production": [

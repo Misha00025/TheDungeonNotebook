@@ -15,6 +15,7 @@ dist
 .env
 .env.*
 config.*.json
+public/config.json
 
 # Git / прочее
 .git

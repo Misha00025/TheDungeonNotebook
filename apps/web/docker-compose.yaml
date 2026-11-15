@@ -1,13 +1,13 @@
 # Docker Compose для всех приложений монорепо tdn-frontend.
 # Запуск из КОРНЯ монорепо (отдельный compose не требуется):
-#   cp template.env .env              # runtime-конфиг (API_BASE)
+#   cp template.env .env              # runtime-конфиг Hub (BFF_BASE, API_BASE)
 #   cp template.env.build .env.build  # параметры сборки (VITE_BASE_*, VITE_REMOTE_*)
 #   docker compose --env-file .env.build up -d --build
 #
 # Каждое приложение — отдельный образ и отдельный контейнер.
 # Базовый путь (VITE_BASE) и URL remotes (VITE_REMOTE_*) задаются на этапе
 # сборки через build.args (подставляются из .env.build).
-# Runtime-конфиг (API_BASE) — общий .env для всех сервисов.
+# Runtime-конфиг используется только Hub.
 
 services:
   campaign:
@@ -20,12 +20,7 @@ services:
     container_name: tdn-campaign
     ports:
       - "${CAMPAIGN_PORT:-3000}:3000"
-    env_file:
-      - .env
     restart: unless-stopped
-    # Чтобы подложить свой config.json (заменит ENV):
-    # volumes:
-    #   - ./config.campaign.json:/app/build/config.json:ro
 
   # game-systems — отключён (не используется). Раскомментировать при необходимости.
   # game-systems:
@@ -38,12 +33,7 @@ services:
   #   container_name: tdn-game-systems
   #   ports:
   #     - "${GAME_SYSTEMS_PORT:-3001}:3000"
-  #   env_file:
-  #     - .env
   #   restart: unless-stopped
-  #   # Чтобы подложить свой config.json (заменит ENV):
-  #   # volumes:
-  #   #   - ./config.game-systems.json:/app/build/config.json:ro
 
   hub:
     build:
@@ -61,9 +51,6 @@ services:
     env_file:
       - .env
     restart: unless-stopped
-    # Чтобы подложить свой config.json (заменит ENV):
-    # volumes:
-    #   - ./config.hub.json:/app/build/config.json:ro
 
   profile:
     build:
@@ -75,12 +62,7 @@ services:
     container_name: tdn-profile
     ports:
       - "${PROFILE_PORT:-3002}:3000"
-    env_file:
-      - .env
     restart: unless-stopped
-    # Чтобы подложить свой config.json (заменит ENV):
-    # volumes:
-    #   - ./config.profile.json:/app/build/config.json:ro
 
   login:
     build:
@@ -92,9 +74,4 @@ services:
     container_name: tdn-login
     ports:
       - "${LOGIN_PORT:-3003}:3000"
-    env_file:
-      - .env
     restart: unless-stopped
-    # Чтобы подложить свой config.json (заменит ENV):
-    # volumes:
-    #   - ./config.login.json:/app/build/config.json:ro

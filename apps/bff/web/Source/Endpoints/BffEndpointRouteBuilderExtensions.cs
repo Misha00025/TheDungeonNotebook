@@ -22,7 +22,7 @@ public static class BffEndpointRouteBuilderExtensions
             var returnUrl = context.Request.Query.TryGetValue("returnUrl", out var requestedReturnUrl)
                 ? requestedReturnUrl.ToString()
                 : "/";
-            await HandleLoginAsync(context, returnUrl, urlHelperFactory).ConfigureAwait(false);
+            await HandleLoginAsync(context, returnUrl, urlHelperFactory, options.Web.PublicOrigin).ConfigureAwait(false);
         });
 
         endpoints.MapGet(options.Endpoints.Session, async (HttpContext context, IAntiforgery antiforgery, IOptions<AntiforgeryOptions> antiforgeryOptions) =>
@@ -35,7 +35,7 @@ public static class BffEndpointRouteBuilderExtensions
         return endpoints;
     }
 
-    public static async Task HandleLoginAsync(HttpContext context, string? returnUrl, IUrlHelperFactory urlHelperFactory)
+    public static async Task HandleLoginAsync(HttpContext context, string? returnUrl, IUrlHelperFactory urlHelperFactory, string? publicOrigin = null)
     {
         SetNoStore(context.Response);
         returnUrl ??= "/";
@@ -49,6 +49,8 @@ public static class BffEndpointRouteBuilderExtensions
         }
 
         var redirectUri = returnUrl.StartsWith("~/", StringComparison.Ordinal) ? urlHelper.Content(returnUrl) : returnUrl;
+        if (!string.IsNullOrWhiteSpace(publicOrigin))
+            redirectUri = $"{publicOrigin.TrimEnd('/')}{redirectUri}";
         await context.ChallengeAsync(BffAuthenticationDefaults.Oidc, new AuthenticationProperties { RedirectUri = redirectUri }).ConfigureAwait(false);
     }
 

@@ -1,183 +1,97 @@
-import React from 'react';
-import type { Mock, Mocked } from 'vitest';
-import { render, screen, act, waitFor } from '@testing-library/react';
-import { AuthProvider, useAuth } from './AuthContext';
+import React, { StrictMode } from 'react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import { AuthProvider, RemoteAuthProvider, useAuth } from './AuthContext';
+import { getConfig, setConfig } from '../config';
+import { makeAuthenticatedRequest, setAuthenticatedRequest } from './api';
+import type { AuthContextType } from './AuthContext';
 
-vi.mock('./api', () => ({
-  authAPI: {
-    login: vi.fn(),
-    register: vi.fn(),
-  },
-  makeAuthenticatedRequest: vi.fn(),
-}));
+const config = { BFF_BASE: 'http://localhost:5080/bff', API_BASE: 'http://localhost:5080/bff/api' };
+const session = { authenticated: true, csrfToken: 'csrf', csrfHeaderName: 'X-CSRF' };
+const Consumer = () => { const auth = useAuth(); return <div><span data-testid="status">{auth.status}</span><span data-testid="user">{auth.userId}</span><span data-testid="error">{auth.error}</span><button onClick={() => void auth.refreshSession()}>refresh</button><button onClick={() => void auth.logout().catch(() => undefined)}>logout</button></div>; };
+const deferred = <T,>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(r => { resolve = r; }); return { promise, resolve }; };
 
-vi.mock('./tokenManager', () => ({
-  __esModule: true,
-  default: {
-    ensureToken: vi.fn(),
-    setTokens: vi.fn(),
-    getAccessToken: vi.fn(),
-    clear: vi.fn(),
-  },
-}));
+describe('AuthProvider', () => {
+  beforeEach(() => { setConfig(config); localStorage.clear(); vi.stubGlobal('fetch', vi.fn()); });
+  afterEach(() => {
+    setAuthenticatedRequest(null);
+    setConfig(config);
+    vi.unstubAllGlobals();
+  });
 
-import { authAPI, makeAuthenticatedRequest } from './api';
-import tokenManager from './tokenManager';
+  it('renders loading then anonymous for a 401 session', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('', { status: 401 }));
+    render(<AuthProvider><Consumer /></AuthProvider>);
+    expect(screen.getByTestId('status').textContent).toBe('loading');
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('anonymous'));
+  });
 
-const createMockResponse = (status: number, body: Record<string, unknown>) =>
-  Promise.resolve({
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => body,
-  } as Response);
+  it('loads authenticated user from whoami', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(session))).mockResolvedValueOnce(new Response(JSON.stringify({ id: 12, type: 'user' })));
+    render(<AuthProvider><Consumer /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('user').textContent).toBe('12'));
+  });
 
-const TestConsumer: React.FC = () => {
-  const { accessToken, userId, login, register, logout } = useAuth();
-  return (
-    <div>
-      <span data-testid="token">{accessToken ?? 'null'}</span>
-      <span data-testid="userId">{userId ?? 'null'}</span>
-      <button data-testid="login" onClick={() => login('u', 'p')}>login</button>
-      <button data-testid="register" onClick={() => register('u', 'p')}>register</button>
-      <button data-testid="logout" onClick={logout}>logout</button>
-    </div>
-  );
-};
+  it('shows errors and can retry session initialization', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(new Response('', { status: 401 }));
+    render(<AuthProvider><Consumer /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('error'));
+    act(() => screen.getByText('refresh').click());
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('anonymous'));
+  });
 
-const renderProvider = () =>
-  render(
-    <AuthProvider>
-      <TestConsumer />
-    </AuthProvider>
-  );
+  it('cleans legacy auth keys without changing preferences or writing user id', async () => {
+    localStorage.setItem('refreshToken', 'old'); localStorage.setItem('userId', '77'); localStorage.setItem('theme', 'dark');
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('', { status: 401 }));
+    render(<AuthProvider><Consumer /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('anonymous'));
+    expect(localStorage.getItem('refreshToken')).toBeNull(); expect(localStorage.getItem('userId')).toBeNull(); expect(localStorage.getItem('theme')).toBe('dark');
+  });
 
-describe('AuthContext', () => {
+  it('keeps the previous auth status and user after logout failure', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(session))).mockResolvedValueOnce(new Response(JSON.stringify({ id: 5, type: 'user' }))).mockResolvedValueOnce(new Response('', { status: 503 }));
+    render(<AuthProvider><Consumer /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('user').textContent).toBe('5'));
+    await act(async () => { screen.getByText('logout').click(); });
+    expect(screen.getByTestId('status').textContent).toBe('authenticated');
+    expect(screen.getByTestId('user').textContent).toBe('5');
+    expect(screen.getByTestId('error').textContent).toContain('503');
+  });
+
+  it('coalesces StrictMode bootstrap and finishes after the repeated effect setup', async () => {
+    const pending = deferred<Response>();
+    vi.mocked(fetch).mockReturnValueOnce(pending.promise).mockResolvedValueOnce(new Response(JSON.stringify({ id: 8, type: 'user' })));
+    render(<StrictMode><AuthProvider><Consumer /></AuthProvider></StrictMode>);
+    await act(async () => pending.resolve(new Response(JSON.stringify(session))));
+    await waitFor(() => expect(screen.getByTestId('user').textContent).toBe('8'));
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('RemoteAuthProvider', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    localStorage.clear();
-    (tokenManager.getAccessToken as Mock).mockReturnValue(null);
+    setConfig(config);
+    setAuthenticatedRequest(null);
+    vi.stubGlobal('fetch', vi.fn());
   });
 
-  it('инициализируется без userId когда нет токена', async () => {
-    (tokenManager.ensureToken as Mock).mockResolvedValue(null);
-
-    renderProvider();
-
-    await waitFor(() => {
-      expect(screen.getByTestId('userId').textContent).toBe('null');
-    });
+  afterEach(() => {
+    setAuthenticatedRequest(null);
+    setConfig(config);
+    vi.unstubAllGlobals();
   });
 
-  it('инициализирует userId через whoami когда токен есть', async () => {
-    (tokenManager.ensureToken as Mock).mockResolvedValue('valid-token');
-    (makeAuthenticatedRequest as Mock).mockResolvedValueOnce(
-      createMockResponse(200, { id: 7 })
-    );
-    (tokenManager.getAccessToken as Mock).mockReturnValue('valid-token');
-
-    renderProvider();
-
-    await waitFor(() => {
-      expect(screen.getByTestId('userId').textContent).toBe('7');
-    });
+  it('installs passed request and config without fetching session', async () => {
+    const request = vi.fn().mockResolvedValue(new Response('{}'));
+    const auth: AuthContextType = { status: 'authenticated', authenticated: true, userId: 2, error: null, config, request, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() };
+    render(<RemoteAuthProvider auth={auth}><Consumer /></RemoteAuthProvider>);
+    expect(getConfig()).toEqual(config);
+    await makeAuthenticatedRequest('/x');
+    expect(request).toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('очищает токен при ошибке whoami', async () => {
-    (tokenManager.ensureToken as Mock).mockResolvedValue('bad-token');
-    (makeAuthenticatedRequest as Mock).mockRejectedValueOnce(new Error('Network error'));
-
-    renderProvider();
-
-    await waitFor(() => {
-      expect(tokenManager.clear).toHaveBeenCalled();
-      expect(screen.getByTestId('userId').textContent).toBe('null');
-    });
-  });
-
-  it('login вызывает authAPI.login и whoami', async () => {
-    (tokenManager.ensureToken as Mock).mockResolvedValue(null);
-    (authAPI.login as Mock).mockResolvedValue({
-      access_token: 'login-token',
-      refresh_token: 'login-refresh',
-    });
-    (makeAuthenticatedRequest as Mock).mockResolvedValueOnce(
-      createMockResponse(200, { id: 10 })
-    );
-
-    renderProvider();
-
-    await waitFor(() => {
-      expect(screen.getByTestId('userId').textContent).toBe('null');
-    });
-
-    await act(async () => {
-      screen.getByTestId('login').click();
-    });
-
-    expect(tokenManager.setTokens).toHaveBeenCalledWith('login-token', 'login-refresh');
-    expect(screen.getByTestId('userId').textContent).toBe('10');
-  });
-
-  it('login пробрасывает ошибку при неудаче', async () => {
-    (tokenManager.ensureToken as Mock).mockResolvedValue(null);
-    (authAPI.login as Mock).mockRejectedValue(new Error('Invalid credentials'));
-
-    renderProvider();
-
-    await waitFor(() => {
-      expect(screen.getByTestId('userId').textContent).toBe('null');
-    });
-
-    await act(async () => {
-      try {
-        await (screen.getByTestId('login').onclick as any)({ preventDefault: () => {} });
-      } catch (e) {
-        // expected
-      }
-    });
-
-    // login failed — userId не установлен
-    expect(screen.getByTestId('userId').textContent).toBe('null');
-  });
-
-  it('register вызывает authAPI.register и whoami', async () => {
-    (tokenManager.ensureToken as Mock).mockResolvedValue(null);
-    (authAPI.register as Mock).mockResolvedValue({
-      access_token: 'reg-token',
-      refresh_token: 'reg-refresh',
-    });
-    (makeAuthenticatedRequest as Mock).mockResolvedValueOnce(
-      createMockResponse(200, { id: 20 })
-    );
-
-    renderProvider();
-
-    await waitFor(() => {
-      expect(screen.getByTestId('userId').textContent).toBe('null');
-    });
-
-    await act(async () => {
-      screen.getByTestId('register').click();
-    });
-
-    expect(tokenManager.setTokens).toHaveBeenCalledWith('reg-token', 'reg-refresh');
-    expect(screen.getByTestId('userId').textContent).toBe('20');
-  });
-
-  it('logout очищает userId и токены', async () => {
-    (tokenManager.ensureToken as Mock).mockResolvedValue(null);
-
-    renderProvider();
-
-    await waitFor(() => {
-      expect(screen.getByTestId('userId').textContent).toBe('null');
-    });
-
-    act(() => {
-      screen.getByTestId('logout').click();
-    });
-
-    expect(tokenManager.clear).toHaveBeenCalled();
-    expect(screen.getByTestId('userId').textContent).toBe('null');
+  it('throws when Hub auth is missing', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect(() => render(<RemoteAuthProvider auth={undefined as unknown as AuthContextType}><Consumer /></RemoteAuthProvider>)).toThrow('RemoteAuthProvider requires Hub auth');
+    spy.mockRestore();
   });
 });

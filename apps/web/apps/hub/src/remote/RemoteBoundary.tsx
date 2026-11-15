@@ -1,10 +1,3 @@
-// RemoteBoundary — каркас монтирования remote-модуля.
-//
-// Загружает remote-модуль (см. loadRemote.ts), показывает состояние
-// загрузки/ошибки и рендерит компонент, прокидывая в него auth, session
-// и apiBase хаба. Хаб не знает деталей домена remote — только контракт
-// RemoteModule / RemoteProps.
-
 import React, { useEffect, useState } from 'react';
 import { loadRemoteModule } from './loadRemote';
 import type { RemoteModule, RemoteProps } from './types';
@@ -20,8 +13,7 @@ const RemoteBoundary: React.FC<RemoteBoundaryProps> = ({
   name,
   module,
   auth,
-  session,
-  apiBase,
+  onCompleted,
 }) => {
   const [mod, setMod] = useState<RemoteModule | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,11 +52,7 @@ const RemoteBoundary: React.FC<RemoteBoundaryProps> = ({
 
   const RemoteComponent = mod.default;
   return (
-    <RemoteComponent
-      auth={auth}
-      session={session}
-      apiBase={apiBase ?? session?.apiBase}
-    />
+    <RemoteComponent auth={auth} onCompleted={onCompleted} />
   );
 };
 

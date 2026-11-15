@@ -14,37 +14,35 @@ interface PermissionsContextType {
 const PermissionsContext = createContext<PermissionsContextType | undefined>(undefined);
 
 export const PermissionsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { accessToken } = useAuth();
+  const { authenticated, userId } = useAuth();
   const [loading, setLoading] = useState(true);
   const location = useLocation();
   const { groupId, characterId } = getGroupAndCharacterIds(location.pathname);
   const { groupUsers, characterUsers, groupUsersLoading, ensureGroupUsers, ensureCharacterUsers } = useGroupUsers();
 
-  const currentUserId = parseInt(localStorage.getItem('userId') || '0');
-  const isGroupAdmin = groupUsers.some(u => u.user.id === currentUserId && u.isAdmin);
+  const currentUserId = userId ?? 0;
+  const isGroupAdmin = authenticated && userId !== null && groupUsers.some(u => u.user.id === currentUserId && u.isAdmin);
   const charUsers = characterId ? characterUsers[characterId] : undefined;
   const currentCharUser = charUsers?.find(u => u.user.id === currentUserId);
-  const canEditCharacter = currentCharUser?.canWrite ?? false;
+  const canEditCharacter = authenticated && userId !== null && (currentCharUser?.canWrite ?? false);
   const canDeleteCharacter = isGroupAdmin;
 
   useEffect(() => {
-    if (!accessToken || !groupId) {
+    if (!authenticated || userId === null || !groupId) {
       setLoading(false);
     } else if (groupUsers.length > 0 || !groupUsersLoading) {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, groupId, groupUsers, groupUsersLoading]);
+  }, [authenticated, userId, groupId, groupUsers, groupUsersLoading]);
 
   useEffect(() => {
-    if (accessToken && groupId) {
+    if (authenticated && userId !== null && groupId) {
       ensureGroupUsers();
     }
-    if (accessToken && characterId) {
+    if (authenticated && userId !== null && characterId) {
       ensureCharacterUsers(characterId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, groupId, characterId]);
+  }, [authenticated, userId, groupId, characterId]);
 
   return (
     <PermissionsContext.Provider value={{

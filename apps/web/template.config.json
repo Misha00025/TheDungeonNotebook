@@ -1,0 +1,4 @@
+{
+  "BFF_BASE": "http://localhost:5080/bff",
+  "API_BASE": "http://localhost:5080/bff/api"
+}

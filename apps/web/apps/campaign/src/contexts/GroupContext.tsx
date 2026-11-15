@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { Group } from '../types/group';
 import { groupAPI } from '../services/api';
 import { storage } from '@tdn/shared/utils/storage';
@@ -13,36 +13,42 @@ const GroupContext = createContext<GroupContextType | undefined>(undefined);
 
 export const GroupProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
-  const { accessToken } = useAuth();
+  const { authenticated, userId } = useAuth();
+  const generation = useRef(0);
 
-  // Восстанавливаем выбранную группу из localStorage при загрузке
   useEffect(() => {
-    if (!accessToken) return;
+    const current = ++generation.current;
+    setSelectedGroup(null);
+    if (!authenticated || userId === null) {
+      storage.clearSelectedGroupId();
+      return;
+    }
 
     const savedGroupId = storage.getSelectedGroupId();
     if (savedGroupId) {
       const fetchGroup = async () => {
         try {
           const group = await groupAPI.getGroup(parseInt(savedGroupId));
-          setSelectedGroup(group);
+          if (current === generation.current) setSelectedGroup(group);
         } catch (error) {
           console.error('Failed to restore group from storage:', error);
-          storage.clearSelectedGroupId();
+          if (current === generation.current) storage.clearSelectedGroupId();
         }
       };
       
       fetchGroup();
     }
-  }, [accessToken]);
+  }, [authenticated, userId]);
 
-  // Сохраняем ID группы в localStorage при изменении
   useEffect(() => {
-    if (selectedGroup) {
+    if (!authenticated || userId === null) {
+      storage.clearSelectedGroupId();
+    } else if (selectedGroup) {
       storage.setSelectedGroupId(selectedGroup.id.toString());
     } else {
       storage.clearSelectedGroupId();
     }
-  }, [selectedGroup]);
+  }, [selectedGroup, authenticated, userId]);
 
   return (
     <GroupContext.Provider value={{ selectedGroup, setSelectedGroup }}>

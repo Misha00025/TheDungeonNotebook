@@ -18,7 +18,7 @@
 // --border-color, --accent-color, --bg-secondary); prefers-color-scheme не
 // используется.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSidebar } from '../SidebarContext';
 import { useAuth } from '../../auth/useAuth';
@@ -45,10 +45,18 @@ const GlobalSidebar: React.FC<GlobalSidebarProps> = ({
   const { logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login', { replace: true });
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } catch {
+      return;
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   const isActive = (path: string): boolean => {
@@ -118,7 +126,7 @@ const GlobalSidebar: React.FC<GlobalSidebarProps> = ({
 
         <div className={styles.drawerFooter}>
           <div className={styles.footerRow}>
-            <button className={styles.footerBtn} onClick={handleLogout}>
+            <button className={styles.footerBtn} onClick={handleLogout} disabled={loggingOut}>
               <span className={styles.icon}>🚪</span>
               <span className={styles.label}>Выйти</span>
             </button>

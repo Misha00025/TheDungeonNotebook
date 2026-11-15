@@ -1,73 +1,41 @@
-// Хаб (shell) — host-приложение микрофронтендов.
-//
-// Точка входа, общая левая панель, оркестрация сессии, монтирование remotes.
-// Маршрутизация верхнего уровня (префиксы) — у хаба; детали доменов — у remotes.
-//
-// Провайдеры: Auth → Theme → Sidebar → Session → Router → AppContent.
-// Порядок соответствует apps/campaign (AuthProvider снаружи, т.к. ThemeProvider
-// зависит от useAuth).
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, ThemeProvider, SidebarProvider, useAuth, GlobalSidebar, names } from '@tdn/shared';
-import { SessionProvider, useHubSession } from './session/SessionProvider';
+import { useProfile } from '@tdn/shared/auth/useProfile';
+import type { AuthContextType } from '@tdn/shared';
 import { hubNavItems } from './navigation';
 import RemoteBoundary from './remote/RemoteBoundary';
 import Login from './pages/Login';
 
-// Гейт «не залогинен»: хаб решает, что пользователь не залогинен, и
-// показывает страницу входа (remote login). Сессия и auth прокидываются
-// в remotes.
+const ProfileGate: React.FC<{ auth: AuthContextType }> = ({ auth }) => {
+  const { loading, error, profileNotFound, fetchProfile } = useProfile(true);
+  if (loading) return <div>Загрузка профиля…</div>;
+  if (error) return <div role="alert">Не удалось загрузить профиль: {error} <button onClick={() => void fetchProfile()}>Повторить</button></div>;
+  if (profileNotFound) return <RemoteBoundary name="campaign" module="CompleteProfile" auth={auth} onCompleted={fetchProfile} />;
+  return (
+    <Routes>
+      <Route path="/groups/*" element={<RemoteBoundary name="campaign" module="App" auth={auth} />} />
+      <Route path="/profile/*" element={<RemoteBoundary name="profile" module="App" auth={auth} />} />
+      <Route path="/settings" element={<SettingsPlaceholder />} />
+      <Route path="/complete-registration" element={<Navigate to="/profile" replace />} />
+      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/" element={<RemoteBoundary name="campaign" module="Home" auth={auth} />} />
+      <Route path="*" element={<RemoteBoundary name="campaign" module="Home" auth={auth} />} />
+    </Routes>
+  );
+};
+
 const AppContent: React.FC = () => {
-  const session = useHubSession();
-  const { accessToken } = session;
-  const { login, logout, userId } = useAuth();
-
-  if (!accessToken) {
-    return <Login />;
-  }
-
-  // Auth, который хаб прокидывает в remotes. Remotes используют его через
-  // RemoteAuthProvider (общий AuthContext), а не бандлят свой AuthProvider.
-  const auth = { accessToken, login, logout, userId };
-
+  const auth = useAuth();
+  if (auth.status === 'loading') return <div>Загрузка…</div>;
+  if (auth.status === 'error') return <div role="alert">Не удалось проверить сессию: {auth.error} <button onClick={() => void auth.refreshSession()}>Повторить</button></div>;
+  if (auth.status === 'anonymous') return <Login />;
   return (
     <>
       <GlobalSidebar navItems={hubNavItems} brand={names.title} />
       <main className="app-content">
-        <Routes>
-          {/* Главная — общая вкладка. Подгружает ТОЛЬКО страницу «Главная»
-              из campaign как готовый модуль (хаб не тянет домен кампании).
-              path="*" (splat) вместо "/": иначе вложенные <Routes> remotes
-              (campaign/game-systems/profile) не матчатся под своими префиксами
-              и react-router выдаёт предупреждение «parent route path has no
-              trailing "*"». Splat также служит catch-all для неизвестных путей. */}
-          <Route
-            path="*"
-            element={
-              <RemoteBoundary name="campaign" module="Home" auth={auth} session={session} />
-            }
-          />
-          {/* Группы (кампания) — remote владеет своей маршрутизацией.
-              Кампания = группы, единый префикс /groups/* (тикет #26). */}
-          <Route
-            path="/groups/*"
-            element={
-              <RemoteBoundary name="campaign" module="App" auth={auth} session={session} />
-            }
-          />
-          {/* Профиль — remote. */}
-          <Route
-            path="/profile/*"
-            element={
-              <RemoteBoundary name="profile" module="App" auth={auth} session={session} />
-            }
-          />
-          {/* Настройки — пока заглушка (владелец настроек темы — хаб). */}
-          <Route path="/settings" element={<SettingsPlaceholder />} />
-          <Route path="/login" element={<Navigate to="/" replace />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        {auth.error && <div role="alert">{auth.error}</div>}
+        <ProfileGate auth={auth} />
       </main>
     </>
   );
@@ -80,20 +48,16 @@ const SettingsPlaceholder: React.FC = () => (
   </div>
 );
 
-const App: React.FC = () => {
-  return (
-    <AuthProvider>
-      <ThemeProvider>
-        <SidebarProvider>
-          <SessionProvider>
-            <Router basename={import.meta.env.BASE_URL}>
-              <AppContent />
-            </Router>
-          </SessionProvider>
-        </SidebarProvider>
-      </ThemeProvider>
-    </AuthProvider>
-  );
-};
+const App: React.FC = () => (
+  <AuthProvider>
+    <ThemeProvider>
+      <SidebarProvider>
+        <Router basename={import.meta.env.BASE_URL}>
+          <AppContent />
+        </Router>
+      </SidebarProvider>
+    </ThemeProvider>
+  </AuthProvider>
+);
 
 export default App;

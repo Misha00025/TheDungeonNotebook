@@ -1,25 +1,11 @@
-/// <reference types="vitest" />
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import federation from '@originjs/vite-plugin-federation';
 import { fileURLToPath, URL } from 'node:url';
 
-// Кампания — remote-приложение микрофронтендов.
-//
-// Собирается и деплоится отдельно. Хаб (host) подключает его через Module
-// Federation: экспонируем доменные модули, которые монтирует хаб:
-//   - App  — всё приложение (хаб монтирует под /campaign/*)
-//   - Home — только страница «Главная» (хаб подгружает на общей вкладке «Главная»)
-//
-// Общие зависимости (react, react-dom, react-router-dom) — синглтоны с
-// совпадающими версиями у всех приложений (см. shared в vite.config хаба).
 export default defineConfig({
-  // Базовый путь приложения. По умолчанию '/' (отдельный поддомен).
-  // Для деплоя под путём (например /campaign) задайте VITE_BASE (build-arg / env).
   base: process.env.VITE_BASE || '/',
-  // Публичные ассеты (favicon, logo, manifest, robots) — общие для всего
-  // проекта, лежат в корневом public/ монорепо.
-  publicDir: '../../public',
+  publicDir: false,
   plugins: [
     react(),
     federation({
@@ -28,6 +14,7 @@ export default defineConfig({
       exposes: {
         './App': './src/App.tsx',
         './Home': './src/Home.tsx',
+        './CompleteProfile': './src/CompleteProfile.tsx',
       },
       shared: ['react', 'react-dom', 'react-router-dom'],
     }),
@@ -43,8 +30,9 @@ export default defineConfig({
   },
   build: {
     outDir: 'build',
-    // Module Federation генерирует remoteEntry.js с top-level await
-    // (importShared). Целевой формат должен поддерживать top-level await.
+    rollupOptions: {
+      input: fileURLToPath(new URL('./src/App.tsx', import.meta.url)),
+    },
     target: 'esnext',
   },
   test: {

@@ -1,29 +1,21 @@
-// src/pages/CompleteRegistration.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@tdn/shared/auth/useAuth';
 import { userAPI } from '../../services/api';
-import { useCampaignNavigate } from '../../navigation';
 import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
 import inputStyles from '@tdn/shared/styles/components/Input.module.css';
 import commonStyles from '@tdn/shared/styles/common.module.css';
 import modalStyles from '@tdn/shared/styles/modal.module.css';
-import { useProfile } from '@tdn/shared/auth/useProfile';
 
-const CompleteRegistration: React.FC = () => {
+type CompleteRegistrationProps = { onCompleted: () => Promise<void> };
+
+const CompleteRegistration: React.FC<CompleteRegistrationProps> = ({ onCompleted }) => {
   const [nickname, setNickname] = useState('');
   const [visibleName, setVisibleName] = useState('');
   const [imageLink, setImageLink] = useState('');
   const [loading, setLoading] = useState(false);
+  const [created, setCreated] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { accessToken } = useAuth();
-  const { fetchProfile } = useProfile();
-  const navigate = useCampaignNavigate();
-
-  useEffect(() => {
-    if (!accessToken) {
-      navigate('/login', { replace: true });
-    }
-  }, [accessToken, navigate]);
+  const { authenticated, userId } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,29 +23,29 @@ const CompleteRegistration: React.FC = () => {
     setError(null);
 
     try {
-      const profileData = {
-        nickname,
-        visibleName,
-        imageLink: imageLink || undefined,
-      };
-      await userAPI.createProfile(profileData);
-      await fetchProfile()
+      if (!created) {
+        const profileData = {
+          nickname,
+          visibleName,
+          imageLink: imageLink || undefined,
+        };
+        await userAPI.createProfile(profileData);
+        setCreated(true);
+      }
+      await onCompleted();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create profile');
     } finally {
       setLoading(false);
-      window.location.reload();
     }
   };
 
-  if (!accessToken) {
-    return null;
-  }
+  if (!authenticated || userId === null) return null;
 
   return (
     <div className={commonStyles.container}>
-      <h1>Завершение регистрации</h1>
-      <p>Пожалуйста, создайте ваш профиль</p>
+      <h1>Профиль The Dungeon Notebook</h1>
+      <p>Создайте профиль, чтобы продолжить.</p>
 
       {error && <div className={modalStyles.error}>{error}</div>}
 
