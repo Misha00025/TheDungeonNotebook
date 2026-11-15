@@ -6,9 +6,8 @@ const Login: React.FC = () => {
   const { login } = useAuth();
   return (
     <main style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', background: 'var(--bg-primary)' }}>
-      <section style={{ display: 'grid', gap: '1rem', width: 'min(100% - 2rem, 360px)', padding: '1.5rem', background: 'var(--bg-secondary)', borderRadius: 'var(--border-radius-md)' }}>
-        <h2>Вход в The Dungeon Notebook</h2>
-        <p>Вход и регистрация выполняются у провайдера учётных записей.</p>
+      <section style={{ display: 'grid', justifyItems: 'center', gap: '1rem', width: 'min(100% - 2rem, 360px)', padding: '1.5rem', background: 'var(--bg-secondary)', borderRadius: 'var(--border-radius-md)' }}>
+        <h2 style={{ textAlign: 'center' }}>Вы не авторизованы</h2>
         <button className={buttonStyles.button} type="button" onClick={() => login()}>Войти</button>
       </section>
     </main>

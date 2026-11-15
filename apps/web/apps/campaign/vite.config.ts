@@ -31,7 +31,7 @@ export default defineConfig({
   build: {
     outDir: 'build',
     rollupOptions: {
-      input: fileURLToPath(new URL('./src/App.tsx', import.meta.url)),
+      input: fileURLToPath(new URL('./src/remote.ts', import.meta.url)),
     },
     target: 'esnext',
   },

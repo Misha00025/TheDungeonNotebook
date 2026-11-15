@@ -86,6 +86,8 @@ Account service проверяет issuer и audience access token соглас�
 
 ## Сессия и запросы
 
+Отсутствие сетевого ответа от IdP, включая OIDC discovery, возвращает `504` с кодом `identity_provider_unavailable`; такая ошибка не считается отзывом сессии. Другие ошибки зависимостей и ответы IdP с ошибками сервера остаются `503` (`dependency_unavailable`).
+
 ### Прямой Web с другого origin
 
 Для подключения Web с отдельного origin поддерживаются `Bff:Web:PublicOrigin` и `Bff:Web:AllowedOrigins` в `apps/bff/web/data/config/appsettings.json`. `PublicOrigin` — доверенный абсолютный HTTP(S) origin хаба (с optional port); при входе локальный `returnUrl` после проверки перенаправляется на этот origin. Если параметр `null`, сохраняется прежний локальный redirect. `AllowedOrigins` — список точных HTTP(S) origins браузерного Web; пустой список не включает cross-origin доступ. Допускаются значения с завершающим `/`, нормализуемым при использовании.

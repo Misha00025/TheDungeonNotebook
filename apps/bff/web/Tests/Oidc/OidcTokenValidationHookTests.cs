@@ -1,6 +1,10 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Globalization;
+using System.Net.Http;
+using System.Net.Sockets;
+using System.IO;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
@@ -78,6 +82,44 @@ public sealed class OidcTokenValidationHookTests
         Assert.IsType<AuthenticationRequiredException>(context.Result?.Failure);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RemoteTransportFailureReturnsGatewayTimeoutWithoutCaching(bool typed)
+    {
+        var options = ConfigureOptions();
+        Exception failure = typed
+            ? new IdentityProviderUnavailableException(new Exception("secret"))
+            : new InvalidOperationException("framework wrapper", new IOException("io", new HttpRequestException("network", new SocketException((int)SocketError.ConnectionRefused))));
+        var context = CreateRemoteFailureContext(options, failure);
+
+        await options.Events.OnRemoteFailure!(context);
+
+        Assert.Equal(StatusCodes.Status504GatewayTimeout, context.Response.StatusCode);
+        Assert.Equal("no-store", context.Response.Headers.CacheControl);
+        context.Response.Body.Position = 0;
+        using var document = await JsonDocument.ParseAsync(context.Response.Body);
+        Assert.Equal("identity_provider_unavailable", document.RootElement.GetProperty("code").GetString());
+    }
+
+    [Theory]
+    [InlineData(true, StatusCodes.Status401Unauthorized, "authentication_required")]
+    [InlineData(false, StatusCodes.Status503ServiceUnavailable, "dependency_unavailable")]
+    public async Task RemoteAuthAndDependencyFailuresKeepExistingMappings(bool authenticationFailure, int statusCode, string code)
+    {
+        var options = ConfigureOptions();
+        Exception failure = authenticationFailure ? new AuthenticationRequiredException() : new DependencyUnavailableException();
+        var context = CreateRemoteFailureContext(options, failure);
+
+        await options.Events.OnRemoteFailure!(context);
+
+        Assert.Equal(statusCode, context.Response.StatusCode);
+        Assert.Equal("no-store", context.Response.Headers.CacheControl);
+        context.Response.Body.Position = 0;
+        using var document = await JsonDocument.ParseAsync(context.Response.Body);
+        Assert.Equal(code, document.RootElement.GetProperty("code").GetString());
+    }
+
     private static OpenIdConnectOptions ConfigureOptions(IOidcTokenClient? tokenClient = null)
     {
         var options = new OpenIdConnectOptions { ClientId = "synthetic-client" };
@@ -120,6 +162,17 @@ public sealed class OidcTokenValidationHookTests
             Nonce = expectedNonce
         };
         return context;
+    }
+
+    private static RemoteFailureContext CreateRemoteFailureContext(OpenIdConnectOptions options, Exception failure)
+    {
+        var httpContext = new DefaultHttpContext();
+        httpContext.Response.Body = new MemoryStream();
+        return new RemoteFailureContext(
+            httpContext,
+            new AuthenticationScheme(BffAuthenticationDefaults.Oidc, BffAuthenticationDefaults.Oidc, typeof(OpenIdConnectHandler)),
+            options,
+            failure);
     }
 
     private sealed class CapturingTokenClient : IOidcTokenClient

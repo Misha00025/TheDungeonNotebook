@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Sockets;
+using System.IO;
 using System.Text;
 using Duende.IdentityModel.Client;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -109,19 +111,74 @@ public sealed class OidcTokenClientTests
     }
 
     [Fact]
-    public async Task InvalidClientNetworkTimeoutAndMalformedJsonAreDependencyFailures()
+    public async Task InvalidClientAndMalformedJsonAreDependencyFailures()
     {
         var (invalidClient, invalidClientOptions) = CreateClient(ClientAuthentication.PostBody, _ => JsonResponse(HttpStatusCode.BadRequest, "{\"error\":\"invalid_client\"}"));
         await Assert.ThrowsAsync<DependencyUnavailableException>(() => invalidClient.RefreshAsync(invalidClientOptions, "synthetic-refresh", CancellationToken.None));
 
-        var (network, networkOptions) = CreateClient(ClientAuthentication.PostBody, _ => throw new HttpRequestException("synthetic-network-error"));
-        await Assert.ThrowsAsync<DependencyUnavailableException>(() => network.RefreshAsync(networkOptions, "synthetic-refresh", CancellationToken.None));
-
-        var (timeout, timeoutOptions) = CreateClient(ClientAuthentication.PostBody, _ => throw new TaskCanceledException("synthetic-timeout"));
-        await Assert.ThrowsAsync<DependencyUnavailableException>(() => timeout.RefreshAsync(timeoutOptions, "synthetic-refresh", CancellationToken.None));
-
         var (malformed, malformedOptions) = CreateClient(ClientAuthentication.PostBody, _ => JsonResponse(HttpStatusCode.OK, "{not-json"));
         await Assert.ThrowsAsync<DependencyUnavailableException>(() => malformed.RefreshAsync(malformedOptions, "synthetic-refresh", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task DiscoveryTransportWrappersFailAsIdentityProviderUnavailableForRedeemAndRefresh()
+    {
+        var failure = new InvalidOperationException("synthetic-wrapper", new IOException("synthetic-io", new HttpRequestException("synthetic-http", new SocketException((int)SocketError.ConnectionRefused))));
+        foreach (var redeem in new[] { true, false })
+        {
+            var (client, options) = CreateClient(ClientAuthentication.PostBody, _ => throw new InvalidOperationException("HTTP transport must not be called"));
+            options.ConfigurationManager = new ThrowingConfigurationManager(failure);
+
+            var exception = redeem
+                ? await Assert.ThrowsAsync<IdentityProviderUnavailableException>(() => client.RedeemCodeAsync(options, "code", "https://bff.example/callback", "verifier", CancellationToken.None))
+                : await Assert.ThrowsAsync<IdentityProviderUnavailableException>(() => client.RefreshAsync(options, "refresh", CancellationToken.None));
+
+            Assert.Same(failure, exception.InnerException);
+        }
+    }
+
+    [Fact]
+    public async Task DiscoveryTimeoutAndTokenEndpointTransportFailuresAreIdentityProviderUnavailable()
+    {
+        var (discovery, discoveryOptions) = CreateClient(ClientAuthentication.PostBody, _ => throw new InvalidOperationException("HTTP transport must not be called"));
+        discoveryOptions.ConfigurationManager = new ThrowingConfigurationManager(new InvalidOperationException("wrapper", new IOException("io", new TimeoutException("timeout"))));
+        await Assert.ThrowsAsync<IdentityProviderUnavailableException>(() => discovery.RefreshAsync(discoveryOptions, "refresh", CancellationToken.None));
+
+        var (tokenEndpoint, tokenOptions) = CreateClient(ClientAuthentication.PostBody, _ => throw new HttpRequestException("network"));
+        await Assert.ThrowsAsync<IdentityProviderUnavailableException>(() => tokenEndpoint.RefreshAsync(tokenOptions, "refresh", CancellationToken.None));
+
+        var (tokenTimeout, tokenTimeoutOptions) = CreateClient(ClientAuthentication.PostBody, _ => throw new TaskCanceledException("timeout"));
+        await Assert.ThrowsAsync<IdentityProviderUnavailableException>(() => tokenTimeout.RefreshAsync(tokenTimeoutOptions, "refresh", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task DiscoveryInvalidOperationWithoutTransportFailureIsNotReclassified()
+    {
+        var (client, options) = CreateClient(ClientAuthentication.PostBody, _ => throw new InvalidOperationException("HTTP transport must not be called"));
+        options.ConfigurationManager = new ThrowingConfigurationManager(new InvalidOperationException("configuration failure"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.RefreshAsync(options, "refresh", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task CallerCancellationIsNotReclassified()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var (client, options) = CreateClient(ClientAuthentication.PostBody, _ => throw new InvalidOperationException("HTTP transport must not be called"));
+        options.ConfigurationManager = new ThrowingConfigurationManager(new InvalidOperationException("wrapper", new OperationCanceledException()));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.RefreshAsync(options, "refresh", cancellation.Token));
+    }
+
+    [Fact]
+    public async Task CallerCancellationAtTokenEndpointIsNotReclassified()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var (client, options) = CreateClient(ClientAuthentication.PostBody, _ => throw new InvalidOperationException("HTTP transport must not be called"));
+        options.Backchannel = new HttpClient(new CancelingHttpMessageHandler(cancellation));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.RefreshAsync(options, "refresh", cancellation.Token));
     }
 
     private static (OidcTokenClient Client, OpenIdConnectOptions Options) CreateClient(ClientAuthentication authentication, Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
@@ -152,5 +209,37 @@ public sealed class OidcTokenClientTests
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(_responseFactory(request));
+    }
+
+    private sealed class ThrowingConfigurationManager : IConfigurationManager<OpenIdConnectConfiguration>
+    {
+        private readonly Exception _exception;
+
+        public ThrowingConfigurationManager(Exception exception)
+        {
+            _exception = exception;
+        }
+
+        public Task<OpenIdConnectConfiguration> GetConfigurationAsync(CancellationToken cancel) => Task.FromException<OpenIdConnectConfiguration>(_exception);
+
+        public void RequestRefresh()
+        {
+        }
+    }
+
+    private sealed class CancelingHttpMessageHandler : HttpMessageHandler
+    {
+        private readonly CancellationTokenSource _cancellation;
+
+        public CancelingHttpMessageHandler(CancellationTokenSource cancellation)
+        {
+            _cancellation = cancellation;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            _cancellation.Cancel();
+            return Task.FromException<HttpResponseMessage>(new TaskCanceledException("synthetic caller cancellation"));
+        }
     }
 }

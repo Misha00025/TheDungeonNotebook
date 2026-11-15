@@ -31,6 +31,7 @@ public sealed class BffExceptionMiddleware
             var (statusCode, code) = exception switch
             {
                 AuthenticationRequiredException => (StatusCodes.Status401Unauthorized, "authentication_required"),
+                IdentityProviderUnavailableException => (StatusCodes.Status504GatewayTimeout, "identity_provider_unavailable"),
                 AntiforgeryValidationException => (StatusCodes.Status400BadRequest, "csrf_invalid"),
                 DependencyUnavailableException or RedisException or TimeoutException or HttpRequestException => (StatusCodes.Status503ServiceUnavailable, "dependency_unavailable"),
                 _ => (StatusCodes.Status500InternalServerError, "internal_error")

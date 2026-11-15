@@ -109,12 +109,33 @@ public sealed class BffOpenIdConnectPostConfigure : IPostConfigureOptions<OpenId
         context.HandleResponse();
         if (context.HttpContext.RequestAborted.IsCancellationRequested)
             return;
+        if (IsIdentityProviderUnavailable(context.Failure))
+        {
+            context.Response.StatusCode = StatusCodes.Status504GatewayTimeout;
+            context.Response.ContentType = "application/json";
+            context.Response.Headers.CacheControl = "no-store";
+            await context.Response.WriteAsJsonAsync(new { code = "identity_provider_unavailable" }, context.HttpContext.RequestAborted).ConfigureAwait(false);
+            return;
+        }
         var dependencyFailure = IsDependencyFailure(context.Failure);
         var code = dependencyFailure ? "dependency_unavailable" : "authentication_required";
         context.Response.StatusCode = dependencyFailure ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status401Unauthorized;
         context.Response.ContentType = "application/json";
         context.Response.Headers.CacheControl = "no-store";
         await context.Response.WriteAsJsonAsync(new { code }, context.HttpContext.RequestAborted).ConfigureAwait(false);
+    }
+
+    private static bool IsIdentityProviderUnavailable(Exception? exception)
+    {
+        if (OidcTransportFailure.IsTransportFailure(exception))
+            return true;
+
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is IdentityProviderUnavailableException)
+                return true;
+        }
+        return false;
     }
 
     private static bool IsDependencyFailure(Exception? exception)

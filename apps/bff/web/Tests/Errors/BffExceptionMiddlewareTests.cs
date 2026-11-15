@@ -87,6 +87,7 @@ public sealed class BffExceptionMiddlewareTests
         yield return [new AuthenticationRequiredException(), StatusCodes.Status401Unauthorized, "authentication_required", "auth-secret"];
         yield return [new AntiforgeryValidationException("csrf-secret"), StatusCodes.Status400BadRequest, "csrf_invalid", "csrf-secret"];
         yield return [new DependencyUnavailableException(new Exception("dependency-secret")), StatusCodes.Status503ServiceUnavailable, "dependency_unavailable", "dependency-secret"];
+        yield return [new IdentityProviderUnavailableException(new Exception("identity-secret")), StatusCodes.Status504GatewayTimeout, "identity_provider_unavailable", "identity-secret"];
         yield return [new HttpRequestException("network-secret"), StatusCodes.Status503ServiceUnavailable, "dependency_unavailable", "network-secret"];
         yield return [new InvalidOperationException("unexpected-secret"), StatusCodes.Status500InternalServerError, "internal_error", "unexpected-secret"];
     }

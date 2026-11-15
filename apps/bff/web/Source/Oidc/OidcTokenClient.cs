@@ -1,7 +1,9 @@
 using System.Net;
+using System.Net.Http;
 using System.Text.Json;
 using Duende.IdentityModel.Client;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.Extensions.Options;
 using Tdn.Bff.Configuration;
 using Tdn.Bff.Errors;
@@ -21,7 +23,7 @@ public sealed class OidcTokenClient : IOidcTokenClient
     {
         try
         {
-            var configuration = await options.ConfigurationManager!.GetConfigurationAsync(cancellationToken).ConfigureAwait(false);
+            var configuration = await GetConfigurationAsync(options, cancellationToken).ConfigureAwait(false);
             var request = new AuthorizationCodeTokenRequest
             {
                 Address = configuration.TokenEndpoint,
@@ -36,15 +38,17 @@ public sealed class OidcTokenClient : IOidcTokenClient
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new DependencyUnavailableException();
+            throw new IdentityProviderUnavailableException();
         }
         catch (HttpRequestException exception)
         {
-            throw new DependencyUnavailableException(exception);
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new IdentityProviderUnavailableException(exception);
         }
         catch (TimeoutException exception)
         {
-            throw new DependencyUnavailableException(exception);
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new IdentityProviderUnavailableException(exception);
         }
     }
 
@@ -52,7 +56,7 @@ public sealed class OidcTokenClient : IOidcTokenClient
     {
         try
         {
-            var configuration = await options.ConfigurationManager!.GetConfigurationAsync(cancellationToken).ConfigureAwait(false);
+            var configuration = await GetConfigurationAsync(options, cancellationToken).ConfigureAwait(false);
             var request = new RefreshTokenRequest
             {
                 Address = configuration.TokenEndpoint,
@@ -65,15 +69,30 @@ public sealed class OidcTokenClient : IOidcTokenClient
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new DependencyUnavailableException();
+            throw new IdentityProviderUnavailableException();
         }
         catch (HttpRequestException exception)
         {
-            throw new DependencyUnavailableException(exception);
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new IdentityProviderUnavailableException(exception);
         }
         catch (TimeoutException exception)
         {
-            throw new DependencyUnavailableException(exception);
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new IdentityProviderUnavailableException(exception);
+        }
+    }
+
+    private static async Task<OpenIdConnectConfiguration> GetConfigurationAsync(OpenIdConnectOptions options, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await options.ConfigurationManager!.GetConfigurationAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (OidcTransportFailure.IsTransportFailure(exception))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new IdentityProviderUnavailableException(exception);
         }
     }
 
@@ -90,8 +109,13 @@ public sealed class OidcTokenClient : IOidcTokenClient
         try
         {
             var response = await send(options.Backchannel, request, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
             if (response.Exception is not null || response.ErrorType == ResponseErrorType.Exception)
+            {
+                if (OidcTransportFailure.IsTransportFailure(response.Exception))
+                    throw new IdentityProviderUnavailableException(response.Exception);
                 throw new DependencyUnavailableException(response.Exception);
+            }
             if (response.HttpStatusCode == HttpStatusCode.TooManyRequests || (int)response.HttpStatusCode >= 500 || response.Error == "invalid_client")
                 throw new DependencyUnavailableException();
             if (response.IsError)
@@ -116,17 +140,23 @@ public sealed class OidcTokenClient : IOidcTokenClient
         {
             throw;
         }
+        catch (IdentityProviderUnavailableException)
+        {
+            throw;
+        }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new DependencyUnavailableException();
+            throw new IdentityProviderUnavailableException();
         }
         catch (HttpRequestException exception)
         {
-            throw new DependencyUnavailableException(exception);
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new IdentityProviderUnavailableException(exception);
         }
         catch (TimeoutException exception)
         {
-            throw new DependencyUnavailableException(exception);
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new IdentityProviderUnavailableException(exception);
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException or FormatException)
         {

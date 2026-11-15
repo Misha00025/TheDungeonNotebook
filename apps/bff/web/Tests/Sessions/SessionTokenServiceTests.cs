@@ -156,6 +156,22 @@ public sealed class SessionTokenServiceTests
     }
 
     [Fact]
+    public async Task IdentityProviderUnavailableDuringRefreshPreservesSession()
+    {
+        var (service, repository, _, client, _) = CreateSystem();
+        var original = TicketFactory.Create(Now.AddHours(8), Now.AddSeconds(5));
+        await SaveAsync(repository, original);
+        client.RefreshHandler = _ => throw new IdentityProviderUnavailableException();
+
+        await Assert.ThrowsAsync<IdentityProviderUnavailableException>(() => service.GetAccessTokenAsync("session", CancellationToken.None));
+
+        var stored = await repository.GetAsync("session", CancellationToken.None);
+        Assert.NotNull(stored);
+        Assert.Equal("access-old", stored.Ticket.Properties.GetTokenValue("access_token"));
+        Assert.Equal("refresh-old", stored.Ticket.Properties.GetTokenValue("refresh_token"));
+    }
+
+    [Fact]
     public async Task MissingRefreshTokenReturnsLiveAccessButDeletesExpiredAccessConditionally()
     {
         var (service, repository, _, client, timeProvider) = CreateSystem();
