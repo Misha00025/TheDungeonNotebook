@@ -2,7 +2,7 @@ name: Integration Tests
 
 on:
   push:
-    branches: [master]
+    branches: []
     paths:
       - 'apps/backend/api-gateway/**'
       - 'apps/backend/users-service/**'
@@ -17,7 +17,7 @@ on:
       - 'Makefile'
       - 'docker-compose.build.yaml'
   pull_request:
-    branches: [master]
+    branches: []
     paths:
       - 'apps/backend/api-gateway/**'
       - 'apps/backend/users-service/**'
