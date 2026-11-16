@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
@@ -21,6 +22,13 @@ public static class BffServiceCollectionExtensions
 {
     public static IServiceCollection AddBffServices(this IServiceCollection services, IConfiguration configuration)
     {
+        services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
+            options.KnownProxies.Clear();
+            options.KnownIPNetworks.Clear();
+        });
+
         var bffSection = configuration.GetSection(BffOptions.SectionName);
         services.AddSingleton<IValidateOptions<BffOptions>, BffOptionsValidator>();
         services.AddOptions<BffOptions>().Bind(bffSection).ValidateOnStart();

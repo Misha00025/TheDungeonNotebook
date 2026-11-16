@@ -66,6 +66,17 @@ BFF доступен на `http://localhost:5080` по умолчанию. Дл�
 
 Если используете Keycloak из `scripts/setup-keycloak.sh`, возьмите базовый URL, напечатанный установщиком, и добавьте `/realms/shared-local`. Не используйте `localhost` внутри контейнера или адрес, недоступный браузеру: URL issuer должен быть доступен и браузеру, и BFF.
 
+### HTTPS через Nginx
+
+BFF использует `X-Forwarded-Proto` для схемы OIDC callback до обработки аутентификации. Если HTTPS завершается на Nginx, передавайте исходную схему браузера в существующем `location`:
+
+```nginx
+proxy_set_header Host $host;
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+Без этого заголовка BFF сохраняет схему входящего запроса и сам HTTPS не включает. Для публичного BFF за HTTPS proxy зарегистрируйте в Keycloak redirect URI вида `https://app.example.test/bff/callback`. Это отличается от HTTP redirect URI для прямого локального Compose-запуска, например указанного выше. `Oidc.RequireHttpsMetadata` управляет загрузкой OIDC metadata, а не схемой callback.
+
 Account service проверяет issuer и audience access token согласно своей конфигурации. Issuer должен совпадать с `Oidc:Providers[*].Issuer`, а audience access token — входить в `Audiences`. Audience ID token (обычно Client ID) не заменяет audience API access token. Если провайдер не выдаёт подходящий audience, настройте отдельный client scope с Audience mapper: Included Custom Audience должен совпадать с допустимым API audience; включите добавление в access token и выключите добавление в ID token. Названия меню могут различаться между версиями Keycloak.
 
 ## Настройки OIDC в конфиге BFF

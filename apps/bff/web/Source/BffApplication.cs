@@ -20,6 +20,7 @@ public static class BffApplication
         builder.Services.AddBffServices(builder.Configuration);
 
         var app = builder.Build();
+        app.UseForwardedHeaders();
         app.UseMiddleware<BffExceptionMiddleware>();
         app.UseRouting();
         app.UseCors();
