@@ -6,12 +6,10 @@ import inputStyles from '@tdn/shared/styles/components/Input.module.css';
 import styles from '@tdn/shared/styles/common.module.css';
 import { useAuth } from '@tdn/shared/auth/AuthContext';
 import { uploadAPI } from '../services/api';
-import { useNavigate } from 'react-router-dom';
 
 const Profile: React.FC = () => {
   const { profile, loading, error, fetchProfile } = useProfile(true);
   const { logout } = useAuth();
-  const navigate = useNavigate();
   
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
@@ -98,7 +96,6 @@ const Profile: React.FC = () => {
     setLoggingOut(true);
     try {
       await logout();
-      navigate('/login', { replace: true });
     } catch {
       return;
     } finally {

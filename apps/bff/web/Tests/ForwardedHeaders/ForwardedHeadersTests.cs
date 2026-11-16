@@ -54,6 +54,7 @@ public sealed class ForwardedHeadersTests
         services.AddBffServices(configuration);
         services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider());
         services.AddSingleton<ISessionRepository>(new FakeSessionRepository(timeProvider));
+        services.AddSingleton<ILogoutRedirectStore, FakeLogoutRedirectStore>();
         services.AddSingleton<ISessionLock>(new FakeSessionLock());
         services.AddSingleton<IOidcTokenClient>(new FakeOidcTokenClient());
         services.Configure<OpenIdConnectOptions>(BffAuthenticationDefaults.Oidc, options =>

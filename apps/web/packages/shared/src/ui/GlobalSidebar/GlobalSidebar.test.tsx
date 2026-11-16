@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import GlobalSidebar from './GlobalSidebar';
 
@@ -14,15 +14,19 @@ const Location = () => <span data-testid="path">{useLocation().pathname}</span>;
 describe('GlobalSidebar logout', () => {
   beforeEach(() => { vi.clearAllMocks(); mocks.sidebar.isOpen = false; });
 
-  it('navigates to login only after successful logout', async () => {
+  it('does not perform SPA navigation after successful logout', async () => {
     mocks.logout.mockRejectedValueOnce(new Error('offline'));
     render(<MemoryRouter initialEntries={['/profile']}><GlobalSidebar navItems={[]} /><Location /></MemoryRouter>);
     fireEvent.click(screen.getByText('Выйти'));
     await waitFor(() => expect(mocks.logout).toHaveBeenCalledTimes(1));
     expect(screen.getByTestId('path').textContent).toBe('/profile');
+    const button = screen.getByText('Выйти').closest('button') as HTMLButtonElement;
+    await waitFor(() => expect(button.disabled).toBe(false));
     mocks.logout.mockResolvedValueOnce(undefined);
-    fireEvent.click(screen.getByText('Выйти'));
-    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/login'));
+    fireEvent.click(button);
+    await waitFor(() => expect(button.disabled).toBe(false));
+    expect(mocks.logout).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('path').textContent).toBe('/profile');
   });
 
   it('disables the logout control while the request is pending', async () => {
@@ -32,6 +36,6 @@ describe('GlobalSidebar logout', () => {
     const button = screen.getByText('Выйти').closest('button') as HTMLButtonElement;
     fireEvent.click(button);
     expect(button.disabled).toBe(true);
-    resolve();
+    await act(async () => resolve());
   });
 });

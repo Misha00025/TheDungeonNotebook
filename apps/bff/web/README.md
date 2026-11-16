@@ -2,7 +2,7 @@
 
 ## Что даёт BFF
 
-BFF даёт браузеру вход через Keycloak, хранит OAuth-токены только на сервере и обращается к API Gateway от имени вошедшего пользователя. Он обновляет access token при необходимости, защищает изменяющие запросы CSRF-проверкой и позволяет завершить локальную BFF-сессию.
+BFF даёт браузеру вход через Keycloak, хранит OAuth-токены только на сервере и обращается к API Gateway от имени вошедшего пользователя. Он обновляет access token при необходимости, защищает изменяющие запросы CSRF-проверкой и инициирует OIDC logout после удаления локальной BFF-сессии.
 
 BFF не содержит предметных прав и TDN-профиля. Web Hub использует endpoints BFF-сессии и передаёт cookie-based transport remotes campaign, profile и login. Вход в IdP и создание TDN-профиля — отдельные шаги.
 
@@ -62,7 +62,9 @@ BFF доступен на `http://localhost:5080` по умолчанию. Дл�
 - Включите Client authentication и Standard flow; выключите Direct access grants, Implicit flow и Service accounts.
 - Включите PKCE с методом S256.
 - Добавьте точный redirect URI `http://<BFF-host>:5080/bff/callback` (если изменён `BFF_PORT`, используйте этот порт).
-- Client secret возьмите из настроек этого client. Web origins для серверного BFF не нужны; global/back-channel logout не настраивается.
+- В `Valid post logout redirect URIs` добавьте точный BFF callback `http://<BFF-host>:5080/bff/signout-callback` (используйте фактический `BFF_PORT`, если он отличается от default). Это callback BFF, не конечный адрес Web после выхода.
+- OIDC metadata realm должен публиковать `end_session_endpoint`; без него BFF не может подготовить logout redirect.
+- Client secret возьмите из настроек этого client. Web origins для серверного BFF не нужны; front-channel и back-channel logout этой функцией не настраиваются.
 
 Если используете Keycloak из `scripts/setup-keycloak.sh`, возьмите базовый URL, напечатанный установщиком, и добавьте `/realms/shared-local`. Не используйте `localhost` внутри контейнера или адрес, недоступный браузеру: URL issuer должен быть доступен и браузеру, и BFF.
 
@@ -75,7 +77,7 @@ proxy_set_header Host $host;
 proxy_set_header X-Forwarded-Proto $scheme;
 ```
 
-Без этого заголовка BFF сохраняет схему входящего запроса и сам HTTPS не включает. Для публичного BFF за HTTPS proxy зарегистрируйте в Keycloak redirect URI вида `https://app.example.test/bff/callback`. Это отличается от HTTP redirect URI для прямого локального Compose-запуска, например указанного выше. `Oidc.RequireHttpsMetadata` управляет загрузкой OIDC metadata, а не схемой callback.
+Без этого заголовка BFF сохраняет схему входящего запроса и сам HTTPS не включает. Для публичного BFF за HTTPS proxy зарегистрируйте в Keycloak login redirect URI `https://app.example.test/bff/callback` и post-logout URI `https://app.example.test/bff/signout-callback`. Используйте реальную внешнюю HTTPS-схему, передаваемую через `X-Forwarded-Proto`; это отличается от HTTP URI для прямого локального Compose-запуска. `Oidc.RequireHttpsMetadata` управляет загрузкой OIDC metadata, а не схемой callback. `Oidc.SignedOutCallbackPath` настраивается отдельно от login `Oidc.CallbackPath`.
 
 Account service проверяет issuer и audience access token согласно своей конфигурации. Issuer должен совпадать с `Oidc:Providers[*].Issuer`, а audience access token — входить в `Audiences`. Audience ID token (обычно Client ID) не заменяет audience API access token. Если провайдер не выдаёт подходящий audience, настройте отдельный client scope с Audience mapper: Included Custom Audience должен совпадать с допустимым API audience; включите добавление в access token и выключите добавление в ID token. Названия меню могут различаться между версиями Keycloak.
 
@@ -88,7 +90,9 @@ Account service проверяет issuer и audience access token соглас�
 | `Oidc.Authority` | Реальный URL issuer realm, например `https://sso.example.org/realms/my-realm`; не URL административной консоли и не `localhost` внутри контейнера. |
 | `Oidc.ClientId` | ID настроенного BFF client, например `tdn-bff`. |
 | `Oidc.ClientSecret` | Secret этого client, если выбран confidential client; не помещайте действительное значение в исходники или общий репозиторий. |
-| `Oidc.CallbackPath` | `/bff/callback`; путь должен совпасть с зарегистрированным redirect URI. |
+| `Oidc.CallbackPath` | `/bff/callback`; путь должен совпасть с зарегистрированным login redirect URI. |
+| `Oidc.SignedOutCallbackPath` | `/bff/signout-callback`; путь должен совпасть с зарегистрированным post-logout URI. |
+| `Oidc.SignedOutRedirectUri` | `/login` по умолчанию; конечный адрес Web после callback. Локальный путь при заданном `Bff.Web.PublicOrigin` направляется на этот origin, иначе остаётся на origin BFF. Абсолютный доверенный server-config target используется как задан. |
 | `Oidc.RequireHttpsMetadata` | `true` для HTTPS metadata; `false` только если намеренно используется HTTP IdP. Это не настройка HTTP/HTTPS самого BFF. |
 | `Oidc.Scope` | Для обычного входа достаточно `openid` и `profile`. `offline_access` необязателен для обычного refresh в Keycloak. |
 | `Bff.ClientAuthentication` | `PostBody` для стандартного client secret; значение должно соответствовать настройке client в IdP. |
@@ -97,7 +101,7 @@ Account service проверяет issuer и audience access token соглас�
 
 ## Сессия и запросы
 
-Отсутствие сетевого ответа от IdP, включая OIDC discovery, возвращает `504` с кодом `identity_provider_unavailable`; такая ошибка не считается отзывом сессии. Другие ошибки зависимостей и ответы IdP с ошибками сервера остаются `503` (`dependency_unavailable`).
+Транспортные ошибки token exchange/refresh и обработанные OIDC remote failures используют `504 identity_provider_unavailable`. Ошибки logout обрабатываются общим middleware и могут завершиться, например, `503 dependency_unavailable` или `500 internal_error`; нельзя считать, что любой сбой discovery во время logout вернёт именно `504`.
 
 ### Прямой Web с другого origin
 
@@ -108,6 +112,10 @@ BFF разрешает credentials, методы и заголовки запр�
 - `GET /bff/session` показывает состояние входа и CSRF token, но не возвращает OAuth-токены, claims или ключ сессии.
 - Для изменяющих запросов к `/bff/api/...` и `POST /bff/logout` передавайте CSRF token в header `X-CSRF-TOKEN`.
 - `GET /bff/login?returnUrl=/bff/session` начинает вход и после возврата из Keycloak ведёт на указанный локальный адрес.
-- Logout завершает только локальную BFF-сессию; он не выполняет выход из Keycloak.
+- `POST /bff/logout` требует аутентифицированную сессию и CSRF. Успешная подготовка возвращает `200` JSON с абсолютным одноразовым BFF `logoutUrl`; браузер должен перейти на него верхнеуровнево. Клиент не следует redirect к IdP внутри `fetch` и не ждёт `204`.
+- `GET /bff/logout/continue?request=...` разрешён без cookie: он атомарно забирает одноразовый handle и отвечает redirect `302` на IdP. Отсутствующий, истёкший, уже использованный или повреждённый handle даёт `400 invalid_logout_request`. Callback с отсутствующим или неверным state даёт `400 invalid_logout_state`. Logout-ответы не кэшируются; continuation устанавливает `Referrer-Policy: no-referrer`.
+- Реальный IdP logout URL, включая `id_token_hint`, хранится на сервере в Redis под защитой Data Protection; POST JSON содержит только непрозрачный BFF URL и не раскрывает OIDC URL или OAuth-токены. Путь задаётся `Bff.Endpoints.LogoutContinuation` (по умолчанию `/bff/logout/continue`), а TTL — `Bff.Logout.RequestLifetime` (по умолчанию `00:05:00`, требуется положительное значение). TTL настраивается BFF и не является протокольным лимитом.
+- Локальная BFF-сессия/cookie удаляется до завершения OIDC logout. Успешный `POST 200` означает, что подготовлена ссылка, а не что браузер уже дошёл до IdP и его SSO-сессия завершена. При сбое подготовки Web показывает ошибку и не объявляет полный logout успешным; POST автоматически не повторяется. Если браузер не перешёл по ссылке, завершение SSO не гарантировано. Распространение logout на другие устройства или приложения зависит от настроек IdP: TDN не реализует и не гарантирует его, а front-channel и back-channel logout этой функцией не настраиваются. TDN также не гарантирует немедленный отзыв уже выданных access JWT.
+- Конечный адрес после callback берётся только из `Oidc.SignedOutRedirectUri`; произвольный logout return URL от клиента не принимается. Отсутствующие новые поля в старом host JSON используют defaults приложения и не требуют копирования или перезаписи файла. Точный post-logout URI в Keycloak пользователь регистрирует отдельно; реальные host-конфиги автоматически не меняются.
 
-Web выполняет вход перенаправлением браузера через BFF и использует cookie credentials с CSRF header для изменяющих API-запросов. Исходный API response возвращается вызывающему сервису; автоматического повтора запроса нет. Logout завершает только локальную BFF-сессию, не SSO IdP. Без настроенного Keycloak client вход не заработает. Даже успешный вход требует согласованной настройки issuer и access-token audience в Account service.
+Web выполняет вход перенаправлением браузера через BFF и использует cookie credentials с CSRF header для изменяющих API-запросов. Исходный API response возвращается вызывающему сервису; автоматического повтора запроса нет. Без настроенного Keycloak client вход не заработает. Даже успешный вход требует согласованной настройки issuer и access-token audience в Account service.

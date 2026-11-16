@@ -7,6 +7,7 @@ public sealed class BffOptions
     public const string SectionName = "Bff";
 
     public EndpointsOptions Endpoints { get; set; } = new();
+    public LogoutOptions Logout { get; set; } = new();
     public RedisOptions Redis { get; set; } = new();
     public SessionOptions Session { get; set; } = new();
     public TransportOptions Transport { get; set; } = new();
@@ -20,6 +21,12 @@ public sealed class EndpointsOptions
     public string Login { get; set; } = "/bff/login";
     public string Session { get; set; } = "/bff/session";
     public string Logout { get; set; } = "/bff/logout";
+    public string LogoutContinuation { get; set; } = "/bff/logout/continue";
+}
+
+public sealed class LogoutOptions
+{
+    public TimeSpan RequestLifetime { get; set; } = TimeSpan.FromMinutes(5);
 }
 
 public sealed class RedisOptions
@@ -86,6 +93,8 @@ public sealed class BffOptionsValidator : IValidateOptions<BffOptions>
         ValidateLocalPath(options.Endpoints.Login, "Bff:Endpoints:Login", errors);
         ValidateLocalPath(options.Endpoints.Session, "Bff:Endpoints:Session", errors);
         ValidateLocalPath(options.Endpoints.Logout, "Bff:Endpoints:Logout", errors);
+        ValidateLocalPath(options.Endpoints.LogoutContinuation, "Bff:Endpoints:LogoutContinuation", errors);
+        ValidatePositive(options.Logout.RequestLifetime, "Bff:Logout:RequestLifetime", errors);
 
         ValidateOrigin(options.Web.PublicOrigin, "Bff:Web:PublicOrigin", errors);
         foreach (var origin in options.Web.AllowedOrigins)

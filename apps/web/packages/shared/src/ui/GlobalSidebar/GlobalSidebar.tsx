@@ -19,7 +19,7 @@
 // используется.
 
 import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useSidebar } from '../SidebarContext';
 import { useAuth } from '../../auth/useAuth';
 import ThemeToggle from '../Buttons/ThemeToggle/ThemeToggle';
@@ -44,14 +44,12 @@ const GlobalSidebar: React.FC<GlobalSidebarProps> = ({
   const { isOpen, open, close } = useSidebar();
   const { logout } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
   const [loggingOut, setLoggingOut] = useState(false);
 
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
       await logout();
-      navigate('/login', { replace: true });
     } catch {
       return;
     } finally {

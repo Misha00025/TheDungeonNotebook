@@ -64,9 +64,9 @@ Hub загружает `public/config.json` относительно Vite base U
 
 ## BFF, вход и профиль
 
-Hub проверяет BFF session и передаёт cookie-based transport remotes. Вход в IdP и профиль TDN — разные шаги: после первого входа может потребоваться создать профиль TDN. Вход выполняется browser redirect через BFF с возвратом на текущий локальный путь. Logout завершает локальную BFF session, но не выполняет SSO logout в IdP.
+Hub проверяет BFF session и передаёт cookie-based transport remotes. Вход в IdP и профиль TDN — разные шаги: после первого входа может потребоваться создать профиль TDN. Вход выполняется browser redirect через BFF с возвратом на текущий локальный путь. Logout удаляет локальную BFF session, затем браузер верхнеуровнево переходит по одноразовой ссылке BFF и инициирует OIDC RP-Initiated Logout у IdP; callback возвращает браузер в Web. Получение успешного POST-ответа ещё не означает, что браузер дошёл до IdP или что SSO уже завершён.
 
-Для локального Hub укажите в конфигурации BFF `Bff:Web:PublicOrigin=http://localhost:3004` и `Bff:Web:AllowedOrigins[0]=http://localhost:3004`. Если callback ещё не добавлен в IdP, используйте `http://localhost:5080/bff/callback`. Пользователь задаёт эти настройки сам.
+Для локального Hub укажите в конфигурации BFF `Bff:Web:PublicOrigin=http://localhost:3004` и `Bff:Web:AllowedOrigins[0]=http://localhost:3004`. Зарегистрируйте в IdP login callback `http://localhost:5080/bff/callback` и точный post-logout callback BFF `http://localhost:5080/bff/signout-callback`; это не конечный Web `/login`. Для HTTPS proxy используйте внешнюю forwarded scheme. Пользователь задаёт эти настройки сам. Подробнее о logout и настройке Keycloak — в [README BFF](../bff/web/README.md).
 
 Web отправляет cookie credentials и CSRF token в header, имя которого сообщает BFF; CSRF применяется к unsafe запросам. API `Response` возвращается вызывающему сервису без автоматического повтора. При доступе по сетевому имени укажите browser-reachable hostname вместо `localhost` согласованно в `BFF_BASE`/`API_BASE`, `PublicOrigin` и `AllowedOrigins`; для same-site Web и BFF должны использовать одну схему HTTP/HTTPS. `localhost` в браузере обозначает компьютер пользователя.
 

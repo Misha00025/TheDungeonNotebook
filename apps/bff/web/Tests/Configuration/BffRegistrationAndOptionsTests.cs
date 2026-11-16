@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Tdn.Bff.Configuration;
+using Tdn.Bff.Oidc;
 using Tdn.Bff.Sessions;
 using bff_web.Tests.Support;
 
@@ -34,7 +35,8 @@ public sealed class BffRegistrationAndOptionsTests
         Assert.Equal(BffAuthenticationDefaults.Cookies, oidc.SignInScheme);
         Assert.Equal("/bff/callback", oidc.CallbackPath);
         Assert.Equal(PathString.Empty, oidc.RemoteSignOutPath);
-        Assert.Equal(PathString.Empty, oidc.SignedOutCallbackPath);
+        Assert.Equal("/bff/signout-callback", oidc.SignedOutCallbackPath);
+        Assert.Equal("/login", oidc.SignedOutRedirectUri);
         Assert.Equal(OpenIdConnectResponseMode.Query, oidc.ResponseMode);
         Assert.Equal(SameSiteMode.Lax, oidc.CorrelationCookie.SameSite);
         Assert.Equal(CookieSecurePolicy.SameAsRequest, oidc.CorrelationCookie.SecurePolicy);
@@ -103,11 +105,35 @@ public sealed class BffRegistrationAndOptionsTests
         {
             Redis = new RedisOptions { ConnectionString = "redis", KeyPrefix = "prefix:" },
             Session = new SessionOptions { Lifetime = TimeSpan.Zero },
-            Endpoints = new EndpointsOptions { Login = "relative", Session = "/has?query", Logout = "/has#fragment" }
+            Endpoints = new EndpointsOptions { Login = "relative", Session = "/has?query", Logout = "/has#fragment", LogoutContinuation = "//host/path" },
+            Logout = new LogoutOptions { RequestLifetime = TimeSpan.Zero }
         };
 
         Assert.True(validator.Validate(null, valid).Succeeded);
         Assert.False(validator.Validate(null, invalid).Succeeded);
+    }
+
+    [Fact]
+    public void MissingLogoutSettingsUseDefaultsAndConfiguredValuesAreBound()
+    {
+        using var defaults = CreateProvider(new Dictionary<string, string?>());
+        var defaultOptions = defaults.GetRequiredService<IOptions<BffOptions>>().Value;
+        Assert.Equal("/bff/logout/continue", defaultOptions.Endpoints.LogoutContinuation);
+        Assert.Equal(TimeSpan.FromMinutes(5), defaultOptions.Logout.RequestLifetime);
+
+        using var configured = CreateProvider(new Dictionary<string, string?>
+        {
+            ["Bff:Endpoints:LogoutContinuation"] = "/custom/logout",
+            ["Bff:Logout:RequestLifetime"] = "00:02:00",
+            ["Oidc:SignedOutCallbackPath"] = "/custom/callback",
+            ["Oidc:SignedOutRedirectUri"] = "https://web.example/logout"
+        });
+        var options = configured.GetRequiredService<IOptions<BffOptions>>().Value;
+        var oidc = configured.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>().Get(BffAuthenticationDefaults.Oidc);
+        Assert.Equal("/custom/logout", options.Endpoints.LogoutContinuation);
+        Assert.Equal(TimeSpan.FromMinutes(2), options.Logout.RequestLifetime);
+        Assert.Equal("/custom/callback", oidc.SignedOutCallbackPath);
+        Assert.Equal("https://web.example/logout", oidc.SignedOutRedirectUri);
     }
 
     [Fact]
@@ -254,6 +280,7 @@ public sealed class BffRegistrationAndOptionsTests
         services.AddLogging();
         services.AddBffServices(configuration);
         services.AddSingleton<ISessionRepository>(new FakeSessionRepository(timeProvider));
+        services.AddSingleton<ILogoutRedirectStore, FakeLogoutRedirectStore>();
         services.AddSingleton<ISessionLock>(new FakeSessionLock());
         services.AddSingleton<TimeProvider>(timeProvider);
         return services.BuildServiceProvider();

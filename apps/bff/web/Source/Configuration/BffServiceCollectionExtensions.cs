@@ -31,7 +31,14 @@ public static class BffServiceCollectionExtensions
 
         var bffSection = configuration.GetSection(BffOptions.SectionName);
         services.AddSingleton<IValidateOptions<BffOptions>, BffOptionsValidator>();
-        services.AddOptions<BffOptions>().Bind(bffSection).ValidateOnStart();
+        services.AddOptions<BffOptions>()
+            .Configure(options =>
+            {
+                options.Endpoints.LogoutContinuation = "/bff/logout/continue";
+                options.Logout.RequestLifetime = TimeSpan.FromMinutes(5);
+            })
+            .Bind(bffSection)
+            .ValidateOnStart();
 
         var webOptions = bffSection.GetSection("Web").Get<WebOptions>() ?? new WebOptions();
         var exposedHeaders = (bffSection.GetSection("Transport:ResponseHeaders").Get<List<string>>() ?? [])
@@ -54,6 +61,7 @@ public static class BffServiceCollectionExtensions
         services.AddSingleton<IConnectionMultiplexer>(provider =>
             ConnectionMultiplexer.Connect(provider.GetRequiredService<IOptions<BffOptions>>().Value.Redis.ConnectionString));
         services.AddSingleton<ISessionRepository, RedisSessionRepository>();
+        services.AddSingleton<ILogoutRedirectStore, RedisLogoutRedirectStore>();
         services.AddSingleton<RedisTicketStore>();
         services.AddSingleton<ITicketStore>(provider => provider.GetRequiredService<RedisTicketStore>());
         services.AddSingleton<ISessionLock, RedisSessionLock>();
@@ -76,6 +84,8 @@ public static class BffServiceCollectionExtensions
             .Configure(options =>
             {
                 options.SignInScheme = BffAuthenticationDefaults.Cookies;
+                options.SignedOutCallbackPath = "/bff/signout-callback";
+                options.SignedOutRedirectUri = "/login";
                 options.ResponseType = OpenIdConnectResponseType.Code;
                 options.ResponseMode = OpenIdConnectResponseMode.Query;
                 options.CallbackPath = "/bff/callback";

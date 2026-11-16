@@ -1,5 +1,7 @@
 using System.Net.Http;
 using System.Globalization;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
@@ -15,12 +17,14 @@ public sealed class BffOpenIdConnectPostConfigure : IPostConfigureOptions<OpenId
     private readonly IOidcTokenClient _tokenClient;
     private readonly IOptions<BffOptions> _bffOptions;
     private readonly TimeProvider _timeProvider;
+    private readonly ILogoutRedirectStore _logoutRedirectStore;
 
-    public BffOpenIdConnectPostConfigure(IOidcTokenClient tokenClient, IOptions<BffOptions> bffOptions, TimeProvider timeProvider)
+    public BffOpenIdConnectPostConfigure(IOidcTokenClient tokenClient, IOptions<BffOptions> bffOptions, TimeProvider timeProvider, ILogoutRedirectStore logoutRedirectStore)
     {
         _tokenClient = tokenClient;
         _bffOptions = bffOptions;
         _timeProvider = timeProvider;
+        _logoutRedirectStore = logoutRedirectStore;
     }
 
     public void PostConfigure(string? name, OpenIdConnectOptions options)
@@ -38,12 +42,46 @@ public sealed class BffOpenIdConnectPostConfigure : IPostConfigureOptions<OpenId
         options.PushedAuthorizationBehavior = PushedAuthorizationBehavior.Disable;
         options.CallbackPath = string.IsNullOrEmpty(options.CallbackPath) ? "/bff/callback" : options.CallbackPath;
         options.RemoteSignOutPath = PathString.Empty;
-        options.SignedOutCallbackPath = PathString.Empty;
         options.Events ??= new OpenIdConnectEvents();
         options.Events.OnAuthorizationCodeReceived = RedeemAuthorizationCodeAsync;
         options.Events.OnTokenValidated = ValidateTokenResponse;
         options.Events.OnTicketReceived = EnsureAccessTokenAsync;
         options.Events.OnRemoteFailure = HandleRemoteFailureAsync;
+        options.Events.OnRedirectToIdentityProviderForSignOut = HandleSignOutRedirectAsync;
+        options.Events.OnSignedOutCallbackRedirect = HandleSignedOutCallbackRedirect;
+    }
+
+    private async Task HandleSignOutRedirectAsync(Microsoft.AspNetCore.Authentication.OpenIdConnect.RedirectContext context)
+    {
+        var message = context.ProtocolMessage;
+        if (string.IsNullOrWhiteSpace(message.IssuerAddress))
+            throw new DependencyUnavailableException();
+        message.ClientId ??= context.Options.ClientId;
+        var properties = context.Properties;
+        var userState = message.State;
+        if (!string.IsNullOrEmpty(userState))
+            properties.Items[OpenIdConnectDefaults.UserstatePropertiesKey] = userState;
+        message.State = context.Options.StateDataFormat!.Protect(properties);
+        var redirectUrl = message.CreateLogoutRequestUrl();
+        var request = await _logoutRedirectStore.StoreAsync(redirectUrl, context.HttpContext.RequestAborted).ConfigureAwait(false);
+        var http = context.HttpContext;
+        var continuation = UriHelper.BuildAbsolute(http.Request.Scheme, http.Request.Host, http.Request.PathBase, _bffOptions.Value.Endpoints.LogoutContinuation);
+        var logoutUrl = QueryHelpers.AddQueryString(continuation, "request", request);
+        http.Response.Headers.CacheControl = "no-store";
+        context.HandleResponse();
+        await http.Response.WriteAsJsonAsync(new { logoutUrl }, http.RequestAborted).ConfigureAwait(false);
+    }
+
+    private static Task HandleSignedOutCallbackRedirect(RemoteSignOutContext context)
+    {
+        context.HttpContext.Response.Headers.CacheControl = "no-store";
+        if (string.IsNullOrWhiteSpace(context.Properties?.RedirectUri))
+        {
+            context.HandleResponse();
+            context.HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return context.HttpContext.Response.WriteAsJsonAsync(new { code = "invalid_logout_state" }, context.HttpContext.RequestAborted);
+        }
+        return Task.CompletedTask;
     }
 
     private async Task RedeemAuthorizationCodeAsync(AuthorizationCodeReceivedContext context)

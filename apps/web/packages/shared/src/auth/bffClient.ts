@@ -138,32 +138,70 @@ export function createBffClient(config: AppConfig, onSessionLost?: () => void) {
     const headers = new Headers();
     headers.set(session.csrfHeaderName, session.csrfToken);
 
-    const response = await fetch(joinApiUrl(config.BFF_BASE, '/logout'), {
-      method: 'POST',
-      credentials: 'include',
-      headers,
-    });
+    let response: Response;
+    try {
+      response = await fetch(joinApiUrl(config.BFF_BASE, '/logout'), {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+      });
+    } catch (error) {
+      snapshot = null;
+      throw error;
+    }
 
-    if (response.status === 204) {
-      snapshot = {
-        authenticated: false,
-        csrfToken: null,
-        csrfHeaderName: null,
-      };
+    if (response.status === 200) {
+      let logoutUrl: unknown;
+      try {
+        logoutUrl = (await response.json())?.logoutUrl;
+      } catch {
+        snapshot = null;
+        throw new Error('Malformed logout response');
+      }
+
+      if (typeof logoutUrl !== 'string' || !logoutUrl.trim()) {
+        snapshot = null;
+        throw new Error('Malformed logout response');
+      }
+
+      let target: URL;
+      try {
+        target = new URL(logoutUrl);
+      } catch {
+        snapshot = null;
+        throw new Error('Malformed logout URL');
+      }
+
+      let bffOrigin: string;
+      try {
+        bffOrigin = new URL(config.BFF_BASE, window.location.origin).origin;
+      } catch {
+        snapshot = null;
+        throw new Error('Malformed BFF base URL');
+      }
+
+      if (
+        (target.protocol !== 'http:' && target.protocol !== 'https:') ||
+        target.origin !== bffOrigin ||
+        target.username !== '' ||
+        target.password !== ''
+      ) {
+        snapshot = null;
+        throw new Error('Invalid logout URL');
+      }
+
+      snapshot = null;
+      window.location.assign(target.toString());
       onSessionLost?.();
       return;
     }
 
     if (response.status === 401) {
-      if (!(await getSession()).authenticated) {
-        snapshot = {
-          authenticated: false,
-          csrfToken: null,
-          csrfHeaderName: null,
-        };
-        onSessionLost?.();
-        return;
+      try {
+        await getSession();
+      } catch {
       }
+      throw new Error('Logout failed: 401');
     }
 
     if (response.status === 400) {
@@ -178,6 +216,8 @@ export function createBffClient(config: AppConfig, onSessionLost?: () => void) {
         throw new BffRequestError('csrf_invalid', 400);
       }
     }
+
+    if (response.status >= 500) snapshot = null;
 
     throw new Error(`Logout failed: ${response.status}`);
   };

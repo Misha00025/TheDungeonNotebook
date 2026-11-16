@@ -43,6 +43,28 @@ public sealed class BffExceptionMiddlewareTests
     }
 
     [Fact]
+    public async Task DependencyFailurePreservesExpiryCookieButClearsUnsafeLocation()
+    {
+        var context = CreateContext();
+        const string expiryCookie = "tdn-session=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; httponly";
+        var middleware = new BffExceptionMiddleware(httpContext =>
+        {
+            httpContext.Response.Headers.SetCookie = expiryCookie;
+            httpContext.Response.Headers.Location = "https://unsafe.example/redirect";
+            return Task.FromException(new DependencyUnavailableException());
+        }, NullLogger<BffExceptionMiddleware>.Instance);
+
+        await middleware.InvokeAsync(context);
+
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, context.Response.StatusCode);
+        Assert.Equal("application/json; charset=utf-8", context.Response.ContentType);
+        Assert.Equal(expiryCookie, context.Response.Headers.SetCookie);
+        Assert.False(context.Response.Headers.ContainsKey("Location"));
+        using var document = await ReadJsonAsync(context);
+        Assert.Equal("dependency_unavailable", document.RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task UnexpectedFailureLogsDiagnosticDetailsWithoutExceptionMessagesOrRequestData()
     {
         const string exceptionSecret = "exception-secret-value";

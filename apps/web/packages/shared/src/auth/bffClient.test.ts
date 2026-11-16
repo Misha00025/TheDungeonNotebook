@@ -3,9 +3,14 @@ import { createBffClient } from './bffClient';
 const config = { BFF_BASE: 'http://localhost:5080/bff', API_BASE: 'http://localhost:5080/bff/api' };
 const authSession = { authenticated: true, csrfToken: 'csrf-value', csrfHeaderName: 'X-Custom-CSRF' };
 const mockFetch = () => fetch as unknown as ReturnType<typeof vi.fn>;
+const locationAssign = vi.fn();
 
 describe('createBffClient', () => {
-  beforeEach(() => vi.stubGlobal('fetch', vi.fn()));
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+    locationAssign.mockReset();
+    vi.stubGlobal('window', { location: { origin: 'https://web.example', assign: locationAssign } });
+  });
   afterEach(() => vi.unstubAllGlobals());
 
   it('coalesces session GETs and validates/stores only the session contract', async () => {
@@ -91,24 +96,87 @@ describe('createBffClient', () => {
     expect(mockFetch().mock.calls[3][1].headers.get('X-Custom-CSRF')).toBe('csrf-value');
   });
 
-  it('logout requires CSRF, identifies csrf_invalid and handles 204/401 accurately', async () => {
+  it('logout posts with dynamic CSRF, validates the BFF URL, clears session, navigates and notifies loss', async () => {
+    mockFetch().mockResolvedValueOnce(new Response(JSON.stringify(authSession))).mockResolvedValueOnce(new Response(JSON.stringify({ logoutUrl: 'http://localhost:5080/bff/logout/continue?request=opaque' }), { status: 200 }));
+    const lost = vi.fn(); const client = createBffClient(config, lost); await client.getSession(); await client.logout();
+    const [, options] = mockFetch().mock.calls[1];
+    expect(options).toMatchObject({ method: 'POST', credentials: 'include' });
+    expect(options.headers.get('X-Custom-CSRF')).toBe('csrf-value');
+    expect(locationAssign).toHaveBeenCalledTimes(1);
+    expect(locationAssign).toHaveBeenCalledWith('http://localhost:5080/bff/logout/continue?request=opaque');
+    expect(lost).toHaveBeenCalledTimes(1);
+    mockFetch().mockResolvedValueOnce(new Response(JSON.stringify({ authenticated: false, csrfToken: null, csrfHeaderName: null })));
+    expect((await client.getSession()).authenticated).toBe(false);
+  });
+
+  it('resolves relative BFF bases against the page origin for logout URL validation', async () => {
+    mockFetch().mockResolvedValueOnce(new Response(JSON.stringify(authSession))).mockResolvedValueOnce(new Response(JSON.stringify({ logoutUrl: 'https://web.example/bff/logout/continue?request=opaque' }), { status: 200 }));
+    const client = createBffClient({ BFF_BASE: '/bff', API_BASE: '/bff/api' });
+    await client.getSession(); await client.logout();
+    expect(locationAssign).toHaveBeenCalledTimes(1);
+    expect(locationAssign).toHaveBeenCalledWith('https://web.example/bff/logout/continue?request=opaque');
+  });
+
+  it.each([
+    ['missing URL', {}],
+    ['empty URL', { logoutUrl: '  ' }],
+    ['relative URL', { logoutUrl: '/bff/logout/continue?request=x' }],
+    ['non-HTTP URL', { logoutUrl: 'javascript:alert(1)' }],
+    ['wrong origin', { logoutUrl: 'https://evil.example/logout' }],
+    ['URL with credentials', { logoutUrl: 'http://user:pass@localhost:5080/logout' }],
+  ])('rejects %s without navigating', async (_name, body) => {
+    mockFetch().mockResolvedValueOnce(new Response(JSON.stringify(authSession))).mockResolvedValueOnce(new Response(JSON.stringify(body), { status: 200 }));
+    const client = createBffClient(config);
+    await client.getSession();
+    await expect(client.logout()).rejects.toThrow();
+    expect(locationAssign).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-JSON logout response without navigating', async () => {
+    mockFetch().mockResolvedValueOnce(new Response(JSON.stringify(authSession))).mockResolvedValueOnce(new Response('not-json', { status: 200 }));
+    const client = createBffClient(config);
+    await client.getSession();
+    await expect(client.logout()).rejects.toThrow('Malformed logout response');
+    expect(locationAssign).not.toHaveBeenCalled();
+  });
+
+  it('does not treat 204 or 401 as completed logout', async () => {
+    mockFetch().mockResolvedValueOnce(new Response(JSON.stringify(authSession))).mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const lost = vi.fn(); const noContent = createBffClient(config, lost); await noContent.getSession();
+    await expect(noContent.logout()).rejects.toThrow('Logout failed: 204');
+    expect(lost).not.toHaveBeenCalled(); expect(locationAssign).not.toHaveBeenCalled();
+
+    mockFetch().mockResolvedValueOnce(new Response(JSON.stringify(authSession))).mockResolvedValueOnce(new Response('', { status: 401 })).mockResolvedValueOnce(new Response('', { status: 401 }));
+    const unauthenticated = createBffClient(config, lost); await unauthenticated.getSession();
+    await expect(unauthenticated.logout()).rejects.toThrow('Logout failed: 401');
+    expect(lost).not.toHaveBeenCalled(); expect(locationAssign).not.toHaveBeenCalled();
+    expect(mockFetch()).toHaveBeenCalledTimes(5);
+  });
+
+  it('preserves csrf errors and clears snapshot after server or network failure without retrying logout', async () => {
     mockFetch().mockResolvedValueOnce(new Response(JSON.stringify(authSession))).mockResolvedValueOnce(new Response(JSON.stringify({ code: 'csrf_invalid' }), { status: 400 }));
     const client = createBffClient(config); await client.getSession();
     await expect(client.logout()).rejects.toMatchObject({ code: 'csrf_invalid', status: 400 });
+    expect(locationAssign).not.toHaveBeenCalled();
     mockFetch().mockResolvedValueOnce(new Response(JSON.stringify(authSession))).mockResolvedValueOnce(new Response('{}'));
     await client.request('/after-logout-error', { method: 'POST' });
     expect(mockFetch()).toHaveBeenCalledTimes(4);
-    mockFetch().mockResolvedValueOnce(new Response(JSON.stringify(authSession))).mockResolvedValueOnce(new Response(null, { status: 204 }));
-    const lost = vi.fn(); const logoutClient = createBffClient(config, lost); await logoutClient.getSession(); await logoutClient.logout();
-    expect(lost).toHaveBeenCalledTimes(1);
-    mockFetch().mockResolvedValueOnce(new Response(JSON.stringify(authSession))).mockResolvedValueOnce(new Response('', { status: 401 })).mockResolvedValueOnce(new Response('', { status: 401 }));
-    const alreadyOut = createBffClient(config); await alreadyOut.getSession(); await alreadyOut.logout();
-  });
 
-  it('surfaces logout failures without declaring a session lost', async () => {
-    mockFetch().mockResolvedValueOnce(new Response(JSON.stringify(authSession))).mockResolvedValueOnce(new Response('', { status: 503 }));
-    const lost = vi.fn(); const client = createBffClient(config, lost); await client.getSession();
-    await expect(client.logout()).rejects.toThrow('503'); expect(lost).not.toHaveBeenCalled();
+    mockFetch().mockReset();
+    mockFetch().mockResolvedValueOnce(new Response(JSON.stringify(authSession))).mockResolvedValueOnce(new Response('', { status: 503 })).mockResolvedValueOnce(new Response(JSON.stringify(authSession))).mockResolvedValueOnce(new Response('{}'));
+    const failed = createBffClient(config); await failed.getSession();
+    await expect(failed.logout()).rejects.toThrow('Logout failed: 503');
+    await failed.request('/after-logout-failure', { method: 'POST' });
+    expect(mockFetch()).toHaveBeenCalledTimes(4);
+    expect(locationAssign).not.toHaveBeenCalled();
+
+    mockFetch().mockReset();
+    mockFetch().mockResolvedValueOnce(new Response(JSON.stringify(authSession))).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(new Response(JSON.stringify(authSession))).mockResolvedValueOnce(new Response('{}'));
+    const offline = createBffClient(config); await offline.getSession();
+    await expect(offline.logout()).rejects.toThrow('offline');
+    await offline.request('/after-network-failure', { method: 'POST' });
+    expect(mockFetch()).toHaveBeenCalledTimes(4);
+    expect(locationAssign).not.toHaveBeenCalled();
   });
 
   it('encodes the local return path including query and fragment', () => {

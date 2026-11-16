@@ -52,6 +52,7 @@ public sealed class OidcCallbackHandlerTests
         services.AddBffServices(configuration);
         services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider());
         services.AddSingleton<ISessionRepository>(new FakeSessionRepository(timeProvider));
+        services.AddSingleton<ILogoutRedirectStore, FakeLogoutRedirectStore>();
         services.AddSingleton<ISessionLock>(new FakeSessionLock());
         services.AddSingleton<IOidcTokenClient>(tokenClient);
         services.Configure<OpenIdConnectOptions>(BffAuthenticationDefaults.Oidc, options =>

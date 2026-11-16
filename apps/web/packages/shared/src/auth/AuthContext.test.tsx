@@ -57,6 +57,32 @@ describe('AuthProvider', () => {
     expect(screen.getByTestId('error').textContent).toContain('503');
   });
 
+  it('clears authenticated state and assigns the BFF logout continuation after successful logout', async () => {
+    const assign = vi.fn();
+    const originalWindow = window;
+    const windowStub = new Proxy(originalWindow, {
+      get(target, property) {
+        if (property === 'location') return { origin: 'https://web.example', assign };
+        return Reflect.get(target, property, target);
+      },
+    });
+    vi.stubGlobal('window', windowStub);
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(session)))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 5, type: 'user' })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ logoutUrl: 'http://localhost:5080/bff/logout/continue?request=opaque' }), { status: 200 }));
+    render(<AuthProvider><Consumer /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('user').textContent).toBe('5'));
+
+    await act(async () => { screen.getByText('logout').click(); });
+
+    expect(assign).toHaveBeenCalledTimes(1);
+    expect(assign).toHaveBeenCalledWith('http://localhost:5080/bff/logout/continue?request=opaque');
+    expect(screen.getByTestId('status').textContent).toBe('anonymous');
+    expect(screen.getByTestId('user').textContent).toBe('');
+    expect(screen.getByTestId('error').textContent).toBe('');
+  });
+
   it('coalesces StrictMode bootstrap and finishes after the repeated effect setup', async () => {
     const pending = deferred<Response>();
     vi.mocked(fetch).mockReturnValueOnce(pending.promise).mockResolvedValueOnce(new Response(JSON.stringify({ id: 8, type: 'user' })));

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
-import { useNavigate } from 'react-router-dom';
 import App from './App';
 
 const controls = vi.hoisted(() => ({
@@ -30,9 +29,8 @@ vi.mock('@tdn/shared', () => ({
   hubNavItems: [],
   GlobalSidebar: () => {
     const auth = controls.auth;
-    const navigate = useNavigate();
     const [, update] = useState(0);
-    const logout = async () => { try { await auth.logout(); navigate('/login'); } catch (reason) { auth.error = reason instanceof Error ? reason.message : String(reason); update(value => value + 1); } };
+    const logout = async () => { try { await auth.logout(); } catch (reason) { auth.error = reason instanceof Error ? reason.message : String(reason); update(value => value + 1); } };
     return <button onClick={() => void logout()}>sidebar logout</button>;
   },
 }));

@@ -8,6 +8,7 @@ using Moq;
 using Tdn.Bff.Endpoints;
 using Tdn.Bff.Security;
 using Tdn.Bff.Sessions;
+using bff_web.Tests.Support;
 
 namespace bff_web.Tests.Security;
 
@@ -143,7 +144,7 @@ public sealed class EndpointAndAntiforgeryTests
     }
 
     [Fact]
-    public async Task LogoutValidatesCsrfBeforeSigningOutOnlyCookieScheme()
+    public async Task LogoutValidatesCsrfBeforeSigningOutCookieThenOidcScheme()
     {
         var (context, authentication) = CreateContext();
         var order = new List<string>();
@@ -155,13 +156,15 @@ public sealed class EndpointAndAntiforgeryTests
         authentication.Setup(service => service.SignOutAsync(context, BffAuthenticationDefaults.Cookies, It.IsAny<AuthenticationProperties?>()))
             .Callback<HttpContext, string?, AuthenticationProperties?>((_, _, _) => order.Add("signout"))
             .Returns(Task.CompletedTask);
+        authentication.Setup(service => service.SignOutAsync(context, BffAuthenticationDefaults.Oidc, It.IsAny<AuthenticationProperties?>()))
+            .Callback<HttpContext, string?, AuthenticationProperties?>((_, _, _) => order.Add("oidc"))
+            .Returns(Task.CompletedTask);
 
         await BffEndpointRouteBuilderExtensions.HandleLogoutAsync(context, validator);
 
-        Assert.Equal(new[] { "validate", "signout" }, order);
-        Assert.Equal(StatusCodes.Status204NoContent, context.Response.StatusCode);
+        Assert.Equal(new[] { "validate", "signout", "oidc" }, order);
         Assert.Equal("no-store", context.Response.Headers.CacheControl);
-        authentication.Verify(service => service.SignOutAsync(context, BffAuthenticationDefaults.Oidc, It.IsAny<AuthenticationProperties?>()), Times.Never);
+        authentication.Verify(service => service.SignOutAsync(context, BffAuthenticationDefaults.Oidc, It.Is<AuthenticationProperties?>(properties => properties!.RedirectUri == "/login")), Times.Once);
     }
 
     [Fact]
@@ -173,6 +176,43 @@ public sealed class EndpointAndAntiforgeryTests
         await Assert.ThrowsAsync<AntiforgeryValidationException>(() => BffEndpointRouteBuilderExtensions.HandleLogoutAsync(context, validator));
 
         authentication.Verify(service => service.SignOutAsync(It.IsAny<HttpContext>(), It.IsAny<string?>(), It.IsAny<AuthenticationProperties?>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task LogoutKeepsCookieRemovalWhenOidcSignOutFails()
+    {
+        var (context, authentication) = CreateContext();
+        var order = new List<string>();
+        authentication.Setup(service => service.SignOutAsync(context, BffAuthenticationDefaults.Cookies, It.IsAny<AuthenticationProperties?>()))
+            .Callback(() => order.Add("cookie"))
+            .Returns(Task.CompletedTask);
+        authentication.Setup(service => service.SignOutAsync(context, BffAuthenticationDefaults.Oidc, It.IsAny<AuthenticationProperties?>()))
+            .Callback(() => order.Add("oidc"))
+            .ThrowsAsync(new InvalidOperationException("discovery failed"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => BffEndpointRouteBuilderExtensions.HandleLogoutAsync(context, new DelegateAntiforgeryValidator(_ => Task.CompletedTask)));
+
+        Assert.Equal(new[] { "cookie", "oidc" }, order);
+    }
+
+    [Fact]
+    public async Task LogoutContinuationConsumesOpaqueRequestAndRedirectsOnce()
+    {
+        var store = new FakeLogoutRedirectStore();
+        var request = await store.StoreAsync("https://idp.example/logout?id_token_hint=secret", CancellationToken.None);
+        var context = new DefaultHttpContext();
+        context.Request.QueryString = new QueryString($"?request={request}");
+
+        await BffEndpointRouteBuilderExtensions.HandleLogoutContinuationAsync(context, store);
+
+        Assert.Equal("https://idp.example/logout?id_token_hint=secret", context.Response.Headers.Location);
+        Assert.Equal("no-store", context.Response.Headers.CacheControl);
+        Assert.Equal("no-referrer", context.Response.Headers["Referrer-Policy"]);
+        var missing = new DefaultHttpContext { RequestServices = context.RequestServices };
+        missing.Request.QueryString = new QueryString($"?request={request}");
+        missing.Response.Body = new MemoryStream();
+        await BffEndpointRouteBuilderExtensions.HandleLogoutContinuationAsync(missing, store);
+        Assert.Equal(StatusCodes.Status400BadRequest, missing.Response.StatusCode);
     }
 
     [Fact]

@@ -230,3 +230,22 @@ internal static class TestOptions
     public static SessionTokenService TokenService(FakeSessionRepository repository, FakeSessionLock sessionLock, FakeOidcTokenClient client, FixedTimeProvider timeProvider, BffOptions? bffOptions = null) =>
         new(repository, sessionLock, client, new FixedOptionsMonitor<OpenIdConnectOptions>(new OpenIdConnectOptions()), Options.Create(bffOptions ?? Bff()), timeProvider);
 }
+
+internal sealed class FakeLogoutRedirectStore : ILogoutRedirectStore
+{
+    private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
+
+    public Task<string> StoreAsync(string redirectUrl, CancellationToken cancellationToken)
+    {
+        var request = Guid.NewGuid().ToString("N");
+        _values[request] = redirectUrl;
+        return Task.FromResult(request);
+    }
+
+    public Task<string?> TakeAsync(string request, CancellationToken cancellationToken)
+    {
+        if (!_values.Remove(request, out var value))
+            return Task.FromResult<string?>(null);
+        return Task.FromResult<string?>(value);
+    }
+}

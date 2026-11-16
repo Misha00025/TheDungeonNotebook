@@ -126,7 +126,8 @@ public sealed class OidcTokenValidationHookTests
         var postConfigure = new BffOpenIdConnectPostConfigure(
             tokenClient ?? new FakeOidcTokenClient(),
             Options.Create(new BffOptions()),
-            new FixedTimeProvider(DateTimeOffset.UtcNow));
+            new FixedTimeProvider(DateTimeOffset.UtcNow),
+            new FakeLogoutRedirectStore());
         postConfigure.PostConfigure(BffAuthenticationDefaults.Oidc, options);
         return options;
     }

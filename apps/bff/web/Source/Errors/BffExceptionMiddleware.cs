@@ -58,7 +58,10 @@ public sealed class BffExceptionMiddleware
                     socketException?.NativeErrorCode);
             }
 
+            var setCookie = context.Response.Headers.SetCookie;
             context.Response.Clear();
+            if (setCookie.Count > 0)
+                context.Response.Headers.SetCookie = setCookie;
             context.Response.StatusCode = statusCode;
             context.Response.ContentType = "application/json";
             context.Response.Headers.CacheControl = "no-store";
