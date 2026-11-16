@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "tsc && vite build",
+    "postbuild": "node --experimental-vm-modules ../../scripts/check-remote-assets.mjs profile",
     "preview": "vite preview --port 3002 --strictPort",
     "test": "vitest --passWithNoTests",
     "test:run": "vitest run --passWithNoTests",

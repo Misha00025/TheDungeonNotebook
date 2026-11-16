@@ -42,7 +42,13 @@ Remote path values — локальные slash-delimited suffix paths, кото
 
 При старте proxy generator из одного набора runtime env создаёт `/app/runtime/config.json` и Nginx config. Browser JSON содержит только `BFF_BASE`, `API_BASE`, `BASE_PATH` и `REMOTES` с публичными remote entry paths; internal upstream addresses туда не входят. `config.json` отдаётся с `Cache-Control: no-store`.
 
-Hub загружает `config.json` относительно `document.baseURI`, регистрирует remotes до рендера приложения и использует `BASE_PATH` как Router basename. Hub и remote assets собраны с относительными `./` asset paths. Gateway заменяет нейтральный `<base href="/">` в HTML; compiled JS/CSS не патчатся. Deployment paths и remote URLs не задаются через build-time `VITE_BASE`/`VITE_REMOTE_*`, и localhost entry fallback нет. При сетевой ошибке браузер всё равно видит публичный URL assets, но Hub показывает только общее сообщение без raw exception или entry address.
+Hub загружает `config.json` относительно `document.baseURI`, регистрирует remotes до рендера приложения и использует `BASE_PATH` как Router basename. Hub собран с `base: './'`; три remotes используют нейтральный Vite `base: '/'` и `experimental.renderBuiltUrl` для относительных JS/CSS asset URLs, не меняя URL `remoteEntry.js` или расположение файлов в `assets/`. Gateway заменяет нейтральный `<base href="/">` Hub HTML; compiled JS/CSS не патчатся. Deployment paths и remote URLs не задаются через build-time `VITE_BASE`/`VITE_REMOTE_*`, и localhost entry fallback нет. При сетевой ошибке браузер всё равно видит публичный URL assets, но Hub показывает только общее сообщение без raw exception или entry address.
+
+Каждая campaign/profile/login build после сборки запускает VM-based checker: он проверяет emitted JS imports и CSS links относительно трёх public base URL и подтверждает наличие файлов в build directory без сети и запуска browser. Checker также можно запустить на имеющихся build artifacts:
+
+```bash
+node --experimental-vm-modules apps/web/scripts/check-remote-assets.mjs [campaign|profile|login]
+```
 
 При изменении `.env` пересоздайте только proxy container, без пересборки образов:
 
@@ -99,6 +105,7 @@ Unit verification commands:
 
 ```bash
 node --test apps/web/proxy/generate.test.mjs
+node --experimental-vm-modules --test apps/web/scripts/check-remote-assets.test.mjs
 python3 -m unittest discover -s tests -p test_web_deployment.py
 npm --prefix apps/web run test:run --workspace @tdn/hub
 npm --prefix apps/web run test:run --workspace @tdn/shared

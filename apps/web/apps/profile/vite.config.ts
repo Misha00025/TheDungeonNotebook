@@ -2,9 +2,10 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import federation from '@originjs/vite-plugin-federation';
 import { fileURLToPath, URL } from 'node:url';
+import { remoteAssetConfig } from '../../remote-build.config';
 
 export default defineConfig({
-  base: './',
+  ...remoteAssetConfig,
   publicDir: false,
   plugins: [
     react(),
