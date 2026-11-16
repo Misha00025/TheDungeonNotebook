@@ -1,22 +1,25 @@
 # Переносимый Web
 
-В каталоге достаточно `docker-compose.yaml` и, если нужны настройки, `.env`, созданного вручную по образцу `.env.example`. Папку можно перенести на Docker host отдельно от репозитория: исходники и checkout не нужны. Compose использует только готовые образы `tdn-campaign:latest`, `tdn-profile:latest`, `tdn-login:latest` и `tdn-hub:latest`; до запуска они должны быть доступны Docker host. Их можно доставить через `docker load` или собрать заранее вне переносимого каталога. Compose ничего не собирает и не публикует.
+Переносимый каталог содержит `docker-compose.yaml` и `.env.example`; исходники и checkout не требуются. Compose запускает пять готовых images: `tdn-campaign:latest`, `tdn-profile:latest`, `tdn-login:latest`, `tdn-hub:latest` и `tdn-web-proxy:latest`. До запуска доставьте их на Docker host, включая proxy image. Собрать комплект из checkout можно командой `make build-web`; Compose в этом каталоге не собирает images и не монтирует исходники. `APP_PULL_POLICY` сохраняет управление pull behavior, по умолчанию `never`.
 
-По умолчанию `APP_PULL_POLICY=never` использует локальные образы. Оператор может выбрать другую поддерживаемую Docker Compose pull policy через `.env`; registry этим комплектом не предполагается. Стандартные готовые образы для переносимого запуска собираются с base `/` и согласованными remote URLs. Пользовательский build env может переопределять значения шаблона; старые образы не обновятся без пересборки, а применённые контейнеры пользователь должен пересоздать.
-
-При необходимости скопируйте образец, не перезаписывая существующий файл, затем настройте его вручную:
+Создайте `.env`, не перезаписывая уже существующий файл:
 
 ```sh
 test -e .env || cp .env.example .env
 docker compose config
 docker compose up -d
-docker compose down
 ```
 
-Без `.env` используются defaults Compose. `BFF_BASE` — адрес BFF, доступный браузеру, а не Docker container DNS; `API_BASE` можно оставить пустым, тогда entrypoint Hub выведет его как `BFF_BASE/api`. Порты публикации настраиваются через `CAMPAIGN_PORT`, `PROFILE_PORT`, `LOGIN_PORT` и `HUB_PORT`.
+Runtime состоит из `campaign`, `profile`, `login`, `hub` и `nginx`. Только nginx публикует `${WEB_PORT:-3004}:80`; Hub и remotes доступны nginx по внутренним service DNS names и порту 3000. Hub — Node `serve`, не Nginx. Порты 3000/3002/3003 относятся к локальным Vite previews, а не к опубликованным Docker remote ports. `WEB_BASE_PATH` и `WEB_CAMPAIGN_PATH`/`WEB_PROFILE_PATH`/`WEB_LOGIN_PATH` задают public routes; `WEB_*_UPSTREAM` задают internal origins, `WEB_DNS_RESOLVER` — resolver Nginx. Полный runtime env contract и пример external Nginx с сохранением path prefix описаны в [Web README](../../apps/web/README.md).
 
-BFF/backend и IdP запускаются отдельно. Для локального HTTP Web и BFF должны использовать один hostname и схему, например `localhost`, при разных портах. В конфигурации уже запущенного BFF задайте `Bff.Web.PublicOrigin=http://localhost:3004` и `AllowedOrigins=['http://localhost:3004']`. Для `deploy/backend` это `config/bff/appsettings.json` рядом с backend Compose-файлом, не путь к исходникам. Этот комплект не читает и не меняет эти файлы. IdP должен иметь login callback BFF `/bff/callback` и точный post-logout callback BFF `/bff/signout-callback` (не конечный Web `/login`); существующую конфигурацию здесь не изменяют. Подробнее — в [README BFF](../../apps/bff/web/README.md).
+Proxy при старте генерирует `config.json` и Nginx routing из этого же env-набора. Browser config содержит `BFF_BASE`, `API_BASE`, `BASE_PATH` и публичные `REMOTES`, но не internal upstream addresses. `BFF_BASE` и `API_BASE` должны быть URL, доступными браузеру; gateway не проксирует BFF. `localhost` в BFF defaults означает компьютер пользователя, поэтому для серверного deployment укажите публичный hostname и настройте backend/BFF `PublicOrigin` и `AllowedOrigins` на внешний Web origin без path. TLS завершает отдельный external Nginx пользователя.
 
-Hub — единственный UI. Campaign, profile и login на портах 3000, 3002 и 3003 предоставляют статические remote assets, а не самостоятельные приложения. Опубликованные remote URLs внутри готового Hub image задаются при его сборке. Смена remote-портов или hostname требует уже собранного Hub image с согласованными federation URLs. Runtime `.env` меняет `BFF_BASE`, `API_BASE` и host-порты, но не `VITE_REMOTE_*` и `VITE_BASE`, встроенные в образ.
+Смена `.env` требует пересоздать только proxy container, без rebuild images:
 
-Перенос папки не требует путей к `apps/` и не затрагивает backend-данные. В комплект не входят TLS/nginx, IdP, Redis или backend-сервисы.
+```sh
+docker compose up -d --force-recreate nginx
+```
+
+Изменение base/remote paths не требует пересборки Hub/remotes. Миграция со старой схемы требует однократно собрать и доставить новые Hub, campaign, profile, login и proxy images; старые images сами не приобретают runtime routing. `WEB_PORT` заменяет старые `HUB_PORT` и remote host-port settings; `VITE_BASE`/`VITE_REMOTE_*` build args больше не задают deployment paths. Перенесите эти настройки в runtime `.env`. Source `apps/web/template.env` и этот переносимый `.env.example` — разные шаблоны, автоматически друг в друга не копируются и не перезаписываются.
+
+BFF/backend и IdP запускаются отдельно. Callback BFF и OIDC logout настройки не меняются этим комплектом. Если logout должен вернуть пользователя под prefix, BFF `Oidc.SignedOutRedirectUri` задаётся отдельно, например `/notebook/login`. Подробнее — в [README BFF](../../apps/bff/web/README.md).

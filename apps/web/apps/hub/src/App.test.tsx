@@ -9,7 +9,7 @@ const controls = vi.hoisted(() => ({
     authenticated: false,
     userId: null as number | null,
     error: null as string | null,
-    config: { BFF_BASE: '/bff', API_BASE: '/bff/api' },
+    config: { BFF_BASE: '/bff', API_BASE: '/bff/api', BASE_PATH: '/' },
     request: vi.fn(),
     login: vi.fn(),
     logout: vi.fn(),
@@ -45,6 +45,8 @@ vi.mock('@tdn/shared/auth/useProfile', () => ({
   },
 }));
 
+vi.mock('@tdn/shared/config', () => ({ getConfig: () => controls.auth.config }));
+
 vi.mock('./remote/RemoteBoundary', () => ({
   default: (props: any) => {
     controls.lastRemote = props;
@@ -66,6 +68,7 @@ describe('Hub App auth and profile gates', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     controls.auth.status = 'loading'; controls.auth.authenticated = false; controls.auth.userId = null; controls.auth.error = null;
+    controls.auth.config.BASE_PATH = '/';
     controls.profile.loading = false; controls.profile.error = null; controls.profile.profileNotFound = false;
   });
 
@@ -87,6 +90,14 @@ describe('Hub App auth and profile gates', () => {
     renderHub('/groups/4');
     expect(screen.getByTestId('remote')).toHaveAttribute('data-module', 'App');
     expect(controls.lastRemote.auth).toBe(controls.auth);
+  });
+
+  it('routes prefixed profile deep links with the configured basename', () => {
+    controls.auth.status = 'authenticated'; controls.auth.authenticated = true; controls.auth.userId = 7;
+    controls.auth.config.BASE_PATH = '/notebook/';
+    renderHub('/notebook/profile/characters/9?tab=items#details');
+    expect(screen.getByTestId('remote')).toHaveAttribute('data-name', 'profile');
+    expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe('/notebook/profile/characters/9?tab=items#details');
   });
 
   it('offers a profile retry for profile lookup errors', () => {

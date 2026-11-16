@@ -14,7 +14,7 @@ npm --prefix apps/web run preview --workspace @tdn/campaign
 npm --prefix apps/web run build --workspace @tdn/campaign
 ```
 
-Preview раздаёт federation assets на `http://localhost:3000`; Hub загружает `http://localhost:3000/assets/remoteEntry.js`. Это не standalone интерфейс кампании. Hub запускается отдельно на `http://localhost:3004` и владеет runtime config и BFF session.
+Для локальной разработки preview раздаёт federation assets на `http://localhost:3000`; это локальный preview port, не опубликованный Docker port. Production remote assets маршрутизирует отдельный Web proxy из runtime env; remote URL не вшивается в Hub build. Это не standalone интерфейс кампании. Hub локально запускается отдельно на `http://localhost:3004`, владеет BFF session, а runtime config генерируется Web proxy.
 
 Общий transport отправляет cookie credentials и CSRF header BFF для unsafe запросов. Ошибочные API-запросы автоматически не повторяются. Выход инициируется shared auth-клиентом: он удаляет локальную BFF session, затем выполняет верхнеуровневый переход через одноразовую BFF logout-ссылку для OIDC logout в IdP. Успешный POST сам по себе не гарантирует, что браузер дошёл до IdP и завершил SSO. Подробности callback и настройки Keycloak — в [README BFF](../../../../apps/bff/web/README.md).
 

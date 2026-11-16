@@ -16,21 +16,19 @@ const RemoteBoundary: React.FC<RemoteBoundaryProps> = ({
   onCompleted,
 }) => {
   const [mod, setMod] = useState<RemoteModule | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setMod(null);
-    setError(null);
+    setFailed(false);
 
     loadRemoteModule(name, module)
       .then((loaded) => {
         if (!cancelled) setMod(loaded);
       })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err));
-        }
+      .catch(() => {
+        if (!cancelled) setFailed(true);
       });
 
     return () => {
@@ -38,10 +36,10 @@ const RemoteBoundary: React.FC<RemoteBoundaryProps> = ({
     };
   }, [name, module]);
 
-  if (error) {
+  if (failed) {
     return (
-      <div style={{ padding: '2rem', color: 'var(--danger-color, #d93025)' }}>
-        Не удалось загрузить модуль «{name}/{module}»: {error}
+      <div role="alert" style={{ padding: '2rem', color: 'var(--danger-color, #d93025)' }}>
+        Не удалось загрузить раздел. Попробуйте обновить страницу.
       </div>
     );
   }

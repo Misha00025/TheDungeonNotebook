@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@tdn/shared': fileURLToPath(new URL('../../packages/shared/src', import.meta.url)),
+      'virtual:__federation__': fileURLToPath(new URL('./src/remote/federation.test-support.ts', import.meta.url)),
     },
   },
   test: {

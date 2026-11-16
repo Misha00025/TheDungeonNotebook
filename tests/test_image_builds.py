@@ -10,8 +10,15 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 SERVICES = (
     "api-gateway users-service account-service campaign-service game-systems-service "
-    "sync-service web-hub web-campaign web-profile web-login web-game-systems bff-web"
+    "sync-service web-hub web-campaign web-profile web-login web-game-systems web-proxy bff-web"
 ).split()
+BACKEND_BUILD_SERVICES = (
+    "api-gateway users-service account-service campaign-service game-systems-service sync-service"
+).split()
+WEB_BUILD_SERVICES = (
+    "web-hub web-campaign web-profile web-login web-game-systems web-proxy"
+).split()
+BFF_BUILD_SERVICES = ["bff-web"]
 IMAGE_REPOSITORIES = {
     "api-gateway": "backend-api-gateway",
     "users-service": "backend-users-service",
@@ -24,6 +31,7 @@ IMAGE_REPOSITORIES = {
     "web-profile": "tdn-profile",
     "web-login": "tdn-login",
     "web-game-systems": "tdn-game-systems",
+    "web-proxy": "tdn-web-proxy",
     "bff-web": "tdn-bff-web",
 }
 BUILD_CONTEXTS = {
@@ -38,6 +46,7 @@ BUILD_CONTEXTS = {
     "web-profile": ("apps/web", "apps/profile/Dockerfile"),
     "web-login": ("apps/web", "apps/login/Dockerfile"),
     "web-game-systems": ("apps/web", "apps/game-systems/Dockerfile"),
+    "web-proxy": ("apps/web/proxy", "Dockerfile"),
     "bff-web": ("apps/bff/web", "Dockerfile"),
 }
 
@@ -79,7 +88,7 @@ class ImageBuildComposeConfigTests(unittest.TestCase):
         config = self.config(tag)
         services = config["services"]
         self.assertEqual(set(services), set(SERVICES))
-        self.assertEqual(len(services), 12)
+        self.assertEqual(len(services), 13)
         for service_name, repository in IMAGE_REPOSITORIES.items():
             with self.subTest(service=service_name, tag=tag):
                 service = services[service_name]
@@ -107,6 +116,18 @@ class ImageBuildComposeConfigTests(unittest.TestCase):
                 self.assertTrue(context.is_dir())
                 self.assertEqual(build.get("dockerfile", "Dockerfile"), expected_dockerfile)
                 self.assertTrue((context / expected_dockerfile).is_file())
+
+    def test_active_web_builds_have_no_deployment_build_args(self):
+        services = self.config()["services"]
+        for service_name in ("web-hub", "web-campaign", "web-profile", "web-login", "web-proxy"):
+            with self.subTest(service=service_name):
+                args = services[service_name]["build"].get("args", {})
+                self.assertFalse(any(name.startswith(("VITE_BASE", "VITE_REMOTE_")) for name in args))
+        self.assertNotIn("args", services["web-proxy"]["build"])
+        self.assertEqual(
+            Path(services["web-proxy"]["build"]["context"]).resolve(),
+            (ROOT / "apps/web/proxy").resolve(),
+        )
 
     def test_backend_runtime_compose_config_uses_migrated_paths(self):
         result = subprocess.run(
@@ -199,11 +220,11 @@ class ImageBuildMakeTests(unittest.TestCase):
                 self.assert_build_services([f"build-{service}"], [service])
 
     def test_group_targets_and_default_build(self):
-        self.assert_build_services(["build-backend"], SERVICES[:6])
+        self.assert_build_services(["build-backend"], BACKEND_BUILD_SERVICES)
         self.log.unlink()
-        self.assert_build_services(["build-web"], SERVICES[6:11])
+        self.assert_build_services(["build-web"], WEB_BUILD_SERVICES)
         self.log.unlink()
-        self.assert_build_services(["build-bff"], SERVICES[11:])
+        self.assert_build_services(["build-bff"], BFF_BUILD_SERVICES)
         self.log.unlink()
         self.assert_build_services(["build"], SERVICES)
 
@@ -243,7 +264,7 @@ class ImageBuildMakeTests(unittest.TestCase):
         )
         self.assertEqual(call["image_tag"], "from-env")
 
-    def test_run_targets_use_migrated_working_directories(self):
+    def test_run_targets_use_migrated_working_directories_and_runtime_env(self):
         backend = self.make("run-backend")
         self.assertEqual(backend.returncode, 0, backend.stderr)
         calls = self.records()
@@ -257,7 +278,12 @@ class ImageBuildMakeTests(unittest.TestCase):
         calls = self.records()
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0]["cwd"], str(ROOT / "apps/web"))
-        self.assertEqual(calls[0]["argv"], ["compose", "--env-file", "template.env.build", "up", "-d"])
+        self.assertEqual(calls[0]["argv"], ["compose", "--env-file", ".env", "up", "-d"])
+        self.log.unlink()
+        web = self.make("run-web", "WEB_ENV=web-runtime.env")
+        self.assertEqual(web.returncode, 0, web.stderr)
+        calls = self.records()
+        self.assertEqual(calls[0]["argv"], ["compose", "--env-file", "web-runtime.env", "up", "-d"])
 
 
 if __name__ == "__main__":

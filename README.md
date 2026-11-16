@@ -8,7 +8,7 @@
 
 ## Сборка Docker-образов
 
-`make build` собирает все 12 образов; `SERVICE=<name>` выбирает один образ из списка `make list-images`. Группы доступны через `make build-backend` (шесть backend-образов), `make build-web` (пять web-образов) и отдельную группу `make build-bff` (один BFF-образ). Образ BFF также можно собрать как `make build SERVICE=bff-web`. `make help` выводит краткую справку.
+`make build` собирает все 13 образов; `SERVICE=<name>` выбирает один образ из списка `make list-images`. Группы доступны через `make build-backend` (шесть backend-образов), `make build-web` (шесть web-образов, включая gateway proxy) и отдельную группу `make build-bff` (один BFF-образ). Образ BFF также можно собрать как `make build SERVICE=bff-web`; proxy — как `make build-web-proxy`. `make help` выводит краткую справку.
 
 ```bash
 make build
@@ -21,13 +21,13 @@ make build-web WEB_BUILD_ENV=.env.build
 make list-images
 ```
 
-Каждая сборка образа помечается `latest` и, если задан `IMAGE_TAG`, дополнительным тегом. `BUILD_FLAGS` передаёт флаги Docker Compose; `WEB_BUILD_ENV` задаёт файл параметров web-сборки, по умолчанию используется шаблон. Сборка не запускает контейнеры и не публикует образы.
+Каждая сборка образа помечается `latest` и, если задан `IMAGE_TAG`, дополнительным тегом. `BUILD_FLAGS` передаёт флаги Docker Compose; `WEB_BUILD_ENV` задаёт build env-файл и сохранён для совместимости. `apps/web/template.env.build` больше не содержит deployment settings. Сборка не запускает контейнеры и не публикует образы.
 
 ## Подготовка и запуск
 
 ```bash
 cp template.env apps/backend/.env
-cp apps/web/template.env apps/web/.env
+test -e apps/web/.env || cp apps/web/template.env apps/web/.env
 npm ci --prefix apps/web
 make check-web
 make run-backend
@@ -37,7 +37,7 @@ make run
 
 До запуска заполните обязательные пустые ключи и общий пароль MySQL в `apps/backend/.env` (в частности `MYSQL_PASSWORD`, `ACCOUNT_SERVICE_KEY` и `INTERNAL_SERVICE_KEY`). Account service использует общий MySQL-пользователь и пароль с Users/Campaign, но подключается к отдельной базе `ACCOUNTS_DATABASE`. Compose автоматически создаст OIDC-конфиг Account service в `apps/backend/account-config/accounts.json` из безопасного шаблона; вручную создавать или копировать файл не нужно. Настройте внешнего провайдера в этом JSON перед запуском сервиса. Быстрый порядок настройки и ограничения описаны в [руководстве Account service](apps/backend/account-service/README.md). Перед включением нового account-ID потока на существующих данных оператор должен выбрать свободный диапазон выше всех legacy user references. Проверка исторических group JWT в Account остаётся отдельной опциональной функцией; backend больше не выпускает такие токены. `make run-backend` запускает backend, BFF и его отдельный Redis; `make run` дополнительно запускает Web.
 
-Web использует BFF через Hub-owned cookie session и CSRF transport. Подготовьте `apps/web/.env` с `BFF_BASE=http://localhost:5080/bff` и `API_BASE=http://localhost:5080/bff/api` (либо укажите browser-reachable BFF URL). Hub работает на `http://localhost:3004`; при локальной настройке BFF задайте `Bff:Web:PublicOrigin=http://localhost:3004` и `Bff:Web:AllowedOrigins[0]=http://localhost:3004`. Зарегистрируйте у IdP login callback BFF `http://localhost:5080/bff/callback` и post-logout callback `http://localhost:5080/bff/signout-callback`; второй — callback BFF, не конечный Web `/login`. Пользователь настраивает эти BFF/IdP параметры самостоятельно; запуск/сборка Web их не меняет. Подробности runtime config и remote preview приведены в [Web README](apps/web/README.md), настройка logout — в [README BFF](apps/bff/web/README.md).
+Web runtime состоит из Hub, трёх remotes и отдельного `tdn-web-proxy`; только proxy публикует host port `WEB_PORT` (по умолчанию 3004). Для source run настройте `apps/web/.env`; для переносимого комплекта — отдельный `.env` по образцу `deploy/web/.env.example`. Hub и remote containers не публикуют host ports. Proxy генерирует browser config и маршруты из runtime environment; BFF остаётся отдельным browser-reachable endpoint и этим gateway не проксируется. Значение `localhost` для `BFF_BASE` годится лишь если BFF действительно доступен на компьютере пользователя. Hub владеет cookie session и CSRF transport; пользователь отдельно настраивает BFF `PublicOrigin`/`AllowedOrigins` на фактический публичный Web origin и IdP callbacks. Подробности runtime config, deployment и внешний Nginx — в [Web README](apps/web/README.md), portable run — в [deploy/web README](deploy/web/README.md), настройка logout — в [README BFF](apps/bff/web/README.md).
 
 Для запуска готовых Web-образов без checkout используйте [переносимый Web-комплект](deploy/web/README.md).
 

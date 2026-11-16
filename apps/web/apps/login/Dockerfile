@@ -1,9 +1,6 @@
 # @tdn/login — «Вход» (remote-приложение микрофронтендов)
 # Сборка из КОРНЯ монорепо (context: .), т.к. приложение зависит от packages/shared.
 #   docker build -f apps/login/Dockerfile -t tdn-login .
-# Базовый путь: по умолчанию '/' (отдельный поддомен). Для деплоя под путём
-# (например /apps/login) передайте --build-arg VITE_BASE=/apps/login.
-
 FROM node:20 AS builder
 WORKDIR /usr/src/app
 
@@ -20,8 +17,6 @@ RUN npm ci
 # Исходники (включая packages/shared, от которого зависит приложение)
 COPY . .
 
-ARG VITE_BASE=/
-ENV VITE_BASE=$VITE_BASE
 RUN npm run build --workspace @tdn/login
 
 FROM node:lts-alpine

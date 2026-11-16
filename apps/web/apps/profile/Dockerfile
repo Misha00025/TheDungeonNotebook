@@ -1,9 +1,6 @@
 # @tdn/profile — «Профиль» (remote-приложение микрофронтендов)
 # Сборка из КОРНЯ монорепо (context: .), т.к. приложение зависит от packages/shared.
 #   docker build -f apps/profile/Dockerfile -t tdn-profile .
-# Базовый путь: по умолчанию '/' (отдельный поддомен). Для деплоя под путём
-# (например /apps/profile) передайте --build-arg VITE_BASE=/apps/profile.
-
 FROM node:20 AS builder
 WORKDIR /usr/src/app
 
@@ -20,8 +17,6 @@ RUN npm ci
 # Исходники (включая packages/shared, от которого зависит приложение)
 COPY . .
 
-ARG VITE_BASE=/
-ENV VITE_BASE=$VITE_BASE
 RUN npm run build --workspace @tdn/profile
 
 FROM node:lts-alpine

@@ -3,29 +3,37 @@ services:
     image: tdn-campaign:latest
     pull_policy: "${APP_PULL_POLICY:-never}"
     restart: unless-stopped
-    ports:
-      - "${CAMPAIGN_PORT:-3000}:3000"
 
   profile:
     image: tdn-profile:latest
     pull_policy: "${APP_PULL_POLICY:-never}"
     restart: unless-stopped
-    ports:
-      - "${PROFILE_PORT:-3002}:3000"
 
   login:
     image: tdn-login:latest
     pull_policy: "${APP_PULL_POLICY:-never}"
     restart: unless-stopped
-    ports:
-      - "${LOGIN_PORT:-3003}:3000"
 
   hub:
     image: tdn-hub:latest
     pull_policy: "${APP_PULL_POLICY:-never}"
     restart: unless-stopped
+
+  nginx:
+    image: tdn-web-proxy:latest
+    pull_policy: "${APP_PULL_POLICY:-never}"
+    restart: unless-stopped
     ports:
-      - "${HUB_PORT:-3004}:3000"
+      - "${WEB_PORT:-3004}:80"
     environment:
       BFF_BASE: "${BFF_BASE:-http://localhost:5080/bff}"
       API_BASE: "${API_BASE:-}"
+      WEB_BASE_PATH: "${WEB_BASE_PATH:-/}"
+      WEB_CAMPAIGN_PATH: "${WEB_CAMPAIGN_PATH:-/remotes/campaign/}"
+      WEB_PROFILE_PATH: "${WEB_PROFILE_PATH:-/remotes/profile/}"
+      WEB_LOGIN_PATH: "${WEB_LOGIN_PATH:-/remotes/login/}"
+      WEB_HUB_UPSTREAM: "${WEB_HUB_UPSTREAM:-http://hub:3000}"
+      WEB_CAMPAIGN_UPSTREAM: "${WEB_CAMPAIGN_UPSTREAM:-http://campaign:3000}"
+      WEB_PROFILE_UPSTREAM: "${WEB_PROFILE_UPSTREAM:-http://profile:3000}"
+      WEB_LOGIN_UPSTREAM: "${WEB_LOGIN_UPSTREAM:-http://login:3000}"
+      WEB_DNS_RESOLVER: "${WEB_DNS_RESOLVER:-127.0.0.11}"

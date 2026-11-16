@@ -1,4 +1,10 @@
 {
   "BFF_BASE": "http://localhost:5080/bff",
-  "API_BASE": "http://localhost:5080/bff/api"
+  "API_BASE": "http://localhost:5080/bff/api",
+  "BASE_PATH": "/",
+  "REMOTES": {
+    "campaign": "remotes/campaign/assets/remoteEntry.js",
+    "profile": "remotes/profile/assets/remoteEntry.js",
+    "login": "remotes/login/assets/remoteEntry.js"
+  }
 }

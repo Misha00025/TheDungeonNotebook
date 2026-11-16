@@ -1,74 +1,115 @@
 # Web workspace TDN
 
-Внутренний workspace Web использует Vite, React, TypeScript и npm workspaces. Hub — единственная браузерная точка входа. Campaign, profile и login подключаются к Hub как Module Federation remotes; game-systems также собирается как remote, но отключён в Hub и Compose. Remote-сборки не содержат отдельного HTML-приложения.
+Hub — единственная браузерная точка входа; campaign, profile и login загружаются как Module Federation remotes. Runtime routing и browser config обслуживает отдельный `nginx` service из образа `tdn-web-proxy:latest`. Hub остаётся Node `serve`; Nginx не встроен в его образ.
 
-## Установка, тесты и сборка
+## Запуск из исходников
 
-Команды выполняются из корня репозитория:
+Из корня репозитория:
 
 ```bash
-cp apps/web/template.env apps/web/.env
+test -e apps/web/.env || cp apps/web/template.env apps/web/.env
 npm ci --prefix apps/web
-npm --prefix apps/web run test:run
-npm --prefix apps/web run build --workspaces --if-present
-make check-web
+make build-web
+make run-web WEB_ENV=.env
 ```
 
-`npm --prefix apps/web run test` запускает тесты workspaces в watch-режиме, `test:run` — однократный запуск тестов во всех workspaces с такой командой. Также доступны `make web-test`, `make web-build` и `make check-web`.
+`make build-web` собирает Hub, три активных remotes, proxy и образ game-systems из существующего build catalog; game-systems не включён в runtime Compose или Hub. `make run-web` использует `apps/web/.env` по умолчанию через `WEB_ENV`; автоматического копирования env-файла нет. `WEB_BUILD_ENV` относится только к сборке и сохранён для совместимости; `apps/web/template.env.build` больше не задаёт deployment values.
 
-## Локальный Hub и статические remote previews
+Runtime Compose содержит campaign, profile, login, hub и nginx. Только nginx публикует `${WEB_PORT:-3004}:80`; остальные контейнеры доступны только во внутренней сети Compose на порту 3000. Порты 3000, 3002 и 3003 относятся к локальным Vite remote preview-процессам, а не к опубликованным Docker-портам.
 
-Hub Vite запускается на `http://localhost:3004`. Для remote сначала запустите сборку в watch-режиме, а во втором терминале — preview, который раздаёт файлы federation:
+## Runtime environment
 
-```bash
-npm --prefix apps/web run dev --workspace @tdn/campaign
-npm --prefix apps/web run preview --workspace @tdn/campaign
+Заполните `.env` перед запуском. Source template — `apps/web/template.env`, переносимый пример — `deploy/web/.env.example`.
 
-npm --prefix apps/web run dev --workspace @tdn/profile
-npm --prefix apps/web run preview --workspace @tdn/profile
-
-npm --prefix apps/web run dev --workspace @tdn/login
-npm --prefix apps/web run preview --workspace @tdn/login
-
-npm --prefix apps/web run dev --workspace @tdn/hub
-npm --prefix apps/web run build --workspace @tdn/hub
-npm --prefix apps/web run preview --workspace @tdn/hub
-```
-
-| Remote | Preview origin | Federation entry |
+| Variable | Default | Назначение |
 | --- | --- | --- |
-| campaign | `http://localhost:3000` | `http://localhost:3000/assets/remoteEntry.js` |
-| game-systems | `http://localhost:3001` | `http://localhost:3001/assets/remoteEntry.js` |
-| profile | `http://localhost:3002` | `http://localhost:3002/assets/remoteEntry.js` |
-| login | `http://localhost:3003` | `http://localhost:3003/assets/remoteEntry.js` |
+| `WEB_PORT` | `3004` | Порт хоста, опубликованный nginx на container port 80 |
+| `WEB_BASE_PATH` | `/` | Публичный base path, например `/notebook/` |
+| `WEB_CAMPAIGN_PATH` | `/remotes/campaign/` | Remote path suffix ниже base path |
+| `WEB_PROFILE_PATH` | `/remotes/profile/` | Remote path suffix ниже base path |
+| `WEB_LOGIN_PATH` | `/remotes/login/` | Remote path suffix ниже base path |
+| `WEB_HUB_UPSTREAM` | `http://hub:3000` | Внутренний Hub origin |
+| `WEB_CAMPAIGN_UPSTREAM` | `http://campaign:3000` | Внутренний campaign origin |
+| `WEB_PROFILE_UPSTREAM` | `http://profile:3000` | Внутренний profile origin |
+| `WEB_LOGIN_UPSTREAM` | `http://login:3000` | Внутренний login origin |
+| `WEB_DNS_RESOLVER` | `127.0.0.11` | Resolver для Nginx; допустим список адресов |
+| `BFF_BASE` | `http://localhost:5080/bff` | BFF URL, доступный браузеру |
+| `API_BASE` | пусто в Compose | API URL, доступный браузеру; пустое значение выводится как `${BFF_BASE}/api` |
 
-Preview remotes раздают только federation entry/assets, не standalone интерфейс. Game-systems отключён в Hub и в общем Docker Compose. URL remoteEntry из `template.env.build` / `VITE_REMOTE_*` — параметры сборки Hub; они не задают API runtime config.
+Remote path values — локальные slash-delimited suffix paths, которые gateway присоединяет к `WEB_BASE_PATH`. Upstream values — HTTP(S) origins внутренних static services. Их DNS-имена не попадают в browser config. BFF не проксируется этим gateway: `BFF_BASE` и `API_BASE` должны содержать публично доступные браузеру URL. Значение `localhost` по умолчанию удобно только там, где BFF действительно доступен на компьютере пользователя; на сервере настройте browser-reachable hostname. Публичный BFF hostname и backend-конфигурацию пользователь настраивает отдельно.
 
-Hub Vite preview использует стандартный порт Vite Preview `4173`; приведённая ниже конфигурация `PublicOrigin` для локальной разработки относится к Hub dev на `3004`. Для другого browser origin значения `PublicOrigin` и `AllowedOrigins` должны соответствовать фактическому Hub origin.
+## Gateway и runtime config
 
-Для Vite Hub вручную скопируйте безопасный шаблон и настройте локальный файл:
+При старте proxy generator из одного набора runtime env создаёт `/app/runtime/config.json` и Nginx config. Browser JSON содержит только `BFF_BASE`, `API_BASE`, `BASE_PATH` и `REMOTES` с публичными remote entry paths; internal upstream addresses туда не входят. `config.json` отдаётся с `Cache-Control: no-store`.
+
+Hub загружает `config.json` относительно `document.baseURI`, регистрирует remotes до рендера приложения и использует `BASE_PATH` как Router basename. Hub и remote assets собраны с относительными `./` asset paths. Gateway заменяет нейтральный `<base href="/">` в HTML; compiled JS/CSS не патчатся. Deployment paths и remote URLs не задаются через build-time `VITE_BASE`/`VITE_REMOTE_*`, и localhost entry fallback нет. При сетевой ошибке браузер всё равно видит публичный URL assets, но Hub показывает только общее сообщение без raw exception или entry address.
+
+При изменении `.env` пересоздайте только proxy container, без пересборки образов:
 
 ```bash
-cp apps/web/template.config.json apps/web/public/config.json
+cd apps/web
+docker compose --env-file .env up -d --force-recreate nginx
 ```
 
-Hub загружает `public/config.json` относительно Vite base URL. Задайте `BFF_BASE` (по умолчанию `http://localhost:5080/bff`) и `API_BASE` (по умолчанию `http://localhost:5080/bff/api`). `public/config.json` игнорируется Git и Docker; агент и сборка его не создают. Для локального same-site запуска используйте одинаковую схему для Web и BFF: HTTP с HTTP либо HTTPS с HTTPS. Vite proxy не используется.
+Изменение `WEB_BASE_PATH` или remote paths меняет маршруты и browser config, но не требует пересборки образов. Существующие `.env`, `.env.build` и `public/config.json` автоматически не перезаписываются; старые `VITE_*` значения из `.env.build` больше не задают deployment routes. Старый Hub `build/config.json`, создаваемый entrypoint, не является runtime config, который использует браузер за gateway.
 
-## Docker runtime
+## Внешний Nginx и TLS
 
-`apps/web/.env` передаёт `BFF_BASE` и `API_BASE` только Hub. При первом старте Hub создаёт `build/config.json`, только если такого файла ещё нет; отсутствующий `API_BASE` выводится из `BFF_BASE`. Имеющийся файл не перезаписывается. Remotes не загружают runtime config и раздают статические federation файлы с CORS.
+На сервере внешний Nginx пользователя завершает TLS и проксирует трафик на опубликованный proxy container. Для root deployment:
 
-Для запуска готовых Web-образов из переносимого каталога без checkout используйте [`deploy/web`](../../deploy/web/README.md).
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:3004;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Forwarded-Host $http_host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+```
 
-Общий Compose по умолчанию публикует campaign на порту 3000, profile на 3002, login на 3003 и Hub на 3004. Game-systems в нём выключен. `make build-web` собирает Web-образы, `make run-web` запускает настроенные Compose-сервисы. Стандартные образы для переносимого запуска собираются с base `/` и remote URLs, согласованными с портами Compose; пользовательский build env может переопределить шаблон. Уже собранные образы не обновятся без пересборки, а контейнеры требуют пересоздания пользователем.
+Для `WEB_BASE_PATH=/notebook/` используйте `location /notebook/` с тем же `proxy_pass http://127.0.0.1:3004;` без URI и с теми же forwarded headers: исходный prefix должен сохраниться до gateway. Контейнер не подменяет исходную HTTPS scheme на внутренний HTTP. TLS и сертификаты остаются настройкой уже существующего внешнего Nginx.
 
-## BFF, вход и профиль
+## Локальная Vite-разработка
 
-Hub проверяет BFF session и передаёт cookie-based transport remotes. Вход в IdP и профиль TDN — разные шаги: после первого входа может потребоваться создать профиль TDN. Вход выполняется browser redirect через BFF с возвратом на текущий локальный путь. Logout удаляет локальную BFF session, затем браузер верхнеуровнево переходит по одноразовой ссылке BFF и инициирует OIDC RP-Initiated Logout у IdP; callback возвращает браузер в Web. Получение успешного POST-ответа ещё не означает, что браузер дошёл до IdP или что SSO уже завершён.
+Для локального Hub вручную создайте `apps/web/public/config.json`, только если файла ещё нет:
 
-Для локального Hub укажите в конфигурации BFF `Bff:Web:PublicOrigin=http://localhost:3004` и `Bff:Web:AllowedOrigins[0]=http://localhost:3004`. Зарегистрируйте в IdP login callback `http://localhost:5080/bff/callback` и точный post-logout callback BFF `http://localhost:5080/bff/signout-callback`; это не конечный Web `/login`. Для HTTPS proxy используйте внешнюю forwarded scheme. Пользователь задаёт эти настройки сам. Подробнее о logout и настройке Keycloak — в [README BFF](../bff/web/README.md).
+```bash
+test -e apps/web/public/config.json || cp apps/web/template.config.json apps/web/public/config.json
+```
 
-Web отправляет cookie credentials и CSRF token в header, имя которого сообщает BFF; CSRF применяется к unsafe запросам. API `Response` возвращается вызывающему сервису без автоматического повтора. При доступе по сетевому имени укажите browser-reachable hostname вместо `localhost` согласованно в `BFF_BASE`/`API_BASE`, `PublicOrigin` и `AllowedOrigins`; для same-site Web и BFF должны использовать одну схему HTTP/HTTPS. `localhost` в браузере обозначает компьютер пользователя.
+Настройте в нём browser-reachable `BFF_BASE`/`API_BASE` и три `REMOTES`; старый config без `REMOTES` приводит к безопасному config failure. Это ручной локальный файл, он игнорируется и не создаётся сборкой. Hub dev proxy направляет `/remotes/campaign/`, `/remotes/profile/` и `/remotes/login/` на локальные preview origins; его `WEB_*_UPSTREAM` overrides относятся к Vite config, не к production browser bundle.
+
+Для каждого remote запустите watch-сборку и preview в отдельных терминалах из корня репозитория:
+
+| Remote | Terminal 1: watch build | Terminal 2: preview | Local preview port |
+| --- | --- | --- | --- |
+| campaign | `npm --prefix apps/web run dev --workspace @tdn/campaign` | `npm --prefix apps/web run preview --workspace @tdn/campaign` | 3000 |
+| profile | `npm --prefix apps/web run dev --workspace @tdn/profile` | `npm --prefix apps/web run preview --workspace @tdn/profile` | 3002 |
+| login | `npm --prefix apps/web run dev --workspace @tdn/login` | `npm --prefix apps/web run preview --workspace @tdn/login` | 3003 |
+
+Hub Vite dev server запускается отдельно на локальном порту 3004:
+
+```bash
+npm --prefix apps/web run dev --workspace @tdn/hub
+```
+
+Эти порты предназначены для локальных dev/preview процессов и не публикуются Docker remote containers. Hub Preview при запуске на стандартном порту Vite 4173 имеет другой browser origin; BFF `PublicOrigin` и `AllowedOrigins` должны соответствовать фактическому Hub origin.
+
+Unit verification commands:
+
+```bash
+node --test apps/web/proxy/generate.test.mjs
+python3 -m unittest discover -s tests -p test_web_deployment.py
+npm --prefix apps/web run test:run --workspace @tdn/hub
+npm --prefix apps/web run test:run --workspace @tdn/shared
+npm --prefix apps/web run build --workspace @tdn/hub
+```
+
+Эти команды перечислены как способы проверки; результаты запусков здесь не заявляются.
+
+## BFF и вход
+
+Hub владеет BFF session и передаёт cookie-based transport remotes. Для BFF настройте `Bff:Web:PublicOrigin` и `Bff:Web:AllowedOrigins` на фактический browser origin без path. Если logout после gateway prefix должен вернуть пользователя под prefix, задайте `Oidc.SignedOutRedirectUri=/notebook/login` самостоятельно. Зарегистрируйте в IdP login callback BFF `/bff/callback` и post-logout callback BFF `/bff/signout-callback`, не конечный Web `/login`. BFF/backend config и callbacks не изменяются Web gateway. Подробности — в [README BFF](../bff/web/README.md).
 
 ## Документация API
 

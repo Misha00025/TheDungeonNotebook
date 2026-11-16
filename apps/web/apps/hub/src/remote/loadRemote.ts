@@ -1,55 +1,60 @@
-// Механизм подгрузки remote-модулей (Module Federation).
-//
-// Хаб — host. Remote-модули подгружаются динамическим импортом
-// `import('remoteName/Module')`, который vite-plugin-federation транслирует
-// в __federation_method_getRemote. Здесь — тонкая обёртка: кэширование
-// загруженных модулей и типизированный доступ к контракту RemoteModule.
-//
-// ВАЖНО: vite-plugin-federation транслирует в __federation_method_getRemote
-// ТОЛЬКО динамические импорты со статическим строковым литералом
-// (import('campaign/App')). Импорт через шаблонную строку
-// (import(`${name}/${module}`)) плагин НЕ распознаёт — remotes-карта и
-// __federation_method_getRemote не попадают в бандл. Поэтому здесь —
-// статическая карта лоадеров с литеральными импортами.
-
+import {
+  __federation_method_getRemote as getRemote,
+  __federation_method_setRemote as setRemote,
+  __federation_method_unwrapDefault as unwrapDefault,
+} from 'virtual:__federation__';
+import type { AppConfig } from '@tdn/shared/config';
 import type { RemoteModule, RemoteDescriptor } from './types';
 
-// Статические динамические импорты remote-модулей (литеральные строки).
-const loaders: Record<string, Record<string, () => Promise<RemoteModule>>> = {
-  campaign: {
-    App: () => import('campaign/App'),
-    Home: () => import('campaign/Home'),
-    CompleteProfile: () => import('campaign/CompleteProfile'),
-  },
-  profile: {
-    App: () => import('profile/App'),
-  },
-  login: {
-    App: () => import('login/App'),
-  },
+const remoteNames = ['campaign', 'profile', 'login'] as const;
+const allowedModules: Record<(typeof remoteNames)[number], string[]> = {
+  campaign: ['App', 'Home', 'CompleteProfile'],
+  profile: ['App'],
+  login: ['App'],
 };
-
-// Кэш загруженных remote-модулей (по ключу `${name}/${module}`).
 const moduleCache = new Map<string, RemoteModule>();
+let configured = false;
 
-/**
- * Загружает remote-модуль по имени remote и имени модуля.
- * Кэширует результат, чтобы не грузить один модуль дважды.
- */
+export function configureRemotes(
+  entries: AppConfig['REMOTES'],
+  baseUrl: string = document.baseURI,
+): void {
+  if (!entries || typeof entries !== 'object' || Array.isArray(entries)) throw new Error('Invalid remote configuration');
+  const resolved = remoteNames.map((name) => {
+    const entry = entries[name];
+    if (typeof entry !== 'string' || !entry.trim()) throw new Error('Invalid remote configuration');
+    let url: URL;
+    try {
+      url = new URL(entry, baseUrl);
+    } catch {
+      throw new Error('Invalid remote configuration');
+    }
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Invalid remote configuration');
+    return [name, url.href] as const;
+  });
+
+  for (const [name, url] of resolved) {
+    setRemote(name, { url, format: 'esm', from: 'vite' });
+  }
+  moduleCache.clear();
+  configured = true;
+}
+
 export async function loadRemoteModule(
   name: RemoteDescriptor['name'],
-  module: string
+  module: string,
 ): Promise<RemoteModule> {
+  if (!remoteNames.includes(name as (typeof remoteNames)[number]) || !allowedModules[name as keyof typeof allowedModules]?.includes(module)) {
+    throw new Error('Unknown remote module');
+  }
+  if (!configured) throw new Error('Remote configuration is not ready');
   const key = `${name}/${module}`;
   const cached = moduleCache.get(key);
   if (cached) return cached;
 
-  const loader = loaders[name]?.[module];
-  if (!loader) {
-    throw new Error(`Unknown remote module: ${name}/${module}`);
-  }
-
-  const mod = await loader();
-  moduleCache.set(key, mod);
-  return mod;
+  const remote = await getRemote(name, `./${module}`);
+  const component = await unwrapDefault(remote);
+  const loaded = { default: component as RemoteModule['default'] };
+  moduleCache.set(key, loaded);
+  return loaded;
 }

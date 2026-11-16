@@ -1,6 +1,8 @@
 export type AppConfig = {
   BFF_BASE: string;
   API_BASE: string;
+  BASE_PATH?: string;
+  REMOTES?: Record<'campaign' | 'profile' | 'login', string>;
 };
 
 const defaultBff = 'http://localhost:5080/bff';
@@ -28,12 +30,38 @@ function normalizeConfig(value: unknown): AppConfig {
   if (typeof api !== 'string' || !api) throw new Error('Invalid runtime config');
 
   const normalizedApi = api.replace(/\/+$/, '') || '/';
-  return { BFF_BASE: normalizedBff, API_BASE: normalizedApi };
+  const normalized: AppConfig = { BFF_BASE: normalizedBff, API_BASE: normalizedApi };
+  if (fields.BASE_PATH !== undefined) {
+    if (typeof fields.BASE_PATH !== 'string' || !fields.BASE_PATH.startsWith('/') || fields.BASE_PATH.startsWith('//')) {
+      throw new Error('Invalid runtime config');
+    }
+    let basePath: URL;
+    try {
+      basePath = new URL(fields.BASE_PATH, 'http://runtime.invalid');
+    } catch {
+      throw new Error('Invalid runtime config');
+    }
+    if (basePath.origin !== 'http://runtime.invalid' || basePath.search || basePath.hash || basePath.pathname !== fields.BASE_PATH) {
+      throw new Error('Invalid runtime config');
+    }
+    normalized.BASE_PATH = fields.BASE_PATH.endsWith('/') ? fields.BASE_PATH : `${fields.BASE_PATH}/`;
+  }
+  if (fields.REMOTES !== undefined) {
+    if (!fields.REMOTES || typeof fields.REMOTES !== 'object' || Array.isArray(fields.REMOTES)) {
+      throw new Error('Invalid runtime config');
+    }
+    const remotes = fields.REMOTES as Record<string, unknown>;
+    const names = ['campaign', 'profile', 'login'] as const;
+    if (names.some((name) => typeof remotes[name] !== 'string' || !(remotes[name] as string).trim())) {
+      throw new Error('Invalid runtime config');
+    }
+    normalized.REMOTES = { campaign: remotes.campaign as string, profile: remotes.profile as string, login: remotes.login as string };
+  }
+  return normalized;
 }
 
 export async function loadConfig(): Promise<void> {
-  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-  const res = await fetch(`${base}/config.json`);
+  const res = await fetch(new URL('config.json', document.baseURI), { cache: 'no-store' });
   if (res.status === 404) {
     config = { ...defaultConfig };
     return;

@@ -4,7 +4,7 @@ import federation from '@originjs/vite-plugin-federation';
 import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
-  base: process.env.VITE_BASE || '/',
+  base: './',
   publicDir: false,
   plugins: [
     react(),

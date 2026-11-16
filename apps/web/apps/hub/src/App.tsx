@@ -4,6 +4,7 @@ import { AuthProvider, ThemeProvider, SidebarProvider, useAuth, GlobalSidebar, n
 import { useProfile } from '@tdn/shared/auth/useProfile';
 import type { AuthContextType } from '@tdn/shared';
 import { hubNavItems } from './navigation';
+import { getConfig } from '@tdn/shared/config';
 import RemoteBoundary from './remote/RemoteBoundary';
 import Login from './pages/Login';
 
@@ -52,7 +53,7 @@ const App: React.FC = () => (
   <AuthProvider>
     <ThemeProvider>
       <SidebarProvider>
-        <Router basename={import.meta.env.BASE_URL}>
+        <Router basename={getConfig().BASE_PATH || '/'}>
           <AppContent />
         </Router>
       </SidebarProvider>
