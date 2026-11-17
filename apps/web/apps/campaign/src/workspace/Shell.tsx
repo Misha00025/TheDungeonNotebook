@@ -9,7 +9,7 @@ import { useResource } from './hooks';
 import { ApiError } from './Feedback';
 import styles from './Workspace.module.css';
 
-export type CampaignWorkspaceValue = { campaign: Campaign; permissions: Permissions; permissionsLoading?: boolean; mode: 'gm' | 'player'; reloadCampaign: () => void };
+export type CampaignWorkspaceValue = { campaign: Campaign; permissions: Permissions; lastKnownPermissions: Permissions; permissionsLoading?: boolean; mode: 'gm' | 'player'; reloadCampaign: () => void };
 const CampaignContext = createContext<CampaignWorkspaceValue | null>(null);
 export const useCampaignWorkspace = () => { const value = useContext(CampaignContext); if (!value) throw new Error('useCampaignWorkspace requires campaign route'); return value; };
 const CampaignShell: React.FC = () => {
@@ -53,9 +53,9 @@ const CampaignShell: React.FC = () => {
     catch (error) { if (mounted.current && sequence.current === current && route.current === pathname) setSwitchError(error); }
     finally { if (mounted.current && sequence.current === current) { busy.current = false; setSwitchBusy(false); } }
   };
-  const nav = mode === 'gm' ? [['Обзор', 'gm/overview'], ['Персонажи', 'gm/characters']] : [['Мои персонажи', 'player/characters']];
+  const nav = mode === 'gm' ? [['Обзор', 'gm/overview'], ['Персонажи', 'gm/characters'], ['Участники и доступ', 'gm/members'], ['Настройки', 'gm/settings']] : [['Мои персонажи', 'player/characters']];
   const title = nav.find(([, suffix]) => location.pathname.endsWith(`/${suffix}`))?.[0] ?? campaign.data.name;
-  return <CampaignContext.Provider value={{ campaign: campaign.data, permissions: effective, permissionsLoading: permission.loading, mode, reloadCampaign: campaign.reload }}>
+  return <CampaignContext.Provider value={{ campaign: campaign.data, permissions: effective, lastKnownPermissions: permission.data, permissionsLoading: permission.loading || Boolean(permission.error), mode, reloadCampaign: campaign.reload }}>
     <div className={styles.workspace}><button className={`${buttonStyles.button} ${styles.mobileToggle}`} aria-expanded={menuOpen} aria-controls="campaign-navigation" onClick={() => setMenuOpen(value => !value)}>Меню</button><aside id="campaign-navigation" className={`${commonStyles.card} ${styles.sidebar} ${menuOpen ? styles.open : ''}`}>
       <p>Режим: {mode === 'gm' ? 'Мастер' : 'Игрок'}</p>
       <label>Кампания<select value={String(id)} disabled={switchBusy} onChange={event => { setMenuOpen(false); void changeCampaign(Number(event.target.value)); }} aria-label="Кампания">{campaigns.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>

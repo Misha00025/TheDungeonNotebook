@@ -48,8 +48,8 @@ describe('campaign first iteration', () => {
     expect(JSON.parse(String(posts[0][1]?.body))).toEqual({ name: 'Uncertain', requestId });
   });
 
-  it('shows only first-iteration destinations and safely rejects direct future and legacy routes', async () => {
-    const unsupported = ['/12/gm/templates', '/12/gm/members', '/12/gm/formulas', '/12/gm/views', '/12/gm/settings', '/12/quests', '/12/items', '/12/character/abcdef01-2345-6789-abcd-ef0123456789'];
+  it('shows supported destinations and safely rejects future routes', async () => {
+    const unsupported = ['/12/gm/templates', '/12/gm/formulas', '/12/gm/views', '/12/quests', '/12/items', '/12/character/abcdef01-2345-6789-abcd-ef0123456789'];
     for (const path of unsupported) {
       const request = vi.fn(async (url: string) => url.endsWith('/permissions') ? response(permissions()) : url === '/api/campaigns/12' ? response(campaign()) : response([]));
       const view = renderApp(path, request);
@@ -63,7 +63,57 @@ describe('campaign first iteration', () => {
     expect(await screen.findByRole('heading', { name: 'Обзор кампании' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Обзор' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Персонажи' })).toBeInTheDocument();
-    for (const label of ['Участники', 'Шаблоны', 'Формулы', 'Представления', 'Настройки', 'Создать персонажа']) expect(screen.queryByText(label)).not.toBeInTheDocument();
+    for (const label of ['Шаблоны', 'Формулы', 'Представления', 'Создать персонажа']) expect(screen.queryByText(label)).not.toBeInTheDocument();
+  });
+
+  it('routes GM access panels and the legacy members route to scoped membership data', async () => {
+    const request = vi.fn(async (url: string) => {
+      if (url === '/api/campaigns/12') return response(campaign());
+      if (url === '/api/campaigns/12/permissions') return response({ ...permissions(), canManageAccess: true });
+      if (url === '/api/campaigns/12/members') return response([]);
+      if (url === '/api/campaigns/12/characters') return response([]);
+      return response([]);
+    });
+    renderApp('/12/users', request);
+    expect(await screen.findByRole('heading', { name: 'Участники кампании' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Участники и доступ' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Настройки' })).toBeInTheDocument();
+    expect(request.mock.calls.some(([url]) => url === '/api/campaigns/12/members')).toBe(true);
+    expect(request.mock.calls.some(([url]) => url.includes('/assignments'))).toBe(false);
+  });
+
+  it('keeps player direct GM links out of membership and assignment APIs', async () => {
+    for (const route of ['/12/gm/members', '/12/gm/settings']) {
+      const request = vi.fn(async (url: string) => {
+        if (url === '/api/campaigns/12') return response(campaign());
+        if (url === '/api/campaigns/12/permissions') return response(permissions(false));
+        if (url === '/api/campaigns/12/characters') return response([]);
+        return response([]);
+      });
+      const view = renderApp(route, request);
+      expect(await screen.findByRole('heading', { name: 'Мои персонажи' })).toBeInTheDocument();
+      expect(request.mock.calls.some(([url]) => /\/members|\/assignments/.test(url))).toBe(false);
+      view.unmount();
+    }
+  });
+
+  it('routes legacy settings and saves only the campaign name', async () => {
+    const renamed = { ...campaign(), name: 'Renamed', metadataRevision: 2 };
+    let currentCampaign = campaign();
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url === '/api/campaigns/12' && options?.method === 'PUT') { currentCampaign = renamed; return response(renamed); }
+      if (url === '/api/campaigns/12') return response(currentCampaign);
+      if (url === '/api/campaigns/12/permissions') return response(permissions());
+      return response([]);
+    });
+    renderApp('/12/settings', request);
+    fireEvent.change(await screen.findByLabelText('Название кампании'), { target: { value: 'Renamed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => expect(request).toHaveBeenCalledWith('/api/campaigns/12', expect.objectContaining({ method: 'PUT', body: expect.any(String) })));
+    const write = request.mock.calls.find(([url, options]) => url === '/api/campaigns/12' && options?.method === 'PUT');
+    expect(JSON.parse(String(write?.[1]?.body))).toEqual({ name: 'Renamed', expectedRevision: 1 });
+    expect(await screen.findByText('Название сохранено.')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Renamed' })).toBeInTheDocument();
   });
 
   it('denies GM routes without canWrite and independently groups character grants for players', async () => {
