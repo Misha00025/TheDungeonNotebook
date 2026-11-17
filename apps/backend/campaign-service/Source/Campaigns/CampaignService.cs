@@ -24,6 +24,12 @@ public sealed class CampaignService(ICampaignStore store)
         return new CampaignAccess(current, member.IsAdmin);
     }
 
+    public async Task<ResourcePermissionsDto> GetPermissionsAsync(Subject? subject, int campaignId, CancellationToken cancellationToken)
+    {
+        var access = await GetAccessAsync(subject, campaignId, cancellationToken);
+        return new ResourcePermissionsDto(true, access.IsAdmin, access.IsAdmin);
+    }
+
     public async Task<CampaignDto> CreateAsync(Subject? subject, CreateCampaignRequest request, CancellationToken cancellationToken)
     {
         var current = RequireSubject(subject);

@@ -3,6 +3,7 @@
 Current API contracts:
 
 - [Campaigns and membership](campaigns.md)
+- [Current resource permissions](permissions.md)
 - [Templates and base-field definitions](templates.md)
 - [Characters, assignments, and sheets](characters.md)
 - [Formulas, virtual fields, and computed sheets](formulas.md)

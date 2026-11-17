@@ -173,6 +173,12 @@ public sealed class SheetService(
         return ToDto(character);
     }
 
+    public async Task<ResourcePermissionsDto> GetCharacterPermissionsAsync(Subject? subject, int campaignId, Guid characterId, CancellationToken cancellationToken)
+    {
+        var result = await ResolveCharacterAccessAsync(subject, campaignId, characterId, cancellationToken);
+        return new ResourcePermissionsDto(true, result.CanWrite, result.Access.IsAdmin);
+    }
+
     public async Task<CharacterMetadataDto> UpdateCharacterAsync(Subject? subject, int campaignId, Guid characterId, CharacterUpdateRequest request, CancellationToken cancellationToken)
     {
         var expected = RequireRevision(request.ExpectedRevision);
@@ -322,14 +328,22 @@ public sealed class SheetService(
 
     private async Task<(CharacterMetadata Character, CampaignAccess Access)> RequireCharacterAccessAsync(Subject? subject, int campaignId, Guid characterId, bool write, CancellationToken cancellationToken)
     {
+        var result = await ResolveCharacterAccessAsync(subject, campaignId, characterId, cancellationToken);
+        if (write && !result.CanWrite)
+            throw Forbidden();
+        return (result.Character, result.Access);
+    }
+
+    private async Task<(CharacterMetadata Character, CampaignAccess Access, bool CanWrite)> ResolveCharacterAccessAsync(Subject? subject, int campaignId, Guid characterId, CancellationToken cancellationToken)
+    {
         var access = await campaignService.GetAccessAsync(subject, campaignId, cancellationToken);
         var character = await RequireCharacterAsync(campaignId, characterId, cancellationToken);
         if (access.IsAdmin)
-            return (character, access);
+            return (character, access, true);
         var assignment = await resources.GetAssignmentAsync(campaignId, characterId, access.Subject.Id, cancellationToken);
-        if (assignment is null || write && !assignment.CanWrite)
+        if (assignment is null)
             throw Forbidden();
-        return (character, access);
+        return (character, access, assignment.CanWrite);
     }
 
     private async Task<CharacterMetadata> RequireCharacterAsync(int campaignId, Guid characterId, CancellationToken cancellationToken) =>

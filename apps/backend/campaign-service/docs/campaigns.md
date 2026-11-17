@@ -54,6 +54,8 @@ Return `200` with campaign DTO array. A User receives only campaigns for which t
 
 `campaignId` is an int32 path parameter. Return `200` with a campaign DTO for a global Admin, a Group whose `Id` equals the campaign ID, or a User with membership. Missing or out-of-scope campaign returns `404`.
 
+Read the current subject's effective campaign permissions with [`GET /api/campaigns/{campaignId}/permissions`](permissions.md). This is available to regular members and does not open the member list.
+
 ## `PUT /api/campaigns/{campaignId}`
 
 Rename a campaign. Only a global Admin, matching Group, or User campaign admin may call this operation. Body:

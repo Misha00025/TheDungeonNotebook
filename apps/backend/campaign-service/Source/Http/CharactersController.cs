@@ -24,6 +24,11 @@ public sealed class CharactersController(SheetService sheets, VirtualFieldServic
     public async Task<ActionResult<CharacterMetadataDto>> Get(int campaignId, Guid characterId, CancellationToken cancellationToken) =>
         Ok(await sheets.GetCharacterAsync(ReadSubject(), campaignId, characterId, cancellationToken));
 
+    [HttpGet("{characterId:guid}/permissions")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<ActionResult<ResourcePermissionsDto>> Permissions(int campaignId, Guid characterId, CancellationToken cancellationToken) =>
+        Ok(await sheets.GetCharacterPermissionsAsync(ReadSubject(), campaignId, characterId, cancellationToken));
+
     [HttpPut("{characterId:guid}")]
     public async Task<ActionResult<CharacterMetadataDto>> Update(int campaignId, Guid characterId, [FromBody] CharacterUpdateRequest request, CancellationToken cancellationToken) =>
         Ok(await sheets.UpdateCharacterAsync(ReadSubject(), campaignId, characterId, request, cancellationToken));

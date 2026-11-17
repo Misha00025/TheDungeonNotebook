@@ -12,4 +12,6 @@ Campaign routes do not configure query/body rewrites or body skipping. Request q
 
 The campaign response hook uses the PyApiGate response builder's `passthrough` contract. It delegates upstream status and response headers—including `Location` and `application/problem+json` content type—to that standard response handling. JSON response semantics are preserved; byte-for-byte JSON serialization equality is not promised. No campaign DTO wrapping is applied.
 
+The two current-permissions reads are `GET /api/campaigns/{campaignId}/permissions` and `GET /api/campaigns/{campaignId}/characters/{characterId}/permissions`; each is an authenticated one-to-one proxy with the verified `X-Subject` and no parameter injection. See the [permissions contract](permissions.md).
+
 For the supported methods and domain contracts, see [campaigns and members](campaigns.md), [templates](templates.md), [characters](characters.md), [formulas and virtual fields](formulas.md), and [views and presentation contexts](views.md).

@@ -26,6 +26,8 @@ An already published request ID returns `409` (`already_published`). A prepared 
 
 Returns `200` metadata to an admin or a directly assigned User. A campaign member without an assignment receives `403`; missing character or another campaign's character returns `404`.
 
+Read the current subject's effective character permissions with [`GET /api/campaigns/{campaignId}/characters/{characterId}/permissions`](permissions.md). A read-only assignment can read its own permissions; this does not open the admin-only assignment list.
+
 ## `PUT /api/campaigns/{campaignId}/characters/{characterId:guid}`
 
 Admin or an assigned User with `canWrite=true`. Body requires `name` (non-whitespace), `importance` (known enum), and `expectedRevision` (int64 >= 1). Success is `200` metadata with incremented `metadataRevision`; stale revision is `409`; missing character is `404`; missing write permission is `403`. This is SQL-only and does not change Mongo content revision.

@@ -27,6 +27,11 @@ public sealed class CampaignsController(CampaignService campaigns) : ControllerB
     public async Task<ActionResult<CampaignDto>> Get(int campaignId, CancellationToken cancellationToken) =>
         Ok(await campaigns.GetAsync(ReadSubject(), campaignId, cancellationToken));
 
+    [HttpGet("{campaignId:int}/permissions")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<ActionResult<ResourcePermissionsDto>> Permissions(int campaignId, CancellationToken cancellationToken) =>
+        Ok(await campaigns.GetPermissionsAsync(ReadSubject(), campaignId, cancellationToken));
+
     [HttpPut("{campaignId:int}")]
     public async Task<ActionResult<CampaignDto>> Rename(int campaignId, [FromBody] RenameCampaignRequest request, CancellationToken cancellationToken) =>
         Ok(await campaigns.RenameAsync(ReadSubject(), campaignId, request, cancellationToken));

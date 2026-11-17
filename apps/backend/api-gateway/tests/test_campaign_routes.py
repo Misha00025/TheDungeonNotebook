@@ -49,6 +49,24 @@ def controller_endpoints():
 
 
 class CampaignRouteTests(unittest.TestCase):
+    def test_permissions_routes_are_read_only_subject_scoped_proxies(self):
+        config = yaml.safe_load((GATEWAY / "configs" / "routes.yaml").read_text())
+        routes = {route["path"]: route for route in config["routes"] if isinstance(route, dict)}
+        paths = (
+            "/api/campaigns/{campaignId}/permissions",
+            "/api/campaigns/{campaignId}/characters/{characterId}/permissions",
+        )
+        for path in paths:
+            route = routes[path]
+            self.assertEqual(["GET"], route["methods"])
+            self.assertEqual(path, route["proxy"]["path"])
+            self.assertEqual("{state.x_subject}", route["proxy"]["headers"]["X-Subject"])
+            self.assertEqual("campaign_upstream", route["pre_request_handler"])
+            self.assertEqual("campaign_response", route["response_handler"])
+            self.assertEqual("required", route["auth"])
+            self.assertNotIn("params", route)
+            self.assertNotIn("access", route)
+
     def test_gateway_campaign_routes_match_all_controller_actions(self):
         config = yaml.safe_load((GATEWAY / "configs" / "routes.yaml").read_text())
         campaign_routes = [route for route in config["routes"] if isinstance(route, dict) and route.get("proxy", {}).get("service") == "campaign"]

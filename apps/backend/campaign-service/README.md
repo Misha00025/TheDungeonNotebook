@@ -2,7 +2,7 @@
 
 Изменения API должны включать соответствующую адаптацию Gateway в той же работе; см. [правила вклада](CONTRIBUTING.md) и [контракт маршрутизации Gateway](docs/gateway.md).
 
-Campaign Service is a .NET 10 ASP.NET Core service for campaigns, templates, characters, assignments, character sheets, and saved Views/presentation configuration. Requests use the `X-Subject` JSON header. The [current API index](docs/README.md) links the host contracts. The public [HTML API documentation](../../../docs/api/index.html) describes legacy routes, not this host.
+Campaign Service is a .NET 10 ASP.NET Core service for campaigns, templates, characters, assignments, character sheets, and saved Views/presentation configuration. Requests use the `X-Subject` JSON header. The [current API index](docs/README.md), including the separate [current permissions contract](docs/permissions.md), links the host contracts. The public [HTML API documentation](../../../docs/api/index.html) describes legacy routes, not this host.
 
 ## Structure
 

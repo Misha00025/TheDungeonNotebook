@@ -132,6 +132,17 @@ routes:
     auth: required
     methods: [PUT, DELETE]
 
+  - path: /api/campaigns/{campaignId}/permissions
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/permissions
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET]
+
   - path: /api/campaigns/{campaignId}/members
     proxy:
       service: campaign
@@ -197,6 +208,17 @@ routes:
     response_handler: campaign_response
     auth: required
     methods: [PUT, DELETE]
+
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/permissions
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/characters/{characterId}/permissions
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET]
 
   - path: /api/campaigns/{campaignId}/characters/{characterId}/virtual-overrides
     proxy:
