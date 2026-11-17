@@ -42,3 +42,12 @@ public sealed class FormulaMetadata
     public required string Name { get; set; }
     public long MetadataRevision { get; set; } = 1;
 }
+
+public sealed class ViewMetadata
+{
+    public Guid Id { get; set; }
+    public int CampaignId { get; set; }
+    public Campaign? Campaign { get; set; }
+    public required string Name { get; set; }
+    public long MetadataRevision { get; set; } = 1;
+}

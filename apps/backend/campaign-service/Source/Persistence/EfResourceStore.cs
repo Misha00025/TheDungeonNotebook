@@ -127,6 +127,31 @@ public sealed class EfResourceStore(CampaignDbContext db) : IResourceStore
         await db.FormulaMetadata.Where(x => x.CampaignId == campaignId && x.Id == formulaId && x.MetadataRevision == expectedRevision)
             .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.Name, name).SetProperty(x => x.MetadataRevision, x => x.MetadataRevision + 1), cancellationToken) == 1;
 
+    public async Task<IReadOnlyList<ViewMetadata>> ListViewsAsync(int campaignId, CancellationToken cancellationToken) =>
+        await db.ViewMetadata.AsNoTracking().Where(x => x.CampaignId == campaignId).OrderBy(x => x.Name).ToArrayAsync(cancellationToken);
+
+    public Task<ViewMetadata?> GetViewAsync(int campaignId, Guid viewId, CancellationToken cancellationToken) =>
+        db.ViewMetadata.AsNoTracking().SingleOrDefaultAsync(x => x.CampaignId == campaignId && x.Id == viewId, cancellationToken);
+
+    public async Task<ViewMetadata> CreateViewAsync(ViewMetadata view, CancellationToken cancellationToken)
+    {
+        db.ViewMetadata.Add(view);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return view;
+        }
+        catch (DbUpdateException exception) when (IsMySqlDuplicate(exception))
+        {
+            db.ChangeTracker.Clear();
+            throw new DuplicateResourceException();
+        }
+    }
+
+    public async Task<bool> RenameViewAsync(int campaignId, Guid viewId, string name, long expectedRevision, CancellationToken cancellationToken) =>
+        await db.ViewMetadata.Where(x => x.CampaignId == campaignId && x.Id == viewId && x.MetadataRevision == expectedRevision)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.Name, name).SetProperty(x => x.MetadataRevision, x => x.MetadataRevision + 1), cancellationToken) == 1;
+
     private static bool IsMySqlDuplicate(Exception exception)
     {
         for (Exception? current = exception; current is not null; current = current.InnerException)

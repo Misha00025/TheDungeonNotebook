@@ -10,6 +10,7 @@ using Tdn.Campaigns.Http;
 using Tdn.Campaigns.Persistence;
 using Tdn.Campaigns.Sheets;
 using Tdn.Campaigns.Computation;
+using Tdn.Campaigns.Views;
 using MongoDB.Driver;
 
 namespace Tdn.Campaigns;
@@ -93,6 +94,8 @@ public static class CampaignApplication
         builder.Services.AddScoped<FormulaService>();
         builder.Services.AddScoped<VirtualFieldService>();
         builder.Services.AddScoped<ComputedSheetService>();
+        builder.Services.AddScoped<ViewService>();
+        builder.Services.AddScoped<PresentationService>();
         if (bool.TryParse(migrationValue, out var applyMigrations) && applyMigrations)
             builder.Services.AddHostedService<DatabaseMigrationService>();
 

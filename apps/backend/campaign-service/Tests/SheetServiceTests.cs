@@ -564,7 +564,7 @@ public class SheetServiceTests
         Assert.Empty(fixture.Resources.Assignments);
     }
 
-    private static Fixture CreateFixture(bool membersCanReadDefinitions = true)
+    internal static Fixture CreateFixture(bool membersCanReadDefinitions = true)
     {
         var campaigns = new FakeCampaignStore();
         campaigns.SeedCampaign(7);
@@ -625,9 +625,9 @@ public class SheetServiceTests
         fixture.Sheets.SetBaseValueAsync(Admin, 7, characterId, fieldId,
             new BaseValueRequest { Value = Element(value), ExpectedRevision = revision }, default);
 
-    private sealed record Fixture(FakeCampaignStore Campaigns, FakeResourceStore Resources, FakeContentStore Content, SheetService Sheets);
+    internal sealed record Fixture(FakeCampaignStore Campaigns, FakeResourceStore Resources, FakeContentStore Content, SheetService Sheets);
 
-    private sealed class FakeCampaignStore : ICampaignStore
+    internal sealed class FakeCampaignStore : ICampaignStore
     {
         public List<Campaign> Campaigns { get; } = [];
         public List<CampaignMember> Members { get; } = [];
@@ -653,18 +653,21 @@ public class SheetServiceTests
         public Task<bool> DeleteMemberAsync(int campaignId, int userId, long expectedRevision, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
-    private sealed class FakeResourceStore : IResourceStore
+    internal sealed class FakeResourceStore : IResourceStore
     {
         private readonly HashSet<(int CampaignId, int UserId)> _members = [];
         public List<TemplateMetadata> Templates { get; } = [];
         public List<CharacterMetadata> Characters { get; } = [];
         public List<CharacterAssignment> Assignments { get; } = [];
         public List<FormulaMetadata> Formulas { get; } = [];
+        public List<ViewMetadata> Views { get; } = [];
         public Exception? FormulaCreateFailure { get; set; }
         public int FormulaCreateAttempts { get; private set; }
         public int TemplateCreates { get; private set; }
         public int CharacterCreates { get; private set; }
         public Exception? TemplateCreateFailure { get; set; }
+        public Exception? ViewCreateFailure { get; set; }
+        public int ViewCreates { get; private set; }
 
         public void SeedMember(int campaignId, int userId) => _members.Add((campaignId, userId));
         public Task<IReadOnlyList<TemplateMetadata>> ListTemplatesAsync(int campaignId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<TemplateMetadata>>(Templates.Where(x => x.CampaignId == campaignId).ToArray());
@@ -768,9 +771,27 @@ public class SheetServiceTests
             formula.MetadataRevision++;
             return Task.FromResult(true);
         }
+        public Task<IReadOnlyList<ViewMetadata>> ListViewsAsync(int campaignId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<ViewMetadata>>(Views.Where(x => x.CampaignId == campaignId).ToArray());
+        public Task<ViewMetadata?> GetViewAsync(int campaignId, Guid viewId, CancellationToken cancellationToken) => Task.FromResult(Views.SingleOrDefault(x => x.CampaignId == campaignId && x.Id == viewId));
+        public Task<ViewMetadata> CreateViewAsync(ViewMetadata view, CancellationToken cancellationToken)
+        {
+            ViewCreates++;
+            if (ViewCreateFailure is not null) throw ViewCreateFailure;
+            if (Views.Any(x => x.CampaignId == view.CampaignId && x.Id == view.Id)) throw new DuplicateResourceException();
+            Views.Add(view);
+            return Task.FromResult(view);
+        }
+        public Task<bool> RenameViewAsync(int campaignId, Guid viewId, string name, long expectedRevision, CancellationToken cancellationToken)
+        {
+            var view = Views.SingleOrDefault(x => x.CampaignId == campaignId && x.Id == viewId && x.MetadataRevision == expectedRevision);
+            if (view is null) return Task.FromResult(false);
+            view.Name = name;
+            view.MetadataRevision++;
+            return Task.FromResult(true);
+        }
     }
 
-    private sealed class FakeContentStore : IContentStore
+    internal sealed class FakeContentStore : IContentStore
     {
         private readonly Dictionary<(string Collection, int CampaignId, Guid ResourceId), object> _documents = [];
         private readonly Dictionary<(string Collection, int CampaignId, Guid ResourceId), long> _revisions = [];

@@ -27,6 +27,7 @@ public class CampaignDbContextModelTests
         Assert.Contains("CREATE TABLE `CharacterMetadata`", script);
         Assert.Contains("CREATE TABLE `CharacterAssignments`", script);
         Assert.Contains("CREATE TABLE `FormulaMetadata`", script);
+        Assert.Contains("CREATE TABLE `ViewMetadata`", script);
     }
 
     [Fact]
@@ -43,6 +44,7 @@ public class CampaignDbContextModelTests
         var character = model.FindEntityType(typeof(CharacterMetadata))!;
         var assignment = model.FindEntityType(typeof(CharacterAssignment))!;
         var formula = model.FindEntityType(typeof(FormulaMetadata))!;
+        var view = model.FindEntityType(typeof(ViewMetadata))!;
 
         Assert.Equal(new[] { "Id" }, campaign.FindPrimaryKey()!.Properties.Select(x => x.Name));
         Assert.Contains(campaign.GetIndexes(), index => index.IsUnique && index.Properties.Select(x => x.Name).SequenceEqual(new[] { "CreationRequestId" }));
@@ -83,5 +85,10 @@ public class CampaignDbContextModelTests
         Assert.Contains(formula.GetKeys(), key => key.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }));
         Assert.True(formula.FindProperty(nameof(FormulaMetadata.MetadataRevision))!.IsConcurrencyToken);
         Assert.Equal(DeleteBehavior.Restrict, Assert.Single(formula.GetForeignKeys()).DeleteBehavior);
+
+        Assert.Equal(new[] { "Id" }, view.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Contains(view.GetKeys(), key => key.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }));
+        Assert.True(view.FindProperty(nameof(ViewMetadata.MetadataRevision))!.IsConcurrencyToken);
+        Assert.Equal(DeleteBehavior.Restrict, Assert.Single(view.GetForeignKeys()).DeleteBehavior);
     }
 }

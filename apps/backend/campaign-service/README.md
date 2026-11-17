@@ -1,6 +1,6 @@
 # Campaign Service
 
-Campaign Service is a .NET 10 ASP.NET Core service for campaigns, templates, characters, assignments, and character sheets. Requests use the `X-Subject` JSON header. The [current API index](docs/README.md) links the campaign, template, and character contracts. The public [HTML API documentation](../../../docs/api/index.html) describes legacy routes, not this host.
+Campaign Service is a .NET 10 ASP.NET Core service for campaigns, templates, characters, assignments, character sheets, and saved Views/presentation configuration. Requests use the `X-Subject` JSON header. The [current API index](docs/README.md) links the host contracts. The public [HTML API documentation](../../../docs/api/index.html) describes legacy routes, not this host.
 
 ## Structure
 
@@ -8,7 +8,9 @@ Campaign Service is a .NET 10 ASP.NET Core service for campaigns, templates, cha
 - `Source/` — host, HTTP, domain, access, configuration, and persistence code
 - `Source/Persistence/Migrations/` — EF Core migration and model snapshot
 - `Source/Sheets/` — template and character-sheet domain and application code
-- `Source/Persistence/MongoContentStore.cs` — document storage for templates and sheets
+- `Source/Computation/` — formula and virtual-field calculation services
+- `Source/Views/` — saved view trees, declared-source projection, and presentation contexts
+- `Source/Persistence/MongoContentStore.cs` — document storage for template, character, formula, view, and presentation content
 - `Tests/` — unit tests
 - `config/` — configuration example
 - `.config/dotnet-tools.json` — local `dotnet-ef` tool manifest
@@ -35,7 +37,15 @@ Configuration uses standard ASP.NET Core providers. Root `appsettings.json` is f
 
 `CampaignApplication.Build` does not connect to MySQL. A connection string is required on host startup. Migrations run only when explicitly enabled.
 
-Mongo settings are also validated on host startup. `MongoClient` is created lazily through DI and the host build does not connect to MongoDB. Template and character content is stored separately from SQL metadata.
+Mongo settings are also validated on host startup. `MongoClient` is created lazily through DI and the host build does not connect to MongoDB. `Access:MembersCanReadDefinitions` controls member reads of template, formula, and View definitions and presentation context configuration; it does not grant access to another user's unassigned character sheet.
+
+Views store a typed Layout/Widget tree and opaque native JSON parameters. The backend validates node structure and declared field sources, and can project only those sources for a specifically requested character. It does not render Views, interpret widget formats, or execute presentation/context parameters. Presentation defaults select a View by campaign and context key; they do not assign a selection to characters or templates.
+
+## Data storage and publication boundaries
+
+SQL stores campaign and member records, resource metadata, and character assignments. MongoDB stores content in `templateContents`, `characterSheets`, `formulaContents`, `viewContents`, and `campaignPresentationConfigs`. Current point reads use MongoDB's standard unique `_id` index, whose value combines campaign ID and resource GUID; the service does not rely on user-created indexes or full collection scans to establish publication. Mongo `contentRevision` and SQL `metadataRevision` are independent. View `params` and context parameters remain native JSON values. This service slice has no filesystem-backed content bodies.
+
+SQL and MongoDB do not share a transaction. Resource content is prepared in MongoDB before its SQL metadata is published; a prepared document without SQL metadata is not publicly discoverable through the resource endpoints. If publication returns an unknown outcome, check the corresponding campaign-scoped GET using the same request ID/resource ID before deciding what to do; do not retry with a new identifier. Unpublished content remnants are not cleaned up automatically.
 
 | Setting | Purpose | Default/current value |
 | --- | --- | --- |

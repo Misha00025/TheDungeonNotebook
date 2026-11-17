@@ -12,6 +12,7 @@ public sealed class CampaignDbContext(DbContextOptions<CampaignDbContext> option
     public DbSet<CharacterMetadata> CharacterMetadata => Set<CharacterMetadata>();
     public DbSet<CharacterAssignment> CharacterAssignments => Set<CharacterAssignment>();
     public DbSet<FormulaMetadata> FormulaMetadata => Set<FormulaMetadata>();
+    public DbSet<ViewMetadata> ViewMetadata => Set<ViewMetadata>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -65,5 +66,13 @@ public sealed class CampaignDbContext(DbContextOptions<CampaignDbContext> option
         formula.Property(x => x.Name).IsRequired().HasColumnType("longtext");
         formula.Property(x => x.MetadataRevision).IsRequired().IsConcurrencyToken();
         formula.HasOne(x => x.Campaign).WithMany().HasForeignKey(x => x.CampaignId).OnDelete(DeleteBehavior.Restrict);
+
+        var view = modelBuilder.Entity<ViewMetadata>();
+        view.ToTable("ViewMetadata", table => table.HasCheckConstraint("CK_ViewMetadata_MetadataRevision", "MetadataRevision >= 1"));
+        view.HasKey(x => x.Id);
+        view.HasAlternateKey(x => new { x.CampaignId, x.Id });
+        view.Property(x => x.Name).IsRequired().HasColumnType("longtext");
+        view.Property(x => x.MetadataRevision).IsRequired().IsConcurrencyToken();
+        view.HasOne(x => x.Campaign).WithMany().HasForeignKey(x => x.CampaignId).OnDelete(DeleteBehavior.Restrict);
     }
 }

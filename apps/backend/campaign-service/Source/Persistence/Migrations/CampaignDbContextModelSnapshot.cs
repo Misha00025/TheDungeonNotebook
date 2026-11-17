@@ -11,6 +11,9 @@ namespace Tdn.Campaigns.Persistence.Migrations;
 public sealed class CampaignDbContextModelSnapshot : ModelSnapshot
 {
     protected override void BuildModel(ModelBuilder modelBuilder)
+        => BuildSnapshotModel(modelBuilder);
+
+    internal static void BuildSnapshotModel(ModelBuilder modelBuilder)
     {
         modelBuilder.HasAnnotation("ProductVersion", "9.0.11")
             .HasAnnotation("Relational:MaxIdentifierLength", 64);
@@ -98,6 +101,17 @@ public sealed class CampaignDbContextModelSnapshot : ModelSnapshot
             entity.ToTable("FormulaMetadata", table => table.HasCheckConstraint("CK_FormulaMetadata_MetadataRevision", "MetadataRevision >= 1"));
         });
 
+        modelBuilder.Entity("Tdn.Campaigns.Sheets.ViewMetadata", entity =>
+        {
+            entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("char(36)");
+            entity.Property<int>("CampaignId").HasColumnType("int");
+            entity.Property<string>("Name").IsRequired().HasColumnType("longtext");
+            entity.Property<long>("MetadataRevision").IsConcurrencyToken().HasColumnType("bigint");
+            entity.HasKey("Id");
+            entity.HasAlternateKey("CampaignId", "Id");
+            entity.ToTable("ViewMetadata", table => table.HasCheckConstraint("CK_ViewMetadata_MetadataRevision", "MetadataRevision >= 1"));
+        });
+
         modelBuilder.Entity("Tdn.Campaigns.Sheets.TemplateMetadata", entity =>
         {
             entity.HasOne("Tdn.Campaigns.Campaigns.Campaign", "Campaign")
@@ -124,6 +138,12 @@ public sealed class CampaignDbContextModelSnapshot : ModelSnapshot
         });
 
         modelBuilder.Entity("Tdn.Campaigns.Sheets.FormulaMetadata", entity =>
+        {
+            entity.HasOne("Tdn.Campaigns.Campaigns.Campaign", "Campaign")
+                .WithMany().HasForeignKey("CampaignId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+        });
+
+        modelBuilder.Entity("Tdn.Campaigns.Sheets.ViewMetadata", entity =>
         {
             entity.HasOne("Tdn.Campaigns.Campaigns.Campaign", "Campaign")
                 .WithMany().HasForeignKey("CampaignId").OnDelete(DeleteBehavior.Restrict).IsRequired();

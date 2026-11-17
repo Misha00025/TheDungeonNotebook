@@ -15,7 +15,7 @@ public enum FieldSourceKind
     Virtual
 }
 
-public sealed record FieldReference(FieldSourceKind Kind, Guid FieldId);
+public sealed record FieldReference([property: System.Text.Json.Serialization.JsonRequired] FieldSourceKind Kind, Guid FieldId);
 
 public sealed record VirtualField(
     Guid Id,

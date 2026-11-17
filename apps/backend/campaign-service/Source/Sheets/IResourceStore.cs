@@ -22,6 +22,10 @@ public interface IResourceStore
     Task<FormulaMetadata?> GetFormulaAsync(int campaignId, Guid formulaId, CancellationToken cancellationToken);
     Task<FormulaMetadata> CreateFormulaAsync(FormulaMetadata formula, CancellationToken cancellationToken);
     Task<bool> RenameFormulaAsync(int campaignId, Guid formulaId, string name, long expectedRevision, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ViewMetadata>> ListViewsAsync(int campaignId, CancellationToken cancellationToken);
+    Task<ViewMetadata?> GetViewAsync(int campaignId, Guid viewId, CancellationToken cancellationToken);
+    Task<ViewMetadata> CreateViewAsync(ViewMetadata view, CancellationToken cancellationToken);
+    Task<bool> RenameViewAsync(int campaignId, Guid viewId, string name, long expectedRevision, CancellationToken cancellationToken);
 }
 
 public sealed class DuplicateResourceException : Exception
