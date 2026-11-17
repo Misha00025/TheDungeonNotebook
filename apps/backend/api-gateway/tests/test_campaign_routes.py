@@ -1,0 +1,101 @@
+import json
+import re
+import unittest
+
+import yaml
+
+from test_support import GATEWAY
+
+
+CAMPAIGN_SERVICE = GATEWAY.parent / "campaign-service"
+HTTP_ATTRIBUTE = re.compile(r"\[Http(Get|Post|Put|Delete|Patch|Head|Options)(?:\s*\((.*?)\))?\]", re.DOTALL)
+ROUTE_ATTRIBUTE = re.compile(r'\[Route\s*\(\s*"([^"]*)"\s*\)\]')
+QUOTED_VALUE = re.compile(r'"([^"]*)"')
+PLACEHOLDER_CONSTRAINT = re.compile(r":(?:int|guid)\b")
+
+
+def controller_endpoints():
+    endpoints = set()
+    controller_files = sorted((CAMPAIGN_SERVICE / "Source" / "Http").glob("*Controller.cs"))
+    if not controller_files:
+        raise AssertionError(f"no campaign-service controller files found in {CAMPAIGN_SERVICE / 'Source' / 'Http'}")
+    for file_path in controller_files:
+        source = file_path.read_text()
+        routes = ROUTE_ATTRIBUTE.findall(source)
+        if len(routes) != 1:
+            raise AssertionError(f"{file_path} must contain exactly one supported [Route(\"...\")] attribute")
+        attributes = list(HTTP_ATTRIBUTE.finditer(source))
+        if not attributes:
+            raise AssertionError(f"{file_path} contains no supported HTTP action attributes")
+        unsupported = re.search(r"\[Http[A-Za-z]+\b", source)
+        if unsupported and len(re.findall(r"\[Http[A-Za-z]+\b", source)) != len(attributes):
+            raise AssertionError(f"{file_path} contains an unsupported HTTP attribute format")
+        for attribute in attributes:
+            method = attribute.group(1).upper()
+            argument = attribute.group(2) or ""
+            if argument and not argument.lstrip().startswith('"'):
+                raise AssertionError(f"{file_path} contains an unsupported [Http{method.title()}(...)] argument format")
+            values = QUOTED_VALUE.findall(argument)
+            suffix = values[0] if values else ""
+            path = "/".join(part.strip("/") for part in (routes[0], suffix) if part.strip("/"))
+            path = "/" + PLACEHOLDER_CONSTRAINT.sub("", path)
+            endpoint = (method, path)
+            if endpoint in endpoints:
+                raise AssertionError(f"duplicate campaign-service endpoint {method} {path} in {file_path}")
+            endpoints.add(endpoint)
+    if not endpoints:
+        raise AssertionError("no campaign-service controller endpoints were discovered")
+    return endpoints
+
+
+class CampaignRouteTests(unittest.TestCase):
+    def test_gateway_campaign_routes_match_all_controller_actions(self):
+        config = yaml.safe_load((GATEWAY / "configs" / "routes.yaml").read_text())
+        campaign_routes = [route for route in config["routes"] if isinstance(route, dict) and route.get("proxy", {}).get("service") == "campaign"]
+        actual = []
+        for route in campaign_routes:
+            methods = route.get("methods")
+            if not isinstance(methods, list):
+                methods = list(methods or {})
+            actual.extend((method.upper(), route["path"]) for method in methods)
+            self.assertEqual(route["proxy"].get("path"), route["path"])
+            self.assertEqual(route.get("auth"), "required")
+            self.assertEqual(route.get("pre_request_handler"), "campaign_upstream")
+            self.assertEqual(route.get("response_handler"), "campaign_response")
+            self.assertEqual(route["proxy"].get("headers", {}).get("X-Subject"), "{state.x_subject}")
+            self.assertNotIn("params", route)
+            self.assertNotIn("skip_body", route["proxy"])
+            self.assertNotIn("access", route)
+            self.assertNotIn("response", route)
+        self.assertEqual(len(actual), len(set(actual)), "duplicate Gateway campaign method/path pairs")
+        self.assertEqual(set(actual), controller_endpoints())
+        for _, path in actual:
+            self.assertNotIn("*", path)
+            self.assertNotRegex(path, r"\{[^}]+:[^}]+\}")
+            self.assertFalse(path.startswith("/groups"))
+            self.assertNotIn("/polices/", path)
+
+    def test_app_configs_include_routes_without_game_systems(self):
+        for filename in ("app.json", "app.test.json"):
+            config = json.loads((GATEWAY / "configs" / filename).read_text())
+            self.assertIn("routes.yaml", config["routes"]["files"])
+            self.assertNotIn("game-systems.yaml", config["routes"]["files"])
+
+    def test_existing_non_campaign_routes_keep_authentication_contract(self):
+        config = yaml.safe_load((GATEWAY / "configs" / "routes.yaml").read_text())
+        routes = {route["path"]: route for route in config["routes"]}
+        self.assertEqual(routes["/get_api"].get("auth"), "none")
+        self.assertEqual(routes["/whoami"].get("auth"), "required")
+        for path in ("/auth/register", "/auth/check", "/auth/reset-password/confirm", "/auth/token", "/.well-known/jwks.json"):
+            self.assertEqual(routes[path].get("handler"), "legacy_auth_unavailable")
+            self.assertEqual(routes[path].get("auth"), "none")
+        self.assertEqual(routes["/users"]["methods"]["POST"], {"handler": "user_create", "auth": "required"})
+        self.assertEqual(routes["/users"]["methods"]["GET"]["auth"], "none")
+        self.assertEqual(routes["/users/{user_id}"]["auth"], "required")
+        self.assertEqual(routes["/users/{user_id}"]["methods"]["PATCH"]["access"], "self_only")
+        self.assertEqual(routes["/users/{user_id}/settings"]["auth"], "required")
+        self.assertTrue(all(method["access"] == "self_only" for method in routes["/users/{user_id}/settings"]["methods"].values()))
+
+
+if __name__ == "__main__":
+    unittest.main()

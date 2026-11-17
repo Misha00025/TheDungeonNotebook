@@ -1,6 +1,6 @@
 from app.engine.context import RouteContext
 from app.engine.registry import register_response_handler
-from app.engine.status import ok, unauthorized, forbidden, not_found
+from app.engine.status import ok, forbidden
 from starlette.responses import Response
 from handlers.trusted import trusted_headers
 
@@ -61,103 +61,6 @@ async def handle_whoami(ctx: RouteContext):
     })
 
 
-@register_response_handler("group_users")
-async def handle_group_users(ctx: RouteContext):
-    group_id = ctx.path_params["group_id"]
-
-    pres = ctx.services.campaign.get(
-        "/polices/groups",
-        params={"groupId": group_id},
-        headers=trusted_headers(ctx)
-    )
-    if not pres.ok:
-        return not_found({"error": "Not found"})
-
-    group_users = []
-    for entry in pres.json().get("users", []):
-        user_resp = ctx.services.users.get(f"/users/{entry['userId']}", headers=trusted_headers(ctx, False))
-        if user_resp.ok:
-            group_users.append({
-                "user": user_resp.json(),
-                "isAdmin": entry.get("isAdmin"),
-            })
-
-    return ok({"users": group_users})
-
-
-@register_response_handler("character_users")
-async def handle_character_users(ctx: RouteContext):
-    group_id = ctx.path_params["group_id"]
-    character_id = ctx.path_params["character_id"]
-
-    pres = ctx.services.campaign.get(
-        "/polices/groups/characters",
-        params={
-            "groupId": group_id,
-            "characterId": character_id,
-        },
-        headers=trusted_headers(ctx)
-    )
-    if not pres.ok:
-        return not_found({"error": "Not found"})
-
-    character_users = []
-    for entry in pres.json().get("users", []):
-        user_resp = ctx.services.users.get(f"/users/{entry['userId']}", headers=trusted_headers(ctx, False))
-        if user_resp.ok:
-            character_users.append({
-                "user": user_resp.json(),
-                "canWrite": entry.get("canWrite"),
-            })
-
-    return ok({"users": character_users})
-
-
-@register_response_handler("group_export")
-async def handle_group_export(ctx: RouteContext):
-    group_id = ctx.path_params["group_id"]
-    include = ctx.request.query_params.get("include", "templates,characters,items,skills")
-    uid = get_user_id(ctx.jwt)
-
-    params = {"include": include}
-    if uid:
-        params["userId"] = str(uid)
-
-    result = ctx.services.campaign.get(
-        f"/groups/{group_id}/export",
-        params=params,
-        headers=trusted_headers(ctx)
-    )
-
-    resp = ok(result.json() if result.ok else {})
-    try:
-        return Response(content=result.content, status_code=result.status_code, media_type="application/json")
-    except Exception:
-        return Response(content=result.content, status_code=result.status_code)
-
-
-@register_response_handler("group_import")
-async def handle_group_import(ctx: RouteContext):
-    group_id = ctx.path_params["group_id"]
-    include = ctx.request.query_params.get("include", "templates,characters,items,skills")
-    uid = get_user_id(ctx.jwt)
-
-    params = {"include": include}
-    if uid:
-        params["userId"] = str(uid)
-
-    body_data = ctx.request.json or {}
-
-    result = ctx.services.campaign.post(
-        f"/groups/{group_id}/import",
-        json=body_data,
-        params=params,
-        headers=trusted_headers(ctx)
-    )
-
-    return Response(content=result.content, status_code=result.status_code, media_type="application/json")
-
-
 @register_response_handler("user_create")
 async def handle_user_create(ctx: RouteContext):
     uid = get_user_id(ctx.jwt)
@@ -172,22 +75,6 @@ async def handle_user_create(ctx: RouteContext):
     return Response(content=result.content, status_code=result.status_code, media_type="application/json")
 
 
-@register_response_handler("quest_create_for_character")
-async def handle_quest_create_for_character(ctx: RouteContext):
-    group_id = ctx.path_params.get("group_id")
-    character_id = ctx.path_params.get("character_id")
-
-    if group_id is None or character_id is None:
-        return forbidden()
-
-    data = ctx.request.json or {}
-    data["assignedCharacters"] = [int(character_id)]
-
-    result = ctx.services.campaign.post(
-        f"/groups/{group_id}/quests",
-        json=data,
-        params={"userId": get_user_id(ctx.jwt)},
-        headers=trusted_headers(ctx)
-    )
-
-    return Response(content=result.content, status_code=result.status_code, media_type="application/json")
+@register_response_handler("campaign_response")
+async def handle_campaign_response(ctx: RouteContext):
+    ctx.response.passthrough()

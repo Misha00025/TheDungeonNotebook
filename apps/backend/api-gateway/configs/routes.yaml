@@ -99,569 +99,324 @@ routes:
       DELETE:
         access: self_only
 
-  # ============================================================
-  # Groups
-  # ============================================================
-  - path: /groups
+  - path: /api/campaigns/creation/{requestId}
     proxy:
       service: campaign
-      path: /groups
+      path: /api/campaigns/creation/{requestId}
       headers:
         X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
     auth: required
-    params:
-      query:
-        userId: "{jwt.userId}"
-    methods:
-      GET:
-        response:
-          wrap: groups
-      POST: {}
-
-  - path: /groups/{group_id}
-    proxy:
-      service: campaign
-      path: /groups/{group_id}
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    methods:
-      GET:
-        params:
-          query:
-            userId: "{jwt.userId}"
-      PATCH: {}
-
-  # ============================================================
-  # Group Users (composite)
-  # ============================================================
-  - path: /groups/{group_id}/users
     methods: [GET]
-    handler: group_users
-    auth: required
 
-  - path: /groups/{group_id}/users/{user_id}
+  - path: /api/campaigns
     proxy:
       service: campaign
-      path: /polices/groups
+      path: /api/campaigns
       headers:
         X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
     auth: required
-    methods:
-      PUT:
-        params:
-          body:
-            groupId: "{path.group_id}"
-            userId: "{path.user_id}"
-      DELETE:
-        params:
-          query:
-            groupId: "{path.group_id}"
-            userId: "{path.user_id}"
+    methods: [GET, POST]
 
-  # ============================================================
-  # Group Items
-  # ============================================================
-  - path: /groups/{group_id}/items
+  - path: /api/campaigns/{campaignId}/members/{userId}
     proxy:
       service: campaign
-      path: /groups/{group_id}/items
+      path: /api/campaigns/{campaignId}/members/{userId}
       headers:
         X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
     auth: required
-    methods:
-      GET:
-        params:
-          query:
-            userId: "{jwt.userId}"
-      POST: {}
+    methods: [PUT, DELETE]
 
-  - path: /groups/{group_id}/items/{item_id}
+  - path: /api/campaigns/{campaignId}/members
     proxy:
       service: campaign
-      path: /groups/{group_id}/items/{item_id}
+      path: /api/campaigns/{campaignId}/members
       headers:
         X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
     auth: required
-    params:
-      query:
-        userId: "{jwt.userId}"
-    methods:
-      GET: {}
-      PUT: {}
-      DELETE: {}
-
-  # ============================================================
-  # Group Notes
-  # ============================================================
-  - path: /groups/{group_id}/notes
-    proxy:
-      service: campaign
-      path: /groups/{group_id}/notes
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    methods:
-      GET:
-        response:
-          wrap: notes
-        params:
-          query:
-            userId: "{jwt.userId}"
-      POST: {}
-
-  - path: /groups/{group_id}/notes/{note_id}
-    proxy:
-      service: campaign
-      path: /groups/{group_id}/notes/{note_id}
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    methods:
-      GET: {}
-      PUT: {}
-      DELETE: {}
-
-  # ============================================================
-  # Group Skills
-  # ============================================================
-  - path: /groups/{group_id}/skills/attributes
-    proxy:
-      service: campaign
-      path: /groups/{group_id}/skills/attributes
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    methods:
-      GET:
-        params:
-          query:
-            userId: "{jwt.userId}"
-      PUT: {}
-
-  - path: /groups/{group_id}/skills
-    proxy:
-      service: campaign
-      path: /groups/{group_id}/skills
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    methods:
-      GET:
-        params:
-          query: "*"
-      POST: {}
-
-  - path: /groups/{group_id}/skills/{skill_id}
-    proxy:
-      service: campaign
-      path: /groups/{group_id}/skills/{skill_id}
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    methods:
-      GET:
-        params:
-          query:
-            userId: "{jwt.userId}"
-      PUT: {}
-      DELETE: {}
-
-  # ============================================================
-  # Group Schemas
-  # ============================================================
-  - path: /groups/{group_id}/schemas/items
-    proxy:
-      service: campaign
-      path: /schemas/groups/{group_id}/items
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    methods:
-      GET:
-        params:
-          query:
-            userId: "{jwt.userId}"
-      PUT: {}
-
-  - path: /groups/{group_id}/schemas/skills
-    proxy:
-      service: campaign
-      path: /schemas/groups/{group_id}/skills
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    methods:
-      GET:
-        params:
-          query:
-            userId: "{jwt.userId}"
-      PUT: {}
-
-  - path: /groups/{group_id}/schemas/template
-    proxy:
-      service: campaign
-      path: /schemas/groups/{group_id}/template
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    methods:
-      GET:
-        params:
-          query:
-            userId: "{jwt.userId}"
-      PUT: {}
-
-  - path: /groups/{group_id}/schemas/characters/resources
-    proxy:
-      service: campaign
-      path: /schemas/groups/{group_id}/characters/resources
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    methods:
-      GET:
-        params:
-          query:
-            userId: "{jwt.userId}"
-      PUT: {}
-
-  # ============================================================
-  # Export / Import
-  # ============================================================
-  - path: /groups/{group_id}/export
     methods: [GET]
-    handler: group_export
-    auth: required
 
-  - path: /groups/{group_id}/import
-    methods: [POST]
-    handler: group_import
-    auth: required
-
-  # ============================================================
-  # Group Quests
-  # ============================================================
-  - path: /groups/{group_id}/quests
+  - path: /api/campaigns/{campaignId}/templates/{templateId}/virtual-fields
     proxy:
       service: campaign
-      path: /groups/{group_id}/quests
+      path: /api/campaigns/{campaignId}/templates/{templateId}/virtual-fields
       headers:
         X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
     auth: required
-    methods:
-      GET:
-        params:
-          query:
-            userId: "{jwt.userId}"
-      POST: {}
+    methods: [GET, PUT]
 
-  - path: /groups/{group_id}/quests/{quest_id}
+  - path: /api/campaigns/{campaignId}/templates/{templateId}/content
     proxy:
       service: campaign
-      path: /groups/{group_id}/quests/{quest_id}
+      path: /api/campaigns/{campaignId}/templates/{templateId}/content
       headers:
         X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
     auth: required
-    methods:
-      GET: {}
-      PUT: {}
-      PATCH:
-        params:
-          query:
-            userId: "{jwt.userId}"
-      DELETE: {}
+    methods: [GET, PUT]
 
-  - path: /groups/{group_id}/characters/{character_id}/quests
-    methods:
-      GET:
-        proxy:
-          service: campaign
-          path: /groups/{group_id}/quests
-          headers:
-            X-Subject: "{state.x_subject}"
-        pre_request_handler: trusted_upstream
-        auth: required
-        params:
-          query:
-            userId: "{jwt.userId}"
-            characterId: "{path.character_id}"
-      POST:
-        handler: quest_create_for_character
-        auth: required
-
-  # ============================================================
-  # Characters
-  # ============================================================
-  - path: /groups/{group_id}/characters
+  - path: /api/campaigns/{campaignId}/templates/{templateId}
     proxy:
       service: campaign
-      path: /groups/{group_id}/characters
+      path: /api/campaigns/{campaignId}/templates/{templateId}
       headers:
         X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
     auth: required
-    methods:
-      GET:
-        params:
-          query:
-            userId: "{jwt.userId}"
-      POST: {}
+    methods: [GET, PUT]
 
-  - path: /groups/{group_id}/characters/{character_id}
+  - path: /api/campaigns/{campaignId}/templates
     proxy:
       service: campaign
-      path: /groups/{group_id}/characters/{character_id}
+      path: /api/campaigns/{campaignId}/templates
       headers:
         X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
     auth: required
-    params:
-      query:
-        userId: "{jwt.userId}"
-    methods:
-      GET: {}
-      PATCH: {}
-      DELETE: {}
+    methods: [GET, POST]
 
-  # ============================================================
-  # Character Users (composite)
-  # ============================================================
-  - path: /groups/{group_id}/characters/{character_id}/users
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/virtual-overrides/{virtualFieldId}
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/characters/{characterId}/virtual-overrides/{virtualFieldId}
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [PUT, DELETE]
+
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/virtual-overrides
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/characters/{characterId}/virtual-overrides
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
     methods: [GET]
-    handler: character_users
-    auth: required
 
-  - path: /groups/{group_id}/characters/{character_id}/users/{user_id}
-    auth: required
-    methods:
-      PUT:
-        proxy:
-          service: campaign
-          path: /polices/groups/characters
-          headers:
-            X-Subject: "{state.x_subject}"
-        pre_request_handler: trusted_upstream
-        params:
-          body:
-            groupId: "{path.group_id}"
-            userId: "{path.user_id}"
-            characterId: "{path.character_id}"
-      DELETE:
-        proxy:
-          service: campaign
-          path: /polices/groups
-          headers:
-            X-Subject: "{state.x_subject}"
-        pre_request_handler: trusted_upstream
-        params:
-          query:
-            groupId: "{path.group_id}"
-            userId: "{path.user_id}"
-            characterId: "{path.character_id}"
-
-  # ============================================================
-  # Character Templates
-  # ============================================================
-  - path: /groups/{group_id}/characters/templates
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/custom-virtual-fields
     proxy:
       service: campaign
-      path: /groups/{group_id}/characters/templates
+      path: /api/campaigns/{campaignId}/characters/{characterId}/custom-virtual-fields
       headers:
         X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
     auth: required
-    methods:
-      GET:
-        params:
-          query:
-            userId: "{jwt.userId}"
-      POST: {}
-      PUT: {}
+    methods: [GET, PUT]
 
-  - path: /groups/{group_id}/characters/templates/{template_id}
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/computed-sheet
     proxy:
       service: campaign
-      path: /groups/{group_id}/characters/templates/{template_id}
+      path: /api/campaigns/{campaignId}/characters/{characterId}/computed-sheet
       headers:
         X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
     auth: required
-    methods:
-      GET:
-        params:
-          query:
-            userId: "{jwt.userId}"
-      PUT: {}
-
-  # ============================================================
-  # Character Items
-  # ============================================================
-  - path: /groups/{group_id}/characters/{character_id}/items
-    proxy:
-      service: campaign
-      path: /groups/{group_id}/characters/{character_id}/items
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    params:
-      query:
-        userId: "{jwt.userId}"
-    methods:
-      GET: {}
-      POST: {}
-
-  - path: /groups/{group_id}/characters/{character_id}/items/{item_id}
-    proxy:
-      service: campaign
-      path: /groups/{group_id}/characters/{character_id}/items/{item_id}
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    params:
-      query:
-        userId: "{jwt.userId}"
-    methods:
-      GET: {}
-      PUT: {}
-      DELETE: {}
-
-  # ============================================================
-  # Character Notes
-  # ============================================================
-  - path: /groups/{group_id}/characters/{character_id}/notes
-    proxy:
-      service: campaign
-      path: /groups/{group_id}/characters/{character_id}/notes
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    methods:
-      GET:
-        response:
-          wrap: notes
-      POST: {}
-
-  - path: /groups/{group_id}/characters/{character_id}/notes/{note_id}
-    proxy:
-      service: campaign
-      path: /groups/{group_id}/characters/{character_id}/notes/{note_id}
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    methods:
-      GET: {}
-      PUT: {}
-      DELETE: {}
-
-  # ============================================================
-  # Character Skills
-  # ============================================================
-  - path: /groups/{group_id}/characters/{character_id}/skills
-    methods:
-      GET:
-        proxy:
-          service: campaign
-          path: /groups/{group_id}/characters/{character_id}/skills
-          headers:
-            X-Subject: "{state.x_subject}"
-        pre_request_handler: trusted_upstream
-        auth: required
-        params:
-          query: "*"
-
-  - path: /groups/{group_id}/characters/{character_id}/skills/{skill_id}
-    proxy:
-      service: campaign
-      path: /groups/{group_id}/characters/{character_id}/skills/{skill_id}
-      headers:
-        X-Subject: "{state.x_subject}"
-      skip_body: true
-    pre_request_handler: trusted_upstream
-    auth: required
-    params:
-      query:
-        userId: "{jwt.userId}"
-    methods:
-      PUT: {}
-      DELETE: {}
-
-  # ============================================================
-  # Character Equipment
-  # ============================================================
-  - path: /groups/{group_id}/characters/{character_id}/equipment
-    proxy:
-      service: campaign
-      path: /groups/{group_id}/characters/{character_id}/equipment
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    params:
-      query:
-        userId: "{jwt.userId}"
-    methods:
-      GET: {}
-      PATCH: {}
-      PUT: {}
-
-  # ============================================================
-  # Character Commands
-  # ============================================================
-  - path: /groups/{group_id}/characters/{character_id}/commands
-    proxy:
-      service: campaign
-      path: /groups/{group_id}/characters/{character_id}/commands
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    methods:
-      POST: {}
-
-  - path: /groups/{group_id}/characters/{character_id}/commands/batch
-    proxy:
-      service: campaign
-      path: /groups/{group_id}/characters/{character_id}/commands/batch
-      headers:
-        X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
-    auth: required
-    methods:
-      POST: {}
-
-  # ============================================================
-  # Character Log
-  # ============================================================
-  - path: /groups/{group_id}/characters/{character_id}/log
     methods: [GET]
+
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/base-values/{fieldId}
     proxy:
       service: campaign
-      path: /groups/{group_id}/characters/{character_id}/log
+      path: /api/campaigns/{campaignId}/characters/{characterId}/base-values/{fieldId}
       headers:
         X-Subject: "{state.x_subject}"
-    pre_request_handler: trusted_upstream
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
     auth: required
+    methods: [PUT, DELETE]
+
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/assignments/{userId}
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/characters/{characterId}/assignments/{userId}
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [PUT, DELETE]
+
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/assignments
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/characters/{characterId}/assignments
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET]
+
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/description
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/characters/{characterId}/description
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [PUT]
+
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/sheet
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/characters/{characterId}/sheet
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET]
+
+  - path: /api/campaigns/{campaignId}/characters/{characterId}
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/characters/{characterId}
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, PUT]
+
+  - path: /api/campaigns/{campaignId}/characters
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/characters
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, POST]
+
+  - path: /api/campaigns/{campaignId}/formulas/{formulaId}/content
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/formulas/{formulaId}/content
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, PUT]
+
+  - path: /api/campaigns/{campaignId}/formulas/{formulaId}
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/formulas/{formulaId}
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, PUT]
+
+  - path: /api/campaigns/{campaignId}/formulas
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/formulas
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, POST]
+
+  - path: /api/campaigns/{campaignId}/views/{viewId}/sources
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/views/{viewId}/sources
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET]
+
+  - path: /api/campaigns/{campaignId}/views/{viewId}/content
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/views/{viewId}/content
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, PUT]
+
+  - path: /api/campaigns/{campaignId}/views/{viewId}
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/views/{viewId}
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, PUT]
+
+  - path: /api/campaigns/{campaignId}/views
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/views
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, POST]
+
+  - path: /api/campaigns/{campaignId}/presentation/resolve
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/presentation/resolve
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET]
+
+  - path: /api/campaigns/{campaignId}/presentation
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/presentation
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, PUT]
+
+  - path: /api/campaigns/{campaignId}
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, PUT]
 
   # ============================================================
   # Game Systems & Sync — вынесены в configs/game-systems.yaml

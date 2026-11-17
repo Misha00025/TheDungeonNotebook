@@ -104,7 +104,10 @@ class TrustedHeaderTests(unittest.TestCase):
 
         visit(config)
         self.assertGreater(len(proxies), 0)
-        self.assertTrue(all(node.get("pre_request_handler") == "trusted_upstream" for node in proxies))
+        for node in proxies:
+            route = node.get("path", "")
+            expected = "campaign_upstream" if route.startswith("/api/campaigns") else "trusted_upstream"
+            self.assertEqual(node.get("pre_request_handler"), expected)
 
 
 if __name__ == "__main__":

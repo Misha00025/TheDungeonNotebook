@@ -55,6 +55,12 @@ async def trusted_upstream(ctx, req: RequestBuilder):
     req.set_header("X-Internal-Service-Key", _trusted_secret())
 
 
+@register_pre_request_handler("campaign_upstream")
+async def campaign_upstream(ctx, req: RequestBuilder):
+    await trusted_upstream(ctx, req)
+    req.remove_header("X-Internal-Service-Key")
+
+
 @register_auth_strategy("account_service")
 def account_service_factory(config):
     account_key = _secret("ACCOUNT_SERVICE_KEY")
