@@ -4,6 +4,26 @@ namespace Tdn.Campaigns.Campaigns;
 
 public sealed class CampaignService(ICampaignStore store)
 {
+    public async Task<CampaignAccess> GetAccessAsync(Subject? subject, int campaignId, CancellationToken cancellationToken)
+    {
+        var current = RequireSubject(subject);
+        var campaign = await store.GetCampaignAsync(campaignId, cancellationToken);
+        if (campaign is null)
+            throw NotFound();
+        if (current.Type == SubjectType.Admin)
+            return new CampaignAccess(current, true);
+        if (current.Type == SubjectType.Group)
+        {
+            if (current.Id != campaignId)
+                throw NotFound();
+            return new CampaignAccess(current, true);
+        }
+        var member = await store.GetMemberAsync(campaignId, current.Id, cancellationToken);
+        if (member is null)
+            throw NotFound();
+        return new CampaignAccess(current, member.IsAdmin);
+    }
+
     public async Task<CampaignDto> CreateAsync(Subject? subject, CreateCampaignRequest request, CancellationToken cancellationToken)
     {
         var current = RequireSubject(subject);
@@ -149,27 +169,15 @@ public sealed class CampaignService(ICampaignStore store)
 
     private async Task<Campaign> RequireCampaignAdminAsync(Subject subject, int campaignId, CancellationToken cancellationToken)
     {
-        var campaign = await store.GetCampaignAsync(campaignId, cancellationToken);
-        if (campaign is null)
-            throw NotFound();
-        if (subject.Type == SubjectType.Admin || subject.Type == SubjectType.Group && subject.Id == campaignId)
-            return campaign;
-        if (subject.Type != SubjectType.User)
-            throw NotFound();
-        var member = await store.GetMemberAsync(campaignId, subject.Id, cancellationToken);
-        if (member is null)
-            throw NotFound();
-        if (!member.IsAdmin)
+        var access = await GetAccessAsync(subject, campaignId, cancellationToken);
+        if (!access.IsAdmin)
             throw Forbidden();
-        return campaign;
+        return await store.GetCampaignAsync(campaignId, cancellationToken) ?? throw NotFound();
     }
 
     private async Task RequireCampaignAccessAsync(Subject subject, int campaignId, CancellationToken cancellationToken)
     {
-        if (subject.Type == SubjectType.Admin || subject.Type == SubjectType.Group && subject.Id == campaignId)
-            return;
-        if (subject.Type != SubjectType.User || await store.GetMemberAsync(campaignId, subject.Id, cancellationToken) is null)
-            throw NotFound();
+        await GetAccessAsync(subject, campaignId, cancellationToken);
     }
 
     private static Subject RequireSubject(Subject? subject)
@@ -186,6 +194,8 @@ public sealed class CampaignService(ICampaignStore store)
     private static DomainException Conflict(string code, string message, int resourceId) => new(409, code, message, resourceId);
     private static DomainException ServiceUnavailable() => new(503, "dependency_unavailable", "The campaign store is temporarily unavailable.");
 }
+
+public sealed record CampaignAccess(Subject Subject, bool IsAdmin);
 
 public sealed class DuplicateCreationRequestException : Exception
 {

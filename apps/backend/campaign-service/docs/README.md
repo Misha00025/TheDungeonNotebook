@@ -1,6 +1,12 @@
 # Campaign Service API
 
-The current campaigns and membership contract is documented in [Campaigns API](campaigns.md). Routes in the [legacy public HTML API documentation](../../../../docs/api/index.html) are historical and are not served by this host.
+Current API contracts:
+
+- [Campaigns and membership](campaigns.md)
+- [Templates and base-field definitions](templates.md)
+- [Characters, assignments, and sheets](characters.md)
+
+Routes in the [legacy public HTML API documentation](../../../../docs/api/index.html) are historical and are not served by this host.
 
 Run the service from its root directory (`apps/backend/campaign-service`):
 

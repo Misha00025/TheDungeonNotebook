@@ -8,6 +8,8 @@ using Tdn.Campaigns.Campaigns;
 using Tdn.Campaigns.Configuration;
 using Tdn.Campaigns.Http;
 using Tdn.Campaigns.Persistence;
+using Tdn.Campaigns.Sheets;
+using MongoDB.Driver;
 
 namespace Tdn.Campaigns;
 
@@ -17,6 +19,10 @@ public static class CampaignApplication
     {
         var builder = WebApplication.CreateBuilder(args);
         var migrationValue = builder.Configuration["Database:ApplyMigrations"];
+        var defaultImportance = builder.Configuration["Characters:DefaultImportance"] ?? "background";
+        var membersCanReadDefinitions = builder.Configuration["Access:MembersCanReadDefinitions"];
+        var mongoConnectionString = builder.Configuration["Mongo:ConnectionString"] ?? string.Empty;
+        var mongoDatabase = builder.Configuration["Mongo:Database"] ?? string.Empty;
 
         builder.Services.AddProblemDetails();
         builder.Services.AddExceptionHandler<CampaignExceptionHandler>();
@@ -60,6 +66,29 @@ public static class CampaignApplication
         });
         builder.Services.AddScoped<ICampaignStore, EfCampaignStore>();
         builder.Services.AddScoped<CampaignService>();
+        builder.Services.AddOptions<SheetOptions>()
+            .Configure(options =>
+            {
+                options.DefaultImportance = defaultImportance;
+                options.MembersCanReadDefinitions = membersCanReadDefinitions is null || bool.TryParse(membersCanReadDefinitions, out var canRead) && canRead;
+            })
+            .Validate(options => Enum.TryParse<Importance>(options.DefaultImportance, true, out var importance) && Enum.IsDefined(importance), "Characters:DefaultImportance must be Background, Secondary, or Key.")
+            .Validate(settings => membersCanReadDefinitions is null || bool.TryParse(membersCanReadDefinitions, out _), "Access:MembersCanReadDefinitions must be a boolean.")
+            .ValidateOnStart();
+        builder.Services.AddOptions<MongoOptions>()
+            .Configure(options =>
+            {
+                options.ConnectionString = mongoConnectionString;
+                options.Database = mongoDatabase;
+            })
+            .Validate(options => !string.IsNullOrWhiteSpace(options.ConnectionString), "Mongo:ConnectionString is required.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.Database), "Mongo:Database is required.")
+            .ValidateOnStart();
+        builder.Services.AddSingleton<IMongoClient>(services => new MongoClient(services.GetRequiredService<IOptions<MongoOptions>>().Value.ConnectionString));
+        builder.Services.AddSingleton<IMongoDatabase>(services => services.GetRequiredService<IMongoClient>().GetDatabase(services.GetRequiredService<IOptions<MongoOptions>>().Value.Database));
+        builder.Services.AddScoped<IResourceStore, EfResourceStore>();
+        builder.Services.AddScoped<IContentStore, MongoContentStore>();
+        builder.Services.AddScoped<SheetService>();
         if (bool.TryParse(migrationValue, out var applyMigrations) && applyMigrations)
             builder.Services.AddHostedService<DatabaseMigrationService>();
 

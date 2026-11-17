@@ -2,7 +2,7 @@ namespace Tdn.Campaigns.Campaigns;
 
 public sealed class DomainException : Exception
 {
-    public DomainException(int statusCode, string code, string message, int? resourceId = null, Guid? requestId = null)
+    public DomainException(int statusCode, string code, string message, object? resourceId = null, Guid? requestId = null)
         : base(message)
     {
         StatusCode = statusCode;
@@ -13,6 +13,6 @@ public sealed class DomainException : Exception
 
     public int StatusCode { get; }
     public string Code { get; }
-    public int? ResourceId { get; }
+    public object? ResourceId { get; }
     public Guid? RequestId { get; }
 }

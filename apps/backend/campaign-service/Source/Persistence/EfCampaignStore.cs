@@ -119,12 +119,31 @@ public sealed class EfCampaignStore(CampaignDbContext db) : ICampaignStore
 
     public async Task<bool> DeleteMemberAsync(int campaignId, int userId, long expectedRevision, CancellationToken cancellationToken)
     {
-        return await ExecuteWriteAsync(async () =>
+        try
         {
-            var affected = await db.CampaignMembers.Where(x => x.CampaignId == campaignId && x.UserId == userId && x.MetadataRevision == expectedRevision)
-                .ExecuteDeleteAsync(cancellationToken);
-            return affected == 1;
-        });
+            return await db.CampaignMembers.Where(x => x.CampaignId == campaignId && x.UserId == userId && x.MetadataRevision == expectedRevision)
+                .ExecuteDeleteAsync(cancellationToken) == 1;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (DbUpdateException exception) when (HasMySqlError(exception, 1451))
+        {
+            throw MemberHasAssignments(campaignId);
+        }
+        catch (DbException exception) when (HasMySqlError(exception, 1451))
+        {
+            throw MemberHasAssignments(campaignId);
+        }
+        catch (DbUpdateException)
+        {
+            throw new CampaignStoreException(true);
+        }
+        catch (DbException)
+        {
+            throw new CampaignStoreException(true);
+        }
     }
 
     private static async Task<T> ExecuteWriteAsync<T>(Func<Task<T>> action)
@@ -156,6 +175,19 @@ public sealed class EfCampaignStore(CampaignDbContext db) : ICampaignStore
         }
         return false;
     }
+
+    private static bool HasMySqlError(Exception exception, int number)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is MySqlException mysql && mysql.Number == number)
+                return true;
+        }
+        return false;
+    }
+
+    private static DomainException MemberHasAssignments(int campaignId) =>
+        new(409, "member_has_assignments", "The campaign member still has restrictive references.", campaignId);
 }
 
 public sealed class CampaignStoreException(bool writeOutcomeUnknown) : Exception("The campaign write outcome could not be confirmed.")

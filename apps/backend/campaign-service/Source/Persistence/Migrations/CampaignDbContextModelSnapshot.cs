@@ -43,11 +43,73 @@ public sealed class CampaignDbContextModelSnapshot : ModelSnapshot
 
         modelBuilder.Entity("Tdn.Campaigns.Campaigns.CampaignMember", entity =>
         {
-            entity.HasOne("Tdn.Campaigns.Campaigns.Campaign", null)
+            entity.HasOne("Tdn.Campaigns.Campaigns.Campaign", "Campaign")
                 .WithMany()
                 .HasForeignKey("CampaignId")
                 .OnDelete(DeleteBehavior.Restrict)
                 .IsRequired();
+        });
+
+        modelBuilder.Entity("Tdn.Campaigns.Sheets.TemplateMetadata", entity =>
+        {
+            entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("char(36)");
+            entity.Property<int>("CampaignId").HasColumnType("int");
+            entity.Property<string>("Name").IsRequired().HasColumnType("longtext");
+            entity.Property<long>("MetadataRevision").IsConcurrencyToken().HasColumnType("bigint");
+            entity.HasKey("Id");
+            entity.HasAlternateKey("CampaignId", "Id");
+            entity.ToTable("TemplateMetadata", table => table.HasCheckConstraint("CK_TemplateMetadata_MetadataRevision", "MetadataRevision >= 1"));
+        });
+
+        modelBuilder.Entity("Tdn.Campaigns.Sheets.CharacterMetadata", entity =>
+        {
+            entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("char(36)");
+            entity.Property<int>("CampaignId").HasColumnType("int");
+            entity.Property<Guid>("TemplateId").HasColumnType("char(36)");
+            entity.Property<string>("Name").IsRequired().HasColumnType("longtext");
+            entity.Property<int>("Importance").HasColumnType("int");
+            entity.Property<long>("MetadataRevision").IsConcurrencyToken().HasColumnType("bigint");
+            entity.HasKey("Id");
+            entity.HasAlternateKey("CampaignId", "Id");
+            entity.HasIndex("CampaignId", "TemplateId");
+            entity.ToTable("CharacterMetadata", table => table.HasCheckConstraint("CK_CharacterMetadata_MetadataRevision", "MetadataRevision >= 1"));
+        });
+
+        modelBuilder.Entity("Tdn.Campaigns.Sheets.CharacterAssignment", entity =>
+        {
+            entity.Property<int>("CampaignId").HasColumnType("int");
+            entity.Property<Guid>("CharacterId").HasColumnType("char(36)");
+            entity.Property<int>("UserId").HasColumnType("int");
+            entity.Property<bool>("CanWrite").HasColumnType("tinyint(1)");
+            entity.Property<long>("MetadataRevision").IsConcurrencyToken().HasColumnType("bigint");
+            entity.HasKey("CampaignId", "CharacterId", "UserId");
+            entity.HasIndex("CampaignId", "UserId");
+            entity.ToTable("CharacterAssignments", table => table.HasCheckConstraint("CK_CharacterAssignments_MetadataRevision", "MetadataRevision >= 1"));
+        });
+
+        modelBuilder.Entity("Tdn.Campaigns.Sheets.TemplateMetadata", entity =>
+        {
+            entity.HasOne("Tdn.Campaigns.Campaigns.Campaign", "Campaign")
+                .WithMany().HasForeignKey("CampaignId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+        });
+
+        modelBuilder.Entity("Tdn.Campaigns.Sheets.CharacterMetadata", entity =>
+        {
+            entity.HasOne("Tdn.Campaigns.Campaigns.Campaign", "Campaign")
+                .WithMany().HasForeignKey("CampaignId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+            entity.HasOne("Tdn.Campaigns.Sheets.TemplateMetadata", "Template")
+                .WithMany().HasForeignKey("CampaignId", "TemplateId")
+                .HasPrincipalKey("CampaignId", "Id").OnDelete(DeleteBehavior.Restrict).IsRequired();
+        });
+
+        modelBuilder.Entity("Tdn.Campaigns.Sheets.CharacterAssignment", entity =>
+        {
+            entity.HasOne("Tdn.Campaigns.Sheets.CharacterMetadata", "Character")
+                .WithMany().HasForeignKey("CampaignId", "CharacterId")
+                .HasPrincipalKey("CampaignId", "Id").OnDelete(DeleteBehavior.Restrict).IsRequired();
+            entity.HasOne("Tdn.Campaigns.Campaigns.CampaignMember", "CampaignMember")
+                .WithMany().HasForeignKey("CampaignId", "UserId")
+                .HasPrincipalKey("CampaignId", "UserId").OnDelete(DeleteBehavior.Restrict).IsRequired();
         });
     }
 }

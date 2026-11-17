@@ -1,12 +1,14 @@
 # Campaign Service
 
-Campaign Service is a .NET 10 ASP.NET Core service for campaigns and campaign membership. Requests use the `X-Subject` JSON header described in [the current API contract](docs/campaigns.md). The public [HTML API documentation](../../../docs/api/index.html) describes legacy routes, not this host.
+Campaign Service is a .NET 10 ASP.NET Core service for campaigns, templates, characters, assignments, and character sheets. Requests use the `X-Subject` JSON header. The [current API index](docs/README.md) links the campaign, template, and character contracts. The public [HTML API documentation](../../../docs/api/index.html) describes legacy routes, not this host.
 
 ## Structure
 
 - `CampaignService.csproj` and `CampaignService.sln` — project and solution files
 - `Source/` — host, HTTP, domain, access, configuration, and persistence code
 - `Source/Persistence/Migrations/` — EF Core migration and model snapshot
+- `Source/Sheets/` — template and character-sheet domain and application code
+- `Source/Persistence/MongoContentStore.cs` — document storage for templates and sheets
 - `Tests/` — unit tests
 - `config/` — configuration example
 - `.config/dotnet-tools.json` — local `dotnet-ef` tool manifest
@@ -29,27 +31,33 @@ From repository root, the Docker image build command is:
 docker build -f apps/backend/campaign-service/Dockerfile apps/backend
 ```
 
-Database configuration uses standard ASP.NET Core providers. Root `appsettings.json` is followed by `appsettings.{Environment}.json`, user secrets in Development, environment variables, and command-line arguments; later providers override earlier values. Environment variable hierarchy uses `__`, for example `ConnectionStrings__MySql`. Environment variables and command-line changes require process restart. JSON settings support reload-on-change, including logging configuration.
+Configuration uses standard ASP.NET Core providers. Root `appsettings.json` is followed by `appsettings.{Environment}.json`, user secrets in Development, environment variables, and command-line arguments; later providers override earlier values. Environment variable hierarchy uses `__`, for example `ConnectionStrings__MySql` or `Mongo__Database`. Environment variables and command-line changes require process restart. JSON settings support reload-on-change, including logging configuration.
 
 `CampaignApplication.Build` does not connect to MySQL. A connection string is required on host startup. Migrations run only when explicitly enabled.
+
+Mongo settings are also validated on host startup. `MongoClient` is created lazily through DI and the host build does not connect to MongoDB. Template and character content is stored separately from SQL metadata.
 
 | Setting | Purpose | Default/current value |
 | --- | --- | --- |
 | `ConnectionStrings:MySql` | Required MySQL connection string | No default; configure for service startup |
 | `MySql:ServerVersion` | Pomelo version, parsed locally without network discovery | `8.0.36` |
 | `Database:ApplyMigrations` | Apply migrations during startup | `false` |
+| `Mongo:ConnectionString` | Required MongoDB connection string | No default; configure for service startup |
+| `Mongo:Database` | Required MongoDB database name | No default; configure for service startup |
+| `Characters:DefaultImportance` | Default importance when creating a character | `background` |
+| `Access:MembersCanReadDefinitions` | Allow campaign members to read template definitions | `true` |
 | `urls` / `ASPNETCORE_URLS` | Listening URL configuration | Not set by the service; Kestrel uses standard defaults |
 | `ASPNETCORE_ENVIRONMENT` | ASP.NET Core environment | `Production` when not set |
 | `Logging:LogLevel` | Logging thresholds | Root `appsettings.json`: `Default=Warning`, `Tdn.Api=Information`, `Microsoft.AspNetCore.Hosting.Diagnostics=Information` |
 | `AllowedHosts` | Host filtering | `*` from root `appsettings.json` |
 
-Configure `ConnectionStrings:MySql` and optionally `Database__ApplyMigrations=true` before starting. Alternatively, from the service directory, restore the local tool and apply migrations:
+Configure `ConnectionStrings:MySql`, `Mongo__ConnectionString`, and `Mongo__Database` before starting; optionally set `Database__ApplyMigrations=true`. Alternatively, from the service directory, restore the local tool and apply migrations:
 
 ```sh
 dotnet tool restore
 dotnet ef database update
 ```
 
-`config/appsettings.example.json` is a reference for root appsettings, not an automatically loaded additional file. Its empty connection string is a placeholder. Supply actual local settings through standard appsettings files, environment variables, or command-line arguments; no custom file loader is added.
+`config/appsettings.example.json` is a reference for root appsettings, not an automatically loaded additional file. Its empty connection strings/database are placeholders, not usable credentials. Supply actual local settings through standard appsettings files, environment variables, or command-line arguments; no custom file loader is added.
 
-There is no campaign deletion endpoint. Subsequent requests resolve current membership from SQL. HTTPS can be configured through standard Kestrel settings; this service does not require certificates or add an HTTPS redirect.
+There are no campaign, template, or character deletion endpoints. Delete a member's character assignments explicitly before deleting their campaign membership; restrictive foreign keys reject membership deletion while assignments remain. HTTPS can be configured through standard Kestrel settings; this service does not require certificates or add an HTTPS redirect.

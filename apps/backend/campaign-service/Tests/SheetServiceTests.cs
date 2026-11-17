@@ -1,0 +1,643 @@
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Tdn.Campaigns.Access;
+using Tdn.Campaigns.Campaigns;
+using Tdn.Campaigns.Configuration;
+using Tdn.Campaigns.Persistence;
+using Tdn.Campaigns.Sheets;
+using FieldValueType = Tdn.Campaigns.Sheets.ValueType;
+
+namespace CampaignService.Tests;
+
+public class SheetServiceTests
+{
+    private static readonly Subject Admin = new(SubjectType.Admin, 9);
+    private static readonly Subject Member = new(SubjectType.User, 200);
+
+    [Fact]
+    public async Task CharacterStartsWithoutCopiedValuesAndReadsCurrentTemplateFallback()
+    {
+        var fixture = CreateFixture();
+        var template = await CreateTemplate(fixture, Field(null, "strength", FieldValueType.Integer, "2"));
+        var fieldId = GetStoredField(fixture, template.Id, "strength").Id;
+        var character = await CreateCharacter(fixture, template.Id);
+        var stored = fixture.Content.GetData<CharacterSheet>("characterSheets", 7, character.Id);
+
+        Assert.Empty(stored.BaseValues);
+        var writes = fixture.Content.WriteCount;
+        var sheet = await fixture.Sheets.GetCharacterSheetAsync(Admin, 7, character.Id, default);
+        Assert.Equal(2, sheet.BaseFields.Single().EffectiveValue.GetInt64());
+        Assert.False(sheet.BaseFields.Single().IsExplicit);
+        Assert.Equal(writes, fixture.Content.WriteCount);
+
+        await fixture.Sheets.UpdateTemplateContentAsync(Admin, 7, template.Id, new TemplateContentUpdateRequest
+        {
+            ExpectedRevision = 1,
+            Description = "Updated",
+            BaseFields = [Field(fieldId, "strength", FieldValueType.Integer, "12")]
+        }, default);
+
+        var current = await fixture.Sheets.GetCharacterSheetAsync(Admin, 7, character.Id, default);
+        Assert.Equal(12, current.BaseFields.Single().EffectiveValue.GetInt64());
+        Assert.False(current.BaseFields.Single().IsExplicit);
+        Assert.Equal(writes + 1, fixture.Content.WriteCount);
+    }
+
+    [Fact]
+    public async Task ExplicitZeroFalseEmptyStringAndEmptyMultiChoiceArePreserved()
+    {
+        var fixture = CreateFixture();
+        var template = await CreateTemplate(fixture,
+            Field(null, "integer", FieldValueType.Integer, "1"),
+            Field(null, "boolean", FieldValueType.Boolean, "true"),
+            Field(null, "string", FieldValueType.String, "\"default\""),
+            Field(null, "multi", FieldValueType.MultiChoice, "[\"a\"]", [new ChoiceOption("a", "A")]));
+        var fields = fixture.Content.GetData<TemplateContent>("templateContents", 7, template.Id).BaseFields.ToDictionary(x => x.Key);
+        var character = await CreateCharacter(fixture, template.Id);
+
+        await SetValue(fixture, character.Id, fields["integer"].Id, "0", 1);
+        await SetValue(fixture, character.Id, fields["boolean"].Id, "false", 2);
+        await SetValue(fixture, character.Id, fields["string"].Id, "\"\"", 3);
+        await SetValue(fixture, character.Id, fields["multi"].Id, "[]", 4);
+
+        var effective = (await fixture.Sheets.GetCharacterSheetAsync(Admin, 7, character.Id, default)).BaseFields.ToDictionary(x => x.Key);
+        Assert.Equal(0, effective["integer"].EffectiveValue.GetInt64());
+        Assert.False(effective["boolean"].EffectiveValue.GetBoolean());
+        Assert.Equal(string.Empty, effective["string"].EffectiveValue.GetString());
+        Assert.Equal(0, effective["multi"].EffectiveValue.GetArrayLength());
+        Assert.All(effective.Values, field => Assert.True(field.IsExplicit));
+    }
+
+    [Fact]
+    public async Task TypeChangeAndReturnDoesNotResurrectOlderExplicitValue()
+    {
+        var fixture = CreateFixture();
+        var template = await CreateTemplate(fixture, Field(null, "value", FieldValueType.Integer, "1"));
+        var fieldId = GetStoredField(fixture, template.Id, "value").Id;
+        var character = await CreateCharacter(fixture, template.Id);
+        await SetValue(fixture, character.Id, fieldId, "5", 1);
+
+        await fixture.Sheets.UpdateTemplateContentAsync(Admin, 7, template.Id, new TemplateContentUpdateRequest
+        {
+            ExpectedRevision = 1,
+            Description = string.Empty,
+            BaseFields = [Field(fieldId, "value", FieldValueType.String, "\"text\"")]
+        }, default);
+        await fixture.Sheets.UpdateTemplateContentAsync(Admin, 7, template.Id, new TemplateContentUpdateRequest
+        {
+            ExpectedRevision = 2,
+            Description = string.Empty,
+            BaseFields = [Field(fieldId, "value", FieldValueType.Integer, "7")]
+        }, default);
+
+        var field = (await fixture.Sheets.GetCharacterSheetAsync(Admin, 7, character.Id, default)).BaseFields.Single();
+        var saved = fixture.Content.GetData<CharacterSheet>("characterSheets", 7, character.Id).BaseValues.Single();
+        Assert.Equal(3, field.TypeRevision);
+        Assert.Equal(7, field.EffectiveValue.GetInt64());
+        Assert.False(field.IsExplicit);
+        Assert.Equal(5, saved.Value.GetInt64());
+        Assert.Equal(1, saved.TypeRevision);
+    }
+
+    [Fact]
+    public async Task RemovedChoiceMakesWholeExplicitMultiChoiceIncompatibleWithoutCleanup()
+    {
+        var fixture = CreateFixture();
+        var options = new[] { new ChoiceOption("red", "Red"), new ChoiceOption("blue", "Blue") };
+        var template = await CreateTemplate(fixture, Field(null, "colors", FieldValueType.MultiChoice, "[\"blue\"]", options));
+        var fieldId = GetStoredField(fixture, template.Id, "colors").Id;
+        var character = await CreateCharacter(fixture, template.Id);
+        await SetValue(fixture, character.Id, fieldId, "[\"red\",\"blue\"]", 1);
+
+        await fixture.Sheets.UpdateTemplateContentAsync(Admin, 7, template.Id, new TemplateContentUpdateRequest
+        {
+            ExpectedRevision = 1,
+            Description = string.Empty,
+            BaseFields = [Field(fieldId, "colors", FieldValueType.MultiChoice, "[\"blue\"]", [new ChoiceOption("blue", "Blue")])]
+        }, default);
+
+        var field = (await fixture.Sheets.GetCharacterSheetAsync(Admin, 7, character.Id, default)).BaseFields.Single();
+        var stored = fixture.Content.GetData<CharacterSheet>("characterSheets", 7, character.Id).BaseValues.Single();
+        Assert.Equal("[\"blue\"]", field.EffectiveValue.GetRawText());
+        Assert.False(field.IsExplicit);
+        Assert.Equal("[\"red\",\"blue\"]", stored.Value.GetRawText());
+    }
+
+    [Fact]
+    public async Task DeletingMissingExplicitValueIsNoOpWithoutRevisionAdvance()
+    {
+        var fixture = CreateFixture();
+        var template = await CreateTemplate(fixture, Field(null, "value", FieldValueType.Integer, "3"));
+        var fieldId = GetStoredField(fixture, template.Id, "value").Id;
+        var character = await CreateCharacter(fixture, template.Id);
+        var writes = fixture.Content.WriteCount;
+
+        var response = await fixture.Sheets.DeleteBaseValueAsync(Admin, 7, character.Id, fieldId, 1, default);
+
+        Assert.Equal(1, response.ContentRevision);
+        Assert.Equal(3, response.BaseFields.Single().EffectiveValue.GetInt64());
+        Assert.False(response.BaseFields.Single().IsExplicit);
+        Assert.Equal(writes, fixture.Content.WriteCount);
+    }
+
+    [Fact]
+    public async Task DescriptionUpdateWithFutureRevisionDoesNotReplaceDocument()
+    {
+        var fixture = CreateFixture();
+        var template = await CreateTemplate(fixture, Field(null, "value", FieldValueType.Integer, "3"));
+        var character = await CreateCharacter(fixture, template.Id);
+        var replaceCalls = fixture.Content.ReplaceCount;
+
+        var conflict = await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.UpdateCharacterDescriptionAsync(Admin, 7, character.Id,
+            new CharacterDescriptionRequest { Description = "stale", ExpectedRevision = 2 }, default));
+
+        Assert.Equal(409, conflict.StatusCode);
+        Assert.Equal("content_revision_conflict", conflict.Code);
+        Assert.Equal(replaceCalls, fixture.Content.ReplaceCount);
+        Assert.Equal(string.Empty, fixture.Content.GetData<CharacterSheet>("characterSheets", 7, character.Id).Description);
+    }
+
+    [Fact]
+    public async Task DescriptionUpdateWithStaleRevisionDoesNotReplaceDocument()
+    {
+        var fixture = CreateFixture();
+        var template = await CreateTemplate(fixture, Field(null, "value", FieldValueType.Integer, "3"));
+        var character = await CreateCharacter(fixture, template.Id);
+        await fixture.Sheets.UpdateCharacterDescriptionAsync(Admin, 7, character.Id,
+            new CharacterDescriptionRequest { Description = "current", ExpectedRevision = 1 }, default);
+        var replaceCalls = fixture.Content.ReplaceCount;
+
+        var conflict = await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.UpdateCharacterDescriptionAsync(Admin, 7, character.Id,
+            new CharacterDescriptionRequest { Description = "stale", ExpectedRevision = 1 }, default));
+
+        Assert.Equal(409, conflict.StatusCode);
+        Assert.Equal(replaceCalls, fixture.Content.ReplaceCount);
+        Assert.Equal("current", fixture.Content.GetData<CharacterSheet>("characterSheets", 7, character.Id).Description);
+    }
+
+    [Fact]
+    public async Task DeletedFieldIsHiddenAndReaddingItsKeyGetsANewIdentity()
+    {
+        var fixture = CreateFixture();
+        var template = await CreateTemplate(fixture, Field(null, "same-key", FieldValueType.Integer, "1"));
+        var fieldId = GetStoredField(fixture, template.Id, "same-key").Id;
+        var character = await CreateCharacter(fixture, template.Id);
+        await SetValue(fixture, character.Id, fieldId, "91", 1);
+
+        await fixture.Sheets.UpdateTemplateContentAsync(Admin, 7, template.Id, new TemplateContentUpdateRequest
+        {
+            ExpectedRevision = 1,
+            Description = string.Empty,
+            BaseFields = []
+        }, default);
+        Assert.Empty((await fixture.Sheets.GetCharacterSheetAsync(Admin, 7, character.Id, default)).BaseFields);
+
+        await fixture.Sheets.UpdateTemplateContentAsync(Admin, 7, template.Id, new TemplateContentUpdateRequest
+        {
+            ExpectedRevision = 2,
+            Description = string.Empty,
+            BaseFields = [Field(null, "same-key", FieldValueType.Integer, "4")]
+        }, default);
+
+        var field = (await fixture.Sheets.GetCharacterSheetAsync(Admin, 7, character.Id, default)).BaseFields.Single();
+        var stored = fixture.Content.GetData<CharacterSheet>("characterSheets", 7, character.Id);
+        Assert.NotEqual(fieldId, field.Id);
+        Assert.Equal(4, field.EffectiveValue.GetInt64());
+        Assert.False(field.IsExplicit);
+        Assert.Equal(91, stored.BaseValues.Single().Value.GetInt64());
+        Assert.Equal(fieldId, stored.BaseValues.Single().BaseFieldId);
+    }
+
+    [Fact]
+    public async Task ReadsDoNotWriteAndResourcesAreCampaignScoped()
+    {
+        var fixture = CreateFixture();
+        fixture.Campaigns.SeedCampaign(8);
+        var template = await CreateTemplate(fixture, Field(null, "value", FieldValueType.Integer, "2"));
+        var before = fixture.Content.WriteCount;
+        await fixture.Sheets.GetTemplateContentAsync(Admin, 7, template.Id, default);
+        Assert.Equal(before, fixture.Content.WriteCount);
+
+        var reads = fixture.Content.ReadCount;
+        var missing = await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.GetTemplateContentAsync(Admin, 8, template.Id, default));
+        Assert.Equal(404, missing.StatusCode);
+        Assert.Equal(reads, fixture.Content.ReadCount);
+    }
+
+    [Fact]
+    public async Task DefinitionsReadSettingDoesNotGrantAccessToUnassignedCharactersAndCanWriteIsEnforced()
+    {
+        var fixture = CreateFixture(membersCanReadDefinitions: true);
+        var template = await CreateTemplate(fixture, Field(null, "value", FieldValueType.Integer, "2"));
+        var character = await CreateCharacter(fixture, template.Id);
+        Assert.Single(await fixture.Sheets.ListTemplatesAsync(Member, 7, default));
+        Assert.Equal(403, (await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.GetCharacterAsync(Member, 7, character.Id, default))).StatusCode);
+
+        await fixture.Sheets.UpsertAssignmentAsync(Admin, 7, character.Id, 200, new AssignmentRequest { CanWrite = false, ExpectedRevision = 0 }, default);
+        Assert.Single(await fixture.Sheets.ListAssignmentsAsync(Admin, 7, character.Id, default));
+        Assert.Equal(character.Id, (await fixture.Sheets.GetCharacterAsync(Member, 7, character.Id, default)).Id);
+        await fixture.Sheets.GetCharacterSheetAsync(Member, 7, character.Id, default);
+        Assert.Equal(403, (await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.UpdateCharacterDescriptionAsync(Member, 7, character.Id,
+            new CharacterDescriptionRequest { Description = "No", ExpectedRevision = 1 }, default))).StatusCode);
+
+        await fixture.Sheets.UpsertAssignmentAsync(Admin, 7, character.Id, 200, new AssignmentRequest { CanWrite = true, ExpectedRevision = 1 }, default);
+        await fixture.Sheets.UpdateCharacterDescriptionAsync(Member, 7, character.Id,
+            new CharacterDescriptionRequest { Description = "Allowed", ExpectedRevision = 1 }, default);
+
+        var staleDelete = await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.DeleteAssignmentAsync(Admin, 7, character.Id, 200, 1, default));
+        Assert.Equal(409, staleDelete.StatusCode);
+        await fixture.Sheets.DeleteAssignmentAsync(Admin, 7, character.Id, 200, 2, default);
+        Assert.Equal(403, (await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.GetCharacterAsync(Member, 7, character.Id, default))).StatusCode);
+
+        var unassigned = await CreateCharacter(fixture, template.Id);
+        var restrictive = CreateService(fixture.Campaigns, fixture.Resources, fixture.Content, false);
+        Assert.Equal(403, (await Assert.ThrowsAsync<DomainException>(() => restrictive.GetTemplateAsync(Member, 7, template.Id, default))).StatusCode);
+        Assert.Equal(403, (await Assert.ThrowsAsync<DomainException>(() => restrictive.GetCharacterAsync(Member, 7, unassigned.Id, default))).StatusCode);
+    }
+
+    [Fact]
+    public async Task TemplateMetadataRenameUsesOnlySqlAndContentRevisionCasReturns409()
+    {
+        var fixture = CreateFixture();
+        var template = await CreateTemplate(fixture, Field(null, "value", FieldValueType.Integer, "2"));
+        var writes = fixture.Content.WriteCount;
+
+        var renamed = await fixture.Sheets.RenameTemplateAsync(Admin, 7, template.Id,
+            new TemplateRenameRequest { Name = "Renamed", ExpectedRevision = 1 }, default);
+        Assert.Equal(2, renamed.MetadataRevision);
+        Assert.Equal(writes, fixture.Content.WriteCount);
+
+        var conflict = await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.UpdateTemplateContentAsync(Admin, 7, template.Id,
+            new TemplateContentUpdateRequest { ExpectedRevision = 2, Description = string.Empty, BaseFields = [] }, default));
+        Assert.Equal(409, conflict.StatusCode);
+    }
+
+    [Fact]
+    public async Task CharacterMetadataRenameIsSqlOnlyAndImportanceUsesConfiguredDefaultOrRequest()
+    {
+        var fixture = CreateFixture();
+        var template = await CreateTemplate(fixture, Field(null, "value", FieldValueType.Integer, "1"));
+        var defaultCharacter = await CreateCharacter(fixture, template.Id);
+        var explicitCharacter = await fixture.Sheets.CreateCharacterAsync(Admin, 7, new CharacterCreateRequest
+        {
+            RequestId = Guid.NewGuid(),
+            Name = "Explicit",
+            TemplateId = template.Id,
+            Importance = Importance.Key
+        }, default);
+        Assert.Equal(Importance.Background, defaultCharacter.Importance);
+        Assert.Equal(Importance.Key, explicitCharacter.Importance);
+
+        var writes = fixture.Content.WriteCount;
+        var updated = await fixture.Sheets.UpdateCharacterAsync(Admin, 7, defaultCharacter.Id,
+            new CharacterUpdateRequest { Name = "Renamed", Importance = Importance.Secondary, ExpectedRevision = 1 }, default);
+        Assert.Equal(2, updated.MetadataRevision);
+        Assert.Equal(Importance.Secondary, updated.Importance);
+        Assert.Equal(writes, fixture.Content.WriteCount);
+    }
+
+    [Fact]
+    public async Task AssignmentRevisionUsesInsertOnlyAndCompareAndSwap()
+    {
+        var fixture = CreateFixture();
+        var template = await CreateTemplate(fixture, Field(null, "value", FieldValueType.Integer, "1"));
+        var character = await CreateCharacter(fixture, template.Id);
+        await fixture.Sheets.UpsertAssignmentAsync(Admin, 7, character.Id, 200,
+            new AssignmentRequest { CanWrite = false, ExpectedRevision = 0 }, default);
+
+        var conflict = await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.UpsertAssignmentAsync(Admin, 7, character.Id, 200,
+            new AssignmentRequest { CanWrite = true, ExpectedRevision = 2 }, default));
+        Assert.Equal(409, conflict.StatusCode);
+        var updated = await fixture.Sheets.UpsertAssignmentAsync(Admin, 7, character.Id, 200,
+            new AssignmentRequest { CanWrite = true, ExpectedRevision = 1 }, default);
+        Assert.Equal(2, updated.Assignment.MetadataRevision);
+        Assert.True(updated.Assignment.CanWrite);
+    }
+
+    [Fact]
+    public async Task RepeatedPublishedResourceReturnsConflictBeforePreparingContentAgain()
+    {
+        var fixture = CreateFixture();
+        var requestId = Guid.NewGuid();
+        var request = TemplateRequest(requestId, []);
+        await fixture.Sheets.CreateTemplateAsync(Admin, 7, request, default);
+
+        var conflict = await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.CreateTemplateAsync(Admin, 7, request, default));
+
+        Assert.Equal("already_published", conflict.Code);
+        Assert.Equal(1, fixture.Resources.TemplateCreates);
+        Assert.Equal(1, fixture.Content.CreateCount);
+    }
+
+    [Fact]
+    public async Task FailedContentPreparationDoesNotPublishSqlMetadata()
+    {
+        var fixture = CreateFixture();
+        fixture.Content.CreateFailure = new ContentStoreException(true);
+
+        await Assert.ThrowsAsync<ContentStoreException>(() => CreateTemplate(fixture, Field(null, "value", FieldValueType.Integer, "1")));
+
+        Assert.Equal(0, fixture.Resources.TemplateCreates);
+        Assert.Empty(fixture.Resources.Templates);
+    }
+
+    [Fact]
+    public async Task NullBaseFieldEntryIsBadRequestAndUnknownClientIdIsRejected()
+    {
+        var fixture = CreateFixture();
+        var nullEntry = await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.CreateTemplateAsync(Admin, 7,
+            TemplateRequest(Guid.NewGuid(), [null!]), default));
+        Assert.Equal(400, nullEntry.StatusCode);
+        Assert.Equal(0, fixture.Resources.TemplateCreates);
+
+        var unknownId = await Assert.ThrowsAsync<DomainException>(() => CreateTemplate(fixture,
+            Field(Guid.NewGuid(), "unpublished", FieldValueType.Integer, "1")));
+        Assert.Equal(400, unknownId.StatusCode);
+        Assert.Equal("unknown_field", unknownId.Code);
+        Assert.Equal(0, fixture.Content.CreateCount);
+        Assert.Equal(0, fixture.Resources.TemplateCreates);
+    }
+
+    [Fact]
+    public async Task PreparedOrphanCannotBeReadAndPublishedRetryDoesNotDeleteOrRetryContent()
+    {
+        var fixture = CreateFixture();
+        var requestId = Guid.NewGuid();
+        await fixture.Content.CreateAsync("templateContents", 7, requestId,
+            new TemplateContent(string.Empty, []), default);
+        var prepared = await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.CreateTemplateAsync(Admin, 7,
+            TemplateRequest(requestId, []), default));
+        Assert.Equal("content_already_prepared", prepared.Code);
+        var hidden = await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.GetTemplateContentAsync(Admin, 7, requestId, default));
+        Assert.Equal(404, hidden.StatusCode);
+        Assert.Equal(0, fixture.Resources.TemplateCreates);
+    }
+
+    [Fact]
+    public async Task UnknownSqlPublicationOutcomeKeepsPreparedDocumentAndDoesNotRetry()
+    {
+        var fixture = CreateFixture();
+        fixture.Resources.TemplateCreateFailure = new DbUpdateException("unknown SQL outcome");
+        var requestId = Guid.NewGuid();
+
+        var unknown = await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.CreateTemplateAsync(Admin, 7,
+            TemplateRequest(requestId, []), default));
+
+        Assert.Equal(503, unknown.StatusCode);
+        Assert.Equal("publication_outcome_unknown", unknown.Code);
+        Assert.Equal(requestId, Assert.IsType<Guid>(unknown.ResourceId));
+        Assert.Equal(1, fixture.Resources.TemplateCreates);
+        Assert.Equal(1, fixture.Content.CreateCount);
+        Assert.NotNull(fixture.Content.GetData<TemplateContent>("templateContents", 7, requestId));
+
+        var retry = await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.CreateTemplateAsync(Admin, 7,
+            TemplateRequest(requestId, []), default));
+        Assert.Equal("content_already_prepared", retry.Code);
+        Assert.Equal(1, fixture.Resources.TemplateCreates);
+        Assert.Equal(2, fixture.Content.CreateCount);
+    }
+
+    [Fact]
+    public async Task AssignmentRequiresExistingCampaignMember()
+    {
+        var fixture = CreateFixture();
+        var template = await CreateTemplate(fixture, Field(null, "v", FieldValueType.Integer, "1"));
+        var character = await CreateCharacter(fixture, template.Id);
+
+        var missing = await Assert.ThrowsAsync<DomainException>(() => fixture.Sheets.UpsertAssignmentAsync(Admin, 7, character.Id, -1,
+            new AssignmentRequest { CanWrite = true, ExpectedRevision = 0 }, default));
+        Assert.Equal(404, missing.StatusCode);
+        Assert.Empty(fixture.Resources.Assignments);
+    }
+
+    private static Fixture CreateFixture(bool membersCanReadDefinitions = true)
+    {
+        var campaigns = new FakeCampaignStore();
+        campaigns.SeedCampaign(7);
+        campaigns.SeedMember(7, 100, true);
+        campaigns.SeedMember(7, 200, false);
+        var resources = new FakeResourceStore();
+        resources.SeedMember(7, 100);
+        resources.SeedMember(7, 200);
+        var content = new FakeContentStore();
+        var sheets = CreateService(campaigns, resources, content, membersCanReadDefinitions);
+        return new Fixture(campaigns, resources, content, sheets);
+    }
+
+    private static SheetService CreateService(FakeCampaignStore campaigns, FakeResourceStore resources, FakeContentStore content, bool membersCanReadDefinitions) =>
+        new(new Tdn.Campaigns.Campaigns.CampaignService(campaigns), resources, content,
+            Options.Create(new SheetOptions { DefaultImportance = "background", MembersCanReadDefinitions = membersCanReadDefinitions }));
+
+    private static Task<TemplateCreateDto> CreateTemplate(Fixture fixture, params BaseFieldInput[] fields) =>
+        fixture.Sheets.CreateTemplateAsync(Admin, 7, TemplateRequest(Guid.NewGuid(), fields), default);
+
+    private static TemplateCreateRequest TemplateRequest(Guid requestId, BaseFieldInput[] fields) => new()
+    {
+        RequestId = requestId,
+        Name = "Template",
+        Description = string.Empty,
+        BaseFields = fields
+    };
+
+    private static BaseField GetStoredField(Fixture fixture, Guid templateId, string key) =>
+        fixture.Content.GetData<TemplateContent>("templateContents", 7, templateId).BaseFields.Single(x => x.Key == key);
+
+    private static Task<CharacterMetadataDto> CreateCharacter(Fixture fixture, Guid templateId) =>
+        fixture.Sheets.CreateCharacterAsync(Admin, 7, new CharacterCreateRequest
+        {
+            RequestId = Guid.NewGuid(),
+            Name = "Character",
+            TemplateId = templateId
+        }, default);
+
+    private static BaseFieldInput Field(Guid? id, string key, FieldValueType type, string value, ChoiceOption[]? options = null) => new()
+    {
+        Id = id,
+        Key = key,
+        Title = key,
+        Description = string.Empty,
+        ValueType = type,
+        Value = Element(value),
+        Options = options ?? []
+    };
+
+    private static JsonElement Element(string value)
+    {
+        using var document = JsonDocument.Parse(value);
+        return document.RootElement.Clone();
+    }
+
+    private static Task<CharacterSheetEnvelope> SetValue(Fixture fixture, Guid characterId, Guid fieldId, string value, long revision) =>
+        fixture.Sheets.SetBaseValueAsync(Admin, 7, characterId, fieldId,
+            new BaseValueRequest { Value = Element(value), ExpectedRevision = revision }, default);
+
+    private sealed record Fixture(FakeCampaignStore Campaigns, FakeResourceStore Resources, FakeContentStore Content, SheetService Sheets);
+
+    private sealed class FakeCampaignStore : ICampaignStore
+    {
+        public List<Campaign> Campaigns { get; } = [];
+        public List<CampaignMember> Members { get; } = [];
+        private int _nextId = 1;
+
+        public void SeedCampaign(int id)
+        {
+            Campaigns.Add(new Campaign { Id = id, Name = $"Campaign {id}", CreationRequestId = Guid.NewGuid(), CreatedByType = SubjectType.User, CreatedById = 100 });
+            _nextId = Math.Max(_nextId, id + 1);
+        }
+
+        public void SeedMember(int campaignId, int userId, bool isAdmin) => Members.Add(new CampaignMember { CampaignId = campaignId, UserId = userId, IsAdmin = isAdmin });
+        public Task<Campaign?> GetCampaignAsync(int campaignId, CancellationToken cancellationToken) => Task.FromResult(Campaigns.SingleOrDefault(x => x.Id == campaignId));
+        public Task<IReadOnlyList<Campaign>> GetAllCampaignsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<Campaign>>(Campaigns.ToArray());
+        public Task<IReadOnlyList<Campaign>> GetCampaignsForUserAsync(int userId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<Campaign>>(Campaigns.Where(c => Members.Any(m => m.CampaignId == c.Id && m.UserId == userId)).ToArray());
+        public Task<Campaign?> GetCampaignForUserAsync(int campaignId, int userId, CancellationToken cancellationToken) => Task.FromResult(Campaigns.SingleOrDefault(c => c.Id == campaignId && Members.Any(m => m.CampaignId == c.Id && m.UserId == userId)));
+        public Task<Campaign?> GetCampaignByRequestAsync(Guid requestId, CancellationToken cancellationToken) => Task.FromResult(Campaigns.SingleOrDefault(x => x.CreationRequestId == requestId));
+        public Task<CampaignMember?> GetMemberAsync(int campaignId, int userId, CancellationToken cancellationToken) => Task.FromResult(Members.SingleOrDefault(x => x.CampaignId == campaignId && x.UserId == userId));
+        public Task<IReadOnlyList<CampaignMember>> GetMembersAsync(int campaignId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<CampaignMember>>(Members.Where(x => x.CampaignId == campaignId).ToArray());
+        public Task<Campaign> CreateAsync(Campaign campaign, int administratorUserId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<bool> RenameAsync(int campaignId, string name, long expectedRevision, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<MemberUpdateResult> UpsertMemberAsync(int campaignId, int userId, bool isAdmin, long expectedRevision, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<bool> DeleteMemberAsync(int campaignId, int userId, long expectedRevision, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class FakeResourceStore : IResourceStore
+    {
+        private readonly HashSet<(int CampaignId, int UserId)> _members = [];
+        public List<TemplateMetadata> Templates { get; } = [];
+        public List<CharacterMetadata> Characters { get; } = [];
+        public List<CharacterAssignment> Assignments { get; } = [];
+        public int TemplateCreates { get; private set; }
+        public int CharacterCreates { get; private set; }
+        public Exception? TemplateCreateFailure { get; set; }
+
+        public void SeedMember(int campaignId, int userId) => _members.Add((campaignId, userId));
+        public Task<IReadOnlyList<TemplateMetadata>> ListTemplatesAsync(int campaignId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<TemplateMetadata>>(Templates.Where(x => x.CampaignId == campaignId).ToArray());
+        public Task<TemplateMetadata?> GetTemplateAsync(int campaignId, Guid templateId, CancellationToken cancellationToken) => Task.FromResult(Templates.SingleOrDefault(x => x.CampaignId == campaignId && x.Id == templateId));
+
+        public Task<TemplateMetadata> CreateTemplateAsync(TemplateMetadata template, CancellationToken cancellationToken)
+        {
+            TemplateCreates++;
+            if (TemplateCreateFailure is not null)
+                throw TemplateCreateFailure;
+            if (Templates.Any(x => x.Id == template.Id))
+                throw new DuplicateResourceException();
+            template.MetadataRevision = 1;
+            Templates.Add(template);
+            return Task.FromResult(template);
+        }
+
+        public Task<bool> RenameTemplateAsync(int campaignId, Guid templateId, string name, long expectedRevision, CancellationToken cancellationToken)
+        {
+            var template = Templates.SingleOrDefault(x => x.CampaignId == campaignId && x.Id == templateId && x.MetadataRevision == expectedRevision);
+            if (template is null)
+                return Task.FromResult(false);
+            template.Name = name;
+            template.MetadataRevision++;
+            return Task.FromResult(true);
+        }
+
+        public Task<IReadOnlyList<CharacterMetadata>> ListCharactersAsync(int campaignId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<CharacterMetadata>>(Characters.Where(x => x.CampaignId == campaignId).ToArray());
+        public Task<CharacterMetadata?> GetCharacterAsync(int campaignId, Guid characterId, CancellationToken cancellationToken) => Task.FromResult(Characters.SingleOrDefault(x => x.CampaignId == campaignId && x.Id == characterId));
+        public Task<IReadOnlyList<CharacterMetadata>> ListCharactersForUserAsync(int campaignId, int userId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<CharacterMetadata>>(Characters.Where(x => x.CampaignId == campaignId && Assignments.Any(a => a.CampaignId == campaignId && a.CharacterId == x.Id && a.UserId == userId)).ToArray());
+
+        public Task<CharacterMetadata> CreateCharacterAsync(CharacterMetadata character, CancellationToken cancellationToken)
+        {
+            CharacterCreates++;
+            if (Characters.Any(x => x.Id == character.Id))
+                throw new DuplicateResourceException();
+            character.MetadataRevision = 1;
+            Characters.Add(character);
+            return Task.FromResult(character);
+        }
+
+        public Task<bool> UpdateCharacterAsync(int campaignId, Guid characterId, string name, Importance importance, long expectedRevision, CancellationToken cancellationToken)
+        {
+            var character = Characters.SingleOrDefault(x => x.CampaignId == campaignId && x.Id == characterId && x.MetadataRevision == expectedRevision);
+            if (character is null)
+                return Task.FromResult(false);
+            character.Name = name;
+            character.Importance = importance;
+            character.MetadataRevision++;
+            return Task.FromResult(true);
+        }
+
+        public Task<IReadOnlyList<CharacterAssignment>> ListAssignmentsAsync(int campaignId, Guid characterId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<CharacterAssignment>>(Assignments.Where(x => x.CampaignId == campaignId && x.CharacterId == characterId).ToArray());
+        public Task<CharacterAssignment?> GetAssignmentAsync(int campaignId, Guid characterId, int userId, CancellationToken cancellationToken) => Task.FromResult(Assignments.SingleOrDefault(x => x.CampaignId == campaignId && x.CharacterId == characterId && x.UserId == userId));
+        public Task<bool> IsCampaignMemberAsync(int campaignId, int userId, CancellationToken cancellationToken) => Task.FromResult(_members.Contains((campaignId, userId)));
+
+        public Task<MemberUpdateResult> UpsertAssignmentAsync(int campaignId, Guid characterId, int userId, bool canWrite, long expectedRevision, CancellationToken cancellationToken)
+        {
+            var existing = Assignments.SingleOrDefault(x => x.CampaignId == campaignId && x.CharacterId == characterId && x.UserId == userId);
+            if (expectedRevision == 0)
+            {
+                if (existing is not null)
+                    return Task.FromResult(new MemberUpdateResult(null, true));
+                Assignments.Add(new CharacterAssignment { CampaignId = campaignId, CharacterId = characterId, UserId = userId, CanWrite = canWrite });
+                return Task.FromResult(new MemberUpdateResult(1, true));
+            }
+            if (existing is null)
+                return Task.FromResult(new MemberUpdateResult(null, false));
+            if (existing.MetadataRevision != expectedRevision)
+                return Task.FromResult(new MemberUpdateResult(null, true));
+            existing.CanWrite = canWrite;
+            existing.MetadataRevision++;
+            return Task.FromResult(new MemberUpdateResult(existing.MetadataRevision, true));
+        }
+
+        public Task<bool> DeleteAssignmentAsync(int campaignId, Guid characterId, int userId, long expectedRevision, CancellationToken cancellationToken)
+        {
+            var assignment = Assignments.SingleOrDefault(x => x.CampaignId == campaignId && x.CharacterId == characterId && x.UserId == userId && x.MetadataRevision == expectedRevision);
+            if (assignment is null)
+                return Task.FromResult(false);
+            Assignments.Remove(assignment);
+            return Task.FromResult(true);
+        }
+    }
+
+    private sealed class FakeContentStore : IContentStore
+    {
+        private readonly Dictionary<(string Collection, int CampaignId, Guid ResourceId), object> _documents = [];
+        private readonly Dictionary<(string Collection, int CampaignId, Guid ResourceId), long> _revisions = [];
+        public int ReadCount { get; private set; }
+        public int CreateCount { get; private set; }
+        public int ReplaceCount { get; private set; }
+        public int WriteCount => CreateCount + ReplaceCount;
+        public Exception? CreateFailure { get; set; }
+
+        public T GetData<T>(string collection, int campaignId, Guid id) =>
+            ((ContentEnvelope<T>)_documents[(collection, campaignId, id)]).Data;
+
+        public Task<ContentEnvelope<T>?> GetAsync<T>(string collection, int campaignId, Guid resourceId, CancellationToken cancellationToken)
+        {
+            ReadCount++;
+            var key = (collection, campaignId, resourceId);
+            return Task.FromResult(_documents.TryGetValue(key, out var value) ? (ContentEnvelope<T>?)value : null);
+        }
+
+        public Task<ContentEnvelope<T>> CreateAsync<T>(string collection, int campaignId, Guid resourceId, T data, CancellationToken cancellationToken)
+        {
+            CreateCount++;
+            if (CreateFailure is not null)
+                throw CreateFailure;
+            var key = (collection, campaignId, resourceId);
+            if (_documents.ContainsKey(key))
+                throw new ContentAlreadyPreparedException();
+            var envelope = new ContentEnvelope<T>(campaignId, resourceId, 1, data);
+            _documents.Add(key, envelope);
+            _revisions.Add(key, 1);
+            return Task.FromResult(envelope);
+        }
+
+        public Task<ContentEnvelope<T>?> ReplaceAsync<T>(string collection, int campaignId, Guid resourceId, long expectedRevision, T data, CancellationToken cancellationToken)
+        {
+            ReplaceCount++;
+            var key = (collection, campaignId, resourceId);
+            if (!_documents.TryGetValue(key, out var current) || _revisions[key] != expectedRevision)
+                return Task.FromResult<ContentEnvelope<T>?>(null);
+            var envelope = new ContentEnvelope<T>(campaignId, resourceId, expectedRevision + 1, data);
+            _documents[key] = envelope;
+            _revisions[key] = envelope.ContentRevision;
+            return Task.FromResult<ContentEnvelope<T>?>(envelope);
+        }
+    }
+}

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Tdn.Campaigns.Campaigns;
 using Tdn.Campaigns.Persistence;
+using Tdn.Campaigns.Sheets;
 
 namespace Tdn.Campaigns.Http;
 
@@ -17,10 +18,12 @@ public sealed class CampaignExceptionHandler : IExceptionHandler
         var (status, code, title, message, resourceId, requestId) = exception switch
         {
             DomainException domain => (domain.StatusCode, domain.Code, domain.Message, domain.Message, domain.ResourceId, domain.RequestId),
-            CampaignStoreException store => (503, store.WriteOutcomeUnknown ? "write_outcome_unknown" : "dependency_unavailable", "Service unavailable", "The campaign store is temporarily unavailable.", (int?)null, (Guid?)null),
-            DbUpdateException => (503, "write_outcome_unknown", "Service unavailable", "The write outcome could not be confirmed.", (int?)null, (Guid?)null),
-            DbException => (503, "dependency_unavailable", "Service unavailable", "The campaign store is temporarily unavailable.", (int?)null, (Guid?)null),
-            _ => (500, "internal_error", "Internal server error", "The request could not be completed.", (int?)null, (Guid?)null)
+            CampaignStoreException store => (503, store.WriteOutcomeUnknown ? "write_outcome_unknown" : "dependency_unavailable", "Service unavailable", "The campaign store is temporarily unavailable.", (object?)null, (Guid?)null),
+            DbUpdateException => (503, "write_outcome_unknown", "Service unavailable", "The write outcome could not be confirmed.", (object?)null, (Guid?)null),
+            DbException => (503, "dependency_unavailable", "Service unavailable", "The campaign store is temporarily unavailable.", (object?)null, (Guid?)null),
+            ContentStoreException content => (503, content.WriteOutcomeUnknown ? "content_write_outcome_unknown" : "dependency_unavailable", "Service unavailable", "The content store is temporarily unavailable.", (object?)null, (Guid?)null),
+            MongoDB.Driver.MongoException => (503, "dependency_unavailable", "Service unavailable", "The content store is temporarily unavailable.", (object?)null, (Guid?)null),
+            _ => (500, "internal_error", "Internal server error", "The request could not be completed.", (object?)null, (Guid?)null)
         };
 
         httpContext.Response.StatusCode = status;

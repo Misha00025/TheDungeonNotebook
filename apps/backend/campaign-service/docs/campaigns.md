@@ -82,10 +82,12 @@ With `expectedRevision: 0`, success is `201 Created`, member DTO, and a member `
 
 ## `DELETE /api/campaigns/{campaignId}/members/{userId}?expectedRevision={revision}`
 
-`campaignId` and `userId` are int32 path parameters. `expectedRevision` is a required int64 query parameter of at least 1. Only a global Admin, matching Group, or User campaign admin may call this operation. Success is `204 No Content`; missing/out-of-scope campaign or membership is `404`; non-admin member is `403`; stale revision is `409` (`revision_conflict`). No last-admin or self-removal prohibition is imposed.
+`campaignId` and `userId` are int32 path parameters. `expectedRevision` is a required int64 query parameter of at least 1. Only a global Admin, matching Group, or User campaign admin may call this operation. Success is `204 No Content`; missing/out-of-scope campaign or membership is `404`; non-admin member is `403`; stale revision is `409` (`revision_conflict`). If restrictive references remain, it returns `409` (`member_has_assignments`). No last-admin or self-removal prohibition is imposed.
+
+Explicitly delete the member's character assignments first using the character assignment endpoint; membership deletion does not cascade them.
 
 There is no campaign deletion endpoint. Historical consequences have not been specified.
 
 ## Errors
 
-Errors use ASP.NET Core Problem Details JSON with a machine-readable `code` extension. Body/query binding and validation failures return `400` with `code: invalid_request`; semantic request errors return `400` with codes such as `invalid_name`, `invalid_request_id`, `invalid_revision`, or `administrator_required`. Domain errors include `forbidden` (`403`), `not_found` (`404`), and conflict codes (`409`). Database unavailability returns a safe `503` (`dependency_unavailable`); uncertain write outcomes return `503` (`write_outcome_unknown`). Unexpected errors return a safe `500` (`internal_error`). Database details and connection strings are not returned.
+Errors use ASP.NET Core Problem Details JSON with a machine-readable `code` extension. Body/query binding and validation failures return `400` with `code: invalid_request`; semantic request errors return `400` with codes such as `invalid_name`, `invalid_request_id`, `invalid_revision`, or `administrator_required`. Domain errors include `forbidden` (`403`), `not_found` (`404`), and conflict codes (`409`), including `member_has_assignments`. Database unavailability returns a safe `503` (`dependency_unavailable`); uncertain SQL writes return `503` (`write_outcome_unknown`); uncertain Mongo writes return `503` (`content_write_outcome_unknown`). Unexpected errors return a safe `500` (`internal_error`). Database details and connection strings are not returned.
