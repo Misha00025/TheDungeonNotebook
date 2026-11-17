@@ -49,7 +49,7 @@ describe('campaign first iteration', () => {
   });
 
   it('shows supported destinations and safely rejects future routes', async () => {
-    const unsupported = ['/12/gm/formulas', '/12/gm/views', '/12/quests', '/12/items', ...['items', 'skills', 'quests', 'notes'].map(tab => `/12/character/abcdef01-2345-6789-abcd-ef0123456789/${tab}`)];
+    const unsupported = ['/12/gm/views', '/12/quests', '/12/items', ...['items', 'skills', 'quests', 'notes'].map(tab => `/12/character/abcdef01-2345-6789-abcd-ef0123456789/${tab}`)];
     for (const path of unsupported) {
       const request = vi.fn(async (url: string) => url.endsWith('/permissions') ? response(permissions()) : url === '/api/campaigns/12' ? response(campaign()) : response([]));
       const view = renderApp(path, request);
@@ -64,7 +64,8 @@ describe('campaign first iteration', () => {
     expect(screen.getByRole('link', { name: 'Обзор' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Персонажи' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Шаблоны' })).toBeInTheDocument();
-    for (const label of ['Формулы', 'Представления', 'Создать персонажа']) expect(screen.queryByText(label)).not.toBeInTheDocument();
+    expect(screen.queryByText('Представления')).not.toBeInTheDocument();
+    for (const label of ['Создать персонажа']) expect(screen.queryByText(label)).not.toBeInTheDocument();
   });
 
   it('routes GM access panels and the legacy members route to scoped membership data', async () => {
@@ -167,14 +168,15 @@ describe('campaign first iteration', () => {
         if (url === `/api/campaigns/12/characters/${id}`) return response({ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 });
         if (url.endsWith('/character-permissions')) return response(permissions());
         if (url.endsWith(`/characters/${id}/permissions`)) return response(permissions());
-        if (url.endsWith(`/characters/${id}/sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [] });
+        if (url.endsWith(`/characters/${id}/computed-sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [], virtualFields: [], formulaContentRevisions: [] });
         if (url.endsWith('/characters')) return response([{ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
         return response([]);
       });
       const view = renderApp(`/12/character/${id}${legacy}`, request);
       const sheetNavigation = await screen.findByRole('navigation', { name: 'Лист персонажа' });
       await waitFor(() => expect(within(sheetNavigation).getByRole('link', { name: tab === 'stats' ? 'Характеристики' : 'Обзор' })).toHaveAttribute('aria-current', 'page'));
-      expect(request.mock.calls.some(([url]) => url.includes('/computed-sheet'))).toBe(false);
+      expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(true);
+      expect(request.mock.calls.map(([url]) => url).some(url => /formulas|virtual-fields|custom-virtual-fields|virtual-overrides|assignments/.test(url))).toBe(false);
       view.unmount();
     }
   });
@@ -185,7 +187,7 @@ describe('campaign first iteration', () => {
       if (url === '/api/campaigns/12') return response(campaign());
       if (url === '/api/campaigns/12/permissions') return response(permissions());
       if (url.endsWith(`/characters/${id}/permissions`)) return response(permissions(false));
-      if (url.endsWith(`/characters/${id}/sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [] });
+      if (url.endsWith(`/characters/${id}/computed-sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [], virtualFields: [], formulaContentRevisions: [] });
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 });
       if (url.endsWith('/characters')) return response([{ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
       return response([]);
@@ -195,6 +197,8 @@ describe('campaign first iteration', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
     await waitFor(() => expect(screen.getByRole('link', { name: 'Характеристики' })).toHaveAttribute('href', `/12/player/characters/${id}/stats`));
     expect(request.mock.calls.some(([url]) => url === `/api/campaigns/12/characters/${id}/permissions`)).toBe(true);
+    expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(true);
+    expect(request.mock.calls.map(([url]) => url).some(url => /formulas|virtual-fields|custom-virtual-fields|virtual-overrides|assignments/.test(url))).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'Пространство мастера' }));
     await waitFor(() => expect(screen.getByRole('link', { name: 'Характеристики' })).toHaveAttribute('href', `/12/gm/characters/${id}/stats`));
   });
@@ -209,7 +213,7 @@ describe('campaign first iteration', () => {
         characterPermissionReads += 1;
         return characterPermissionReads === 1 ? response({ canRead: true, canWrite: false, canManageAccess: false }) : response({ code: 'forbidden', title: 'Denied', detail: 'Denied' }, status);
       }
-      if (url.endsWith(`/characters/${id}/sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [] });
+      if (url.endsWith(`/characters/${id}/computed-sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [], virtualFields: [], formulaContentRevisions: [] });
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 });
       if (url.endsWith('/characters')) return response([{ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
       return response([]);
@@ -231,7 +235,7 @@ describe('campaign first iteration', () => {
         characterPermissionReads += 1;
         return characterPermissionReads === 1 ? response({ canRead: true, canWrite: false, canManageAccess: false }) : response({ code: 'dependency_unavailable', title: 'Unavailable', detail: 'Try later' }, 503);
       }
-      if (url.endsWith(`/characters/${id}/sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [] });
+      if (url.endsWith(`/characters/${id}/computed-sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [], virtualFields: [], formulaContentRevisions: [] });
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 });
       return response([]);
     });
@@ -241,7 +245,7 @@ describe('campaign first iteration', () => {
     expect(await screen.findByText('Try later')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Характеристики' })).toHaveAttribute('href', `/12/gm/characters/${id}/stats`);
     expect(screen.queryByRole('heading', { name: 'Мои персонажи' })).not.toBeInTheDocument();
-    expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(false);
+    expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(true);
   });
 
   it('shows the empty character state after a successful empty list, not a numeric zero', async () => {

@@ -75,7 +75,7 @@ const CampaignShell: React.FC = () => {
     catch (error) { if (mounted.current && sequence.current === current && route.current === pathname) setSwitchError(error); }
     finally { if (mounted.current && sequence.current === current) { busy.current = false; setSwitchBusy(false); } }
   };
-  const nav = mode === 'gm' ? [['Обзор', 'gm/overview'], ['Персонажи', 'gm/characters'], ['Шаблоны', 'gm/templates'], ['Участники и доступ', 'gm/members'], ['Настройки', 'gm/settings']] : [['Мои персонажи', 'player/characters']];
+  const nav = mode === 'gm' ? [['Обзор', 'gm/overview'], ['Персонажи', 'gm/characters'], ['Шаблоны', 'gm/templates'], ['Формулы', 'gm/formulas'], ['Участники и доступ', 'gm/members'], ['Настройки', 'gm/settings']] : [['Мои персонажи', 'player/characters']];
   const title = nav.find(([, suffix]) => location.pathname.endsWith(`/${suffix}`))?.[0] ?? campaign.data.name;
   return <CampaignContext.Provider value={{ campaign: campaign.data, permissions: effective, lastKnownPermissions: permission.data, permissionsLoading: permission.loading || Boolean(permission.error), mode, reloadCampaign: campaign.reload }}>
     <div className={styles.workspace}><button className={`${buttonStyles.button} ${styles.mobileToggle}`} aria-expanded={menuOpen} aria-controls="campaign-navigation" onClick={() => setMenuOpen(value => !value)}>Меню</button><aside id="campaign-navigation" className={`${commonStyles.card} ${styles.sidebar} ${menuOpen ? styles.open : ''}`}>

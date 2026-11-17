@@ -1,17 +1,19 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import Templates from './Templates';
 import { CampaignApiError } from './api';
+import type { VirtualField, VirtualFieldsEnvelope } from './types';
 
 const shared = vi.hoisted(() => ({ dirty: false, canWrite: true, permissionsLoading: false, invalidation: 0 }));
-const api = vi.hoisted(() => ({ listTemplates: vi.fn(), getTemplate: vi.fn(), getTemplateContent: vi.fn(), createTemplate: vi.fn(), renameTemplate: vi.fn(), putTemplateContent: vi.fn() }));
+const api = vi.hoisted(() => ({ listTemplates: vi.fn(), listFormulas: vi.fn(), getFormulaContent: vi.fn(), getTemplate: vi.fn(), getTemplateContent: vi.fn(), createTemplate: vi.fn(), renameTemplate: vi.fn(), putTemplateContent: vi.fn(), putTemplateVirtualFields: vi.fn() }));
 vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, sessionKey: 'user', invalidation: shared.invalidation, notifyInvalidation: vi.fn() }), useDirtyDraft: (_owner: string, dirty: boolean) => { shared.dirty = dirty; return () => { shared.dirty = false; }; }, useDirtyState: () => shared.dirty }));
-vi.mock('./Shell', () => ({ useCampaignWorkspace: () => ({ permissions: { canWrite: shared.canWrite }, permissionsLoading: shared.permissionsLoading }) }));
+vi.mock('./Shell', () => ({ useCampaignWorkspace: () => ({ campaign: { id: 4 }, permissions: { canWrite: shared.canWrite }, lastKnownPermissions: { canWrite: shared.canWrite }, permissionsLoading: shared.permissionsLoading }) }));
 
 const first = { id: 'template-1', key: 'key-1', campaignId: 4, name: 'First', metadataRevision: 3 };
 const second = { id: 'template-2', key: 'key-2', campaignId: 4, name: 'Second', metadataRevision: 7 };
 const content = { campaignId: 4, resourceId: first.id, contentRevision: 11, data: { description: 'desc', virtualFields: [{ id: 'opaque', formulaId: 'formula' }], baseFields: [{ id: 'field-1', key: 'immutable', title: 'Title', description: '', valueType: 'String', typeRevision: 5, value: '', options: [] }] } };
+const editableVirtual: VirtualField = { id: 'opaque', key: 'opaque-key', title: 'Opaque field', description: '', resultType: 'Number', formulaId: 'formula', bindings: {} };
 const tree = () => <MemoryRouter initialEntries={['/4/gm/templates']}><Routes><Route path=":groupId/gm/templates" element={<Templates />} /></Routes></MemoryRouter>;
 const renderTemplates = () => render(tree());
 
@@ -20,11 +22,13 @@ describe('base template editor', () => {
     shared.dirty = false; shared.canWrite = true; shared.permissionsLoading = false; shared.invalidation = 0;
     Object.values(api).forEach(method => method.mockReset());
     api.listTemplates.mockResolvedValue([first, second]);
+    api.listFormulas.mockResolvedValue([{ id: 'formula-1', key: 'f1', campaignId: 4, name: 'Formula', metadataRevision: 9 }]);
     api.getTemplate.mockImplementation(async (_id: number, id: string) => id === second.id ? second : first);
     api.getTemplateContent.mockResolvedValue(content);
     api.createTemplate.mockResolvedValue({ ...first, contentRevision: 1 });
     api.renameTemplate.mockResolvedValue({ ...first, name: 'Renamed', metadataRevision: 4 });
     api.putTemplateContent.mockResolvedValue({ ...content, contentRevision: 12, data: { ...content.data, description: 'updated' } });
+    api.putTemplateVirtualFields.mockResolvedValue({ contentRevision: 12, virtualFields: content.data.virtualFields });
   });
 
   it('requires explicit selection and sends base content without field type revisions', async () => {
@@ -43,6 +47,7 @@ describe('base template editor', () => {
     expect(payload.baseFields[1]).not.toHaveProperty('id');
     expect(payload.baseFields[0]).not.toHaveProperty('typeRevision');
     expect(payload).not.toHaveProperty('virtualFields');
+    expect(content.data.virtualFields).toEqual([{ id: 'opaque', formulaId: 'formula' }]);
   });
 
   it('keeps metadata and content revisions independent and preserves drafts across conflict refresh', async () => {
@@ -138,5 +143,69 @@ describe('base template editor', () => {
     expect(api.getTemplate).toHaveBeenCalledWith(4, second.id);
     expect(api.getTemplate).not.toHaveBeenCalledWith(4, 'late-created');
     confirm.mockRestore();
+  });
+
+  it('shares content revisions across base and virtual writes while keeping the other draft intact', async () => {
+    const savedVirtual = { id: 'virtual-saved', key: 'calc', title: 'Calc', description: '', resultType: 'Number', formulaId: 'formula-1', bindings: {} };
+    api.getTemplate.mockResolvedValueOnce({ ...first, metadataRevision: 9 });
+    api.putTemplateContent
+      .mockResolvedValueOnce({ ...content, contentRevision: 12, data: { ...content.data, description: 'server description', virtualFields: content.data.virtualFields } })
+      .mockResolvedValueOnce({ ...content, contentRevision: 14, data: { ...content.data, description: 'final description', virtualFields: [savedVirtual] } });
+    api.putTemplateVirtualFields.mockResolvedValueOnce({ contentRevision: 13, virtualFields: [editableVirtual, savedVirtual] });
+    api.getTemplateContent.mockResolvedValue({ ...content, data: { ...content.data, virtualFields: [editableVirtual] } });
+    api.getFormulaContent.mockResolvedValue({ data: { parameters: [] } });
+    renderTemplates();
+    fireEvent.change(await screen.findByLabelText('Выбранный шаблон'), { target: { value: first.id } });
+    fireEvent.change(await screen.findByLabelText('Название'), { target: { value: 'Independent metadata' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить название' }));
+    await waitFor(() => expect(api.renameTemplate).toHaveBeenCalledWith(4, first.id, { name: 'Independent metadata', expectedRevision: 9 }));
+    const baseForm = within(screen.getByRole('heading', { name: 'Базовое содержимое' }).closest('form')!);
+    fireEvent.click(await screen.findByRole('button', { name: 'Открыть виртуальные поля' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Добавить виртуальное поле' }));
+    const newVirtual = within(screen.getAllByRole('group', { name: 'Новое виртуальное поле' })[0]);
+    fireEvent.change(newVirtual.getByLabelText('Ключ'), { target: { value: 'calc' } });
+    const virtualName = newVirtual.getByLabelText('Название');
+    fireEvent.change(virtualName, { target: { value: 'Calc draft' } });
+    fireEvent.change(newVirtual.getByLabelText('Формула'), { target: { value: 'formula-1' } });
+    fireEvent.change(baseForm.getByLabelText('Описание'), { target: { value: 'base draft' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить базовые поля' }));
+    await waitFor(() => expect(api.putTemplateContent).toHaveBeenCalledTimes(1));
+    expect(api.putTemplateContent.mock.calls[0][2]).toMatchObject({ expectedRevision: 11, description: 'base draft' });
+    expect(api.putTemplateContent.mock.calls[0][2]).not.toHaveProperty('virtualFields');
+    expect(virtualName).toHaveValue('Calc draft');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить виртуальные поля' }));
+    await waitFor(() => expect(api.putTemplateVirtualFields).toHaveBeenCalledTimes(1));
+    expect(api.putTemplateVirtualFields.mock.calls[0][2]).toMatchObject({ expectedRevision: 12 });
+    expect(api.putTemplateVirtualFields.mock.calls[0][2].virtualFields[1]).not.toHaveProperty('id');
+
+    fireEvent.change(baseForm.getByLabelText('Описание'), { target: { value: 'final description' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить базовые поля' }));
+    await waitFor(() => expect(api.putTemplateContent).toHaveBeenCalledTimes(2));
+    expect(api.putTemplateContent.mock.calls[1][2]).toMatchObject({ expectedRevision: 13 });
+    expect(api.putTemplateContent.mock.calls[1][2]).not.toHaveProperty('virtualFields');
+    expect(api.renameTemplate).toHaveBeenCalledTimes(1);
+    expect(first.metadataRevision).toBe(3);
+  });
+
+  it('disables both shared-revision writes while either content request is pending', async () => {
+    let resolveWrite!: (value: VirtualFieldsEnvelope) => void;
+    api.putTemplateVirtualFields.mockReturnValueOnce(new Promise(resolve => { resolveWrite = resolve; }));
+    api.getFormulaContent.mockResolvedValue({ data: { parameters: [] } });
+    api.getTemplateContent.mockResolvedValue({ ...content, data: { ...content.data, virtualFields: [editableVirtual] } });
+    renderTemplates();
+    fireEvent.change(await screen.findByLabelText('Выбранный шаблон'), { target: { value: first.id } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Открыть виртуальные поля' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Добавить виртуальное поле' }));
+    const newVirtual = within(screen.getAllByRole('group', { name: 'Новое виртуальное поле' })[0]);
+    fireEvent.change(newVirtual.getByLabelText('Ключ'), { target: { value: 'calc' } });
+    fireEvent.change(newVirtual.getByLabelText('Название'), { target: { value: 'Calc' } });
+    fireEvent.change(newVirtual.getByLabelText('Формула'), { target: { value: 'formula-1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить виртуальные поля' }));
+    await waitFor(() => expect(api.putTemplateVirtualFields).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: 'Сохранить базовые поля' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Сохранить виртуальные поля' })).toBeDisabled();
+    resolveWrite({ contentRevision: 12, virtualFields: [editableVirtual, { ...editableVirtual, id: 'created-virtual', key: 'calc', title: 'Calc' }] });
   });
 });

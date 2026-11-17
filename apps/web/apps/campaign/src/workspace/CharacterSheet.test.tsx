@@ -13,24 +13,44 @@ const id = 'abcdef01-2345-6789-abcd-ef0123456789';
 const fields = [
   ['integer', 'Integer', 0], ['number', 'Number', 0], ['string', 'String', ''], ['boolean', 'Boolean', false], ['single', 'SingleChoice', 'one'], ['multi', 'MultiChoice', []]
 ].map(([key, valueType, value]) => ({ id: String(key), key: String(key), title: String(key), description: '', valueType, typeRevision: 1, options: valueType === 'SingleChoice' || valueType === 'MultiChoice' ? [{ optionKey: 'one', title: 'One' }, { optionKey: 'two', title: 'Two' }] : [], effectiveValue: value, isExplicit: true }));
-const sheet = { contentRevision: 1, templateContentRevision: 1, description: 'Overview', baseFields: fields };
+const sheet = { contentRevision: 1, templateContentRevision: 1, description: 'Overview', baseFields: fields, virtualFields: [], formulaContentRevisions: [] };
 const auth = (request: (url: string, options?: RequestInit) => Promise<Response>) => ({ status: 'authenticated', authenticated: true, userId: 4, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
 const CurrentPath: React.FC = () => <output aria-label="Current path">{useLocation().pathname}</output>;
 const sheetTree = (request: (url: string, options?: RequestInit) => Promise<Response>, stats: boolean) => <MemoryRouter initialEntries={['/12/player/characters']}><RemoteAuthProvider auth={auth(request)}><WorkspaceProvider mountPath="/"><DirtyProvider><CharacterSheet campaignId={12} characterId={id} stats={stats} /><CurrentPath /></DirtyProvider></WorkspaceProvider></RemoteAuthProvider></MemoryRouter>;
 const renderSheet = (request: (url: string, options?: RequestInit) => Promise<Response>) => render(sheetTree(request, true));
 
 describe('CharacterSheet', () => {
-  it('loads only character metadata, permissions, and the basic sheet for read access', async () => {
+  it('renders computed virtual values and diagnostic code without replacing diagnostics with zero', async () => {
+    const computed = { ...sheet, virtualFields: [
+      { id: 'value-field', key: 'value', title: 'Computed value', description: '', resultType: 'Number', value: 0, diagnostic: null },
+      { id: 'error-field', key: 'broken', title: 'Broken value', description: '', resultType: 'Number', value: 0, diagnostic: { code: 'formula_error', message: 'Broken formula' } }
+    ] };
     const request = vi.fn(async (url: string) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: false, canManageAccess: false });
-      if (url.endsWith('/sheet')) return response(sheet);
+      if (url.endsWith('/computed-sheet')) return response(computed);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      return response([]);
+    });
+    renderSheet(request);
+    const valueCard = await screen.findByRole('heading', { name: 'Computed value' });
+    expect(valueCard.parentElement).toHaveTextContent('0');
+    const errorCard = screen.getByRole('heading', { name: 'Broken value' }).parentElement;
+    expect(errorCard).toHaveTextContent('formula_error: Broken formula');
+    expect(errorCard).not.toHaveTextContent('0');
+  });
+
+  it('loads computed fields for read access without requesting editing definitions', async () => {
+    const request = vi.fn(async (url: string) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: false, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(sheet);
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
       return response([]);
     });
     renderSheet(request);
     expect(await screen.findByText('Только чтение')).toBeInTheDocument();
     expect(screen.getAllByText('Задано явно')).toHaveLength(6);
-    expect(request.mock.calls.map(([url]) => url).some(url => /computed-sheet|virtual-fields|formulas|assignments/.test(url))).toBe(false);
+    expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(true);
+    expect(request.mock.calls.map(([url]) => url).some(url => /virtual-fields|formulas|assignments/.test(url))).toBe(false);
     expect(screen.queryByRole('button', { name: /Сбросить/ })).not.toBeInTheDocument();
   });
 
@@ -38,7 +58,7 @@ describe('CharacterSheet', () => {
     const otherId = 'abcdef02-2345-6789-abcd-ef0123456789';
     const request = vi.fn(async (url: string) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: false, canManageAccess: false });
-      if (url.endsWith('/sheet')) return response(sheet);
+      if (url.endsWith('/computed-sheet')) return response(sheet);
       if (url.endsWith('/characters')) return response([
         { id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 },
         { id: otherId, campaignId: 12, templateId: 'template', name: 'Other', importance: 'Secondary', metadataRevision: 1 }
@@ -52,11 +72,12 @@ describe('CharacterSheet', () => {
   });
 
   it('saves exactly the changed explicit field with the sheet revision and supports typed falsy values', async () => {
+    let latest = sheet;
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
-      if (url.endsWith('/sheet')) return response(sheet);
+      if (url.endsWith('/computed-sheet')) return response(latest);
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
-      if (url.endsWith('/base-values/string') && options?.method === 'PUT') return response({ ...sheet, contentRevision: 2, baseFields: fields.map(field => field.id === 'string' ? { ...field, isExplicit: true, effectiveValue: 'new value' } : field) });
+      if (url.endsWith('/base-values/string') && options?.method === 'PUT') { latest = { ...sheet, contentRevision: 2, baseFields: fields.map(field => field.id === 'string' ? { ...field, isExplicit: true, effectiveValue: 'new value' } : field) }; return response(latest); }
       return response([]);
     });
     renderSheet(request);
@@ -74,9 +95,10 @@ describe('CharacterSheet', () => {
     const revision = '9223372036854775807';
     const inherited = { ...sheet, contentRevision: new LosslessNumber(revision), baseFields: fields.map(field => field.id === 'boolean' ? { ...field, isExplicit: false } : field) };
     const saved = { ...inherited, contentRevision: new LosslessNumber('9223372036854775806'), baseFields: inherited.baseFields.map(field => field.id === 'boolean' ? { ...field, isExplicit: true, effectiveValue: true } : field) };
+    let reads = 0;
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
-      if (url.endsWith('/sheet')) return new Response(`{"contentRevision":${revision},"templateContentRevision":1,"description":"Overview","baseFields":${JSON.stringify(inherited.baseFields)}}`, { headers: { 'Content-Type': 'application/json' } });
+      if (url.endsWith('/computed-sheet')) { const current = reads++ === 0 ? inherited : saved; return response(current); }
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
       if (url.endsWith('/base-values/boolean') && options?.method === 'PUT') return response(saved);
       return response([]);
@@ -97,7 +119,7 @@ describe('CharacterSheet', () => {
     const latest = { ...sheet, contentRevision: 7, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'server', isExplicit: true } : field) };
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
-      if (url.endsWith('/sheet')) return response(sheetReads++ === 0 ? sheet : latest);
+      if (url.endsWith('/computed-sheet')) return response(sheetReads++ === 0 ? sheet : { ...latest, virtualFields: [], formulaContentRevisions: [] });
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
       if (url.endsWith('/base-values/string') && options?.method === 'PUT') { writes += 1; return response({ code: 'conflict', title: 'Conflict', detail: 'Changed' }, 409); }
       return response([]);
@@ -117,11 +139,36 @@ describe('CharacterSheet', () => {
     expect(attempts.map(([, options]) => JSON.parse(String(options?.body)).expectedRevision)).toEqual([1, 7]);
   });
 
+  it('rereads computed content when returning to stats and blocks a revision change without dropping drafts', async () => {
+    let reads = 0;
+    let latest = { ...sheet, contentRevision: 2, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'server value' } : field) };
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(reads++ === 0 ? sheet : latest);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith('/base-values/string') && options?.method === 'PUT') { latest = { ...latest, contentRevision: 3, baseFields: latest.baseFields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'my retained draft' } : field) }; return response({ contentRevision: 3 }); }
+      return response([]);
+    });
+    const view = render(sheetTree(request, true));
+    fireEvent.change(await screen.findByLabelText('string'), { target: { value: 'my retained draft' } });
+    view.rerender(sheetTree(request, false));
+    view.rerender(sheetTree(request, true));
+    await waitFor(() => expect(reads).toBeGreaterThanOrEqual(2));
+    expect(screen.getByLabelText('string')).toHaveValue('my retained draft');
+    expect(await screen.findByText('Запись заблокирована до перечитывания снимка.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Перечитать лист' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить string' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
+    await waitFor(() => expect(request.mock.calls.some(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT')).toBe(true));
+    const put = request.mock.calls.find(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT');
+    expect(JSON.parse(String(put?.[1]?.body)).expectedRevision).toBe(2);
+  });
+
   it('does not automatically retry an unknown write outcome', async () => {
     let writes = 0;
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
-      if (url.endsWith('/sheet')) return response(sheet);
+      if (url.endsWith('/computed-sheet')) return response(sheet);
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
       if (url.endsWith('/base-values/string') && options?.method === 'PUT') { writes += 1; return response({ code: 'write_outcome_unknown', title: 'Unknown', detail: 'Unknown' }, 502); }
       return response([]);
@@ -141,7 +188,7 @@ describe('CharacterSheet', () => {
         permissionReads += 1;
         return response({ canRead: true, canWrite: permissionReads === 1, canManageAccess: false });
       }
-      if (url.endsWith('/sheet')) return response(sheet);
+      if (url.endsWith('/computed-sheet')) return response(sheet);
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
       if (url.endsWith('/base-values/string') && options?.method === 'PUT') return response({ code: 'forbidden', title: 'Forbidden', detail: 'No longer allowed' }, 403);
       return response([]);
@@ -157,20 +204,23 @@ describe('CharacterSheet', () => {
 
   it('serializes description and field writes while keeping independent drafts and metadata revision', async () => {
     let contentRevision = 1;
+    let currentSheet = { ...sheet, contentRevision };
     const meta = { id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 11 };
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
-      if (url.endsWith('/sheet')) return response({ ...sheet, contentRevision });
+       if (url.endsWith('/computed-sheet')) return response(currentSheet);
       if (url.endsWith(`/characters/${id}`) && options?.method === 'PUT') return response({ ...meta, name: 'Renamed', metadataRevision: 12 });
       if (url.endsWith(`/characters/${id}`)) return response(meta);
       if (url.endsWith('/base-values/string') && options?.method === 'PUT') {
         expect(JSON.parse(String(options.body)).expectedRevision).toBe(1);
         contentRevision = 2;
-        return response({ ...sheet, contentRevision, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'saved field' } : field) });
+        currentSheet = { ...sheet, contentRevision, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'saved field' } : field) };
+        return response(currentSheet);
       }
       if (url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT') {
         expect(JSON.parse(String(options.body)).expectedRevision).toBe(2);
         contentRevision = 3;
+        currentSheet = { ...currentSheet, contentRevision, description: 'description draft' };
         return response({ contentRevision });
       }
       return response([]);
@@ -204,7 +254,7 @@ describe('CharacterSheet', () => {
     const base = { ...sheet, baseFields: [typedField] };
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
-      if (url.endsWith('/sheet')) return response(base);
+      if (url.endsWith('/computed-sheet')) return response({ ...base, virtualFields: [], formulaContentRevisions: [] });
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
       if (url.endsWith(`/base-values/${fieldId}`) && options?.method === 'PUT') return response({ ...base, contentRevision: 2, baseFields: [{ ...typedField, isExplicit: true }] });
       return response([]);

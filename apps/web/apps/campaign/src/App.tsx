@@ -12,6 +12,7 @@ import CampaignOverview from './workspace/CampaignOverview';
 import Members from './workspace/Members';
 import CampaignSettings from './workspace/CampaignSettings';
 import Templates from './workspace/Templates';
+import Formulas from './workspace/Formulas';
 import CharacterSheet from './workspace/CharacterSheet';
 import '@tdn/shared/styles/globals.css';
 
@@ -53,6 +54,7 @@ const GuardedRoutes: React.FC = () => {
       <Route index element={<ModeEntry />} />
       <Route path="gm/overview" element={<CampaignOverview />} />
       <Route path="gm/templates" element={<Templates />} />
+      <Route path="gm/formulas" element={<Formulas />} />
       <Route path="templates" element={<LegacySectionEntry target="templates" />} />
       <Route path="gm/characters" element={<Characters />} />
       <Route path="gm/characters/:characterId/:tab" element={<CharacterSheetRoute />} />

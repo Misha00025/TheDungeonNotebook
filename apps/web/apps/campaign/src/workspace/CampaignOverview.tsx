@@ -16,6 +16,7 @@ const CampaignOverview: React.FC = () => {
     {Boolean(characters.error) && <p role="alert">Не удалось загрузить количество персонажей.</p>}
     <Link to={path(`/${campaign.id}/${mode}/characters`)}>К списку персонажей</Link>
     <Link to={path(`/${campaign.id}/gm/templates`)}>Настроить шаблоны</Link>
+    <Link to={path(`/${campaign.id}/gm/formulas`)}>Настроить формулы</Link>
     <Characters compact />
   </section>;
 };

@@ -1,32 +1,34 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useWorkspace, useDirtyDraft } from './Workspace';
+import { useWorkspace, useDirtyDraft, useDirtyState } from './Workspace';
 import { useMutation, useResource } from './hooks';
 import { CampaignApiError } from './api';
-import type { BasicSheet, CharacterMetadata, JsonValue, Permissions, Revision } from './types';
+import type { CharacterMetadata, ComputedSheet, JsonValue, Permissions, Revision } from './types';
 import { ValueInput } from './ValueInput';
-import { stringifyJson } from './json';
+import { displayValue, stringifyJson } from './json';
 import { ApiError } from './Feedback';
 import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
 import inputStyles from '@tdn/shared/styles/components/Input.module.css';
 import styles from './Workspace.module.css';
 import commonStyles from '@tdn/shared/styles/common.module.css';
+import { CharacterVirtuals } from './CharacterVirtuals';
 
 const importanceLabel: Record<string, string> = { Background: 'Фоновый', Secondary: 'Второстепенный', Key: 'Ключевой' };
 type MetadataDraft = { name: string; importance: CharacterMetadata['importance'] };
 
 const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats: boolean }> = ({ campaignId, characterId, stats }) => {
   const { api, path, sessionKey } = useWorkspace();
+  const anyDraftDirty = useDirtyState();
   const navigate = useNavigate();
   const mode = useLocation().pathname.includes('/gm/') ? 'gm' : 'player';
   const scope = `${sessionKey}:${campaignId}:${characterId}`;
   const metadataResource = useResource<CharacterMetadata>(`${scope}:metadata`, () => api.getCharacter(campaignId, characterId));
   const permissionResource = useResource<Permissions>(`${scope}:character-permissions`, () => api.characterPermissions(campaignId, characterId));
-  const sheetResource = useResource<BasicSheet>(`${scope}:sheet`, () => api.getSheet(campaignId, characterId));
+  const sheetResource = useResource<ComputedSheet>(`${scope}:computed-sheet`, () => api.getComputedSheet(campaignId, characterId));
   const charactersResource = useResource<CharacterMetadata[]>(`${sessionKey}:${campaignId}:character-selector`, () => api.listCharacters(campaignId));
   const [metadata, setMetadata] = useState<CharacterMetadata>();
   const [metadataDraft, setMetadataDraft] = useState<MetadataDraft>();
-  const [sheet, setSheet] = useState<BasicSheet>();
+  const [sheet, setSheet] = useState<ComputedSheet>();
   const [descriptionDraft, setDescriptionDraft] = useState<string>();
   const [fieldDrafts, setFieldDrafts] = useState<Record<string, JsonValue>>({});
   const [validity, setValidity] = useState<Record<string, string | undefined>>({});
@@ -35,7 +37,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
   const [metadataError, setMetadataError] = useState<unknown>();
   const [sheetBlocked, setSheetBlocked] = useState(false);
   const [metadataBlocked, setMetadataBlocked] = useState(false);
-  const [sheetSnapshot, setSheetSnapshot] = useState<BasicSheet>();
+  const [sheetSnapshot, setSheetSnapshot] = useState<ComputedSheet>();
   const [metadataSnapshot, setMetadataSnapshot] = useState<CharacterMetadata>();
   const [snapshotError, setSnapshotError] = useState<unknown>();
   const [snapshotBusy, setSnapshotBusy] = useState(false);
@@ -48,6 +50,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
   const snapshotBusyRef = useRef(false);
   const lastPermissionRef = useRef<Permissions | undefined>(undefined);
   const initializedRef = useRef(false);
+  const previousStatsRef = useRef(stats);
   const activeRef = useRef(true);
   useEffect(() => {
     activeRef.current = true;
@@ -60,6 +63,27 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
     setSheet(sheetResource.data);
     contentRevisionRef.current = sheetResource.data.contentRevision;
   }, [metadataResource.data, sheetResource.data]);
+  useEffect(() => {
+    const returningToStats = stats && !previousStatsRef.current;
+    previousStatsRef.current = stats;
+    if (!returningToStats || contentBusyRef.current || snapshotBusyRef.current) return;
+    snapshotBusyRef.current = true;
+    setSnapshotBusy(true);
+    void api.getComputedSheet(campaignId, characterId).then(fresh => {
+      if (!activeRef.current) return;
+      const revisionChanged = contentRevisionRef.current !== undefined && stringifyJson(fresh.contentRevision) !== stringifyJson(contentRevisionRef.current);
+      setSheet(current => current ? { ...current, ...fresh } : fresh);
+      if (revisionChanged && anyDraftDirty) {
+        setSheetSnapshot(fresh);
+        setSheetBlocked(true);
+      } else if (!anyDraftDirty) {
+        contentRevisionRef.current = fresh.contentRevision;
+      }
+    }).catch(error => { if (activeRef.current) setSnapshotError(error); }).finally(() => {
+      snapshotBusyRef.current = false;
+      if (activeRef.current) setSnapshotBusy(false);
+    });
+  }, [stats, api, campaignId, characterId, anyDraftDirty]);
   if (permissionResource.data && !permissionResource.loading && !permissionResource.error) lastPermissionRef.current = permissionResource.data;
 
   const fieldDirty = Object.keys(fieldDrafts).length > 0;
@@ -113,6 +137,19 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
       if (!activeRef.current) return;
       contentRevisionRef.current = result.contentRevision;
       confirmed(result);
+      try {
+        const fresh = await api.getComputedSheet(campaignId, characterId);
+        if (!activeRef.current) return;
+        setSheet(current => current ? { ...current, ...fresh } : fresh);
+        if (stringifyJson(fresh.contentRevision) !== stringifyJson(result.contentRevision) && anyDraftDirty) {
+          setSheetSnapshot(fresh);
+          setSheetBlocked(true);
+        } else {
+          contentRevisionRef.current = fresh.contentRevision;
+        }
+      } catch {
+        if (activeRef.current) setWriteStatus('Запись подтверждена, вычисления не обновлены');
+      }
     } catch (error) {
       if (!activeRef.current) return;
       setWriteError(error);
@@ -144,7 +181,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
     void runContent(
       revision => api.putBaseValue(campaignId, characterId, fieldId, { value, expectedRevision: revision }),
       result => {
-        setSheet(result);
+        setSheet(current => current ? { ...current, ...result, virtualFields: current.virtualFields, formulaContentRevisions: current.formulaContentRevisions } : current);
         setFieldDrafts(current => { const next = { ...current }; delete next[fieldId]; return next; });
         setValidity(current => { const next = { ...current }; delete next[fieldId]; return next; });
         setWriteStatus('Поле сохранено.');
@@ -157,7 +194,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
     void runContent(
       revision => api.resetBaseValue(campaignId, characterId, fieldId, revision),
       result => {
-        setSheet(result);
+        setSheet(current => current ? { ...current, ...result, virtualFields: current.virtualFields, formulaContentRevisions: current.formulaContentRevisions } : current);
         setFieldDrafts(current => { const next = { ...current }; delete next[fieldId]; return next; });
         setValidity(current => { const next = { ...current }; delete next[fieldId]; return next; });
         setResetCounters(current => ({ ...current, [fieldId]: (current[fieldId] ?? 0) + 1 }));
@@ -173,7 +210,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
     setSnapshotError(undefined);
     setSnapshotBusy(true);
     try {
-      const freshSheet = await api.getSheet(campaignId, characterId);
+      const freshSheet = await api.getComputedSheet(campaignId, characterId);
       if (!activeRef.current || generation !== snapshotGenerationRef.current) return;
       setSheet(freshSheet);
       setSheetSnapshot(freshSheet);
@@ -268,13 +305,14 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
         </>}
         </fieldset>
       </div>;
-    })}</div> : <div>
+    })}<section aria-label="Виртуальные характеристики">{sheet.virtualFields.map(field => <article className={commonStyles.card} key={field.id}><h3>{field.title}</h3><p>{field.description}</p>{field.diagnostic ? <p role="alert">{field.diagnostic.code}: {field.diagnostic.message}</p> : <p>{displayValue(field.value)}</p>}</article>)}</section></div> : <div>
       <label>Описание<textarea className={inputStyles.input} value={descriptionDraft ?? sheet.description} disabled={!canWrite} onChange={event => { setWriteStatus(''); setDescriptionDraft(event.target.value); }} /></label>
       {editorAllowed && <>
         <button className={buttonStyles.button} type="button" disabled={descriptionDraft === undefined || descriptionDraft === sheet.description || contentBusy || sheetBlocked || !canWrite} onClick={saveDescription}>Сохранить описание</button>
         <button className={buttonStyles.button} type="button" disabled={descriptionDraft === undefined || contentBusy || !canWrite} onClick={cancelDescription}>Отмена</button>
       </>}
     </div>}
+    {editorAllowed && <div hidden={!stats}><CharacterVirtuals key={`${scope}:virtual-editor`} campaignId={campaignId} characterId={characterId} templateId={metadata.templateId} baseFields={sheet.baseFields} virtualFields={sheet.virtualFields} canWrite={canWrite} busy={contentBusy} blocked={sheetBlocked} write={runContent} /></div>}
     {editorAllowed && <fieldset className={commonStyles.card} disabled={permissionPending || !canWrite || metadataMutation.busy || metadataBlocked}>
       <label>Имя<input className={inputStyles.input} value={metadataDraft?.name ?? metadata.name} onFocus={ensureMetadataDraft} onChange={event => { ensureMetadataDraft(); setMetadataDraft(current => ({ ...(current ?? { name: metadata.name, importance: metadata.importance }), name: event.target.value })); }} /></label>
       <label>Важность<select className={inputStyles.input} value={metadataDraft?.importance ?? metadata.importance} onFocus={ensureMetadataDraft} onChange={event => { ensureMetadataDraft(); setMetadataDraft(current => ({ ...(current ?? { name: metadata.name, importance: metadata.importance }), importance: event.target.value as CharacterMetadata['importance'] })); }}><option value="Background">Фоновый</option><option value="Secondary">Второстепенный</option><option value="Key">Ключевой</option></select></label>

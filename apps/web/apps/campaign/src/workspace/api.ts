@@ -76,7 +76,7 @@ export function createCampaignApi(request: AuthenticatedRequest) {
     createTemplate: (id: number, body: { requestId: Id; name: string; description: string; baseFields: BaseFieldInput[] }) => create<DefinitionCreate>(templates(id), body),
     renameTemplate: (id: number, templateId: Id, body: { name: string; expectedRevision: RevisionPayload['expectedRevision'] }) => put<DefinitionMetadata>(`${templates(id)}/${enc(templateId)}`, body),
     getTemplateContent: (id: number, templateId: Id) => send<TemplateContentEnvelope>(`${templates(id)}/${enc(templateId)}/content`),
-    putTemplateContent: (id: number, templateId: Id, body: { expectedRevision: RevisionPayload['expectedRevision']; description: string; baseFields: BaseFieldInput[] }) => put<TemplateContentEnvelope>(`${templates(id)}/${enc(templateId)}/content`, body),
+     putTemplateContent: (id: number, templateId: Id, body: { expectedRevision: RevisionPayload['expectedRevision']; description: string; baseFields: BaseFieldInput[] }) => put<TemplateContentEnvelope>(`${templates(id)}/${enc(templateId)}/content`, body),
     getTemplateVirtualFields: (id: number, templateId: Id) => send<VirtualFieldsEnvelope>(`${templates(id)}/${enc(templateId)}/virtual-fields`),
     putTemplateVirtualFields: (id: number, templateId: Id, body: { expectedRevision: RevisionPayload['expectedRevision']; virtualFields: VirtualFieldInput[] }) => put<VirtualFieldsEnvelope>(`${templates(id)}/${enc(templateId)}/virtual-fields`, body),
     listCharacters: (id: number) => send<CharacterMetadata[]>(characters(id)),
