@@ -1,6 +1,0 @@
-@backend_cs_HostAddress = http://localhost:5077
-
-GET {{backend_cs_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
