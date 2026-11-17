@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import App from './App';
 import Home from './Home';
@@ -49,7 +49,7 @@ describe('campaign first iteration', () => {
   });
 
   it('shows supported destinations and safely rejects future routes', async () => {
-    const unsupported = ['/12/gm/templates', '/12/gm/formulas', '/12/gm/views', '/12/quests', '/12/items', '/12/character/abcdef01-2345-6789-abcd-ef0123456789'];
+    const unsupported = ['/12/gm/formulas', '/12/gm/views', '/12/quests', '/12/items', ...['items', 'skills', 'quests', 'notes'].map(tab => `/12/character/abcdef01-2345-6789-abcd-ef0123456789/${tab}`)];
     for (const path of unsupported) {
       const request = vi.fn(async (url: string) => url.endsWith('/permissions') ? response(permissions()) : url === '/api/campaigns/12' ? response(campaign()) : response([]));
       const view = renderApp(path, request);
@@ -63,7 +63,8 @@ describe('campaign first iteration', () => {
     expect(await screen.findByRole('heading', { name: 'Обзор кампании' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Обзор' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Персонажи' })).toBeInTheDocument();
-    for (const label of ['Шаблоны', 'Формулы', 'Представления', 'Создать персонажа']) expect(screen.queryByText(label)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Шаблоны' })).toBeInTheDocument();
+    for (const label of ['Формулы', 'Представления', 'Создать персонажа']) expect(screen.queryByText(label)).not.toBeInTheDocument();
   });
 
   it('routes GM access panels and the legacy members route to scoped membership data', async () => {
@@ -155,6 +156,92 @@ describe('campaign first iteration', () => {
     fireEvent.change(screen.getByLabelText('Поиск персонажей'), { target: { value: 'missing' } });
     expect(screen.getByText('Совпадений нет.')).toBeInTheDocument();
     expect(request.mock.calls.map(([url]) => url).some(url => /templates|members|assignments|sheet|computed-sheet/.test(url))).toBe(false);
+  });
+
+  it('redirects supported legacy character routes to the matching basic tab', async () => {
+    const id = 'abcdef01-2345-6789-abcd-ef0123456789';
+    for (const [legacy, tab] of [['', 'overview'], ['/stats', 'stats'], ['/base', 'overview'], ['/resources', 'overview']]) {
+      const request = vi.fn(async (url: string) => {
+        if (url === '/api/campaigns/12') return response(campaign());
+        if (url === '/api/campaigns/12/permissions') return response(permissions());
+        if (url === `/api/campaigns/12/characters/${id}`) return response({ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+        if (url.endsWith('/character-permissions')) return response(permissions());
+        if (url.endsWith(`/characters/${id}/permissions`)) return response(permissions());
+        if (url.endsWith(`/characters/${id}/sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [] });
+        if (url.endsWith('/characters')) return response([{ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
+        return response([]);
+      });
+      const view = renderApp(`/12/character/${id}${legacy}`, request);
+      const sheetNavigation = await screen.findByRole('navigation', { name: 'Лист персонажа' });
+      await waitFor(() => expect(within(sheetNavigation).getByRole('link', { name: tab === 'stats' ? 'Характеристики' : 'Обзор' })).toHaveAttribute('aria-current', 'page'));
+      expect(request.mock.calls.some(([url]) => url.includes('/computed-sheet'))).toBe(false);
+      view.unmount();
+    }
+  });
+
+  it('preserves character identity and active tab when switching modes', async () => {
+    const id = 'abcdef01-2345-6789-abcd-ef0123456789';
+    const request = vi.fn(async (url: string) => {
+      if (url === '/api/campaigns/12') return response(campaign());
+      if (url === '/api/campaigns/12/permissions') return response(permissions());
+      if (url.endsWith(`/characters/${id}/permissions`)) return response(permissions(false));
+      if (url.endsWith(`/characters/${id}/sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [] });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith('/characters')) return response([{ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
+      return response([]);
+    });
+    renderApp(`/12/gm/characters/${id}/stats`, request);
+    expect(await screen.findByRole('link', { name: 'Характеристики' })).toHaveAttribute('aria-current', 'page');
+    fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Характеристики' })).toHaveAttribute('href', `/12/player/characters/${id}/stats`));
+    expect(request.mock.calls.some(([url]) => url === `/api/campaigns/12/characters/${id}/permissions`)).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Пространство мастера' }));
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Характеристики' })).toHaveAttribute('href', `/12/gm/characters/${id}/stats`));
+  });
+
+  it.each([403, 404])('falls back to the target character list when mode access returns %s', async status => {
+    const id = 'abcdef01-2345-6789-abcd-ef0123456789';
+    let characterPermissionReads = 0;
+    const request = vi.fn(async (url: string) => {
+      if (url === '/api/campaigns/12') return response(campaign());
+      if (url === '/api/campaigns/12/permissions') return response(permissions());
+      if (url.endsWith(`/characters/${id}/permissions`)) {
+        characterPermissionReads += 1;
+        return characterPermissionReads === 1 ? response({ canRead: true, canWrite: false, canManageAccess: false }) : response({ code: 'forbidden', title: 'Denied', detail: 'Denied' }, status);
+      }
+      if (url.endsWith(`/characters/${id}/sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [] });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith('/characters')) return response([{ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
+      return response([]);
+    });
+    renderApp(`/12/gm/characters/${id}/stats`, request);
+    await screen.findByRole('link', { name: 'Характеристики' });
+    fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
+    expect(await screen.findByRole('heading', { name: 'Мои персонажи' })).toBeInTheDocument();
+    expect(request.mock.calls.some(([url]) => url.endsWith('/assignments'))).toBe(false);
+  });
+
+  it('keeps the character tab on non-access errors while switching modes', async () => {
+    const id = 'abcdef01-2345-6789-abcd-ef0123456789';
+    let characterPermissionReads = 0;
+    const request = vi.fn(async (url: string) => {
+      if (url === '/api/campaigns/12') return response(campaign());
+      if (url === '/api/campaigns/12/permissions') return response(permissions());
+      if (url.endsWith(`/characters/${id}/permissions`)) {
+        characterPermissionReads += 1;
+        return characterPermissionReads === 1 ? response({ canRead: true, canWrite: false, canManageAccess: false }) : response({ code: 'dependency_unavailable', title: 'Unavailable', detail: 'Try later' }, 503);
+      }
+      if (url.endsWith(`/characters/${id}/sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [] });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      return response([]);
+    });
+    renderApp(`/12/gm/characters/${id}/stats`, request);
+    await screen.findByRole('link', { name: 'Характеристики' });
+    fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
+    expect(await screen.findByText('Try later')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Характеристики' })).toHaveAttribute('href', `/12/gm/characters/${id}/stats`);
+    expect(screen.queryByRole('heading', { name: 'Мои персонажи' })).not.toBeInTheDocument();
+    expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(false);
   });
 
   it('shows the empty character state after a successful empty list, not a numeric zero', async () => {

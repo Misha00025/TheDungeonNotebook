@@ -44,8 +44,30 @@ const CampaignShell: React.FC = () => {
   if (!permission.data) return <p role="alert">Права кампании недоступны.</p>;
   if (mode === 'gm' && !permission.loading && !permission.error && !permission.data.canWrite) return <Navigate to={path(`/${id}/player/characters`)} replace />;
   const effective = permission.loading || permission.error ? { ...permission.data, canWrite: false, canManageAccess: false } : permission.data;
+  const canEnterGm = effective.canWrite;
   const targetMode = (next: 'gm' | 'player') => path(`/${id}/${next === 'gm' ? 'gm/overview' : 'player/characters'}`);
-  const switchMode = () => { if (!busy.current) { setMenuOpen(false); navigate(targetMode(mode === 'gm' ? 'player' : 'gm')); } };
+  const switchMode = async () => {
+    if (busy.current) return;
+    const target = mode === 'gm' ? 'player' : 'gm';
+    const sheetRoute = location.pathname.match(/\/(?:gm|player)\/characters\/([^/]+)\/(overview|stats)$/);
+    if (!sheetRoute) { setMenuOpen(false); navigate(targetMode(target)); return; }
+    busy.current = true; const current = ++sequence.current; const pathname = location.pathname; setSwitchBusy(true); setSwitchError(undefined);
+    try {
+      const access = await api.characterPermissions(id, decodeURIComponent(sheetRoute[1]));
+      if (mounted.current && sequence.current === current && route.current === pathname) {
+        setMenuOpen(false);
+        if (target === 'gm' && !canEnterGm) navigate(targetMode(target));
+        else if (access.canRead || access.canWrite) navigate(path(`/${id}/${target}/characters/${encodeURIComponent(decodeURIComponent(sheetRoute[1]))}/${sheetRoute[2]}`));
+        else navigate(targetMode(target));
+      }
+    } catch (error) {
+      const status = (error as { status?: number })?.status;
+      if (mounted.current && sequence.current === current && route.current === pathname) {
+        if (status === 403 || status === 404) navigate(targetMode(target));
+        else setSwitchError(error);
+      }
+    } finally { if (mounted.current && sequence.current === current) { busy.current = false; setSwitchBusy(false); } }
+  };
   const changeCampaign = async (next: number) => {
     if (busy.current) return;
     busy.current = true; const current = ++sequence.current; const pathname = location.pathname; setSwitchBusy(true); setSwitchError(undefined);
@@ -53,7 +75,7 @@ const CampaignShell: React.FC = () => {
     catch (error) { if (mounted.current && sequence.current === current && route.current === pathname) setSwitchError(error); }
     finally { if (mounted.current && sequence.current === current) { busy.current = false; setSwitchBusy(false); } }
   };
-  const nav = mode === 'gm' ? [['Обзор', 'gm/overview'], ['Персонажи', 'gm/characters'], ['Участники и доступ', 'gm/members'], ['Настройки', 'gm/settings']] : [['Мои персонажи', 'player/characters']];
+  const nav = mode === 'gm' ? [['Обзор', 'gm/overview'], ['Персонажи', 'gm/characters'], ['Шаблоны', 'gm/templates'], ['Участники и доступ', 'gm/members'], ['Настройки', 'gm/settings']] : [['Мои персонажи', 'player/characters']];
   const title = nav.find(([, suffix]) => location.pathname.endsWith(`/${suffix}`))?.[0] ?? campaign.data.name;
   return <CampaignContext.Provider value={{ campaign: campaign.data, permissions: effective, lastKnownPermissions: permission.data, permissionsLoading: permission.loading || Boolean(permission.error), mode, reloadCampaign: campaign.reload }}>
     <div className={styles.workspace}><button className={`${buttonStyles.button} ${styles.mobileToggle}`} aria-expanded={menuOpen} aria-controls="campaign-navigation" onClick={() => setMenuOpen(value => !value)}>Меню</button><aside id="campaign-navigation" className={`${commonStyles.card} ${styles.sidebar} ${menuOpen ? styles.open : ''}`}>
