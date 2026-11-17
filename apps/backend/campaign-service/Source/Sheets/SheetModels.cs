@@ -32,9 +32,16 @@ public sealed record ContentEnvelope<T>(int CampaignId, Guid ResourceId, long Co
 
 public sealed record ChoiceOption(string OptionKey, string Title);
 public sealed record BaseField(Guid Id, string Key, string Title, string Description, ValueType ValueType, long TypeRevision, JsonElement Value, ChoiceOption[] Options);
-public sealed record TemplateContent(string Description, BaseField[] BaseFields);
+public sealed record TemplateContent(string Description, BaseField[] BaseFields)
+{
+    public Tdn.Campaigns.Computation.VirtualField[] VirtualFields { get; init; } = [];
+}
 public sealed record SavedBaseValue(Guid BaseFieldId, long TypeRevision, ValueType ValueType, JsonElement Value);
-public sealed record CharacterSheet(string Description, SavedBaseValue[] BaseValues);
+public sealed record CharacterSheet(string Description, SavedBaseValue[] BaseValues)
+{
+    public Tdn.Campaigns.Computation.VirtualFormulaOverride[] VirtualFormulaOverrides { get; init; } = [];
+    public Tdn.Campaigns.Computation.VirtualField[] CustomVirtualFields { get; init; } = [];
+}
 
 public sealed class TemplateCreateRequest
 {

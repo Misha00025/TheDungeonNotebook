@@ -2,7 +2,7 @@
 
 These routes are scoped to `/api/campaigns/{campaignId:int}` and use the shared JSON `X-Subject` header documented in [the API overview](README.md). A global Admin and a Group whose subject ID matches the campaign are campaign admins. A User must be a current campaign member; only a campaign admin can write definitions. Members may read template definitions when `Access:MembersCanReadDefinitions` is `true` (default); this setting does not grant access to unassigned characters.
 
-This contract currently stores only base-field definitions. Virtual fields and formulas are not exposed by these endpoints.
+Template virtual fields and formula definitions are documented in [formulas, virtual fields, and computed sheets](formulas.md).
 
 ## Metadata shape
 
@@ -62,13 +62,13 @@ Admin only. Body requires `name` (non-whitespace string) and `expectedRevision` 
 Returns `200` with the complete current template content envelope:
 
 ```json
-{"campaignId":7,"resourceId":"54ce37ea-40a5-481c-ae08-92a0eb8fe5c0","contentRevision":1,"data":{"description":"","baseFields":[]}}
+{"campaignId":7,"resourceId":"54ce37ea-40a5-481c-ae08-92a0eb8fe5c0","contentRevision":1,"data":{"description":"","baseFields":[],"virtualFields":[]}}
 ```
 
 The envelope `contentRevision` is independent of SQL `metadataRevision`. Read permissions match the metadata GET. Missing metadata is `404`; published metadata with unavailable content returns safe `503` (`content_unavailable`).
 
 ## `PUT /api/campaigns/{campaignId}/templates/{templateId:guid}/content`
 
-Admin only. Body requires `expectedRevision` (int64 >= 1), `description` (string; empty allowed), and the complete new active `baseFields` array. The update replaces the active definitions as one Mongo document revision. Success returns `200` with the updated envelope and `contentRevision + 1`. Stale revision is `409` (`content_revision_conflict`); unknown field IDs, duplicate active keys/IDs, immutable-key changes, and incompatible values/options return `400`; missing template is `404`; unknown Mongo write outcomes return safe `503` (`content_write_outcome_unknown`), while Mongo read errors return `503` (`dependency_unavailable`).
+Admin only. Body requires `expectedRevision` (int64 >= 1), `description` (string; empty allowed), and the complete new active `baseFields` array. The update replaces the active base definitions as one Mongo document revision and preserves `virtualFields`. Success returns `200` with the updated envelope and `contentRevision + 1`. Stale revision is `409` (`content_revision_conflict`); unknown field IDs, duplicate active keys/IDs, immutable-key changes, and incompatible values/options return `400`; missing template is `404`; unknown Mongo write outcomes return safe `503` (`content_write_outcome_unknown`), while Mongo read errors return `503` (`dependency_unavailable`).
 
 There is no template deletion endpoint because reference/removal behavior has not been specified.

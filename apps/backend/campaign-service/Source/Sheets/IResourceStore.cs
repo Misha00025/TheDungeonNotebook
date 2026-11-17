@@ -18,6 +18,10 @@ public interface IResourceStore
     Task<bool> IsCampaignMemberAsync(int campaignId, int userId, CancellationToken cancellationToken);
     Task<MemberUpdateResult> UpsertAssignmentAsync(int campaignId, Guid characterId, int userId, bool canWrite, long expectedRevision, CancellationToken cancellationToken);
     Task<bool> DeleteAssignmentAsync(int campaignId, Guid characterId, int userId, long expectedRevision, CancellationToken cancellationToken);
+    Task<IReadOnlyList<FormulaMetadata>> ListFormulasAsync(int campaignId, CancellationToken cancellationToken);
+    Task<FormulaMetadata?> GetFormulaAsync(int campaignId, Guid formulaId, CancellationToken cancellationToken);
+    Task<FormulaMetadata> CreateFormulaAsync(FormulaMetadata formula, CancellationToken cancellationToken);
+    Task<bool> RenameFormulaAsync(int campaignId, Guid formulaId, string name, long expectedRevision, CancellationToken cancellationToken);
 }
 
 public sealed class DuplicateResourceException : Exception

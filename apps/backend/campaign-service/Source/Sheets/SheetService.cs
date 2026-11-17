@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Tdn.Campaigns.Access;
 using Tdn.Campaigns.Campaigns;
 using Tdn.Campaigns.Configuration;
+using Tdn.Campaigns.Computation;
 using Tdn.Campaigns.Persistence;
 
 namespace Tdn.Campaigns.Sheets;
@@ -105,7 +106,7 @@ public sealed class SheetService(
             ?? throw ContentMissing(templateId);
         if (current.ContentRevision != expected)
             throw RevisionConflict(templateId, "content_revision_conflict");
-        var updated = new TemplateContent(request.Description, BuildFields(request.BaseFields, current.Data.BaseFields));
+        var updated = current.Data with { Description = request.Description, BaseFields = BuildFields(request.BaseFields, current.Data.BaseFields) };
         var result = await content.ReplaceAsync(TemplateCollection, campaignId, templateId, expected, updated, cancellationToken);
         if (result is null)
             throw RevisionConflict(templateId, "content_revision_conflict");
@@ -295,6 +296,23 @@ public sealed class SheetService(
             throw Forbidden();
     }
 
+    public async Task EnsureDefinitionsReadAsync(Subject? subject, int campaignId, CancellationToken cancellationToken) =>
+        await RequireDefinitionsReadAsync(subject, campaignId, cancellationToken);
+
+    public async Task EnsureAdminAsync(Subject? subject, int campaignId, CancellationToken cancellationToken) =>
+        await RequireAdminAsync(subject, campaignId, cancellationToken);
+
+    public async Task<CharacterMetadata> EnsureCharacterAccessAsync(Subject? subject, int campaignId, Guid characterId, bool write, CancellationToken cancellationToken) =>
+        (await RequireCharacterAccessAsync(subject, campaignId, characterId, write, cancellationToken)).Character;
+
+    public async Task<CalculationInputs> GetCalculationInputsAsync(Subject? subject, int campaignId, Guid characterId, CancellationToken cancellationToken)
+    {
+        var character = await EnsureCharacterAccessAsync(subject, campaignId, characterId, false, cancellationToken);
+        var template = await GetTemplateDocumentAsync(campaignId, character.TemplateId, cancellationToken);
+        var sheet = await GetCharacterDocumentAsync(campaignId, characterId, cancellationToken);
+        return new CalculationInputs(character, template, sheet, ResolveEffectiveBaseValues(template.Data, sheet.Data));
+    }
+
     private async Task RequireAdminAsync(Subject? subject, int campaignId, CancellationToken cancellationToken)
     {
         var access = await campaignService.GetAccessAsync(subject, campaignId, cancellationToken);
@@ -335,9 +353,14 @@ public sealed class SheetService(
     private async Task<CharacterSheetEnvelope> BuildEffectiveSheetAsync(int campaignId, CharacterMetadata character, ContentEnvelope<CharacterSheet> sheet, CancellationToken cancellationToken)
     {
         var template = await GetTemplateDocumentAsync(campaignId, character.TemplateId, cancellationToken);
-        var fields = template.Data.BaseFields.Select(field =>
+        var fields = ResolveEffectiveBaseValues(template.Data, sheet.Data);
+        return new CharacterSheetEnvelope(sheet.ContentRevision, template.ContentRevision, sheet.Data.Description, fields);
+    }
+
+    private static EffectiveBaseField[] ResolveEffectiveBaseValues(TemplateContent template, CharacterSheet sheet) =>
+        template.BaseFields.Select(field =>
         {
-            var saved = sheet.Data.BaseValues.SingleOrDefault(value => value.BaseFieldId == field.Id);
+            var saved = sheet.BaseValues.SingleOrDefault(value => value.BaseFieldId == field.Id);
             var explicitValue = saved is not null && saved.TypeRevision == field.TypeRevision && saved.ValueType == field.ValueType && IsValueCompatible(field.ValueType, saved.Value, field.Options);
             return new EffectiveBaseField(
                 field.Id,
@@ -350,8 +373,6 @@ public sealed class SheetService(
                 (explicitValue ? saved!.Value : field.Value).Clone(),
                 explicitValue);
         }).ToArray();
-        return new CharacterSheetEnvelope(sheet.ContentRevision, template.ContentRevision, sheet.Data.Description, fields);
-    }
 
     private static BaseField[] BuildFields(BaseFieldInput[] inputs, BaseField[] previous)
     {

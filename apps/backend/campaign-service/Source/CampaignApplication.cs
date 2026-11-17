@@ -9,6 +9,7 @@ using Tdn.Campaigns.Configuration;
 using Tdn.Campaigns.Http;
 using Tdn.Campaigns.Persistence;
 using Tdn.Campaigns.Sheets;
+using Tdn.Campaigns.Computation;
 using MongoDB.Driver;
 
 namespace Tdn.Campaigns;
@@ -89,6 +90,9 @@ public static class CampaignApplication
         builder.Services.AddScoped<IResourceStore, EfResourceStore>();
         builder.Services.AddScoped<IContentStore, MongoContentStore>();
         builder.Services.AddScoped<SheetService>();
+        builder.Services.AddScoped<FormulaService>();
+        builder.Services.AddScoped<VirtualFieldService>();
+        builder.Services.AddScoped<ComputedSheetService>();
         if (bool.TryParse(migrationValue, out var applyMigrations) && applyMigrations)
             builder.Services.AddHostedService<DatabaseMigrationService>();
 

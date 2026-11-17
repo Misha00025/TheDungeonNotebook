@@ -5,6 +5,7 @@ Current API contracts:
 - [Campaigns and membership](campaigns.md)
 - [Templates and base-field definitions](templates.md)
 - [Characters, assignments, and sheets](characters.md)
+- [Formulas, virtual fields, and computed sheets](formulas.md)
 
 Routes in the [legacy public HTML API documentation](../../../../docs/api/index.html) are historical and are not served by this host.
 

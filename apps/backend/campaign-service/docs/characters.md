@@ -2,6 +2,8 @@
 
 All routes are scoped to `/api/campaigns/{campaignId:int}` and use the shared JSON `X-Subject` header described in [the API overview](README.md). A campaign admin is a global Admin, matching Group, or User campaign member whose membership is admin. User access to a character requires direct assignment. An assignment with `canWrite=false` permits reading the character and sheet but not writing. Group access remains scoped to its campaign. Other-campaign or non-member campaign access is hidden as `404`; a campaign member who is not assigned to a specific character receives `403`.
 
+Character custom virtual fields, formula overrides, and the computed-sheet response are documented in [formulas, virtual fields, and computed sheets](formulas.md).
+
 ## Character metadata
 
 ```json
@@ -36,11 +38,11 @@ For an active field, a stored value is explicit only when field ID, `typeRevisio
 
 ## `PUT /api/campaigns/{campaignId}/characters/{characterId:guid}/description`
 
-Admin or assigned User with `canWrite=true`. Body requires `description` (string; empty allowed) and `expectedRevision` (int64 >= 1). It replaces only the description, preserving all saved base values including hidden/incompatible entries. Success is `200` with `{"contentRevision":2}`; stale content revision is `409`.
+Admin or assigned User with `canWrite=true`. Body requires `description` (string; empty allowed) and `expectedRevision` (int64 >= 1). It replaces only the description, preserving all saved base values including hidden/incompatible entries, custom virtual fields, and formula overrides. Success is `200` with `{"contentRevision":2}`; stale content revision is `409`.
 
 ## `PUT /api/campaigns/{campaignId}/characters/{characterId:guid}/base-values/{fieldId:guid}`
 
-Admin or assigned writer. Body requires native JSON `value` and `expectedRevision` (int64 >= 1). The field must be currently active or the request returns `404`; incompatible values/options return `400`. The service reads the current template and sheet, replaces only that field's explicit record (using server-owned current type and `typeRevision`), preserves every other stored record, and atomically replaces the Mongo document at the expected revision. Success returns `200` effective sheet with the new revision; stale content revision is `409`.
+Admin or assigned writer. Body requires native JSON `value` and `expectedRevision` (int64 >= 1). The field must be currently active or the request returns `404`; incompatible values/options return `400`. The service reads the current template and sheet, replaces only that field's explicit record (using server-owned current type and `typeRevision`), preserves every other stored record, including custom virtual fields and formula overrides, and atomically replaces the Mongo document at the expected revision. Success returns `200` effective sheet with the new revision; stale content revision is `409`.
 
 Values are native JSON: `Integer` is int64 and accepts integral forms such as `1.0`; `Number` is finite double without rounding; `String` includes the empty string; `Boolean` includes false; `SingleChoice` is one existing option key; `MultiChoice` is a unique array of existing keys and may be empty. JSON null is not a value for these field types.
 

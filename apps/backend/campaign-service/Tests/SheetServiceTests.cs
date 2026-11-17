@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Tdn.Campaigns.Access;
 using Tdn.Campaigns.Campaigns;
+using Tdn.Campaigns.Computation;
 using Tdn.Campaigns.Configuration;
 using Tdn.Campaigns.Persistence;
 using Tdn.Campaigns.Sheets;
@@ -14,6 +15,158 @@ public class SheetServiceTests
 {
     private static readonly Subject Admin = new(SubjectType.Admin, 9);
     private static readonly Subject Member = new(SubjectType.User, 200);
+
+    [Fact]
+    public async Task BaseAndDescriptionUpdatesPreserveVirtualFieldsOverridesAndCustomFields()
+    {
+        var fixture = CreateFixture();
+        var template = await CreateTemplate(fixture, Field(null, "value", FieldValueType.Integer, "1"));
+        var virtualField = new VirtualField(Guid.NewGuid(), "virtual", "Virtual", "", NumericResultType.Integer, Guid.NewGuid(), new(), null, null);
+        var templateContent = fixture.Content.GetData<TemplateContent>("templateContents", 7, template.Id);
+        await fixture.Content.ReplaceAsync("templateContents", 7, template.Id, 1, templateContent with { VirtualFields = [virtualField] }, default);
+        await fixture.Sheets.UpdateTemplateContentAsync(Admin, 7, template.Id, new TemplateContentUpdateRequest
+        {
+            ExpectedRevision = 2,
+            Description = "changed",
+            BaseFields = [Field(templateContent.BaseFields[0].Id, "value", FieldValueType.Integer, "2")]
+        }, default);
+        Assert.Equal(virtualField, fixture.Content.GetData<TemplateContent>("templateContents", 7, template.Id).VirtualFields.Single());
+
+        var character = await CreateCharacter(fixture, template.Id);
+        var custom = virtualField with { Id = Guid.NewGuid(), Key = "custom" };
+        var sheet = fixture.Content.GetData<CharacterSheet>("characterSheets", 7, character.Id) with
+        {
+            VirtualFormulaOverrides = [new(virtualField.Id, "2")],
+            CustomVirtualFields = [custom]
+        };
+        await fixture.Content.ReplaceAsync("characterSheets", 7, character.Id, 1, sheet, default);
+        await fixture.Sheets.UpdateCharacterDescriptionAsync(Admin, 7, character.Id,
+            new CharacterDescriptionRequest { Description = "description", ExpectedRevision = 2 }, default);
+        await SetValue(fixture, character.Id, templateContent.BaseFields[0].Id, "3", 3);
+        var stored = fixture.Content.GetData<CharacterSheet>("characterSheets", 7, character.Id);
+        Assert.Equal("2", stored.VirtualFormulaOverrides.Single().Expression);
+        Assert.Equal(custom, stored.CustomVirtualFields.Single());
+    }
+
+    [Fact]
+    public async Task FormulaEditsAndOverridesUseCurrentContentWithoutComputedSheetWrites()
+    {
+        var fixture = CreateFixture();
+        var template = await CreateTemplate(fixture);
+        var formulaService = new FormulaService(fixture.Resources, fixture.Content, fixture.Sheets);
+        var formula = await formulaService.CreateAsync(Admin, 7, new FormulaCreateRequest
+        {
+            RequestId = Guid.NewGuid(), Name = "Value", Expression = "2", Parameters = []
+        }, default);
+        var virtualFields = new VirtualFieldService(fixture.Resources, fixture.Content, fixture.Sheets);
+        var fieldInput = new VirtualFieldInput
+        {
+            Key = "value", Title = "Value", Description = "", ResultType = NumericResultType.Integer,
+            FormulaId = formula.Id, Bindings = new()
+        };
+        var saved = await virtualFields.UpdateTemplateFieldsAsync(Admin, 7, template.Id,
+            new VirtualFieldsUpdateRequest { ExpectedRevision = 1, VirtualFields = [fieldInput] }, default);
+        var character = await CreateCharacter(fixture, template.Id);
+        var computed = new ComputedSheetService(fixture.Resources, fixture.Content, fixture.Sheets);
+        var writesBeforeRead = fixture.Content.WriteCount;
+        var readsBeforeCalculation = fixture.Content.ReadCount;
+        var first = await computed.GetAsync(Admin, 7, character.Id, default);
+        Assert.Equal(2L, first.VirtualFields.Single().Value);
+        Assert.Equal(writesBeforeRead, fixture.Content.WriteCount);
+        Assert.Equal(readsBeforeCalculation + 3, fixture.Content.ReadCount);
+
+        await formulaService.UpdateContentAsync(Admin, 7, formula.Id,
+            new FormulaContentUpdateRequest { Expression = "4", Parameters = [], ExpectedRevision = 1 }, default);
+        var second = await computed.GetAsync(Admin, 7, character.Id, default);
+        Assert.Equal(4L, second.VirtualFields.Single().Value);
+        Assert.Equal(1, second.ContentRevision);
+
+        await virtualFields.SetOverrideAsync(Admin, 7, character.Id, saved.VirtualFields.Single().Id,
+            new OverrideInput { Expression = "9", ExpectedRevision = 1 }, default);
+        await formulaService.UpdateContentAsync(Admin, 7, formula.Id,
+            new FormulaContentUpdateRequest { Expression = "5", Parameters = [], ExpectedRevision = 2 }, default);
+        var overridden = await computed.GetAsync(Admin, 7, character.Id, default);
+        Assert.Equal(9L, overridden.VirtualFields.Single().Value);
+        Assert.Equal(2, overridden.ContentRevision);
+
+        await virtualFields.DeleteOverrideAsync(Admin, 7, character.Id, saved.VirtualFields.Single().Id, 2, default);
+        var restored = await computed.GetAsync(Admin, 7, character.Id, default);
+        Assert.Equal(5L, restored.VirtualFields.Single().Value);
+        Assert.Equal(3, restored.ContentRevision);
+    }
+
+    [Fact]
+    public async Task FormulaDefinitionReadsUseConfiguredAccessAndCampaignScope()
+    {
+        var fixture = CreateFixture(membersCanReadDefinitions: false);
+        var formulas = new FormulaService(fixture.Resources, fixture.Content, fixture.Sheets);
+        var forbidden = await Assert.ThrowsAsync<DomainException>(() => formulas.ListAsync(Member, 7, default));
+        Assert.Equal(403, forbidden.StatusCode);
+        var missing = await Assert.ThrowsAsync<DomainException>(() => formulas.ListAsync(new Subject(SubjectType.User, 999), 7, default));
+        Assert.Equal(404, missing.StatusCode);
+    }
+
+    [Fact]
+    public async Task CustomVirtualFieldsArePerCharacterAndStaleTemplateCasDoesNotWrite()
+    {
+        var fixture = CreateFixture();
+        var template = await CreateTemplate(fixture);
+        var formulaService = new FormulaService(fixture.Resources, fixture.Content, fixture.Sheets);
+        var formula = await formulaService.CreateAsync(Admin, 7, new FormulaCreateRequest
+        {
+            RequestId = Guid.NewGuid(), Name = "Value", Expression = "3", Parameters = []
+        }, default);
+        var fields = new VirtualFieldService(fixture.Resources, fixture.Content, fixture.Sheets);
+        var staleWrites = fixture.Content.WriteCount;
+        var conflict = await Assert.ThrowsAsync<DomainException>(() => fields.UpdateTemplateFieldsAsync(Admin, 7, template.Id,
+            new VirtualFieldsUpdateRequest { ExpectedRevision = 2, VirtualFields = [] }, default));
+        Assert.Equal(409, conflict.StatusCode);
+        Assert.Equal(staleWrites, fixture.Content.WriteCount);
+
+        var first = await CreateCharacter(fixture, template.Id);
+        var second = await CreateCharacter(fixture, template.Id);
+        var virtualInput = new VirtualFieldInput { Key = "custom", Title = "Custom", Description = "", ResultType = NumericResultType.Integer, FormulaId = formula.Id, Bindings = new() };
+        await fields.UpdateCustomFieldsAsync(Admin, 7, first.Id,
+            new VirtualFieldsUpdateRequest { ExpectedRevision = 1, VirtualFields = [virtualInput] }, default);
+        Assert.Single((await fields.GetCustomFieldsAsync(Admin, 7, first.Id, default)).VirtualFields);
+        Assert.Empty((await fields.GetCustomFieldsAsync(Admin, 7, second.Id, default)).VirtualFields);
+        Assert.Empty(fixture.Content.GetData<TemplateContent>("templateContents", 7, template.Id).VirtualFields);
+    }
+
+    [Fact]
+    public async Task BaseAndVirtualFieldKeysMayMatch()
+    {
+        var fixture = CreateFixture();
+        var template = await CreateTemplate(fixture, Field(null, "score", FieldValueType.Integer, "1"));
+        var formula = await new FormulaService(fixture.Resources, fixture.Content, fixture.Sheets).CreateAsync(Admin, 7,
+            new FormulaCreateRequest { RequestId = Guid.NewGuid(), Name = "Score", Expression = "2", Parameters = [] }, default);
+        var result = await new VirtualFieldService(fixture.Resources, fixture.Content, fixture.Sheets).UpdateTemplateFieldsAsync(Admin, 7, template.Id,
+            new VirtualFieldsUpdateRequest
+            {
+                ExpectedRevision = 1,
+                VirtualFields = [new VirtualFieldInput { Key = "score", Title = "Virtual score", Description = "", ResultType = NumericResultType.Integer, FormulaId = formula.Id, Bindings = new() }]
+            }, default);
+        Assert.Equal("score", fixture.Content.GetData<TemplateContent>("templateContents", 7, template.Id).BaseFields.Single().Key);
+        Assert.Equal("score", result.VirtualFields.Single().Key);
+        Assert.NotEqual(fixture.Content.GetData<TemplateContent>("templateContents", 7, template.Id).BaseFields.Single().Id, result.VirtualFields.Single().Id);
+    }
+
+    [Fact]
+    public async Task FormulaPublicationLeavesPreparedDocumentOnUnknownSqlOutcomeAndDoesNotRetry()
+    {
+        var fixture = CreateFixture();
+        var formulas = new FormulaService(fixture.Resources, fixture.Content, fixture.Sheets);
+        var request = new FormulaCreateRequest { RequestId = Guid.NewGuid(), Name = "Formula", Expression = "1", Parameters = [] };
+        fixture.Resources.FormulaCreateFailure = new CampaignStoreException(true);
+        var unknown = await Assert.ThrowsAsync<DomainException>(() => formulas.CreateAsync(Admin, 7, request, default));
+        Assert.Equal("publication_outcome_unknown", unknown.Code);
+        Assert.NotNull(fixture.Content.GetData<FormulaContent>("formulaContents", 7, request.RequestId!.Value));
+        Assert.Empty(fixture.Resources.Formulas);
+        var duplicate = await Assert.ThrowsAsync<DomainException>(() => formulas.CreateAsync(Admin, 7, request, default));
+        Assert.Equal("content_already_prepared", duplicate.Code);
+        Assert.Empty(fixture.Resources.Formulas);
+        Assert.Equal(1, fixture.Resources.FormulaCreateAttempts);
+    }
 
     [Fact]
     public async Task CharacterStartsWithoutCopiedValuesAndReadsCurrentTemplateFallback()
@@ -506,6 +659,9 @@ public class SheetServiceTests
         public List<TemplateMetadata> Templates { get; } = [];
         public List<CharacterMetadata> Characters { get; } = [];
         public List<CharacterAssignment> Assignments { get; } = [];
+        public List<FormulaMetadata> Formulas { get; } = [];
+        public Exception? FormulaCreateFailure { get; set; }
+        public int FormulaCreateAttempts { get; private set; }
         public int TemplateCreates { get; private set; }
         public int CharacterCreates { get; private set; }
         public Exception? TemplateCreateFailure { get; set; }
@@ -590,6 +746,26 @@ public class SheetServiceTests
             if (assignment is null)
                 return Task.FromResult(false);
             Assignments.Remove(assignment);
+            return Task.FromResult(true);
+        }
+
+        public Task<IReadOnlyList<FormulaMetadata>> ListFormulasAsync(int campaignId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FormulaMetadata>>(Formulas.Where(x => x.CampaignId == campaignId).ToArray());
+        public Task<FormulaMetadata?> GetFormulaAsync(int campaignId, Guid formulaId, CancellationToken cancellationToken) => Task.FromResult(Formulas.SingleOrDefault(x => x.CampaignId == campaignId && x.Id == formulaId));
+        public Task<FormulaMetadata> CreateFormulaAsync(FormulaMetadata formula, CancellationToken cancellationToken)
+        {
+            FormulaCreateAttempts++;
+            if (FormulaCreateFailure is not null) throw FormulaCreateFailure;
+            if (Formulas.Any(x => x.Id == formula.Id)) throw new DuplicateResourceException();
+            formula.MetadataRevision = 1;
+            Formulas.Add(formula);
+            return Task.FromResult(formula);
+        }
+        public Task<bool> RenameFormulaAsync(int campaignId, Guid formulaId, string name, long expectedRevision, CancellationToken cancellationToken)
+        {
+            var formula = Formulas.SingleOrDefault(x => x.CampaignId == campaignId && x.Id == formulaId && x.MetadataRevision == expectedRevision);
+            if (formula is null) return Task.FromResult(false);
+            formula.Name = name;
+            formula.MetadataRevision++;
             return Task.FromResult(true);
         }
     }

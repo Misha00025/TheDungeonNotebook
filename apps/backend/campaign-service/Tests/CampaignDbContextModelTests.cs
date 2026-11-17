@@ -26,6 +26,7 @@ public class CampaignDbContextModelTests
         Assert.Contains("CREATE TABLE `TemplateMetadata`", script);
         Assert.Contains("CREATE TABLE `CharacterMetadata`", script);
         Assert.Contains("CREATE TABLE `CharacterAssignments`", script);
+        Assert.Contains("CREATE TABLE `FormulaMetadata`", script);
     }
 
     [Fact]
@@ -41,6 +42,7 @@ public class CampaignDbContextModelTests
         var template = model.FindEntityType(typeof(TemplateMetadata))!;
         var character = model.FindEntityType(typeof(CharacterMetadata))!;
         var assignment = model.FindEntityType(typeof(CharacterAssignment))!;
+        var formula = model.FindEntityType(typeof(FormulaMetadata))!;
 
         Assert.Equal(new[] { "Id" }, campaign.FindPrimaryKey()!.Properties.Select(x => x.Name));
         Assert.Contains(campaign.GetIndexes(), index => index.IsUnique && index.Properties.Select(x => x.Name).SequenceEqual(new[] { "CreationRequestId" }));
@@ -76,5 +78,10 @@ public class CampaignDbContextModelTests
         Assert.Contains(assignment.GetForeignKeys(), foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(CharacterMetadata) &&
             foreignKey.PrincipalKey.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }));
         Assert.Contains(assignment.GetIndexes(), index => index.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "UserId" }));
+
+        Assert.Equal(new[] { "Id" }, formula.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Contains(formula.GetKeys(), key => key.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }));
+        Assert.True(formula.FindProperty(nameof(FormulaMetadata.MetadataRevision))!.IsConcurrencyToken);
+        Assert.Equal(DeleteBehavior.Restrict, Assert.Single(formula.GetForeignKeys()).DeleteBehavior);
     }
 }

@@ -87,6 +87,17 @@ public sealed class CampaignDbContextModelSnapshot : ModelSnapshot
             entity.ToTable("CharacterAssignments", table => table.HasCheckConstraint("CK_CharacterAssignments_MetadataRevision", "MetadataRevision >= 1"));
         });
 
+        modelBuilder.Entity("Tdn.Campaigns.Sheets.FormulaMetadata", entity =>
+        {
+            entity.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("char(36)");
+            entity.Property<int>("CampaignId").HasColumnType("int");
+            entity.Property<string>("Name").IsRequired().HasColumnType("longtext");
+            entity.Property<long>("MetadataRevision").IsConcurrencyToken().HasColumnType("bigint");
+            entity.HasKey("Id");
+            entity.HasAlternateKey("CampaignId", "Id");
+            entity.ToTable("FormulaMetadata", table => table.HasCheckConstraint("CK_FormulaMetadata_MetadataRevision", "MetadataRevision >= 1"));
+        });
+
         modelBuilder.Entity("Tdn.Campaigns.Sheets.TemplateMetadata", entity =>
         {
             entity.HasOne("Tdn.Campaigns.Campaigns.Campaign", "Campaign")
@@ -110,6 +121,12 @@ public sealed class CampaignDbContextModelSnapshot : ModelSnapshot
             entity.HasOne("Tdn.Campaigns.Campaigns.CampaignMember", "CampaignMember")
                 .WithMany().HasForeignKey("CampaignId", "UserId")
                 .HasPrincipalKey("CampaignId", "UserId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+        });
+
+        modelBuilder.Entity("Tdn.Campaigns.Sheets.FormulaMetadata", entity =>
+        {
+            entity.HasOne("Tdn.Campaigns.Campaigns.Campaign", "Campaign")
+                .WithMany().HasForeignKey("CampaignId").OnDelete(DeleteBehavior.Restrict).IsRequired();
         });
     }
 }

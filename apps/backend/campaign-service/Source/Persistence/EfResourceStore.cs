@@ -102,6 +102,31 @@ public sealed class EfResourceStore(CampaignDbContext db) : IResourceStore
         await db.CharacterAssignments.Where(x => x.CampaignId == campaignId && x.CharacterId == characterId && x.UserId == userId && x.MetadataRevision == expectedRevision)
             .ExecuteDeleteAsync(cancellationToken) == 1;
 
+    public async Task<IReadOnlyList<FormulaMetadata>> ListFormulasAsync(int campaignId, CancellationToken cancellationToken) =>
+        await db.FormulaMetadata.AsNoTracking().Where(x => x.CampaignId == campaignId).OrderBy(x => x.Name).ToArrayAsync(cancellationToken);
+
+    public Task<FormulaMetadata?> GetFormulaAsync(int campaignId, Guid formulaId, CancellationToken cancellationToken) =>
+        db.FormulaMetadata.AsNoTracking().SingleOrDefaultAsync(x => x.CampaignId == campaignId && x.Id == formulaId, cancellationToken);
+
+    public async Task<FormulaMetadata> CreateFormulaAsync(FormulaMetadata formula, CancellationToken cancellationToken)
+    {
+        db.FormulaMetadata.Add(formula);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return formula;
+        }
+        catch (DbUpdateException exception) when (IsMySqlDuplicate(exception))
+        {
+            db.ChangeTracker.Clear();
+            throw new DuplicateResourceException();
+        }
+    }
+
+    public async Task<bool> RenameFormulaAsync(int campaignId, Guid formulaId, string name, long expectedRevision, CancellationToken cancellationToken) =>
+        await db.FormulaMetadata.Where(x => x.CampaignId == campaignId && x.Id == formulaId && x.MetadataRevision == expectedRevision)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.Name, name).SetProperty(x => x.MetadataRevision, x => x.MetadataRevision + 1), cancellationToken) == 1;
+
     private static bool IsMySqlDuplicate(Exception exception)
     {
         for (Exception? current = exception; current is not null; current = current.InnerException)

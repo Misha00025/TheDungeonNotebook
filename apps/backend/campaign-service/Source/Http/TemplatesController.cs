@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
 using Tdn.Campaigns.Access;
 using Tdn.Campaigns.Sheets;
+using Tdn.Campaigns.Computation;
 
 namespace Tdn.Campaigns.Http;
 
 [ApiController]
 [Route("api/campaigns/{campaignId:int}/templates")]
-public sealed class TemplatesController(SheetService sheets) : ControllerBase
+public sealed class TemplatesController(SheetService sheets, VirtualFieldService virtualFields) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<TemplateMetadataDto>>> List(int campaignId, CancellationToken cancellationToken) =>
@@ -34,6 +35,14 @@ public sealed class TemplatesController(SheetService sheets) : ControllerBase
     [HttpPut("{templateId:guid}/content")]
     public async Task<ActionResult<TemplateContentEnvelope>> UpdateContent(int campaignId, Guid templateId, [FromBody] TemplateContentUpdateRequest request, CancellationToken cancellationToken) =>
         Ok(await sheets.UpdateTemplateContentAsync(ReadSubject(), campaignId, templateId, request, cancellationToken));
+
+    [HttpGet("{templateId:guid}/virtual-fields")]
+    public async Task<ActionResult<VirtualFieldsEnvelope>> VirtualFields(int campaignId, Guid templateId, CancellationToken cancellationToken) =>
+        Ok(await virtualFields.GetTemplateFieldsAsync(ReadSubject(), campaignId, templateId, cancellationToken));
+
+    [HttpPut("{templateId:guid}/virtual-fields")]
+    public async Task<ActionResult<VirtualFieldsEnvelope>> UpdateVirtualFields(int campaignId, Guid templateId, [FromBody] VirtualFieldsUpdateRequest request, CancellationToken cancellationToken) =>
+        Ok(await virtualFields.UpdateTemplateFieldsAsync(ReadSubject(), campaignId, templateId, request, cancellationToken));
 
     private Subject? ReadSubject() => SubjectReader.Parse(Request.Headers["X-Subject"].FirstOrDefault());
 }
