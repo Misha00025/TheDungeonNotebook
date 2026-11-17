@@ -10,5 +10,5 @@ RUN dotnet publish campaign-service/CampaignService.csproj -c Release -o /app/pu
 
 FROM base AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "CampaignService.dll"]
