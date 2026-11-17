@@ -9,7 +9,7 @@ interface RemoteBoundaryProps extends RemoteProps {
   module: string;
 }
 
-const RemoteBoundary: React.FC<RemoteBoundaryProps> = ({
+const RemoteLoader: React.FC<RemoteBoundaryProps> = ({
   name,
   module,
   auth,
@@ -53,5 +53,9 @@ const RemoteBoundary: React.FC<RemoteBoundaryProps> = ({
     <RemoteComponent auth={auth} onCompleted={onCompleted} />
   );
 };
+
+const RemoteBoundary: React.FC<RemoteBoundaryProps> = (props) => (
+  <RemoteLoader key={JSON.stringify([props.name, props.module])} {...props} />
+);
 
 export default RemoteBoundary;

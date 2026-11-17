@@ -1,6 +1,7 @@
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate, useResolvedPath } from 'react-router-dom';
 import RemoteBoundary from './RemoteBoundary';
 import type { RemoteModule, RemoteProps } from './types';
 
@@ -109,5 +110,93 @@ describe('RemoteBoundary', () => {
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByTestId('remote-view')).toBeInTheDocument();
+  });
+
+  it('unmounts the old remote before rendering under a different parent route base', async () => {
+    const pendingProfile = deferred<RemoteModule>();
+    const renderLog: string[] = [];
+    let oldRemoteUnmounted = 0;
+    const CampaignHome: React.FC = () => {
+      const location = useLocation();
+      const [capturedLocation] = React.useState(location);
+      const base = useResolvedPath('.').pathname;
+      renderLog.push(`home:${base}`);
+      React.useEffect(() => () => { oldRemoteUnmounted += 1; }, []);
+      return <Routes location={capturedLocation}>
+        <Route path="/" element={<div data-testid="campaign-home" />} />
+      </Routes>;
+    };
+    const Profile: React.FC = () => <div data-testid="profile-view" />;
+    const Navigation: React.FC = () => {
+      const navigate = useNavigate();
+      return <button onClick={() => navigate('/profile')}>profile</button>;
+    };
+    mocks.loadRemoteModule.mockImplementation((name: string, module: string) => {
+      if (name === 'campaign' && module === 'Home') return Promise.resolve({ default: CampaignHome });
+      if (name === 'profile' && module === 'App') return pendingProfile.promise.then(() => ({ default: Profile }));
+      return Promise.resolve(remoteModule);
+    });
+
+    const view = render(<MemoryRouter initialEntries={['/']}>
+      <Navigation />
+      <Routes>
+        <Route path="/groups/*" element={<RemoteBoundary name="campaign" module="Home" auth={auth} />} />
+        <Route path="/profile/*" element={<RemoteBoundary name="profile" module="App" auth={auth} />} />
+        <Route path="/" element={<RemoteBoundary name="campaign" module="Home" auth={auth} />} />
+      </Routes>
+    </MemoryRouter>);
+
+    expect(await screen.findByTestId('campaign-home')).toBeInTheDocument();
+    fireEvent.click(view.getByRole('button', { name: 'profile' }));
+
+    expect(await screen.findByText('Загрузка модуля…')).toBeInTheDocument();
+    expect(screen.queryByTestId('campaign-home')).not.toBeInTheDocument();
+    expect(oldRemoteUnmounted).toBe(1);
+    expect(renderLog).not.toContain('home:/profile');
+    await act(async () => pendingProfile.resolve(remoteModule));
+    expect(await screen.findByTestId('profile-view')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['/groups/12/player/characters', 'campaign', 'App', '/profile'],
+    ['/profile', 'profile', 'App', '/groups/12/player/characters'],
+    ['/', 'campaign', 'Home', '/groups/12/player/characters'],
+  ])('loads the new remote identity on navigation from %s to %s', async (origin, originName, originModule, destination) => {
+    const next = deferred<RemoteModule>();
+    const sourceUnmounts = vi.fn();
+    const Source: React.FC = () => {
+      const location = useLocation();
+      const [acceptedLocation] = React.useState(location);
+      React.useEffect(() => sourceUnmounts, []);
+      return <Routes location={acceptedLocation}><Route path="*" element={<div data-testid="source-remote" />} /></Routes>;
+    };
+    const Destination: React.FC = () => <div data-testid="destination-remote" />;
+    const Navigation: React.FC = () => {
+      const navigate = useNavigate();
+      return <button onClick={() => navigate(destination)}>navigate</button>;
+    };
+    const destinationName = destination.startsWith('/profile') ? 'profile' : 'campaign';
+    const destinationModule = destination === '/profile' ? 'App' : destination.startsWith('/groups') ? 'App' : 'Home';
+    mocks.loadRemoteModule.mockImplementation((name: string, module: string) => {
+      if (name === originName && module === originModule) return Promise.resolve({ default: Source });
+      if (name === destinationName && module === destinationModule) return next.promise.then(() => ({ default: Destination }));
+      return Promise.resolve(remoteModule);
+    });
+    const element = (name: 'campaign' | 'profile', module: string) => <RemoteBoundary name={name} module={module} auth={auth} />;
+    const view = render(<MemoryRouter initialEntries={[origin]}>
+      <Navigation />
+      <Routes>
+        <Route path="/groups/*" element={element('campaign', 'App')} />
+        <Route path="/profile/*" element={element('profile', 'App')} />
+        <Route path="/" element={element('campaign', 'Home')} />
+      </Routes>
+    </MemoryRouter>);
+
+    expect(await screen.findByTestId('source-remote')).toBeInTheDocument();
+    fireEvent.click(view.getByRole('button', { name: 'navigate' }));
+    expect(await screen.findByText('Загрузка модуля…')).toBeInTheDocument();
+    expect(sourceUnmounts).toHaveBeenCalledTimes(1);
+    await act(async () => next.resolve(remoteModule));
+    expect(await screen.findByTestId('destination-remote')).toBeInTheDocument();
   });
 });
