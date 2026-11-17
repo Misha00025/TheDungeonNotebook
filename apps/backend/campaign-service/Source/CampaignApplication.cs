@@ -23,8 +23,8 @@ public static class CampaignApplication
         var migrationValue = builder.Configuration["Database:ApplyMigrations"];
         var defaultImportance = builder.Configuration["Characters:DefaultImportance"] ?? "background";
         var membersCanReadDefinitions = builder.Configuration["Access:MembersCanReadDefinitions"];
-        var mongoConnectionString = builder.Configuration["Mongo:ConnectionString"] ?? string.Empty;
-        var mongoDatabase = builder.Configuration["Mongo:Database"] ?? string.Empty;
+        var mongoConnectionString = builder.Configuration["MONGO_CONNECTION_STRING"] ?? string.Empty;
+        var mongoDatabase = builder.Configuration["MONGO_DATABASE"] ?? string.Empty;
 
         builder.Services.AddProblemDetails();
         builder.Services.AddExceptionHandler<CampaignExceptionHandler>();
@@ -52,11 +52,11 @@ public static class CampaignApplication
         builder.Services.AddOptions<CampaignDatabaseOptions>()
             .Configure(options =>
             {
-                options.ConnectionString = builder.Configuration.GetConnectionString("MySql") ?? string.Empty;
+                options.ConnectionString = builder.Configuration["MYSQL_CONNECTION_STRING"] ?? string.Empty;
                 options.ServerVersion = builder.Configuration["MySql:ServerVersion"] ?? "8.0.36";
                 options.ApplyMigrations = bool.TryParse(migrationValue, out var apply) && apply;
             })
-            .Validate(options => !string.IsNullOrWhiteSpace(options.ConnectionString), "ConnectionStrings:MySql is required.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.ConnectionString), "MYSQL_CONNECTION_STRING is required.")
             .Validate(options => Version.TryParse(options.ServerVersion, out _), "MySql:ServerVersion must be a valid version.")
             .Validate(options => migrationValue is null || bool.TryParse(migrationValue, out _), "Database:ApplyMigrations must be a boolean.")
             .ValidateOnStart();
@@ -83,8 +83,8 @@ public static class CampaignApplication
                 options.ConnectionString = mongoConnectionString;
                 options.Database = mongoDatabase;
             })
-            .Validate(options => !string.IsNullOrWhiteSpace(options.ConnectionString), "Mongo:ConnectionString is required.")
-            .Validate(options => !string.IsNullOrWhiteSpace(options.Database), "Mongo:Database is required.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.ConnectionString), "MONGO_CONNECTION_STRING is required.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.Database), "MONGO_DATABASE is required.")
             .ValidateOnStart();
         builder.Services.AddSingleton<IMongoClient>(services => new MongoClient(services.GetRequiredService<IOptions<MongoOptions>>().Value.ConnectionString));
         builder.Services.AddSingleton<IMongoDatabase>(services => services.GetRequiredService<IMongoClient>().GetDatabase(services.GetRequiredService<IOptions<MongoOptions>>().Value.Database));

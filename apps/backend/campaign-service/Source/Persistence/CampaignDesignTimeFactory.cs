@@ -19,7 +19,7 @@ public sealed class CampaignDesignTimeFactory : IDesignTimeDbContextFactory<Camp
             .AddEnvironmentVariables()
             .AddCommandLine(args)
             .Build();
-        var connectionString = configuration.GetConnectionString("MySql");
+        var connectionString = configuration["MYSQL_CONNECTION_STRING"];
         var versionText = configuration["MySql:ServerVersion"] ?? "8.0.36";
         if (!Version.TryParse(versionText, out var version))
             throw new InvalidOperationException("MySql:ServerVersion must be a valid version.");
