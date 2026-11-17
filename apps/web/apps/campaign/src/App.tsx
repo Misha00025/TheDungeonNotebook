@@ -1,94 +1,56 @@
 import React from 'react';
-import { Routes, Route, Navigate, useParams, Outlet } from 'react-router-dom';
-import { GroupSchemasProvider } from './contexts/GroupSchemasContext';
+import { Link, Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { useAuth, RemoteAuthProvider } from '@tdn/shared';
-import { GroupProvider } from './contexts/GroupContext';
-import { VisitedProvider } from './contexts/VisitedContext';
-import Dashboard from './pages/Dashboard';
-import Groups from './pages/Groups';
-import GroupLayout from './pages/Group/GroupLayout';
-import GroupSettings from './pages/Group/GroupSettings';
-import GroupUsers from './pages/Group/GroupUsers';
-import CharacterTemplates from './pages/Group/Characters/Template/CharacterTemplates';
-import Characters from './pages/Group/Characters/Characters';
-import CharacterLayout from './pages/Group/Characters/CharacterLayout';
-import Character from './pages/Group/Characters/Character/Character';
-import CharacterDashboard from './pages/Group/Characters/Character/CharacterDashboard';
-import CharacterItems from './pages/Group/Characters/Character/CharacterItems';
-import CharacterSkills from './pages/Group/Characters/Character/CharacterSkills';
-import CharacterNotes from './pages/Group/Characters/Character/CharacterNotes';
-import CharacterQuests from './pages/Group/Characters/CharacterQuests';
-import GroupItems from './pages/Group/GroupItems';
-import GroupNotes from './pages/Group/GroupNotes';
-import GroupQuests from './pages/Group/GroupQuests';
-import '@tdn/shared/styles/globals.css';
-import { GroupUsersProvider } from './contexts/GroupUsersContext';
-import { PermissionsProvider } from './contexts/PermissionsContext';
-import GroupSkills from './pages/Group/GroupSkills';
 import type { HubRemoteProps } from '@tdn/shared';
+import { WorkspaceProvider, DirtyProvider, useAcceptedLocation, useWorkspace } from './workspace/Workspace';
+import { useResource } from './workspace/hooks';
+import { ApiError } from './workspace/Feedback';
+import Campaigns from './workspace/Campaigns';
+import Shell from './workspace/Shell';
+import Characters from './workspace/Characters';
+import CampaignOverview from './workspace/CampaignOverview';
+import '@tdn/shared/styles/globals.css';
 
-const GroupSchemasBoundary: React.FC = () => {
-  const { groupId } = useParams<{ groupId: string }>();
-  if (!groupId) {
-    return <Outlet />;
-  }
-  return (
-    <GroupSchemasProvider groupId={Number(groupId)}>
-      <Outlet />
-    </GroupSchemasProvider>
-  );
+const NotFound: React.FC = () => { const { path } = useWorkspace(); return <section><h2>Страница не найдена</h2><Link to={path('/')}>К кампаниям</Link></section>; };
+const ModeEntry: React.FC = () => {
+  const { groupId = '' } = useParams();
+  const { api, path, sessionKey, invalidation } = useWorkspace();
+  const id = Number(groupId);
+  const valid = Boolean(groupId.trim()) && Number.isInteger(id) && id >= -2147483648 && id <= 2147483647;
+  const resource = useResource(`${sessionKey}:${id}:mode-entry:${invalidation}`, () => valid ? api.campaignPermissions(id) : Promise.reject(new Error('Invalid campaign id')));
+  if (!valid) return <NotFound />;
+  if (resource.loading) return <p>Загрузка прав кампании…</p>;
+  if (resource.error) return <ApiError error={resource.error} onRetry={resource.reload} />;
+  return <Navigate to={path(`/${id}/${resource.data?.canWrite ? 'gm/overview' : 'player/characters'}`)} replace />;
 };
-
+const LegacyCharactersEntry: React.FC = () => {
+  const { groupId = '' } = useParams();
+  const { api, path, sessionKey, invalidation } = useWorkspace();
+  const id = Number(groupId);
+  const resource = useResource(`${sessionKey}:${id}:legacy-character-mode:${invalidation}`, () => api.campaignPermissions(id));
+  if (resource.loading) return <p>Загрузка прав кампании…</p>;
+  if (resource.error) return <ApiError error={resource.error} onRetry={resource.reload} />;
+  return <Navigate to={path(`/${id}/${resource.data?.canWrite ? 'gm' : 'player'}/characters`)} replace />;
+};
+const GuardedRoutes: React.FC = () => {
+  const accepted = useAcceptedLocation();
+  return <Routes location={accepted}>
+    <Route index element={<Campaigns />} />
+    <Route path=":groupId" element={<Shell />}>
+      <Route index element={<ModeEntry />} />
+      <Route path="gm/overview" element={<CampaignOverview />} />
+      <Route path="gm/characters" element={<Characters />} />
+      <Route path="player/characters" element={<Characters />} />
+      <Route path="characters" element={<LegacyCharactersEntry />} />
+      <Route path="*" element={<NotFound />} />
+    </Route>
+    <Route path="*" element={<NotFound />} />
+  </Routes>;
+};
 const AppContent: React.FC = () => {
-  const { authenticated } = useAuth();
+  const { authenticated, userId } = useAuth();
   if (!authenticated) return null;
-
-  return (
-    <Routes>
-      <Route index element={<Groups />} />
-      <Route path=":groupId" element={<GroupSchemasBoundary />}>
-        <Route element={<GroupLayout />}>
-          <Route index element={<Navigate to="characters" replace />} />
-          <Route path="characters" element={<Characters />} />
-          <Route path="settings" element={<GroupSettings />} />
-          <Route path="users" element={<GroupUsers />} />
-          <Route path="templates" element={<CharacterTemplates />} />
-          <Route path="skills" element={<GroupSkills />} />
-          <Route path="items" element={<GroupItems />} />
-          <Route path="notes" element={<GroupNotes />} />
-          <Route path="quests" element={<GroupQuests />} />
-        </Route>
-        <Route path="character/:characterId" element={<CharacterLayout />}>
-          <Route index element={<CharacterDashboard />} />
-          <Route path="resources" element={<CharacterDashboard />} />
-          <Route path="stats" element={<Character />} />
-          <Route path="items" element={<CharacterItems />} />
-          <Route path="skills" element={<CharacterSkills />} />
-          <Route path="quests" element={<CharacterQuests />} />
-          <Route path="notes" element={<CharacterNotes />} />
-        </Route>
-      </Route>
-      <Route path="/" element={<Dashboard />} />
-      <Route path="/login" element={<Navigate to="/" replace />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
+  return <WorkspaceProvider key={String(userId)}><DirtyProvider><GuardedRoutes /></DirtyProvider></WorkspaceProvider>;
 };
-
-const App: React.FC<HubRemoteProps> = ({ auth }) => {
-  return (
-    <RemoteAuthProvider auth={auth}>
-      <GroupProvider>
-        <VisitedProvider>
-          <GroupUsersProvider>
-            <PermissionsProvider>
-              <AppContent />
-            </PermissionsProvider>
-          </GroupUsersProvider>
-        </VisitedProvider>
-      </GroupProvider>
-    </RemoteAuthProvider>
-  );
-};
-
+const App: React.FC<HubRemoteProps> = ({ auth }) => <RemoteAuthProvider auth={auth}><AppContent /></RemoteAuthProvider>;
 export default App;

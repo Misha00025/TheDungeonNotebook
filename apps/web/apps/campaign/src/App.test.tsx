@@ -1,94 +1,161 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import App from './App';
+import Home from './Home';
+import type { HubRemoteProps } from '@tdn/shared';
 
-vi.mock('react-markdown', () => ({
-  __esModule: true,
-  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
-vi.mock('@uiw/react-md-editor', () => ({
-  __esModule: true,
-  default: () => null,
-}));
+const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+const makeAuth = (request: (url: string, options?: RequestInit) => Promise<Response>, userId = 4) => ({ status: 'authenticated', authenticated: true, userId, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
+const campaign = (id = 12) => ({ id, name: `Campaign ${id}`, metadataRevision: 1 });
+const permissions = (canWrite = true) => ({ canRead: true, canWrite, canManageAccess: false });
+const renderApp = (initial: string, request: (url: string, options?: RequestInit) => Promise<Response>) => render(<MemoryRouter initialEntries={[initial]}><App auth={makeAuth(request)} /></MemoryRouter>);
 
-vi.mock('@tdn/shared/auth/AuthContext', () => ({
-  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  RemoteAuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useAuth: () => ({
-    status: 'authenticated',
-    authenticated: true,
-    userId: 1,
-    error: null,
-    config: { BFF_BASE: '/bff', API_BASE: '/bff/api' },
-    request: vi.fn(),
-    login: vi.fn(),
-    logout: vi.fn(),
-    refreshSession: vi.fn(),
-  }),
-}));
+describe('campaign first iteration', () => {
+  it('creates with one stable request id and routes to the returned campaign', async () => {
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url === '/api/campaigns' && options?.method === 'POST') return response(campaign(21), 201);
+      if (url === '/api/campaigns/21/permissions') return response(permissions());
+      if (url === '/api/campaigns/21') return response(campaign(21));
+      return response([]);
+    });
+    renderApp('/', request);
+    fireEvent.click(await screen.findByRole('button', { name: 'Создать кампанию' }));
+    fireEvent.change(screen.getByLabelText('Название'), { target: { value: 'New campaign' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Создать$/ }));
+    expect(await screen.findByRole('heading', { name: 'Обзор кампании' })).toBeInTheDocument();
+    const posts = request.mock.calls.filter(([url, options]) => url === '/api/campaigns' && options?.method === 'POST');
+    expect(posts).toHaveLength(1);
+    expect(JSON.parse(String(posts[0][1]?.body))).toEqual({ name: 'New campaign', requestId: expect.any(String) });
+    expect(request.mock.calls.some(([url]) => url === '/api/campaigns/21')).toBe(true);
+  });
 
-vi.mock('./contexts/GroupContext', () => ({
-  GroupProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useGroup: () => ({ selectedGroup: null, setSelectedGroup: vi.fn() }),
-}));
+  it('rechecks an unknown create result with the same UUID and never reposts', async () => {
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url === '/api/campaigns' && options?.method === 'POST') throw new Error('connection lost');
+      if (url.startsWith('/api/campaigns/creation/')) return response({ code: 'not_found', title: 'Not found', detail: 'Not found' }, 404);
+      return response([]);
+    });
+    renderApp('/', request);
+    fireEvent.click(await screen.findByRole('button', { name: 'Создать кампанию' }));
+    fireEvent.change(screen.getByLabelText('Название'), { target: { value: 'Uncertain' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Создать$/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Проверить создание' }));
+    await waitFor(() => expect(request.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1));
+    const posts = request.mock.calls.filter(([url, options]) => url === '/api/campaigns' && options?.method === 'POST');
+    const requestId = JSON.parse(String(posts[0][1]?.body)).requestId;
+    expect(request.mock.calls.filter(([url]) => url === `/api/campaigns/creation/${requestId}`)).toHaveLength(2);
+    expect(JSON.parse(String(posts[0][1]?.body))).toEqual({ name: 'Uncertain', requestId });
+  });
 
-vi.mock('./contexts/VisitedContext', () => ({
-  VisitedProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useVisited: () => ({
-    lastVisitedGroupId: null,
-    lastVisitedCharacters: [],
-    visitGroup: vi.fn(),
-    visitCharacter: vi.fn(),
-    clearVisited: vi.fn(),
-  }),
-}));
+  it('shows only first-iteration destinations and safely rejects direct future and legacy routes', async () => {
+    const unsupported = ['/12/gm/templates', '/12/gm/members', '/12/gm/formulas', '/12/gm/views', '/12/gm/settings', '/12/quests', '/12/items', '/12/character/abcdef01-2345-6789-abcd-ef0123456789'];
+    for (const path of unsupported) {
+      const request = vi.fn(async (url: string) => url.endsWith('/permissions') ? response(permissions()) : url === '/api/campaigns/12' ? response(campaign()) : response([]));
+      const view = renderApp(path, request);
+      expect(await screen.findByRole('heading', { name: 'Страница не найдена' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'К кампаниям' })).toBeInTheDocument();
+      expect(request.mock.calls.map(([url]) => url).some(url => /templates|members|assignments|formulas|views|sheet|quests|items/.test(url))).toBe(false);
+      view.unmount();
+    }
+    const request = vi.fn(async (url: string) => url.endsWith('/permissions') ? response(permissions()) : url === '/api/campaigns/12' ? response(campaign()) : url.endsWith('/characters') ? response([]) : response([]));
+    renderApp('/12/gm/overview', request);
+    expect(await screen.findByRole('heading', { name: 'Обзор кампании' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Обзор' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Персонажи' })).toBeInTheDocument();
+    for (const label of ['Участники', 'Шаблоны', 'Формулы', 'Представления', 'Настройки', 'Создать персонажа']) expect(screen.queryByText(label)).not.toBeInTheDocument();
+  });
 
-vi.mock('./contexts/PermissionsContext', () => ({
-  PermissionsProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  usePermissions: () => ({
-    isGroupAdmin: false,
-    canEditCharacter: false,
-    canDeleteCharacter: false,
-    loading: false,
-  }),
-}));
+  it('denies GM routes without canWrite and independently groups character grants for players', async () => {
+    const id = 'abcdef01-2345-6789-abcd-ef0123456789';
+    const request = vi.fn(async (url: string) => {
+      if (url === '/api/campaigns/12') return response(campaign());
+      if (url === '/api/campaigns/12/permissions') return response(permissions(false));
+      if (url === '/api/campaigns/12/characters') return response([{ id, campaignId: 12, templateId: 't', name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
+      if (url === `/api/campaigns/12/characters/${id}/permissions`) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      return response([]);
+    });
+    const gm = renderApp('/12/gm/overview', request);
+    expect(await screen.findByRole('heading', { name: 'Мои персонажи' })).toBeInTheDocument();
+    gm.unmount();
+    renderApp('/12/player/characters', request);
+    expect(await screen.findByText('Hero')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Могу вести' })).toBeInTheDocument();
+    expect(screen.getByText('Можно вести и редактировать')).toBeInTheDocument();
+    expect(request.mock.calls.some(([url]) => url === `/api/campaigns/12/characters/${id}/permissions`)).toBe(true);
+  });
 
-vi.mock('./contexts/GroupUsersContext', () => ({
-  GroupUsersProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useGroupUsers: () => ({
-    groupUsers: [],
-    groupUsersLoading: false,
-    characterUsers: {},
-    error: null,
-    ensureGroupUsers: vi.fn(),
-    ensureCharacterUsers: vi.fn(),
-    refreshGroupUsers: vi.fn(),
-    refreshCharacterUsers: vi.fn(),
-    invalidateGroupUsers: vi.fn(),
-    invalidateCharacterUsers: vi.fn(),
-  }),
-}));
+  it('keeps a character pending until its permissions resolve and reports permission errors distinctly', async () => {
+    let resolve!: (value: Response) => void;
+    const pending = new Promise<Response>(done => { resolve = done; });
+    const id = 'abcdef02-2345-6789-abcd-ef0123456789';
+    const request = vi.fn(async (url: string) => url === '/api/campaigns/12' ? response(campaign()) : url === '/api/campaigns/12/permissions' ? response(permissions(false)) : url === '/api/campaigns/12/characters' ? response([{ id, campaignId: 12, templateId: 't', name: 'Pending hero', importance: 'Secondary', metadataRevision: 1 }]) : url.endsWith(`/characters/${id}/permissions`) ? pending : response([]));
+    renderApp('/12/player/characters', request);
+    expect(await screen.findByText('Загрузка прав персонажа «Pending hero»…')).toBeInTheDocument();
+    expect(screen.queryByText('Только просмотр')).not.toBeInTheDocument();
+    resolve(response({ code: 'forbidden', title: 'Forbidden', detail: 'No access' }, 403));
+    expect(await screen.findByText(/Не удалось загрузить права для 1 персонажей/)).toBeInTheDocument();
+  });
 
-vi.mock('./contexts/DashboardSettingsContext', () => ({
-  DashboardSettingsProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
+  it('separates empty and unmatched character searches without loading future APIs', async () => {
+    const id = 'abcdef03-2345-6789-abcd-ef0123456789';
+    const request = vi.fn(async (url: string) => url === '/api/campaigns/12' ? response(campaign()) : url === '/api/campaigns/12/permissions' ? response(permissions(false)) : url === '/api/campaigns/12/characters' ? response([{ id, campaignId: 12, templateId: 't', name: 'Hero', importance: 'Background', metadataRevision: 1 }]) : url.endsWith('/permissions') ? response({ canRead: true, canWrite: false, canManageAccess: false }) : response([]));
+    renderApp('/12/player/characters', request);
+    expect(await screen.findByText('Hero')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Поиск персонажей'), { target: { value: 'missing' } });
+    expect(screen.getByText('Совпадений нет.')).toBeInTheDocument();
+    expect(request.mock.calls.map(([url]) => url).some(url => /templates|members|assignments|sheet|computed-sheet/.test(url))).toBe(false);
+  });
 
-vi.mock('./contexts/TemplateEditContext', () => ({
-  TemplateEditProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
+  it('shows the empty character state after a successful empty list, not a numeric zero', async () => {
+    const request = vi.fn(async (url: string) => url === '/api/campaigns/12' ? response(campaign()) : url === '/api/campaigns/12/permissions' ? response(permissions(false)) : response([]));
+    renderApp('/12/player/characters', request);
+    expect(await screen.findByText('Персонажей пока нет.')).toBeInTheDocument();
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
+  });
 
-vi.mock('./pages/Groups', () => ({
-  default: () => <div>Groups</div>,
-}));
+  it('resets workspace drafts when the authenticated user changes', async () => {
+    const request = vi.fn(async () => response([]));
+    const view = render(<MemoryRouter initialEntries={['/']}><App auth={makeAuth(request, 4)} /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Создать кампанию' }));
+    fireEvent.change(screen.getByLabelText('Название'), { target: { value: 'private draft' } });
+    view.rerender(<MemoryRouter initialEntries={['/']}><App auth={makeAuth(request, 5)} /></MemoryRouter>);
+    await waitFor(() => expect(screen.queryByLabelText('Название')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Создать кампанию' })).toBeInTheDocument();
+  });
 
-describe('App', () => {
-  it('renders without crashing', () => {
-    render(
-      <MemoryRouter initialEntries={['/']}>
-        <App auth={{ status: 'authenticated', authenticated: true, userId: 1, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request: vi.fn(), login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }} />
-      </MemoryRouter>
-    );
-    expect(document.body).toBeInTheDocument();
+  it('switches modes and campaigns with isolated campaign IDs', async () => {
+    const request = vi.fn(async (url: string) => {
+      if (url === '/api/campaigns') return response([campaign(), campaign(13)]);
+      if (url === '/api/campaigns/12') return response(campaign());
+      if (url === '/api/campaigns/13') return response(campaign(13));
+      if (url.endsWith('/permissions')) return response(permissions(true));
+      if (url.endsWith('/characters')) return response([]);
+      return response([]);
+    });
+    renderApp('/12/gm/characters', request);
+    fireEvent.click(await screen.findByRole('button', { name: 'Пространство игрока' }));
+    expect(await screen.findByRole('heading', { name: 'Мои персонажи' })).toBeInTheDocument();
+    await screen.findByRole('option', { name: 'Campaign 13' });
+    fireEvent.change(screen.getByLabelText('Кампания'), { target: { value: '13' } });
+    await waitFor(() => expect(request.mock.calls.some(([url]) => url === '/api/campaigns/13/permissions')).toBe(true));
+    expect(await screen.findByRole('heading', { name: 'Campaign 13' })).toBeInTheDocument();
+    expect(request.mock.calls.some(([url]) => url === '/api/campaigns/12/characters')).toBe(true);
+    expect(request.mock.calls.some(([url]) => url === '/api/campaigns/13/characters')).toBe(true);
+  });
+
+  it('supports standalone, nested Hub paths, and Home campaign creation links', async () => {
+    const request = vi.fn(async () => response([]));
+    const standalone = renderApp('/', request);
+    expect(await screen.findByRole('heading', { name: 'Кампании' })).toBeInTheDocument();
+    const home = render(<MemoryRouter initialEntries={['/groups']}><Routes><Route path="/groups/*" element={<Home auth={makeAuth(request)} />} /></Routes></MemoryRouter>);
+    expect(await screen.findByRole('link', { name: 'Создать кампанию' })).toHaveAttribute('href', '/groups?create=1');
+    expect(screen.queryByLabelText('Название')).not.toBeInTheDocument();
+    home.unmount();
+    standalone.unmount();
+    const nestedRequest = vi.fn(async (url: string) => url === '/api/campaigns' ? response([campaign()]) : url.endsWith('/permissions') ? response(permissions()) : response([]));
+    render(<MemoryRouter basename="/tdn" initialEntries={['/tdn']}><App auth={makeAuth(nestedRequest)} /></MemoryRouter>);
+    expect(await screen.findByRole('heading', { name: 'Кампании' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Играть' })).toHaveAttribute('href', '/tdn/12/player/characters');
   });
 });

@@ -1,0 +1,10 @@
+.page { display: grid; gap: 1rem; padding: 1rem; }
+.workspace { display: grid; grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr); min-height: 70vh; gap: 1.5rem; }
+.sidebar { display: flex; flex-direction: column; gap: 1rem; padding: 1rem; }
+.sidebar nav { display: grid; gap: .5rem; }
+.content { min-width: 0; padding: 1rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
+.card { display: grid; gap: .75rem; padding: 1rem; border: 1px solid var(--border-color, currentColor); border-radius: .5rem; }
+.actions { display: flex; gap: 1rem; }
+.mobileToggle { display: none; }
+@media (max-width: 700px) { .workspace { display: block; } .sidebar { display: none; } .sidebar.open { display: flex; } .mobileToggle { display: inline-block; } }

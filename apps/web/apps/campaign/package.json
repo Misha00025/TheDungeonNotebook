@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tdn/shared": "*"
+    "@tdn/shared": "*",
+    "lossless-json": "4.3.0"
   }
 }
