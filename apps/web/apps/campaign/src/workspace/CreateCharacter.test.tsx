@@ -77,7 +77,7 @@ describe('CreateCharacter', () => {
     expect(confirm).toHaveBeenLastCalledWith('Отказаться от проверки операции? Результат создания может оставаться неизвестным.');
     expect(screen.getByRole('dialog', { name: 'Создать персонажа' })).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Проверить создание' }));
-    await screen.findByText('Missing');
+    await screen.findByText('Ресурс не найден.');
     const requestId = shared.api.createCharacter.mock.calls[0][1].requestId;
     expect(shared.api.getCharacter).toHaveBeenNthCalledWith(1, 4, requestId);
     expect(shared.api.getCharacter).toHaveBeenNthCalledWith(2, 4, requestId);

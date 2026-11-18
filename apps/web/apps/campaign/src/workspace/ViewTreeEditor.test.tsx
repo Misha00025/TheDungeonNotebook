@@ -41,7 +41,8 @@ describe('ViewTreeEditor', () => {
     const { rerender } = render(<Harness resetKey={0} validity={validity} />);
     const params = screen.getAllByLabelText('Параметры (JSON)')[0];
     fireEvent.change(params, { target: { value: '{invalid' } });
-    expect(screen.getByRole('alert').textContent).toContain('Некорректный JSON');
+    expect(screen.getByRole('alert')).toHaveTextContent('Некорректный JSON. Проверьте параметры.');
+    expect(screen.getByRole('alert').textContent).not.toContain('position');
     expect(validity).toHaveBeenLastCalledWith(false);
     rerender(<Harness resetKey={1} validity={validity} />);
     expect((screen.getAllByLabelText('Параметры (JSON)')[0] as HTMLTextAreaElement).value).not.toBe('{invalid');
@@ -86,6 +87,14 @@ describe('ViewTreeEditor', () => {
     const params = within(rootFields).getByLabelText('Параметры (JSON)');
     expect(() => fireEvent.change(params, { target: { value: '{invalid' } })).not.toThrow();
     expect(within(rootFields).queryByLabelText('Направление')).toBeNull();
+  });
+
+  it('uses a human fallback label instead of exposing an untitled node key', () => {
+    const privateKey = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    render(<ViewTreeEditor roots={[{ kind: 'layout', nodeKey: privateKey, title: '', params: null, children: [] }]} onChange={vi.fn()} />);
+    expect(screen.getByLabelText('Узел 1')).toBeInTheDocument();
+    expect(screen.getByLabelText('Узел 1')).toHaveAttribute('aria-label', 'Узел 1');
+    expect(screen.getByLabelText('Поля узла Узел 1')).toBeInTheDocument();
   });
 
   it('supports sibling insertion, source ordering and duplicate node-key validation', () => {

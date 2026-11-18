@@ -25,7 +25,9 @@ describe('formatWidget', () => {
 describe('ViewRenderer', () => {
   it('renders nested layouts and widgets independently while continuing past source diagnostics', () => {
     render(<ViewRenderer roots={[{ kind: 'layout', nodeKey: 'a', title: 'outer', params: ['native'], children: [{ kind: 'widget', nodeKey: 'b', title: 'broken', params: null, sources: [], format: '$1', children: [] }, { kind: 'layout', nodeKey: 'c', title: 'inner', params: { direction: 'row' }, children: [{ kind: 'widget', nodeKey: 'd', title: 'healthy', params: 1, sources: [], format: '$1', children: [] }] }] }]} widgets={[{ nodeKey: 'b', sources: [source(0, null, { code: 'unknown_reference' })] }, { nodeKey: 'd', sources: [source(0, 'ok')] }]} />);
-    expect(screen.getAllByText('unknown_reference')).toHaveLength(1);
+     expect(screen.getAllByText('Источник значения недоступен.')).toHaveLength(1);
+     expect(screen.queryByText('unknown_reference')).not.toBeInTheDocument();
+     expect(document.body.textContent).not.toContain('00000000-0000-4000-8000-000000000000');
     expect(screen.getByText('ok')).toBeInTheDocument();
     expect(screen.getByText('outer')).toBeInTheDocument();
   });
@@ -33,5 +35,13 @@ describe('ViewRenderer', () => {
   it('reports declared sources missing from the response', () => {
     render(<ViewRenderer roots={[{ kind: 'widget', nodeKey: 'missing', title: 'Missing', params: {}, children: [], sources: [{ kind: 'Base', fieldId: 'f' }], format: '' }]} widgets={[{ nodeKey: 'missing', sources: [] }]} />);
     expect(screen.getByRole('alert')).toHaveTextContent('Источник $1 отсутствует.');
+  });
+
+  it('renders only a human-readable diagnostic message for formula failures', () => {
+    const privateId = '99999999-9999-4999-8999-999999999999';
+    render(<ViewRenderer roots={[{ kind: 'widget', nodeKey: 'private-node', title: 'Broken formula', params: {}, children: [], sources: [], format: '$1' }]} widgets={[{ nodeKey: 'private-node', sources: [source(0, null, { code: 'formula_error' })] }]} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Не удалось вычислить значение.');
+    expect(document.body.textContent).not.toContain('formula_error');
+    expect(document.body.textContent).not.toContain(privateId);
   });
 });

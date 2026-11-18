@@ -11,20 +11,19 @@ import CreateCharacter from './CreateCharacter';
 type Access = Permissions | { error: unknown };
 const importanceLabel: Record<CharacterMetadata['importance'], string> = { Background: 'Фоновый', Secondary: 'Второстепенный', Key: 'Ключевой' };
 
-const CharacterCard: React.FC<{ character: CharacterMetadata; access: Permissions; href: string; mode: 'gm' | 'player' }> = ({ character, access, href, mode }) => (
+const CharacterCard: React.FC<{ character: CharacterMetadata; href: string; mode: 'gm' | 'player' }> = ({ character, href, mode }) => (
   <Panel
     as="article"
     title={character.name}
     headingLevel={mode === 'player' ? 4 : 3}
-    description={importanceLabel[character.importance] ?? character.importance}
-    status={<Badge>{access.canWrite ? 'Можно вести и редактировать' : 'Только просмотр'}</Badge>}
+    status={<Badge>{importanceLabel[character.importance] ?? character.importance}</Badge>}
     actions={<ActionRow justify="end"><LinkButton to={href} variant="secondary" aria-label={`Открыть лист ${character.name}`}>Открыть лист</LinkButton></ActionRow>}
   />
 );
 
-const CharacterRow: React.FC<{ character: CharacterMetadata; access: Permissions; href: string }> = ({ character, access, href }) => (
+const CharacterRow: React.FC<{ character: CharacterMetadata; href: string }> = ({ character, href }) => (
   <ListItem
-    meta={<><span>{importanceLabel[character.importance] ?? character.importance}</span> · <Badge>{access.canWrite ? 'Можно вести и редактировать' : 'Только просмотр'}</Badge></>}
+    meta={<Badge>{importanceLabel[character.importance] ?? character.importance}</Badge>}
     actions={<LinkButton to={href} variant="secondary" aria-label={`Открыть лист ${character.name}`}>Открыть лист</LinkButton>}
   >
     <strong>{character.name}</strong>
@@ -61,7 +60,6 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
       <PageHeader
         title={mode === 'gm' ? 'Персонажи кампании' : 'Мои персонажи'}
         headingLevel={2}
-        subtitle="Права на каждого персонажа определяются отдельно."
         actions={mode === 'gm'
           ? <Button type="button" disabled={!permissions.canWrite || permissionsLoading || createOpen} onClick={() => setCreateOpen(true)}>Создать персонажа</Button>
           : undefined}
@@ -77,8 +75,8 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
     {filtered.map(character => <PermissionProbe key={`${key}:${character.id}`} character={character} campaignId={campaignId} resourceKey={key} onResult={onResult} />)}
     {mode === 'gm' && <List layout={compact ? 'vertical' : 'grid'} stretch={compact} columns={compact ? undefined : 3} minItemWidth={compact ? undefined : '15rem'}>
       {groups[0][1].map(item => compact
-        ? <CharacterRow key={item.id} character={item} access={accessMap[item.id] as Permissions} href={characterHref(item.id)} />
-        : <CharacterCard key={item.id} character={item} access={accessMap[item.id] as Permissions} href={characterHref(item.id)} mode="gm" />)}
+        ? <CharacterRow key={item.id} character={item} href={characterHref(item.id)} />
+        : <CharacterCard key={item.id} character={item} href={characterHref(item.id)} mode="gm" />)}
     </List>}
     {mode === 'player' && <List layout="grid" columns={2} minItemWidth="18rem">
       {groups.map(([title, items], index) => {
@@ -87,10 +85,10 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
         const mayShowEmpty = filtered.length > 0 && settled && failed.length === 0 && !resource.loading && !resource.error && items.length === 0;
         return <section key={title} aria-labelledby={id}>
           <h3 id={id}>{title}</h3>
-          <List layout="grid" columns={2} minItemWidth="14rem">
+          <List layout="vertical" stretch>
             {items.map(item => compact
-              ? <CharacterRow key={item.id} character={item} access={accessMap[item.id] as Permissions} href={characterHref(item.id)} />
-              : <CharacterCard key={item.id} character={item} access={accessMap[item.id] as Permissions} href={characterHref(item.id)} mode="player" />)}
+              ? <CharacterRow key={item.id} character={item} href={characterHref(item.id)} />
+              : <CharacterCard key={item.id} character={item} href={characterHref(item.id)} mode="player" />)}
             {mayShowEmpty && <StatePanel kind="empty">{emptyLabel}</StatePanel>}
           </List>
         </section>;

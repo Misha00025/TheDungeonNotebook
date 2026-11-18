@@ -99,7 +99,8 @@ describe('CharacterVirtuals', () => {
 
   it('saves an override expression using the shared revision', async () => {
     await openPanel();
-    const override = await screen.findByRole('group', { name: 'Переопределение template-field' });
+    const override = await screen.findByRole('group', { name: 'Переопределение Template field' });
+    expect(override.textContent).not.toContain('template-field');
     const expression = within(override).getByLabelText('Формула');
     fireEvent.change(expression, { target: { value: 'base + 2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить формулу' }));
@@ -118,7 +119,7 @@ describe('CharacterVirtuals', () => {
     let complete: ((value: { contentRevision: number; overrides: { virtualFieldId: string; expression: string }[] }) => void) | undefined;
     api.getOverrides.mockImplementation(() => new Promise(resolve => { complete = resolve; }));
     await openPanel();
-    const override = await screen.findByRole('group', { name: 'Переопределение template-field' });
+    const override = await screen.findByRole('group', { name: 'Переопределение Template field' });
     const field = within(override).getByLabelText('Формула');
     expect(field).toBeDisabled();
     complete?.({ contentRevision: 4, overrides: [{ virtualFieldId: 'template-field', expression: 'server formula' }] });

@@ -21,8 +21,8 @@
 
 | Компонент | Исходный файл |
 | --- | --- |
-| `Button`, `LinkButton` | `packages/shared/src/ui/Buttons/Button.tsx`, `packages/shared/src/ui/Buttons/LinkButton.tsx`, `packages/shared/src/styles/components/Button.module.css` |
-| `Panel`, `Badge`, `StatePanel` | `packages/shared/src/ui/Panel/Panel.tsx`, `packages/shared/src/ui/StatePanel/StatePanel.tsx`, `packages/shared/src/ui/Panel/Panel.module.css` |
+| `Button`, `LinkButton`, `IconButton` | `packages/shared/src/ui/Buttons/Button.tsx`, `packages/shared/src/ui/Buttons/LinkButton.tsx`, `packages/shared/src/ui/Buttons/IconButton/IconButton.tsx`, `packages/shared/src/styles/components/Button.module.css`, `packages/shared/src/ui/Buttons/IconButton/IconButton.module.css` |
+| `Panel`, `Badge`, `StatePanel`, `Statistic` | `packages/shared/src/ui/Panel/Panel.tsx`, `packages/shared/src/ui/Panel/Panel.module.css`, `packages/shared/src/ui/StatePanel/StatePanel.tsx`, `packages/shared/src/ui/Statistic/Statistic.tsx`, `packages/shared/src/ui/Statistic/Statistic.module.css` |
 | `Field`, `Input`, `Select`, `Textarea` | `packages/shared/src/ui/Form/Field.tsx`, `packages/shared/src/ui/Form/Input.tsx`, `packages/shared/src/ui/Form/Select.tsx`, `packages/shared/src/ui/Form/Textarea.tsx`, `packages/shared/src/ui/Form/Field.module.css`, `packages/shared/src/styles/components/Input.module.css` |
 | `WorkspaceLayout` | `packages/shared/src/ui/WorkspaceLayout/WorkspaceLayout.tsx`, `packages/shared/src/ui/WorkspaceLayout/WorkspaceLayout.module.css` |
 | `SectionNav` | `packages/shared/src/ui/SectionNav/SectionNav.tsx`, `packages/shared/src/ui/SectionNav/SectionNav.module.css` |
@@ -46,6 +46,12 @@
 `List` поддерживает `columns={2|3}` и `minItemWidth` для сетки, которая рассчитывается от фактической ширины контейнера; число колонок ограничивает максимум, а не обещает его на узком месте. `auto-fill` оставляет одиночные карточки в track обычного размера. Для текстовой строки с дополнительными данными и действиями используйте `ListItem` props `meta` и `actions`; старый режим целой кликабельной строки не меняется.
 
 `Textarea` — нативный textarea с теми же theme-based контрол-стилями, что `Input`, и вертикальным resize. `Field` остаётся ответственным за label/hint/error association.
+
+`Statistic` принимает отдельные `label` и `value`, выводя их как `dt` и `dd` внутри article; не передавайте этот label повторно как заголовок `Panel`. `Panel` допускает title-only и body-only варианты без пустого body или header. `PageHeader.title` и `subtitle` принимают ReactNode; при нетекстовом title задайте явный `imageAlt`, если в заголовке есть изображение. `IconButton` поддерживает `check` и `close`, `disabled`, `busy` и `ariaLabel`; доступное имя по умолчанию берётся из `title`.
+
+Пользовательские подписи и сообщения об ошибках не должны выводить служебные идентификаторы, ревизии, коды ошибок или необработанные payload/error details. Внутренние DTO, option values и API-запросы при этом сохраняют необходимые идентификаторы и ревизии. JSON, который пользователь редактирует как конфигурацию, остаётся доступным для редактирования и не является debug dump.
+
+В пилотном листе персонажа имя и важность редактируются inline в шапке. Редактирование создаёт локальный dirty draft; blur не сохраняет. Сохранение отправляется только явной командой и использует текущую metadata revision. При конфликте или неизвестном результате выполняется GET для обновления baseline, черновик остаётся на месте, а запись автоматически не повторяется.
 
 Пример формы:
 
@@ -81,3 +87,5 @@ npm run build:game-systems
 ```
 
 Unit/component-тесты проверяют поведение и доступную семантику; они не подтверждают визуальную геометрию. Визуальный просмотр выполняется отдельно. Руководство описывает публичные правила разработки Web и не заменяет визуальную проверку.
+
+`apps/web/.dockerignore` исключает unit/spec-файлы и setup tests из build context для Web-образов. Это ограничение контекста контейнерной сборки; unit-тесты и typecheck запускаются из checkout перечисленными командами.

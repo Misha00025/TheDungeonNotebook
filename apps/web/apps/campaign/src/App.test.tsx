@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import App from './App';
 import Home from './Home';
 import type { HubRemoteProps } from '@tdn/shared';
+import listStyles from '@tdn/shared/ui/List/List.module.css';
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const makeAuth = (request: (url: string, options?: RequestInit) => Promise<Response>, userId = 4) => ({ status: 'authenticated', authenticated: true, userId, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request: async (url: string, options?: RequestInit) => { const result = await request(url, options); if (url.endsWith('/presentation')) { const body = await result.clone().json().catch(() => undefined); if (Array.isArray(body) && body.length === 0) return response({ contentRevision: 0, defaults: {}, contextParams: {} }); } return result; }, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
@@ -145,7 +146,9 @@ describe('campaign first iteration', () => {
     const write = request.mock.calls.find(([url, options]) => url === '/api/campaigns/12' && options?.method === 'PUT');
     expect(JSON.parse(String(write?.[1]?.body))).toEqual({ name: 'Renamed', expectedRevision: 1 });
     expect(await screen.findByText('Название сохранено.')).toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: 'Renamed' })).toBeInTheDocument();
+    expect(await screen.findByRole('option', { name: 'Renamed' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Кампания')).toHaveValue('12');
+    expect(screen.queryByRole('heading', { name: 'Renamed' })).not.toBeInTheDocument();
   });
 
   it('denies GM routes without canWrite and independently groups character grants for players', async () => {
@@ -161,9 +164,15 @@ describe('campaign first iteration', () => {
     expect(await screen.findByRole('heading', { name: 'Мои персонажи' })).toBeInTheDocument();
     gm.unmount();
     renderApp('/12/player/characters', request);
-    expect(await screen.findByText('Hero')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Могу вести' })).toBeInTheDocument();
-    expect(screen.getByText('Можно вести и редактировать')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Hero', level: 4 })).toBeInTheDocument();
+    const canLead = await screen.findByRole('region', { name: 'Могу вести' });
+    expect(within(canLead).getByText('Hero')).toBeInTheDocument();
+    const rows = canLead.querySelector(`:scope > .${listStyles.list}`);
+    expect(rows).toHaveClass(listStyles['layout-vertical'], listStyles.stretch);
+    expect(rows?.querySelector(`.${listStyles['layout-grid']}`)).toBeNull();
+    expect(screen.queryByText('Можно вести и редактировать')).not.toBeInTheDocument();
+    expect(screen.queryByText('Только просмотр')).not.toBeInTheDocument();
+    expect(screen.queryByText('Права на каждого персонажа определяются отдельно.')).not.toBeInTheDocument();
     expect(request.mock.calls.some(([url]) => url === `/api/campaigns/12/characters/${id}/permissions`)).toBe(true);
   });
 
@@ -174,9 +183,10 @@ describe('campaign first iteration', () => {
     const request = vi.fn(async (url: string) => url === '/api/campaigns/12' ? response(campaign()) : url === '/api/campaigns/12/permissions' ? response(permissions(false)) : url === '/api/campaigns/12/characters' ? response([{ id, campaignId: 12, name: 'Pending hero', importance: 'Secondary', metadataRevision: 1 }]) : url.endsWith(`/characters/${id}/permissions`) ? pending : response([]));
     renderApp('/12/player/characters', request);
     expect(await screen.findByText('Загрузка прав персонажа «Pending hero»…')).toBeInTheDocument();
-    expect(screen.queryByText('Только просмотр')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Pending hero', level: 4 })).not.toBeInTheDocument();
     resolve(response({ code: 'forbidden', title: 'Forbidden', detail: 'No access' }, 403));
     expect(await screen.findByText(/Не удалось загрузить права для 1 персонажей/)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Pending hero', level: 4 })).not.toBeInTheDocument();
   });
 
   it('separates empty and unmatched character searches without loading future APIs', async () => {
@@ -272,7 +282,9 @@ describe('campaign first iteration', () => {
     renderApp(`/12/gm/characters/${id}/stats`, request);
     await screen.findByRole('link', { name: 'Характеристики' });
     fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
-    expect(await screen.findByText('Try later')).toBeInTheDocument();
+    expect(await screen.findByText('Зависимый сервис временно недоступен.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('Try later');
+    expect(document.body.textContent).not.toContain('dependency_unavailable');
     expect(screen.getByRole('link', { name: 'Характеристики' })).toHaveAttribute('href', `/12/gm/characters/${id}/stats`);
     expect(screen.queryByRole('heading', { name: 'Мои персонажи' })).not.toBeInTheDocument();
     expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(true);
@@ -310,9 +322,12 @@ describe('campaign first iteration', () => {
     await screen.findByRole('option', { name: 'Campaign 13' });
     fireEvent.change(screen.getByLabelText('Кампания'), { target: { value: '13' } });
     await waitFor(() => expect(request.mock.calls.some(([url]) => url === '/api/campaigns/13/permissions')).toBe(true));
-    expect(await screen.findByRole('heading', { name: 'Campaign 13' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText('Кампания')).toHaveValue('13'));
+    const currentCampaignSelector = screen.getByLabelText('Кампания');
+    expect(within(currentCampaignSelector).getByRole('option', { name: 'Campaign 13' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Campaign 13' })).not.toBeInTheDocument();
     expect(request.mock.calls.some(([url]) => url === '/api/campaigns/12/characters')).toBe(true);
-    expect(request.mock.calls.some(([url]) => url === '/api/campaigns/13/characters')).toBe(true);
+    await waitFor(() => expect(request.mock.calls.some(([url]) => url === '/api/campaigns/13/characters')).toBe(true));
   });
 
   it('supports standalone, nested Hub paths, and Home campaign creation links', async () => {

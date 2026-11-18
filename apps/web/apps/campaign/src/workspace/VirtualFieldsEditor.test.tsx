@@ -20,6 +20,9 @@ describe('VirtualFieldsEditor', () => {
   it('loads parameters for existing formula fields and keeps explicit reference kinds', async () => {
     const field = { ...makeField(), bindings: { amount: { kind: 'Virtual' as const, fieldId: 'virtual-1' }, unknown: { kind: 'Base' as const, fieldId: 'missing' } }, parentVirtualFieldId: 'virtual-1' };
     renderEditor([field]);
+    expect(within(screen.getByLabelText('Формула')).getByRole('option', { name: 'Formula' })).toHaveValue('formula-1');
+    expect(document.body.textContent).not.toContain('formula-1');
+    expect(document.body.textContent).not.toContain('missing');
     expect(await screen.findByLabelText('Параметр amount')).toBeInTheDocument();
     expect((screen.getByLabelText('Параметр amount') as HTMLSelectElement).value).toBe('Virtual:virtual-1');
     expect((screen.getByLabelText('Родитель') as HTMLSelectElement).value).toBe('Virtual:virtual-1');

@@ -181,8 +181,8 @@ export const Formulas: React.FC = () => {
   if (!resource.data && resource.loading) return <p>Загрузка формул…</p>;
   return <main className={styles.page}><h1>Формулы</h1>
     {Boolean(resource.error) && <ApiError error={resource.error} onRetry={resource.reload} />}
-    <label>Выбранная формула<select className={inputStyles.input} value={selected?.id ?? ''} onChange={event => changeSelection(event.target.value)}><option value="">Выберите формулу</option>{resource.data?.map(item => <option key={item.id} value={item.id}>{item.name} ({item.id})</option>)}</select></label>
-    {resource.data && <ul>{resource.data.map(item => <li key={item.id}><button type="button" className={buttonStyles.button} onClick={() => changeSelection(item.id)}>{item.name} ({item.id})</button></li>)}</ul>}
+    <label>Выбранная формула<select className={inputStyles.input} value={selected?.id ?? ''} onChange={event => changeSelection(event.target.value)}><option value="">Выберите формулу</option>{resource.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+    {resource.data && <ul>{resource.data.map(item => <li key={item.id}><button type="button" className={buttonStyles.button} onClick={() => changeSelection(item.id)}>{item.name}</button></li>)}</ul>}
     <button type="button" className={buttonStyles.button} disabled={!writable || creating} onClick={() => { if (writable && !creating && (!dirty || window.confirm('Есть несохранённые изменения. Открыть создание формулы?'))) setCreating(true); }}>Создать формулу</button>
     {creating && <CreateFormula campaignId={campaignId} onCancel={() => setCreating(false)} onCreated={created => { const metadata = created as FormulaMetadata; setSelected(metadata); setCreating(false); resource.reload(); }} />}
     {selected && !creating && <FormulaEditor key={`${campaignId}:${selected.id}`} campaignId={campaignId} formula={selected} />}

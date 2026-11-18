@@ -45,7 +45,9 @@ describe('campaign access and settings', () => {
 
   it('loads user profiles separately and writes a membership grant using its revision', async () => {
     renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
+    expect(document.body.textContent).not.toContain('userId: 21');
+    expect(document.body.textContent).not.toContain('ревизия 8');
     expect(api.listMembers).toHaveBeenCalledWith(4);
     expect(api.getUser).toHaveBeenCalledWith(21);
     fireEvent.click(screen.getByLabelText('Администратор кампании'));
@@ -56,7 +58,7 @@ describe('campaign access and settings', () => {
   it('keeps a successful member value and revision until refreshed props arrive', async () => {
     api.putMember.mockResolvedValueOnce({ ...member, isAdmin: true, metadataRevision: 9 }).mockResolvedValueOnce({ ...member, isAdmin: false, metadataRevision: 10 });
     renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
     const checkbox = screen.getByLabelText('Администратор кампании');
     fireEvent.click(checkbox);
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
@@ -73,7 +75,7 @@ describe('campaign access and settings', () => {
     api.searchUsers.mockResolvedValue([{ id: -32, nickname: 'bob', visibleName: 'Bob' }]);
     api.putMember.mockRejectedValue({ status: 409 });
     renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
     fireEvent.change(screen.getByLabelText('Никнейм'), { target: { value: 'bob' } });
     fireEvent.click(screen.getByRole('button', { name: 'Найти' }));
     fireEvent.change(await screen.findByLabelText('Найденный пользователь'), { target: { value: '-32' } });
@@ -86,7 +88,7 @@ describe('campaign access and settings', () => {
   it('does not list or mutate assignments when the selected character denies access management', async () => {
     api.characterPermissions.mockResolvedValue({ canRead: true, canWrite: true, canManageAccess: false });
     renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
     fireEvent.change(screen.getByLabelText('Персонаж'), { target: { value: characterId } });
     expect(await screen.findByRole('alert')).toHaveTextContent('Нет права управления назначениями');
     expect(api.listAssignments).not.toHaveBeenCalled();
@@ -99,10 +101,10 @@ describe('campaign access and settings', () => {
     api.listMembers.mockResolvedValue([member, sibling]);
     api.getUser.mockImplementation(async (id: number) => id === 21 ? user : { id, nickname: 'bob', visibleName: 'Bob' });
     const view = renderAt(<Members />, '/4/gm/members');
-    const firstRow = (await screen.findByText('userId: 21 · alice')).closest('article');
-    expect(await screen.findByText('userId: 22 · bob')).toBeInTheDocument();
+    const firstRow = (await screen.findByRole('heading', { name: 'Alice' })).closest('article');
+    expect(await screen.findByRole('heading', { name: 'Bob' })).toBeInTheDocument();
     const memberCheckbox = within(firstRow as HTMLElement).getByLabelText('Администратор кампании');
-    const siblingRow = screen.getByText('userId: 22 · bob').closest('article');
+    const siblingRow = screen.getByRole('heading', { name: 'Bob' }).closest('article');
     const siblingCheckbox = within(siblingRow as HTMLElement).getByLabelText('Администратор кампании');
     fireEvent.click(memberCheckbox);
     context.invalidation += 1;
@@ -114,7 +116,7 @@ describe('campaign access and settings', () => {
 
   it('keeps the member row mounted and disables writes while campaign permissions refresh', async () => {
     const view = renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
     const checkbox = screen.getByLabelText('Администратор кампании');
     fireEvent.click(checkbox);
     context.permissionsLoading = true;
@@ -128,7 +130,7 @@ describe('campaign access and settings', () => {
     let resolve!: (value: typeof campaignPermissions) => void;
     api.characterPermissions.mockResolvedValueOnce({ canRead: true, canWrite: true, canManageAccess: true }).mockImplementationOnce(() => new Promise(done => { resolve = done; }));
     const view = renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
     fireEvent.change(screen.getByLabelText('Персонаж'), { target: { value: characterId } });
     const checkbox = await screen.findByLabelText('Может редактировать персонажа');
     fireEvent.click(checkbox);
@@ -144,12 +146,13 @@ describe('campaign access and settings', () => {
     const latest = { ...member, isAdmin: false, metadataRevision: 9 };
     api.listMembers.mockResolvedValueOnce([member]).mockResolvedValue([latest]);
     const view = renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
     const checkbox = screen.getByLabelText('Администратор кампании');
     fireEvent.click(checkbox);
     context.invalidation += 1;
     view.rerender(<MemoryRouter initialEntries={['/4/gm/members']}><Routes><Route path=":groupId/gm/members" element={<Members />} /></Routes></MemoryRouter>);
-    expect(await screen.findByText(/Актуальная версия: участник \(ревизия 9\)/)).toBeInTheDocument();
+    expect(await screen.findByText('Актуальная версия: участник. Черновик сохранён отдельно.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('ревизия 9');
     expect(checkbox).toBeChecked();
     expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Перечитать запись' }));
@@ -163,11 +166,14 @@ describe('campaign access and settings', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     api.characterPermissions.mockResolvedValue({ canRead: true, canWrite: true, canManageAccess: true });
     renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
     fireEvent.change(screen.getByLabelText('Персонаж'), { target: { value: characterId } });
     await screen.findByText(/доступ к персонажу/);
+    expect(document.body.textContent).not.toContain('userId: 21');
+    expect(document.body.textContent).not.toContain('ревизия 11');
     expect(api.characterPermissions).toHaveBeenCalledWith(4, characterId);
     expect(api.listAssignments).toHaveBeenCalledWith(4, characterId);
+    expect(api.getUser).toHaveBeenCalledWith(21);
     fireEvent.click(screen.getByLabelText('Может редактировать персонажа'));
     fireEvent.click(screen.getAllByRole('button', { name: 'Сохранить' }).at(-1)!);
     await waitFor(() => expect(api.putAssignment).toHaveBeenCalledWith(4, characterId, 21, { canWrite: true, expectedRevision: 11 }));
@@ -178,7 +184,7 @@ describe('campaign access and settings', () => {
     api.characterPermissions.mockResolvedValue({ canRead: true, canWrite: true, canManageAccess: true });
     api.putAssignment.mockResolvedValueOnce({ ...assignment, canWrite: true, metadataRevision: 12 }).mockResolvedValueOnce({ ...assignment, canWrite: false, metadataRevision: 13 });
     renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
     fireEvent.change(screen.getByLabelText('Персонаж'), { target: { value: characterId } });
     const checkbox = await screen.findByLabelText('Может редактировать персонажа');
     fireEvent.click(checkbox);
@@ -196,13 +202,13 @@ describe('campaign access and settings', () => {
     api.characterPermissions.mockResolvedValue({ canRead: true, canWrite: true, canManageAccess: true });
     api.listAssignments.mockResolvedValueOnce([assignment]).mockResolvedValue([{ ...assignment, canWrite: false, metadataRevision: 12 }]);
     const view = renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
     fireEvent.change(screen.getByLabelText('Персонаж'), { target: { value: characterId } });
     const checkbox = await screen.findByLabelText('Может редактировать персонажа');
     fireEvent.click(checkbox);
     context.invalidation += 1;
     view.rerender(<MemoryRouter initialEntries={['/4/gm/members']}><Routes><Route path=":groupId/gm/members" element={<Members />} /></Routes></MemoryRouter>);
-    expect(await screen.findByText(/Актуальная версия: только просмотр \(ревизия 12\)/)).toBeInTheDocument();
+    expect(await screen.findByText('Актуальная версия: только просмотр. Черновик сохранён отдельно.')).toBeInTheDocument();
     expect(checkbox).toBeChecked();
     expect(screen.getAllByRole('button', { name: 'Сохранить' }).at(-1)).toBeDisabled();
   });
@@ -212,7 +218,7 @@ describe('campaign access and settings', () => {
     api.deleteMember.mockRejectedValue({ unknownOutcome: true, message: 'connection lost' });
     api.listMembers.mockResolvedValueOnce([member]).mockResolvedValueOnce([]);
     renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
     fireEvent.click(screen.getByRole('button', { name: 'Удалить членство' }));
     await screen.findByText(/Изменение не подтверждено/);
     fireEvent.click(screen.getByRole('button', { name: 'Перечитать запись' }));
@@ -226,7 +232,7 @@ describe('campaign access and settings', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     api.deleteMember.mockRejectedValue({ status: 409, problem: { code: 'member_has_assignments' } });
     renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
     fireEvent.click(screen.getByRole('button', { name: 'Удалить членство' }));
     expect(await screen.findByText(/к участнику привязаны назначения/)).toBeInTheDocument();
     expect(api.deleteAssignment).not.toHaveBeenCalled();
@@ -266,7 +272,8 @@ describe('campaign access and settings', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Перечитать версию' }));
     await waitFor(() => expect(api.getCampaign).toHaveBeenCalledWith(4));
     expect(field).toHaveValue('Keep draft');
-    expect(await screen.findByText(/Текущая версия: «Latest», ревизия 4/)).toBeInTheDocument();
+    expect(await screen.findByText('Текущая версия: «Latest». Черновик: «Keep draft».')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('ревизия 4');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await waitFor(() => expect(api.renameCampaign).toHaveBeenLastCalledWith(4, { name: 'Keep draft', expectedRevision: 4 }));
     expect(await screen.findByText('Название сохранено.')).toBeInTheDocument();
@@ -282,7 +289,7 @@ describe('campaign access and settings', () => {
     expect(field).toHaveValue('Keep name draft');
     expect(screen.getByRole('button', { name: 'Сохранить' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Перечитать версию' }));
-    expect(await screen.findByText(/Текущая версия: «Latest», ревизия 4/)).toBeInTheDocument();
+    expect(await screen.findByText('Текущая версия: «Latest». Черновик: «Keep name draft».')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await waitFor(() => expect(api.renameCampaign).toHaveBeenCalledWith(4, { name: 'Keep name draft', expectedRevision: 4 }));
   });
@@ -307,7 +314,7 @@ describe('campaign access and settings', () => {
     api.putMember.mockRejectedValue({ unknownOutcome: true });
     api.listMembers.mockResolvedValueOnce([member]).mockResolvedValue([member, newMember]);
     renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
     fireEvent.change(screen.getByLabelText('Никнейм'), { target: { value: 'newbie' } });
     fireEvent.click(screen.getByRole('button', { name: 'Найти' }));
     fireEvent.change(await screen.findByLabelText('Найденный пользователь'), { target: { value: '31' } });
@@ -324,7 +331,7 @@ describe('campaign access and settings', () => {
     api.putMember.mockRejectedValueOnce({ unknownOutcome: true }).mockResolvedValue(newMember);
     api.listMembers.mockResolvedValueOnce([member]).mockResolvedValueOnce([member]);
     renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
     fireEvent.change(screen.getByLabelText('Никнейм'), { target: { value: 'newbie' } });
     fireEvent.click(screen.getByRole('button', { name: 'Найти' }));
     fireEvent.change(await screen.findByLabelText('Найденный пользователь'), { target: { value: '31' } });
@@ -341,9 +348,11 @@ describe('campaign access and settings', () => {
     api.listAssignments.mockResolvedValueOnce([]).mockResolvedValue([assignment]);
     api.putAssignment.mockRejectedValue({ unknownOutcome: true });
     renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
     fireEvent.change(screen.getByLabelText('Персонаж'), { target: { value: characterId } });
-    fireEvent.change(await screen.findByLabelText('Добавить участника'), { target: { value: '21' } });
+    const grant = await screen.findByLabelText('Добавить участника') as HTMLSelectElement;
+    expect(await within(grant).findByRole('option', { name: 'Alice (@alice)' })).toHaveValue('21');
+    fireEvent.change(grant, { target: { value: '21' } });
     fireEvent.click(screen.getByRole('button', { name: 'Назначить' }));
     expect(await screen.findByText('Результат добавления назначения не подтверждён.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Проверить добавление' }));
@@ -357,7 +366,7 @@ describe('campaign access and settings', () => {
     api.deleteAssignment.mockRejectedValue({ unknownOutcome: true });
     api.listAssignments.mockResolvedValueOnce([assignment]).mockResolvedValueOnce([]);
     renderAt(<Members />, '/4/gm/members');
-    await screen.findByText(/· alice/);
+    await screen.findByRole('heading', { name: 'Alice' });
     fireEvent.change(screen.getByLabelText('Персонаж'), { target: { value: characterId } });
     const checkbox = await screen.findByLabelText('Может редактировать персонажа');
     fireEvent.click(checkbox);

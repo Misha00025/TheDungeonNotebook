@@ -46,7 +46,9 @@ describe('campaign navigation under the Hub route', () => {
 
     fireEvent.change(screen.getByLabelText('Кампания'), { target: { value: '13' } });
     await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/13/gm/overview'));
-    expect(await screen.findByRole('heading', { name: 'Campaign 13' })).toBeInTheDocument();
+    expect(await screen.findByRole('option', { name: 'Campaign 13' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Кампания')).toHaveValue('13');
+    expect(screen.queryByRole('heading', { name: 'Campaign 13' })).not.toBeInTheDocument();
     await screen.findByRole('navigation', { name: 'Разделы кампании' });
     fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
     await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/13/player/characters'));

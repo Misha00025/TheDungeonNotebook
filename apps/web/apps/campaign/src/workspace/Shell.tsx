@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Navigate, Outlet, useLocation, useParams } from 'react-router-dom';
-import { Badge, BottomNavigation, Breadcrumbs, Button, Field, NavigationIcon, PageHeader, SectionNav, Select, StatePanel, WorkspaceLayout } from '@tdn/shared';
+import { Badge, BottomNavigation, Breadcrumbs, Button, Field, NavigationIcon, SectionNav, Select, StatePanel, WorkspaceLayout } from '@tdn/shared';
 import type { BottomNavigationItem, NavigationIconName } from '@tdn/shared';
 import type { Campaign, Permissions } from './types';
 import { useWorkspace } from './Workspace';
@@ -137,7 +137,6 @@ const CampaignShell: React.FC = () => {
       })} />
     </>} mobileNavigation={<BottomNavigation key={mobileNavigationKey} aria-label={validSheetCharacter ? 'Лист персонажа на телефоне' : 'Навигация кампании на телефоне'} items={mobileItems} />}>
       <Breadcrumbs items={[{ label: 'Кампании', path: path('/') }, { label: campaign.data.name, path: targetMode(mode) }, { label: title }]} />
-      <PageHeader title={campaign.data.name} headingLevel={1} />
       {permission.loading && <StatePanel kind="loading">Обновление прав кампании…</StatePanel>}{Boolean(permission.error) && <ApiError error={permission.error} onRetry={permission.reload} />}{Boolean(switchError) && <ApiError error={switchError} />}<Outlet />
     </WorkspaceLayout>
   </CampaignContext.Provider>;

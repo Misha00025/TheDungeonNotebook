@@ -2,6 +2,7 @@ import React from 'react';
 import { LosslessNumber } from 'lossless-json';
 import type { JsonValue, ViewNode, ViewSourcesResponse } from './types';
 import { displayValue } from './json';
+import { diagnosticMessage } from './displayDiagnostics';
 import commonStyles from '@tdn/shared/styles/common.module.css';
 import styles from './ViewRenderer.module.css';
 
@@ -47,7 +48,7 @@ const NodeView: React.FC<{ node: ViewNode; widgets: Props['widgets'] }> = ({ nod
     {node.kind === 'widget' && (formatted?.error ? !formattedDiagnosticIsListed && <p role="alert">{formatted.error}</p> : <output>{formatted?.text}</output>)}
     {node.kind === 'widget' && !widget && <p role="alert">Источники виджета недоступны.</p>}
     {missingSources.map(index => <p role="alert" key={`missing-${index}`}>Источник ${index + 1} отсутствует.</p>)}
-    {node.kind === 'widget' && widget?.sources.filter(source => source.diagnostic).map(source => <p role="alert" key={source.sourceIndex}>{source.diagnostic?.code}</p>)}
+    {node.kind === 'widget' && widget?.sources.filter(source => source.diagnostic).map(source => <p role="alert" key={source.sourceIndex}>{diagnosticMessage(source.diagnostic!.code)}</p>)}
     {node.children.length > 0 && <div className={styles.children} style={{ display: 'flex', flexDirection: direction }}>{node.children.map(child => <NodeView key={child.nodeKey} node={child} widgets={widgets} />)}</div>}
   </article>;
 };

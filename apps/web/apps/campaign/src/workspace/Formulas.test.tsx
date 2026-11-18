@@ -45,6 +45,14 @@ describe('formula workspace', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Создать формулу' })).not.toBeInTheDocument());
   });
 
+  it('shows formula names without exposing formula identifiers in labels', async () => {
+    renderFormulas();
+    const select = await screen.findByLabelText('Выбранная формула') as HTMLSelectElement;
+    expect(within(select).getByRole('option', { name: 'Original' })).toHaveValue(formula.id);
+    expect(screen.getByRole('button', { name: 'Original' })).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(formula.id);
+  });
+
   it('saves content through revisions independently from metadata', async () => {
     renderFormulas();
     fireEvent.change(await screen.findByLabelText('Выбранная формула'), { target: { value: formula.id } });

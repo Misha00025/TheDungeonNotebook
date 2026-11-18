@@ -1,0 +1,16 @@
+.statistic {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.statistic dt {
+  color: var(--text-secondary);
+}
+
+.statistic dd {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.2;
+}

@@ -24,6 +24,14 @@ beforeEach(() => {
 });
 
 describe('Views workspace', () => {
+  it('shows view names in selectors while preserving opaque option values', async () => {
+    renderPage();
+    const select = await screen.findByLabelText('Выбранное представление') as HTMLSelectElement;
+    expect(within(select).getByRole('option', { name: 'Current' })).toHaveValue(view.id);
+    expect(document.body.textContent).not.toContain(view.id);
+    expect(document.body.textContent).not.toContain(view.key);
+  });
+
   it('renders the nested tree editor and previews only saved content for selected characters', async () => {
     renderPage(); fireEvent.change(await screen.findByLabelText('Выбранное представление'), { target: { value: view.id } });
     expect(await screen.findByDisplayValue('Saved title')).toBeTruthy();
@@ -37,6 +45,8 @@ describe('Views workspace', () => {
 
   it('retains a content draft after revision conflict and requires a fresh snapshot', async () => {
     api.putViewContent.mockRejectedValueOnce(new CampaignApiError(409, { code: 'conflict', title: 'Conflict', detail: 'Conflict' }));
+    const privateId = '99999999-9999-4999-8999-999999999999';
+    api.getViewContent.mockResolvedValueOnce(content).mockResolvedValueOnce({ ...content, data: { roots: [{ ...content.data.roots[0], title: privateId, params: parseJson(`{"private":"${privateId}"}`) }] } });
     renderPage(); fireEvent.change(await screen.findByLabelText('Выбранное представление'), { target: { value: view.id } });
     fireEvent.change(await screen.findByDisplayValue('Saved title'), { target: { value: 'Draft title' } });
     fireEvent.click(screen.getByText('Сохранить содержимое'));
@@ -45,6 +55,10 @@ describe('Views workspace', () => {
     fireEvent.click(screen.getByText('Перечитать содержимое'));
     await waitFor(() => expect(api.getViewContent).toHaveBeenCalledTimes(2));
     expect(screen.getByDisplayValue('Draft title')).toBeTruthy();
+    expect(screen.getByText('Актуальная версия загружена. Черновик сохранён.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(privateId);
+    expect(document.body.textContent).not.toContain('private');
+    expect(api.putViewContent).toHaveBeenCalledTimes(1);
   });
 
   it('saves metadata and tree as independent revisioned sections', async () => {
@@ -73,8 +87,9 @@ describe('Views workspace', () => {
     fireEvent.change(screen.getAllByLabelText('Field ID')[1], { target: { value: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' } });
     fireEvent.change(within(within(widget).getByRole('group', { name: 'Поля узла Saved title' })).getByLabelText('Заголовок'), { target: { value: 'Draft widget' } });
     fireEvent.click(screen.getByText('Сохранить содержимое'));
-    expect(await screen.findByRole('alert')).toHaveTextContent('invalid_source');
-    expect(screen.getByRole('alert')).toHaveTextContent('The source is invalid.');
+    expect(await screen.findByText('Проверьте введённые данные.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('invalid_source');
+    expect(document.body.textContent).not.toContain('The source is invalid.');
     expect(api.putViewContent).toHaveBeenCalledTimes(1);
     const body = api.putViewContent.mock.calls[0][2];
     expect(body.roots[0].sources).toEqual([{ kind: 'Base', fieldId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }, { kind: 'Virtual', fieldId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }]);
@@ -109,7 +124,8 @@ describe('Views workspace', () => {
     api.getPresentation.mockResolvedValue({ contentRevision: 0, defaults: {}, contextParams: { odd: null } });
     renderPage(); fireEvent.click(await screen.findByRole('button', { name: 'Настройки представления кампании' }));
     fireEvent.change(await screen.findByLabelText('Параметры контекста (JSON)'), { target: { value: '{bad' } });
-    expect(screen.getByRole('alert').textContent).toContain('Некорректный JSON');
+    expect(screen.getByRole('alert')).toHaveTextContent('Некорректный JSON. Проверьте параметры.');
+    expect(screen.getByRole('alert').textContent).not.toContain('position');
     fireEvent.click(screen.getByText('Сохранить конфигурацию'));
     expect(api.putPresentation).not.toHaveBeenCalled();
   });
@@ -206,7 +222,8 @@ describe('Views workspace', () => {
     renderPage(); fireEvent.change(await screen.findByLabelText('Выбранное представление'), { target: { value: view.id } });
     fireEvent.change(await screen.findByLabelText('Персонаж'), { target: { value: characterId } });
     fireEvent.click(screen.getByRole('button', { name: 'Предпросмотр сохранённой версии' }));
-    expect(await screen.findByText(/ревизии содержимого предпросмотра не совпадают/i)).toBeTruthy();
+    expect(await screen.findByText('Не удалось выполнить операцию. Попробуйте ещё раз.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('ревизии содержимого предпросмотра не совпадают');
     expect(screen.queryByText('Saved title')).toBeNull();
     expect(api.renameView).not.toHaveBeenCalled(); expect(api.putViewContent).not.toHaveBeenCalled();
   });

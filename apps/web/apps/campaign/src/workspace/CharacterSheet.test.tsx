@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import CharacterSheet from './CharacterSheet';
 import { WorkspaceProvider, DirtyProvider } from './Workspace';
@@ -29,10 +29,10 @@ afterEach(() => {
 });
 
 describe('CharacterSheet', () => {
-  it('renders computed virtual values and diagnostic code without replacing diagnostics with zero', async () => {
+  it('renders computed virtual values with human diagnostics without replacing diagnostics with zero', async () => {
     const computed = { ...sheet, virtualFields: [
       { id: 'value-field', key: 'value', title: 'Computed value', description: '', resultType: 'Number', value: 0, diagnostic: null },
-      { id: 'error-field', key: 'broken', title: 'Broken value', description: '', resultType: 'Number', value: 0, diagnostic: { code: 'formula_error', message: 'Broken formula' } }
+      { id: 'error-field', key: 'broken', title: 'Broken value', description: '', resultType: 'Number', value: 0, diagnostic: { code: 'formula_error', message: 'Broken formula 00000000-0000-4000-8000-000000000001' } }
     ] };
     const request = vi.fn(async (url: string) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: false, canManageAccess: false });
@@ -44,8 +44,10 @@ describe('CharacterSheet', () => {
     const valueCard = await screen.findByRole('heading', { name: 'Computed value' });
     expect(valueCard.closest('article')).toHaveTextContent('0');
     const errorCard = screen.getByRole('heading', { name: 'Broken value' }).closest('article');
-    expect(errorCard).toHaveTextContent('formula_error: Broken formula');
+    expect(errorCard).toHaveTextContent('Не удалось вычислить значение.');
     expect(errorCard).not.toHaveTextContent('0');
+    expect(errorCard).not.toHaveTextContent('formula_error');
+    expect(errorCard).not.toHaveTextContent('00000000-0000-4000-8000-000000000001');
     expect(screen.queryByText(/^Шаблон:/)).not.toBeInTheDocument();
   });
 
@@ -61,27 +63,27 @@ describe('CharacterSheet', () => {
     expect(screen.getAllByText('Задано явно')).toHaveLength(6);
     expect(screen.getByRole('heading', { name: 'Базовые характеристики' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'string', level: 4 })).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('Тип: Integer');
     expect(screen.getByLabelText('string').closest('fieldset')).toBeDisabled();
     expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(true);
     expect(request.mock.calls.map(([url]) => url).some(url => /virtual-fields|formulas|assignments/.test(url))).toBe(false);
     expect(screen.queryByRole('button', { name: /Сбросить/ })).not.toBeInTheDocument();
   });
 
-  it('selects another listed character using an encoded GUID and preserves the active tab', async () => {
-    const otherId = 'abcdef02-2345-6789-abcd-ef0123456789';
+  it('omits the character selector and does not request the characters list', async () => {
     const request = vi.fn(async (url: string) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: false, canManageAccess: false });
       if (url.endsWith('/computed-sheet')) return response(sheet);
-      if (url.endsWith('/characters')) return response([
-        { id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 },
-        { id: otherId, campaignId: 12, name: 'Other', importance: 'Secondary', metadataRevision: 1 }
-      ]);
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       return response([]);
     });
-    renderSheet(request);
-    fireEvent.change(await screen.findByLabelText('Персонаж'), { target: { value: otherId } });
-    expect(screen.getByLabelText('Current path')).toHaveTextContent(`/12/player/characters/${otherId}/stats`);
+    render(sheetTree(request, true, `/12/player/characters/${id}/stats`));
+    expect(await screen.findByText('Только чтение')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Персонаж')).not.toBeInTheDocument();
+    expect(request.mock.calls.filter(([url]) => url === '/api/campaigns/12/characters')).toHaveLength(0);
+    const tabs = screen.getByRole('navigation', { name: 'Лист персонажа' });
+    expect(within(tabs).getByRole('link', { name: 'Характеристики' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'К персонажам' })).toHaveAttribute('href', `/12/player/characters`);
   });
 
   it('renders desktop sheet tabs as links with the current tab marked', async () => {
@@ -134,6 +136,7 @@ describe('CharacterSheet', () => {
       return response([]);
     });
     renderSheet(request);
+    await screen.findByRole('button', { name: 'Сохранить string' });
     const stringInput = await screen.findByLabelText('string');
     fireEvent.change(stringInput, { target: { value: 'new value' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
@@ -157,6 +160,7 @@ describe('CharacterSheet', () => {
       return response([]);
     });
     renderSheet(request);
+    await screen.findByRole('button', { name: 'Сохранить boolean' });
     fireEvent.click(await screen.findByLabelText('boolean'));
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить boolean' }));
     await waitFor(() => expect(screen.getAllByText('Задано явно')).toHaveLength(6));
@@ -166,33 +170,50 @@ describe('CharacterSheet', () => {
     expect(screen.getByLabelText('boolean')).toBeChecked();
   });
 
-  it('blocks a conflicting content write until explicit reread and preserves the draft', async () => {
+  it('automatically rereads a conflicting content write, preserves the draft, and waits for explicit Save', async () => {
     let writes = 0;
     let sheetReads = 0;
     const latest = { ...sheet, contentRevision: 7, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'server', isExplicit: true } : field) };
+    const saved = { ...latest, contentRevision: 8, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'my draft', isExplicit: true } : field) };
+    let resolveRecovery!: (value: Response) => void;
+    const recovery = new Promise<Response>(resolve => { resolveRecovery = resolve; });
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
-      if (url.endsWith('/computed-sheet')) return response(sheetReads++ === 0 ? sheet : { ...latest, virtualFields: [], formulaContentRevisions: [] });
+      if (url.endsWith('/computed-sheet')) {
+        sheetReads += 1;
+        if (sheetReads === 1) return response(sheet);
+        if (sheetReads === 2) return recovery;
+        return response(saved);
+      }
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
-      if (url.endsWith('/base-values/string') && options?.method === 'PUT') { writes += 1; return response({ code: 'conflict', title: 'Conflict', detail: 'Changed' }, 409); }
+      if (url.endsWith('/base-values/string') && options?.method === 'PUT') {
+        writes += 1;
+        return writes === 1 ? response({ code: 'conflict', title: 'Conflict', detail: 'Changed' }, 409) : response(saved);
+      }
       return response([]);
     });
     renderSheet(request);
+    await screen.findByRole('button', { name: 'Сохранить string' });
     fireEvent.change(await screen.findByLabelText('string'), { target: { value: 'my draft' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
-    expect(await screen.findByText('Запись заблокирована до перечитывания снимка.')).toBeInTheDocument();
+    expect(await screen.findByText('Обновляем данные после изменения на сервере. Черновик сохранён.')).toBeInTheDocument();
+    await waitFor(() => expect(sheetReads).toBe(2));
+    expect(screen.getByLabelText('string')).toHaveValue('my draft');
+    expect(screen.getByRole('button', { name: 'Сохранить string' })).toBeDisabled();
     expect(writes).toBe(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Перечитать лист' }));
+    await act(async () => { resolveRecovery(response(latest)); });
+    expect(await screen.findByText('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('string')).toHaveValue('my draft'));
-    expect(screen.getByLabelText('Снимок листа')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Снимок листа')).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить string' })).toBeEnabled());
+    expect(writes).toBe(1);
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
     await waitFor(() => expect(writes).toBe(2));
     const attempts = request.mock.calls.filter(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT');
     expect(attempts.map(([, options]) => JSON.parse(String(options?.body)).expectedRevision)).toEqual([1, 7]);
   });
 
-  it('rereads computed content when returning to stats and blocks a revision change without dropping drafts', async () => {
+  it('automatically recovers a changed revision when returning to stats without dropping drafts', async () => {
     let reads = 0;
     let latest = { ...sheet, contentRevision: 2, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'server value' } : field) };
     const request = vi.fn(async (url: string, options?: RequestInit) => {
@@ -203,13 +224,15 @@ describe('CharacterSheet', () => {
       return response([]);
     });
     const view = render(sheetTree(request, true));
+    await screen.findByRole('button', { name: 'Сохранить string' });
     fireEvent.change(await screen.findByLabelText('string'), { target: { value: 'my retained draft' } });
     view.rerender(sheetTree(request, false));
     view.rerender(sheetTree(request, true));
-    await waitFor(() => expect(reads).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(reads).toBeGreaterThanOrEqual(3));
     expect(screen.getByLabelText('string')).toHaveValue('my retained draft');
-    expect(await screen.findByText('Запись заблокирована до перечитывания снимка.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Перечитать лист' }));
+    expect(await screen.findByText('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Снимок листа')).not.toBeInTheDocument();
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить string' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
     await waitFor(() => expect(request.mock.calls.some(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT')).toBe(true));
@@ -217,21 +240,58 @@ describe('CharacterSheet', () => {
     expect(JSON.parse(String(put?.[1]?.body)).expectedRevision).toBe(2);
   });
 
-  it('does not automatically retry an unknown write outcome', async () => {
+  it('does not retry an unknown write after its automatic snapshot read', async () => {
     let writes = 0;
+    let sheetReads = 0;
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
-      if (url.endsWith('/computed-sheet')) return response(sheet);
+      if (url.endsWith('/computed-sheet')) { sheetReads += 1; return response(sheet); }
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       if (url.endsWith('/base-values/string') && options?.method === 'PUT') { writes += 1; return response({ code: 'write_outcome_unknown', title: 'Unknown', detail: 'Unknown' }, 502); }
       return response([]);
     });
     renderSheet(request);
+    await screen.findByRole('button', { name: 'Сохранить string' });
     fireEvent.change(await screen.findByLabelText('string'), { target: { value: 'draft' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
-    expect(await screen.findByText(/Результат операции неизвестен/)).toBeInTheDocument();
+    expect(await screen.findByText('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.')).toBeInTheDocument();
+    await waitFor(() => expect(sheetReads).toBe(2));
     expect(writes).toBe(1);
-    expect(screen.getByRole('button', { name: 'Сохранить string' })).toBeDisabled();
+    expect(screen.getByLabelText('string')).toHaveValue('draft');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить string' })).toBeEnabled());
+    expect(writes).toBe(1);
+  });
+
+  it('stops after an automatic reread error and retries only after the error action', async () => {
+    let writes = 0;
+    let sheetReads = 0;
+    const latest = { ...sheet, contentRevision: 6 };
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) {
+        sheetReads += 1;
+        if (sheetReads === 2) return response({ code: 'dependency_unavailable', title: 'Unavailable', detail: 'Snapshot unavailable' }, 503);
+        return response(sheetReads === 1 ? sheet : latest);
+      }
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith('/base-values/string') && options?.method === 'PUT') { writes += 1; return response({ code: 'conflict', title: 'Conflict', detail: 'Changed' }, 409); }
+      return response([]);
+    });
+    renderSheet(request);
+    await screen.findByRole('button', { name: 'Сохранить string' });
+    fireEvent.change(await screen.findByLabelText('string'), { target: { value: 'kept draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
+    expect(await screen.findByText('Зависимый сервис временно недоступен.')).toBeInTheDocument();
+    expect(screen.getByLabelText('string')).toHaveValue('kept draft');
+    expect(screen.getByRole('button', { name: 'Повторить загрузку' })).toBeInTheDocument();
+    expect(writes).toBe(1);
+    expect(sheetReads).toBe(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить загрузку' }));
+    expect(await screen.findByText('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.')).toBeInTheDocument();
+    await waitFor(() => expect(sheetReads).toBe(3));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить string' })).toBeEnabled());
+    expect(screen.getByLabelText('string')).toHaveValue('kept draft');
+    expect(writes).toBe(1);
   });
 
   it('refreshes character permissions after a forbidden write without dropping the draft', async () => {
@@ -247,12 +307,110 @@ describe('CharacterSheet', () => {
       return response([]);
     });
     renderSheet(request);
+    await screen.findByRole('button', { name: 'Сохранить string' });
     fireEvent.change(await screen.findByLabelText('string'), { target: { value: 'kept draft' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
     expect(await screen.findByText('Доступ запрещён.')).toBeInTheDocument();
     await waitFor(() => expect(permissionReads).toBeGreaterThan(1));
     expect(screen.getByLabelText('string')).toHaveTextContent('kept draft');
     expect(request.mock.calls.filter(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT')).toHaveLength(1);
+  });
+
+  it.each([409, 502])('automatically rereads metadata after status %s and saves the retained inline draft with the fresh revision', async status => {
+    const initialMetadata = { id, campaignId: 12, name: 'Hero', importance: 'Key' as const, metadataRevision: 11 };
+    const freshMetadata = { ...initialMetadata, name: 'Server name', metadataRevision: 12 };
+    let metadataReads = 0;
+    let writes = 0;
+    let resolveMetadata!: (value: Response) => void;
+    const pendingMetadata = new Promise<Response>(resolve => { resolveMetadata = resolve; });
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(sheet);
+      if (url.endsWith(`/characters/${id}`) && options?.method === 'PUT') {
+        writes += 1;
+        if (writes === 1) return response({ code: status === 502 ? 'write_outcome_unknown' : 'metadata_conflict', title: 'Conflict', detail: 'Changed' }, status);
+        return response({ ...freshMetadata, name: 'Draft name', metadataRevision: 13 });
+      }
+      if (url.endsWith(`/characters/${id}`)) {
+        metadataReads += 1;
+        if (metadataReads === 1) return response(initialMetadata);
+        if (metadataReads === 2) return pendingMetadata;
+        return response(freshMetadata);
+      }
+      return response([]);
+    });
+    render(sheetTree(request, false, `/12/player/characters/${id}/overview`));
+    expect(await screen.findByRole('button', { name: 'Изменить сведения персонажа' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить сведения персонажа' }));
+    const name = screen.getByLabelText('Имя');
+    const importance = screen.getByLabelText('Важность');
+    fireEvent.change(name, { target: { value: 'Draft name' } });
+    fireEvent.change(importance, { target: { value: 'Secondary' } });
+    fireEvent.blur(name);
+    expect(writes).toBe(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить сведения персонажа' }));
+    await waitFor(() => expect(metadataReads).toBe(2));
+    expect(name).toHaveValue('Draft name');
+    expect(name).toBeDisabled();
+    expect(writes).toBe(1);
+    await act(async () => { resolveMetadata(response(freshMetadata)); });
+    expect(await screen.findByText('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Имя')).toHaveValue('Draft name');
+    expect(screen.getByLabelText('Важность')).toHaveValue('Secondary');
+    expect(screen.queryByText('Серверные метаданные: Server name')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить сведения персонажа' })).toBeEnabled());
+    expect(writes).toBe(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить сведения персонажа' }));
+    await waitFor(() => expect(writes).toBe(2));
+    const writeAttempts = request.mock.calls.filter(([url, options]) => url.endsWith(`/characters/${id}`) && options?.method === 'PUT');
+    expect(writeAttempts).toHaveLength(2);
+    expect(JSON.parse(String(writeAttempts[0][1]?.body))).toMatchObject({ expectedRevision: 11 });
+    expect(JSON.parse(String(writeAttempts[1][1]?.body))).toEqual({ name: 'Draft name', importance: 'Secondary', expectedRevision: 12 });
+    expect(await screen.findByRole('heading', { name: 'Draft name' })).toBeInTheDocument();
+  });
+
+  it('does not write on metadata edit or blur and keeps rejected inline cancellation', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const request = vi.fn(async (url: string, _options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(sheet);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 11 });
+      return response([]);
+    });
+    renderSheet(request);
+    fireEvent.click(await screen.findByRole('button', { name: 'Изменить сведения персонажа' }));
+    const name = screen.getByLabelText('Имя');
+    fireEvent.change(name, { target: { value: 'Unsaved name' } });
+    fireEvent.blur(name);
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
+    fireEvent.keyDown(name, { key: 'Escape' });
+    expect(confirm).toHaveBeenCalledWith('Отменить черновик метаданных?');
+    expect(screen.getByLabelText('Имя')).toHaveValue('Unsaved name');
+    fireEvent.click(screen.getByRole('button', { name: 'Отменить изменения сведений персонажа' }));
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(screen.getByLabelText('Имя')).toHaveValue('Unsaved name');
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
+    confirm.mockRestore();
+  });
+
+  it('saves inline metadata once on Enter without an implicit form submission', async () => {
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(sheet);
+      if (url.endsWith(`/characters/${id}`) && options?.method === 'PUT') return response({ id, campaignId: 12, name: 'Enter name', importance: 'Key', metadataRevision: 12 });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 11 });
+      return response([]);
+    });
+    renderSheet(request);
+    fireEvent.click(await screen.findByRole('button', { name: 'Изменить сведения персонажа' }));
+    const name = screen.getByLabelText('Имя');
+    fireEvent.change(name, { target: { value: 'Enter name' } });
+    fireEvent.keyDown(name, { key: 'Enter', isComposing: true });
+    expect(request.mock.calls.filter(([url, options]) => url.endsWith(`/characters/${id}`) && options?.method === 'PUT')).toHaveLength(0);
+    fireEvent.keyDown(name, { key: 'Enter' });
+    await waitFor(() => expect(request.mock.calls.filter(([url, options]) => url.endsWith(`/characters/${id}`) && options?.method === 'PUT')).toHaveLength(1));
+    const write = request.mock.calls.find(([url, options]) => url.endsWith(`/characters/${id}`) && options?.method === 'PUT');
+    expect(JSON.parse(String(write?.[1]?.body))).toEqual({ name: 'Enter name', importance: 'Key', expectedRevision: 11 });
   });
 
   it('serializes description and field writes while keeping independent drafts and metadata revision', async () => {
@@ -279,8 +437,11 @@ describe('CharacterSheet', () => {
       return response([]);
     });
     const view = render(sheetTree(request, false));
+    await screen.findByRole('button', { name: 'Изменить сведения персонажа' });
+    await waitFor(() => expect(screen.getByLabelText('Описание')).toHaveValue('Overview'));
     fireEvent.change(await screen.findByLabelText('Описание'), { target: { value: 'description draft' } });
     view.rerender(sheetTree(request, true));
+    await screen.findByRole('button', { name: 'Сохранить string' });
     fireEvent.change(await screen.findByLabelText('string'), { target: { value: 'saved field' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
     expect(await screen.findByText('Поле сохранено.')).toBeInTheDocument();
@@ -288,8 +449,10 @@ describe('CharacterSheet', () => {
     expect(screen.getByLabelText('Описание')).toHaveValue('description draft');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить описание' }));
     await waitFor(() => expect(request.mock.calls.some(([url, options]) => url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT')).toBe(true));
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить сведения персонажа' }));
     fireEvent.change(screen.getByLabelText('Имя'), { target: { value: 'Renamed' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить метаданные' }));
+    expect(request.mock.calls.filter(([url, options]) => url === `/api/campaigns/12/characters/${id}` && options?.method === 'PUT')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить сведения персонажа' }));
     await waitFor(() => expect(request.mock.calls.some(([url, options]) => url === `/api/campaigns/12/characters/${id}` && options?.method === 'PUT')).toBe(true));
     const metadataWrite = request.mock.calls.find(([url, options]) => url === `/api/campaigns/12/characters/${id}` && options?.method === 'PUT');
     expect(JSON.parse(String(metadataWrite?.[1]?.body))).toEqual({ name: 'Renamed', importance: 'Key', expectedRevision: 11 });
@@ -313,6 +476,7 @@ describe('CharacterSheet', () => {
       return response([]);
     });
     renderSheet(request);
+    await screen.findByRole('button', { name: `Сохранить ${fieldId}` });
     const input = await screen.findByLabelText(fieldId);
     if (valueType === 'Boolean') fireEvent.click(input);
     else if (valueType === 'String') fireEvent.change(input, { target: { value: '' } });

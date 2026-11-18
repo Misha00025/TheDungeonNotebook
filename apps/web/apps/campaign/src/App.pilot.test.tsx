@@ -5,6 +5,7 @@ import type { HubRemoteProps } from '@tdn/shared';
 import App from './App';
 import { CampaignApiError } from './workspace/api';
 import { ApiError } from './workspace/Feedback';
+import listStyles from '@tdn/shared/ui/List/List.module.css';
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const campaign = { id: 12, name: 'Pilot campaign', metadataRevision: 1 };
@@ -12,6 +13,8 @@ const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia')
 const playerCharacters = [
   { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', campaignId: 12, name: 'Writable hero', importance: 'Key', metadataRevision: 1 },
   { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', campaignId: 12, name: 'Read only hero', importance: 'Background', metadataRevision: 1 },
+  { id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', campaignId: 12, name: 'Second writable hero', importance: 'Secondary', metadataRevision: 1 },
+  { id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', campaignId: 12, name: 'Second readonly hero', importance: 'Background', metadataRevision: 1 },
 ];
 const makeAuth = (request: (url: string, options?: RequestInit) => Promise<Response>) => ({ status: 'authenticated', authenticated: true, userId: 4, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
 const CurrentPath: React.FC = () => <output aria-label="Current pathname">{useLocation().pathname}</output>;
@@ -36,10 +39,13 @@ describe('campaign SDK pilot', () => {
     [404, 'Ресурс не найден.'],
     [503, 'Зависимый сервис временно недоступен.'],
   ] as const)('preserves API error feedback for status %s', (status, message) => {
-    render(<ApiError error={new CampaignApiError(status, { code: 'failure', title: 'Failure', detail: 'Details' })} />);
-    expect(screen.getByRole('alert')).toHaveTextContent(message);
-    expect(screen.getByText('Код: failure')).toBeInTheDocument();
-    expect(screen.getByText('Details')).toBeInTheDocument();
+    render(<ApiError error={new CampaignApiError(status, { code: 'failure', title: 'Failure', detail: 'Details', errors: { 'private-field': ['raw validation'] } })} />);
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(message);
+    expect(alert).not.toHaveTextContent('failure');
+    expect(alert).not.toHaveTextContent('Details');
+    expect(alert).not.toHaveTextContent('private-field');
+    expect(alert).not.toHaveTextContent('raw validation');
   });
 
   it('shows player characters in independent permission groups without creation controls', async () => {
@@ -50,16 +56,29 @@ describe('campaign SDK pilot', () => {
       if (url === '/api/campaigns/12/characters') return response(playerCharacters);
       if (url.endsWith(`${playerCharacters[0].id}/permissions`)) return response({ canRead: true, canWrite: true, canManageAccess: false });
       if (url.endsWith(`${playerCharacters[1].id}/permissions`)) return response({ canRead: true, canWrite: false, canManageAccess: false });
+      if (url.endsWith(`${playerCharacters[2].id}/permissions`)) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith(`${playerCharacters[3].id}/permissions`)) return response({ canRead: true, canWrite: false, canManageAccess: false });
       throw new Error(`Unexpected request: ${url}`);
     });
     renderPilot(request, '/groups/12/player/characters');
     expect(await screen.findByRole('heading', { name: 'Writable hero', level: 4 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Second writable hero', level: 4 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Read only hero', level: 4 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Second readonly hero', level: 4 })).toBeInTheDocument();
     const canLead = await screen.findByRole('region', { name: 'Могу вести' });
     const canView = screen.getByRole('region', { name: 'Могу просматривать' });
     expect(within(canLead).getByRole('heading', { name: 'Writable hero', level: 4 })).toBeInTheDocument();
-    expect(within(canLead).getByText('Можно вести и редактировать')).toBeInTheDocument();
+    expect(within(canLead).getByRole('heading', { name: 'Second writable hero', level: 4 })).toBeInTheDocument();
     expect(within(canView).getByRole('heading', { name: 'Read only hero', level: 4 })).toBeInTheDocument();
-    expect(within(canView).getByText('Только просмотр')).toBeInTheDocument();
+    expect(within(canView).getByRole('heading', { name: 'Second readonly hero', level: 4 })).toBeInTheDocument();
+    expect(screen.queryByText('Можно вести и редактировать')).not.toBeInTheDocument();
+    expect(screen.queryByText('Только просмотр')).not.toBeInTheDocument();
+    expect(screen.queryByText('Права на каждого персонажа определяются отдельно.')).not.toBeInTheDocument();
+    for (const group of [canLead, canView]) {
+      const rows = group.querySelector(`:scope > .${listStyles.list}`);
+      expect(rows).toHaveClass(listStyles['layout-vertical'], listStyles.stretch);
+      expect(rows?.querySelector(`.${listStyles['layout-grid']}`)).toBeNull();
+    }
     expect(screen.queryByRole('button', { name: 'Создать персонажа' })).not.toBeInTheDocument();
     expect(screen.queryByRole('main')).not.toBeInTheDocument();
   });
@@ -77,11 +96,12 @@ describe('campaign SDK pilot', () => {
     });
     renderPilot(request, '/groups/12/player/characters');
     expect(await screen.findByText(`Загрузка прав персонажа «${playerCharacters[0].name}»…`)).toBeInTheDocument();
-    expect(screen.queryByText('Только просмотр')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: playerCharacters[0].name, level: 4 })).not.toBeInTheDocument();
     expect(screen.queryByText('Нет персонажей для ведения.')).not.toBeInTheDocument();
     expect(screen.queryByText('Нет персонажей только для просмотра.')).not.toBeInTheDocument();
     await act(async () => { resolvePermissions(response({ canRead: true, canWrite: false, canManageAccess: false })); });
-    expect(await screen.findByRole('heading', { name: playerCharacters[0].name, level: 4 })).toBeInTheDocument();
+    const canView = await screen.findByRole('region', { name: 'Могу просматривать' });
+    expect(within(canView).getByRole('heading', { name: playerCharacters[0].name, level: 4 })).toBeInTheDocument();
   });
 
   it('filters locally, clears search, and renders a GM card with an explicit sheet action', async () => {
@@ -98,6 +118,9 @@ describe('campaign SDK pilot', () => {
     const search = await screen.findByRole('textbox', { name: 'Поиск персонажей' });
     const article = await screen.findByRole('article');
     expect(within(article).getByRole('heading', { name: playerCharacters[0].name, level: 3 })).toBeInTheDocument();
+    expect(within(article).getAllByText('Ключевой')).toHaveLength(1);
+    expect(within(article).queryByText('Можно вести и редактировать')).not.toBeInTheDocument();
+    expect(within(article).queryByText('Только просмотр')).not.toBeInTheDocument();
     expect(within(article).getByRole('link', { name: `Открыть лист ${playerCharacters[0].name}` })).toHaveAttribute('href', `/tdn/groups/12/gm/characters/${playerCharacters[0].id}/overview`);
     expect(within(article).queryByRole('link', { name: playerCharacters[0].name })).not.toBeInTheDocument();
     fireEvent.change(search, { target: { value: 'not found' } });

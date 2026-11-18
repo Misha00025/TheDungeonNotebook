@@ -2,8 +2,8 @@ import React from 'react';
 import styles from './PageLayout.module.css';
 
 export interface PageHeaderProps {
-  title: string;
-  subtitle?: string;
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
   imageUrl?: string;
   imageAlt?: string;
   actions?: React.ReactNode;
@@ -26,7 +26,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
       {imageUrl && (
         <img
           src={imageUrl}
-          alt={imageAlt ?? title}
+          alt={imageAlt ?? (typeof title === 'string' ? title : '')}
           className={styles.headerImage}
         />
       )}

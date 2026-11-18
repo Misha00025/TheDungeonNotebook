@@ -156,11 +156,13 @@ describe('singleton campaign template editor', () => {
     const description = baseDescription();
     fireEvent.change(description, { target: { value: 'Content draft' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить базовые поля' }));
-    await screen.findByText('Conflict');
+    await screen.findByText('Конфликт версии. Черновик сохранён; перечитайте данные перед повторным сохранением.');
     expect(screen.getByRole('button', { name: 'Сохранить базовые поля' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Перечитать содержимое' }));
     await waitFor(() => expect(api.getTemplateContent).toHaveBeenCalledTimes(2));
     expect(description).toHaveValue('Content draft');
+    expect(await screen.findAllByText('Title')).toHaveLength(2);
+    expect(screen.queryByText('immutable: Title')).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить базовые поля' })).toBeEnabled());
     expect(api.putTemplateContent).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить базовые поля' }));
@@ -178,7 +180,7 @@ describe('singleton campaign template editor', () => {
     fireEvent.change(newVirtual.getByLabelText('Название'), { target: { value: 'Calc' } });
     fireEvent.change(newVirtual.getByLabelText('Формула'), { target: { value: 'formula' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить виртуальные поля' }));
-    await screen.findByText('Unknown');
+    await screen.findByText('Результат операции неизвестен. Проверьте данные перед повторной попыткой.');
     expect(screen.getByRole('button', { name: 'Сохранить виртуальные поля' })).toBeDisabled();
     expect(api.putTemplateVirtualFields).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getAllByRole('button', { name: 'Перечитать содержимое' })[1]);

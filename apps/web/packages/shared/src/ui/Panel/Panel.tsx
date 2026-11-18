@@ -28,6 +28,7 @@ export default function Panel({
   ...props
 }: PanelProps) {
   const Heading = `h${headingLevel}` as const;
+  const hasBody = React.Children.toArray(children).length > 0;
 
   return (
     <Element {...props} className={[styles.panel, className].filter(Boolean).join(' ')}>
@@ -40,7 +41,7 @@ export default function Panel({
           {status != null && <div className={styles.status}>{status}</div>}
         </header>
       )}
-      <div className={styles.body}>{children}</div>
+      {hasBody && <div className={styles.body}>{children}</div>}
       {actions != null && <footer className={styles.actions}>{actions}</footer>}
     </Element>
   );

@@ -100,7 +100,10 @@ describe('Home dashboard', () => {
     renderHome(request);
     expect(await screen.findByText('Последняя группа недоступна.')).toBeInTheDocument();
     expect(await screen.findByText('Still available')).toBeInTheDocument();
-    expect(await screen.findByText('Try again')).toBeInTheDocument();
+    expect(await screen.findByText('Зависимый сервис временно недоступен.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('Try again');
+    expect(document.body.textContent).not.toContain('dependency_unavailable');
+    expect(document.body.textContent).not.toContain('Unavailable');
     expect(screen.getByRole('link', { name: 'Открыть персонажа Still available' })).toHaveAttribute('href', `/groups/13/gm/characters/${guidB}/overview`);
     expect(request.mock.calls.some(([url]) => url.includes('/characters/987'))).toBe(false);
     expect(window.localStorage.getItem('lastVisitedCharacters')).toBe(legacyCharacters);

@@ -22,3 +22,7 @@ public/config.json
 .DS_Store
 plans
 docs
+**/*.test.*
+**/*.spec.*
+**/__tests__/**
+**/setupTests.*

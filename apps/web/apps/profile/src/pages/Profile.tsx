@@ -151,9 +151,6 @@ const Profile: React.FC = () => {
 
           <div className={styles.info}>
             <div className={styles.field}>
-              <strong>ID:</strong> {profile.id}
-            </div>
-            <div className={styles.field}>
               <strong>Никнейм:</strong> {profile.nickname}
             </div>
             

@@ -52,7 +52,7 @@ export const ViewTreeEditor: React.FC<Props> = ({ roots, onChange, disabled = fa
     return change(rows, 0);
   };
   const renderRows = (list: Row[], path: number[] = []): React.ReactNode => list.map((row, index) => {
-    const at = [...path, index]; const node = row.node;
+     const at = [...path, index]; const node = row.node; const nodeLabel = node.title || `Узел ${index + 1}`; const nodeGroupLabel = node.title ? `Узел ${node.title}` : nodeLabel;
     const update = (patch: Partial<ViewNode>) => publish(setAt(at, item => ({ ...item, node: { ...item.node, ...patch } as ViewNode })));
     const replaceNode = (next: ViewNode) => publish(setAt(at, item => ({ ...item, node: next })));
     const paramChange = (text: string) => {
@@ -61,8 +61,8 @@ export const ViewTreeEditor: React.FC<Props> = ({ roots, onChange, disabled = fa
       publish(setAt(at, item => ({ ...item, paramsText: text, paramsError, node: paramsError ? item.node : { ...item.node, params } as ViewNode })));
     };
     const addSource = () => update({ sources: [...(node.kind === 'widget' ? node.sources : []), { kind: 'Base', fieldId: '' }] } as Partial<WidgetNode>);
-    return <section className={commonStyles.card} key={row.id} aria-label={`Узел ${node.title || node.nodeKey || index + 1}`}>
-      <fieldset disabled={disabled} className={styles.nodeFields} aria-label={`Поля узла ${node.title || node.nodeKey || index + 1}`}>
+     return <section className={commonStyles.card} key={row.id} aria-label={nodeGroupLabel}>
+       <fieldset disabled={disabled} className={styles.nodeFields} aria-label={`Поля узла ${nodeLabel}`}>
         <label className={commonStyles.formGroup}>Тип<select className={inputStyles.input} value={node.kind} onChange={event => {
           const kind = event.target.value as 'layout' | 'widget'; if (kind === node.kind) return;
           if (node.kind === 'widget' && !window.confirm('Преобразовать в Layout и удалить источники и формат?')) return;
@@ -72,7 +72,7 @@ export const ViewTreeEditor: React.FC<Props> = ({ roots, onChange, disabled = fa
         <label className={commonStyles.formGroup}>nodeKey<input className={inputStyles.input} value={node.nodeKey} onChange={event => update({ nodeKey: event.target.value })} /></label>
         <label className={commonStyles.formGroup}>Заголовок<input className={inputStyles.input} value={node.title} onChange={event => update({ title: event.target.value })} /></label>
         <label className={commonStyles.formGroup}>Параметры (JSON)<textarea className={inputStyles.input} value={row.paramsText} onChange={event => paramChange(event.target.value)} /></label>
-        {row.paramsError && <p role="alert">Некорректный JSON: {row.paramsError}</p>}
+         {row.paramsError && <p role="alert">Некорректный JSON. Проверьте параметры.</p>}
         {node.params !== null && typeof node.params === 'object' && !Array.isArray(node.params) && !isLosslessNumber(node.params) && !row.paramsError && <label className={commonStyles.formGroup}>Направление<select className={inputStyles.input} value={(node.params as Record<string, JsonValue>).direction === 'row' ? 'row' : 'column'} onChange={event => { try { const current = parseJson(row.paramsText); if (!current || typeof current !== 'object' || Array.isArray(current) || isLosslessNumber(current)) return; paramChange(stringifyJson({ ...current, direction: event.target.value }, 2)); } catch { return; } }}><option value="column">Колонка</option><option value="row">Строка</option></select></label>}
         {node.kind === 'widget' && <>
           <label className={commonStyles.formGroup}>Формат<textarea className={inputStyles.input} value={node.format} onChange={event => update({ format: event.target.value } as Partial<WidgetNode>)} /></label>
@@ -86,7 +86,7 @@ export const ViewTreeEditor: React.FC<Props> = ({ roots, onChange, disabled = fa
           </div>)}<button type="button" className={buttonStyles.button} onClick={addSource}>Добавить источник</button>
         </>}
       </fieldset>
-      <div className={styles.actions}><button type="button" aria-label={`Узел ${node.title || node.nodeKey || index + 1}: вверх`} disabled={disabled || index === 0} className={buttonStyles.button} onClick={() => mutate(at, (items, i) => { const next = items.slice(); [next[i - 1], next[i]] = [next[i], next[i - 1]]; return next; })}>↑</button><button type="button" aria-label={`Узел ${node.title || node.nodeKey || index + 1}: вниз`} disabled={disabled || index === list.length - 1} className={buttonStyles.button} onClick={() => mutate(at, (items, i) => { const next = items.slice(); [next[i + 1], next[i]] = [next[i], next[i + 1]]; return next; })}>↓</button><button type="button" disabled={disabled} className={buttonStyles.button} onClick={() => { if (window.confirm('Удалить узел и всё его содержимое?')) mutate(at, (items, i) => items.filter((_, n) => n !== i)); }}>Удалить</button></div>
+       <div className={styles.actions}><button type="button" aria-label={`${nodeGroupLabel}: вверх`} disabled={disabled || index === 0} className={buttonStyles.button} onClick={() => mutate(at, (items, i) => { const next = items.slice(); [next[i - 1], next[i]] = [next[i], next[i - 1]]; return next; })}>↑</button><button type="button" aria-label={`${nodeGroupLabel}: вниз`} disabled={disabled || index === list.length - 1} className={buttonStyles.button} onClick={() => mutate(at, (items, i) => { const next = items.slice(); [next[i + 1], next[i]] = [next[i], next[i + 1]]; return next; })}>↓</button><button type="button" disabled={disabled} className={buttonStyles.button} onClick={() => { if (window.confirm('Удалить узел и всё его содержимое?')) mutate(at, (items, i) => items.filter((_, n) => n !== i)); }}>Удалить</button></div>
       <h4>Дочерние узлы</h4>{renderRows(row.children, at)}
       <button type="button" disabled={disabled} className={buttonStyles.button} onClick={() => mutate(at, (items, i) => items.map((item, n) => n === i ? { ...item, children: [...item.children, makeNode('layout')] } : item))}>Добавить Layout</button>
       <button type="button" disabled={disabled} className={buttonStyles.button} onClick={() => mutate(at, (items, i) => items.map((item, n) => n === i ? { ...item, children: [...item.children, makeNode('widget')] } : item))}>Добавить Widget</button>
