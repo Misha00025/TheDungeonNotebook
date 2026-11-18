@@ -6,7 +6,7 @@ import Home from './Home';
 import type { HubRemoteProps } from '@tdn/shared';
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
-const makeAuth = (request: (url: string, options?: RequestInit) => Promise<Response>, userId = 4) => ({ status: 'authenticated', authenticated: true, userId, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
+const makeAuth = (request: (url: string, options?: RequestInit) => Promise<Response>, userId = 4) => ({ status: 'authenticated', authenticated: true, userId, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request: async (url: string, options?: RequestInit) => { const result = await request(url, options); if (url.endsWith('/presentation')) { const body = await result.clone().json().catch(() => undefined); if (Array.isArray(body) && body.length === 0) return response({ contentRevision: 0, defaults: {}, contextParams: {} }); } return result; }, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
 const campaign = (id = 12) => ({ id, name: `Campaign ${id}`, metadataRevision: 1 });
 const permissions = (canWrite = true) => ({ canRead: true, canWrite, canManageAccess: false });
 const renderApp = (initial: string, request: (url: string, options?: RequestInit) => Promise<Response>) => render(<MemoryRouter initialEntries={[initial]}><App auth={makeAuth(request)} /></MemoryRouter>);
@@ -48,8 +48,14 @@ describe('campaign first iteration', () => {
     expect(JSON.parse(String(posts[0][1]?.body))).toEqual({ name: 'Uncertain', requestId });
   });
 
-  it('shows supported destinations and safely rejects future routes', async () => {
-    const unsupported = ['/12/gm/views', '/12/quests', '/12/items', ...['items', 'skills', 'quests', 'notes'].map(tab => `/12/character/abcdef01-2345-6789-abcd-ef0123456789/${tab}`)];
+  it('routes views and safely rejects unsupported destinations', async () => {
+    const supported = vi.fn(async (url: string, _options?: RequestInit) => url.endsWith('/permissions') ? response(permissions()) : url === '/api/campaigns/12' ? response(campaign()) : url.endsWith('/views') ? response([]) : response([]));
+    const supportedView = renderApp('/12/gm/views', supported);
+    expect(await screen.findByRole('heading', { name: 'Представления' })).toBeInTheDocument();
+    expect(supported.mock.calls.some(([url]) => url === '/api/campaigns/12/views')).toBe(true);
+    expect(supported.mock.calls.some(([url, options]) => url.includes('/views') && options?.method === 'DELETE')).toBe(false);
+    supportedView.unmount();
+    const unsupported = ['/12/quests', '/12/items', ...['items', 'skills', 'quests', 'notes'].map(tab => `/12/character/abcdef01-2345-6789-abcd-ef0123456789/${tab}`)];
     for (const path of unsupported) {
       const request = vi.fn(async (url: string) => url.endsWith('/permissions') ? response(permissions()) : url === '/api/campaigns/12' ? response(campaign()) : response([]));
       const view = renderApp(path, request);
@@ -61,10 +67,12 @@ describe('campaign first iteration', () => {
     const request = vi.fn(async (url: string) => url.endsWith('/permissions') ? response(permissions()) : url === '/api/campaigns/12' ? response(campaign()) : url.endsWith('/characters') ? response([]) : response([]));
     renderApp('/12/gm/overview', request);
     expect(await screen.findByRole('heading', { name: 'Обзор кампании' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Обзор' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Персонажи' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Шаблоны' })).toBeInTheDocument();
-    expect(screen.queryByText('Представления')).not.toBeInTheDocument();
+    const campaignNavigation = within(screen.getByRole('navigation', { name: 'Разделы кампании' }));
+    expect(campaignNavigation.getByRole('link', { name: 'Обзор' })).toBeInTheDocument();
+    expect(campaignNavigation.getByRole('link', { name: 'Персонажи' })).toBeInTheDocument();
+    expect(campaignNavigation.getByRole('link', { name: 'Шаблоны' })).toBeInTheDocument();
+    expect(campaignNavigation.getByRole('link', { name: 'Представления' })).toBeInTheDocument();
+    expect(campaignNavigation.queryByRole('link', { name: /Предметы|Навыки|Задания|Заметки|Отряды/ })).toBeNull();
     for (const label of ['Создать персонажа']) expect(screen.queryByText(label)).not.toBeInTheDocument();
   });
 
@@ -85,7 +93,7 @@ describe('campaign first iteration', () => {
   });
 
   it('keeps player direct GM links out of membership and assignment APIs', async () => {
-    for (const route of ['/12/gm/members', '/12/gm/settings']) {
+    for (const route of ['/12/gm/members', '/12/gm/settings', '/12/gm/views']) {
       const request = vi.fn(async (url: string) => {
         if (url === '/api/campaigns/12') return response(campaign());
         if (url === '/api/campaigns/12/permissions') return response(permissions(false));

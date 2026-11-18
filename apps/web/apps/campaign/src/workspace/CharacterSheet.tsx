@@ -12,6 +12,7 @@ import inputStyles from '@tdn/shared/styles/components/Input.module.css';
 import styles from './Workspace.module.css';
 import commonStyles from '@tdn/shared/styles/common.module.css';
 import { CharacterVirtuals } from './CharacterVirtuals';
+import CharacterPresentation from './CharacterPresentation';
 
 const importanceLabel: Record<string, string> = { Background: 'Фоновый', Secondary: 'Второстепенный', Key: 'Ключевой' };
 type MetadataDraft = { name: string; importance: CharacterMetadata['importance'] };
@@ -29,6 +30,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
   const [metadata, setMetadata] = useState<CharacterMetadata>();
   const [metadataDraft, setMetadataDraft] = useState<MetadataDraft>();
   const [sheet, setSheet] = useState<ComputedSheet>();
+  const [presentationRefreshKey, setPresentationRefreshKey] = useState(0);
   const [descriptionDraft, setDescriptionDraft] = useState<string>();
   const [fieldDrafts, setFieldDrafts] = useState<Record<string, JsonValue>>({});
   const [validity, setValidity] = useState<Record<string, string | undefined>>({});
@@ -64,6 +66,9 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
     contentRevisionRef.current = sheetResource.data.contentRevision;
   }, [metadataResource.data, sheetResource.data]);
   useEffect(() => {
+    if (sheetResource.data) setPresentationRefreshKey(value => value + 1);
+  }, [sheetResource.data]);
+  useEffect(() => {
     const returningToStats = stats && !previousStatsRef.current;
     previousStatsRef.current = stats;
     if (!returningToStats || contentBusyRef.current || snapshotBusyRef.current) return;
@@ -71,6 +76,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
     setSnapshotBusy(true);
     void api.getComputedSheet(campaignId, characterId).then(fresh => {
       if (!activeRef.current) return;
+      setPresentationRefreshKey(value => value + 1);
       const revisionChanged = contentRevisionRef.current !== undefined && stringifyJson(fresh.contentRevision) !== stringifyJson(contentRevisionRef.current);
       setSheet(current => current ? { ...current, ...fresh } : fresh);
       if (revisionChanged && anyDraftDirty) {
@@ -140,6 +146,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
       try {
         const fresh = await api.getComputedSheet(campaignId, characterId);
         if (!activeRef.current) return;
+        setPresentationRefreshKey(value => value + 1);
         setSheet(current => current ? { ...current, ...fresh } : fresh);
         if (stringifyJson(fresh.contentRevision) !== stringifyJson(result.contentRevision) && anyDraftDirty) {
           setSheetSnapshot(fresh);
@@ -212,6 +219,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
     try {
       const freshSheet = await api.getComputedSheet(campaignId, characterId);
       if (!activeRef.current || generation !== snapshotGenerationRef.current) return;
+      setPresentationRefreshKey(value => value + 1);
       setSheet(freshSheet);
       setSheetSnapshot(freshSheet);
       contentRevisionRef.current = freshSheet.contentRevision;
@@ -318,7 +326,8 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
       <label>Важность<select className={inputStyles.input} value={metadataDraft?.importance ?? metadata.importance} onFocus={ensureMetadataDraft} onChange={event => { ensureMetadataDraft(); setMetadataDraft(current => ({ ...(current ?? { name: metadata.name, importance: metadata.importance }), importance: event.target.value as CharacterMetadata['importance'] })); }}><option value="Background">Фоновый</option><option value="Secondary">Второстепенный</option><option value="Key">Ключевой</option></select></label>
       <button className={buttonStyles.button} type="button" disabled={!metadataDirty || metadataMutation.busy || metadataBlocked || !canWrite} onClick={() => void saveMetadata()}>Сохранить метаданные</button>
       <button className={buttonStyles.button} type="button" disabled={!metadataDraft || metadataMutation.busy || !canWrite} onClick={cancelMetadata}>Отмена</button>
-    </fieldset>}
+     </fieldset>}
+    {!stats && <CharacterPresentation campaignId={campaignId} characterId={characterId} refreshKey={presentationRefreshKey} />}
   </section>;
 };
 

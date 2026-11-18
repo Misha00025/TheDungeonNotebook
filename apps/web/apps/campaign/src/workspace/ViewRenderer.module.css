@@ -1,0 +1,12 @@
+.roots,
+.children {
+  gap: 1rem;
+}
+
+.roots {
+  display: grid;
+}
+
+.node {
+  min-width: 0;
+}

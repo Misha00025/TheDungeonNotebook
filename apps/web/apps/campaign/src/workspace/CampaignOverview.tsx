@@ -17,6 +17,7 @@ const CampaignOverview: React.FC = () => {
     <Link to={path(`/${campaign.id}/${mode}/characters`)}>К списку персонажей</Link>
     <Link to={path(`/${campaign.id}/gm/templates`)}>Настроить шаблоны</Link>
     <Link to={path(`/${campaign.id}/gm/formulas`)}>Настроить формулы</Link>
+    <Link to={path(`/${campaign.id}/gm/views`)}>Настроить представления</Link>
     <Characters compact />
   </section>;
 };
