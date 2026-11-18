@@ -4,6 +4,7 @@ import { useWorkspace } from './Workspace';
 import { useResource } from './hooks';
 import { useCampaignWorkspace } from './Shell';
 import Characters from './Characters';
+import GMOverviewRoster from './GMOverviewRoster';
 import { ApiError } from './Feedback';
 
 const CampaignOverview: React.FC = () => {
@@ -27,7 +28,9 @@ const CampaignOverview: React.FC = () => {
     </List>
     <List layout="grid" columns={2} minItemWidth="18rem">
       <Panel title="Персонажи кампании" headingLevel={3}>
-        <Characters compact />
+        {mode === 'gm'
+          ? characters.data !== undefined && <GMOverviewRoster campaignId={campaign.id} characters={characters.data} resourceKey={`${sessionKey}:${campaign.id}:overview-roster:${invalidation}`} />
+          : <Characters compact />}
       </Panel>
       <Panel title="Быстрые действия" headingLevel={3}>
         <List layout="vertical" stretch>

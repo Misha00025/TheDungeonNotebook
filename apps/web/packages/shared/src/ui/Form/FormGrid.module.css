@@ -1,0 +1,13 @@
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--form-column-min)), 1fr));
+  gap: 0.375rem 0.625rem;
+  min-width: 0;
+  align-items: start;
+}
+
+.formGrid > label {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}

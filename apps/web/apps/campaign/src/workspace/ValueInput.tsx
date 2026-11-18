@@ -44,7 +44,7 @@ export function validateFieldValue(field: Field, value: JsonValue, raw?: string)
   }
 }
 
-export const ValueInput: React.FC<{ field: Field; value: JsonValue; onChange: (value: JsonValue) => void; onValidityChange?: (error: string | undefined) => void; disabled?: boolean; label?: string }> = ({ field, value, onChange, onValidityChange, disabled = false, label }) => {
+export const ValueInput: React.FC<{ field: Field; value: JsonValue; onChange: (value: JsonValue) => void; onValidityChange?: (error: string | undefined) => void; disabled?: boolean; label?: string; compact?: boolean }> = ({ field, value, onChange, onValidityChange, disabled = false, label, compact = false }) => {
   const numeric = field.valueType === 'Integer' || field.valueType === 'Number';
   const [draft, setDraft] = useState(() => numeric ? rawNumber(value) : '');
   const validityCallback = useRef(onValidityChange);
@@ -53,7 +53,7 @@ export const ValueInput: React.FC<{ field: Field; value: JsonValue; onChange: (v
   const error = validateFieldValue(field, value, numeric ? draft : undefined);
   useEffect(() => { validityCallback.current?.(error); }, [error]);
   if (disabled) return <output aria-label={label}>{displayValue(value)}</output>;
-  if (field.valueType === 'String') return <Textarea aria-label={label} value={typeof value === 'string' ? value : ''} onChange={event => onChange(event.target.value)} />;
+  if (field.valueType === 'String') return <Textarea aria-label={label} rows={compact ? 1 : undefined} style={compact ? { minHeight: '2.5rem' } : undefined} value={typeof value === 'string' ? value : ''} onChange={event => onChange(event.target.value)} />;
   if (field.valueType === 'Boolean') return <input aria-label={label} type="checkbox" checked={value === true} onChange={event => onChange(event.target.checked)} />;
   if (field.valueType === 'SingleChoice') return <Select aria-label={label} value={typeof value === 'string' ? value : ''} onChange={event => onChange(event.target.value)}><option value="">Выберите вариант</option>{field.options.map(option => <option key={option.optionKey} value={option.optionKey}>{option.title}</option>)}</Select>;
   if (field.valueType === 'MultiChoice') {

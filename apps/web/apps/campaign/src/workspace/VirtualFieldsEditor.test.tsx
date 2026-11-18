@@ -34,10 +34,51 @@ describe('VirtualFieldsEditor', () => {
     const onChange = vi.fn();
     renderEditor([makeField()], onChange);
     await screen.findByText(/связи можно редактировать вручную/i);
+    expect(screen.getByRole('heading', { name: 'Виртуальные поля' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Имя параметра')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Имя параметра'), { target: { value: 'manual' } });
     fireEvent.change(screen.getByLabelText('ID поля'), { target: { value: 'base-1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Добавить связь' }));
     expect(onChange).toHaveBeenCalledWith([expect.objectContaining({ bindings: { manual: { kind: 'Base', fieldId: 'base-1' } } })]);
+  });
+
+  it('keeps compact core controls visible and places stored and manual links in additional details', async () => {
+    const onChange = vi.fn();
+    const field = { ...makeField(), bindings: { unknown: { kind: 'Base' as const, fieldId: 'missing' } }, parentBaseFieldId: 'base-1' };
+    render(<VirtualFieldsEditor compact campaignId={4} fields={[field]} onChange={onChange} formulas={formulas} baseFields={[{ id: 'base-1', key: 'base', title: 'Base field' }]} />);
+
+    const row = screen.getByRole('group', { name: 'Calc' });
+    expect(screen.queryByRole('heading', { name: 'Виртуальные поля' })).not.toBeInTheDocument();
+    expect(row.querySelector('[class*="formGrid"]')).toBeInTheDocument();
+    expect(within(row).getByLabelText('Ключ')).toHaveValue('calc');
+    expect(within(row).getByLabelText('Название')).toHaveValue('Calc');
+    expect(within(row).getByLabelText('Результат')).toHaveValue('Number');
+    expect(within(row).getByLabelText('Формула')).toBeInTheDocument();
+    expect(within(row).getByLabelText('Родитель')).toHaveValue('Base:base-1');
+    expect(await within(row).findByLabelText('Параметр amount')).toBeInTheDocument();
+    const additional = within(row).getByText('Дополнительные связи').closest('details')!;
+    expect(additional).not.toHaveAttribute('open');
+
+    fireEvent.click(within(row).getByText('Дополнительные связи'));
+    expect(additional).toHaveAttribute('open');
+    expect(within(additional).getByRole('group', { name: 'Сохранённая неизвестная связь' })).toBeInTheDocument();
+    const manualGroup = within(additional).getByRole('group', { name: 'Добавить связь вручную' });
+    fireEvent.change(within(manualGroup).getByLabelText('Имя параметра'), { target: { value: 'manual' } });
+    fireEvent.change(within(manualGroup).getByLabelText('ID поля'), { target: { value: 'base-1' } });
+    fireEvent.click(within(manualGroup).getByRole('button', { name: 'Добавить связь' }));
+    expect(onChange).toHaveBeenLastCalledWith([expect.objectContaining({
+      bindings: {
+        unknown: { kind: 'Base', fieldId: 'missing' },
+        manual: { kind: 'Base', fieldId: 'base-1' }
+      },
+      parentBaseFieldId: 'base-1'
+    })]);
+  });
+
+  it('keeps the formula read error and manual-link hint visible in compact mode', async () => {
+    api.getFormulaContent.mockRejectedValue(new Error('forbidden'));
+    render(<VirtualFieldsEditor compact campaignId={4} fields={[makeField()]} onChange={vi.fn()} formulas={formulas} baseFields={[]} />);
+    expect(await screen.findByText(/связи можно редактировать вручную/i)).toBeInTheDocument();
   });
 
   it('ignores stale formula reads after the selected formula changes', async () => {

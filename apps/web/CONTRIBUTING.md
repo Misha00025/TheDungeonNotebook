@@ -7,6 +7,13 @@
 - Hub владеет глобальной навигацией, авторизацией и темой. Remote не добавляет вторую глобальную навигацию и отдельную палитру.
 - Используйте существующие theme variables (`--bg-primary`, `--bg-secondary`, `--text-primary`, `--text-secondary`, `--accent-color`, `--border-color` и связанные переменные). Не задавайте remote-собственные цвета темы.
 
+## Композиция GM Campaign UI
+
+- Обзор кампании связывает имя персонажа с его GM-обзором и показывает назначенных ведущих с правом записи; наблюдатели в этом списке не отображаются.
+- Полный список персонажей GM сгруппирован по важности. Описания карточек и фоновых строк загружаются из листа персонажа.
+- Страница шаблона — singleton: UI не редактирует metadata шаблона, а описание шаблона передаётся обратно как пассивное content-значение при сохранении полей.
+- `VirtualFieldsEditor` поддерживает opt-in `compact` для шаблона. Потребитель `CharacterVirtuals` использует default-режим без этого флага.
+
 ## Нативная семантика и компоновка
 
 - `Button` рендерит настоящий `<button>` и по умолчанию имеет `type="button"`. Для отправки формы всегда указывайте `type="submit"` явно.
@@ -24,6 +31,8 @@
 | `Button`, `LinkButton`, `IconButton` | `packages/shared/src/ui/Buttons/Button.tsx`, `packages/shared/src/ui/Buttons/LinkButton.tsx`, `packages/shared/src/ui/Buttons/IconButton/IconButton.tsx`, `packages/shared/src/styles/components/Button.module.css`, `packages/shared/src/ui/Buttons/IconButton/IconButton.module.css` |
 | `Panel`, `Badge`, `StatePanel`, `Statistic` | `packages/shared/src/ui/Panel/Panel.tsx`, `packages/shared/src/ui/Panel/Panel.module.css`, `packages/shared/src/ui/StatePanel/StatePanel.tsx`, `packages/shared/src/ui/Statistic/Statistic.tsx`, `packages/shared/src/ui/Statistic/Statistic.module.css` |
 | `Field`, `Input`, `Select`, `Textarea` | `packages/shared/src/ui/Form/Field.tsx`, `packages/shared/src/ui/Form/Input.tsx`, `packages/shared/src/ui/Form/Select.tsx`, `packages/shared/src/ui/Form/Textarea.tsx`, `packages/shared/src/ui/Form/Field.module.css`, `packages/shared/src/styles/components/Input.module.css` |
+| `FieldSet` | `packages/shared/src/ui/Form/FieldSet.tsx`, `packages/shared/src/ui/Form/FieldSet.module.css` |
+| `FormGrid` | `packages/shared/src/ui/Form/FormGrid.tsx`, `packages/shared/src/ui/Form/FormGrid.module.css` |
 | `WorkspaceLayout` | `packages/shared/src/ui/WorkspaceLayout/WorkspaceLayout.tsx`, `packages/shared/src/ui/WorkspaceLayout/WorkspaceLayout.module.css` |
 | `SectionNav` | `packages/shared/src/ui/SectionNav/SectionNav.tsx`, `packages/shared/src/ui/SectionNav/SectionNav.module.css` |
 | `ActionRow`, `Toolbar` | `packages/shared/src/ui/Composition/ActionRow.tsx`, `packages/shared/src/ui/Composition/Toolbar.tsx`, `packages/shared/src/ui/Composition/Composition.module.css` |
@@ -45,7 +54,11 @@
 
 `List` поддерживает `columns={2|3}` и `minItemWidth` для сетки, которая рассчитывается от фактической ширины контейнера; число колонок ограничивает максимум, а не обещает его на узком месте. `auto-fill` оставляет одиночные карточки в track обычного размера. Для текстовой строки с дополнительными данными и действиями используйте `ListItem` props `meta` и `actions`; старый режим целой кликабельной строки не меняется.
 
+`Panel` и `ListItem` принимают `density="compact"` для более плотной компоновки; по умолчанию используется `density="default"`. `FormGrid` задаёт адаптивную сетку полей и принимает `minColumnWidth` (по умолчанию `12rem`), а также обычные атрибуты и `style` контейнера. Он не изменяет размеры вложенных контролов.
+
 `Textarea` — нативный textarea с теми же theme-based контрол-стилями, что `Input`, и вертикальным resize. `Field` остаётся ответственным за label/hint/error association.
+
+`FieldSet` рендерит нативный `<fieldset>` с необязательным `legend`; стандартное поведение `disabled` наследуется браузером.
 
 `Statistic` принимает отдельные `label` и `value`, выводя их как `dt` и `dd` внутри article; не передавайте этот label повторно как заголовок `Panel`. `Panel` допускает title-only и body-only варианты без пустого body или header. `PageHeader.title` и `subtitle` принимают ReactNode; при нетекстовом title задайте явный `imageAlt`, если в заголовке есть изображение. `IconButton` поддерживает `check` и `close`, `disabled`, `busy` и `ariaLabel`; доступное имя по умолчанию берётся из `title`.
 

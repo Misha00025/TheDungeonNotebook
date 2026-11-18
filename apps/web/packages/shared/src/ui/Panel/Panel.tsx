@@ -10,6 +10,7 @@ export type PanelProps = Omit<HTMLAttributes<HTMLElement>, 'title'> & {
   status?: ReactNode;
   actions?: ReactNode;
   children?: ReactNode;
+  density?: 'default' | 'compact';
 };
 
 export function Badge({ className, ...props }: HTMLAttributes<HTMLSpanElement>) {
@@ -24,6 +25,7 @@ export default function Panel({
   status,
   actions,
   children,
+  density = 'default',
   className,
   ...props
 }: PanelProps) {
@@ -31,7 +33,7 @@ export default function Panel({
   const hasBody = React.Children.toArray(children).length > 0;
 
   return (
-    <Element {...props} className={[styles.panel, className].filter(Boolean).join(' ')}>
+    <Element {...props} className={[styles.panel, density === 'compact' ? styles.compact : '', className].filter(Boolean).join(' ')}>
       {(title != null || description != null || status != null) && (
         <header className={styles.header}>
           <div className={styles.headingContent}>

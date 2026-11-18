@@ -22,4 +22,12 @@ describe('Panel', () => {
     expect(container.querySelector('header')).toBeNull();
     expect(container.querySelector(`.${styles.body}`)).toHaveTextContent('Body content');
   });
+
+  test('uses compact density without exposing it as a DOM attribute', () => {
+    render(<Panel density="compact" title="Compact" data-testid="compact-panel">Content</Panel>);
+    expect(screen.getByTestId('compact-panel')).toHaveClass(styles.compact);
+    expect(screen.getByTestId('compact-panel')).not.toHaveAttribute('density');
+    render(<Panel title="Default" data-testid="default-panel" />);
+    expect(screen.getByTestId('default-panel')).not.toHaveClass(styles.compact);
+  });
 });

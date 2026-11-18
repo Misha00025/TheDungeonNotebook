@@ -91,11 +91,14 @@ describe('campaign first iteration', () => {
     renderApp('/12/gm/overview', request);
     fireEvent.click(await screen.findByRole('link', { name: 'Шаблон' }));
     expect(await screen.findByRole('heading', { name: 'Шаблон кампании' })).toBeInTheDocument();
-    expect(await screen.findByRole('heading', { name: 'Метаданные' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Базовые поля' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Метаданные' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Название')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Описание')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Выбранный шаблон')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Создать шаблон' })).not.toBeInTheDocument();
     expect(request.mock.calls.map(([url]) => url).filter(url => url.startsWith('/api/')).some(url => url.includes('/templates'))).toBe(false);
-    expect(request.mock.calls.some(([url]) => url === '/api/campaigns/12/template')).toBe(true);
+    expect(request.mock.calls.some(([url]) => url === '/api/campaigns/12/template')).toBe(false);
     expect(request.mock.calls.some(([url]) => url === '/api/campaigns/12/template/content')).toBe(true);
   });
 

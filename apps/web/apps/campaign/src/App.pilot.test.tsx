@@ -112,13 +112,16 @@ describe('campaign SDK pilot', () => {
       if (url === '/api/campaigns/12/characters') return response([playerCharacters[0]]);
       if (url === '/api/campaigns/12/formulas' || url === '/api/campaigns/12/views') return response([]);
       if (url.endsWith(`${playerCharacters[0].id}/permissions`)) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith(`/characters/${playerCharacters[0].id}/sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: 'Pilot description', baseFields: [] });
+      if (url.endsWith(`/characters/${playerCharacters[0].id}/assignments`)) return response([]);
       throw new Error(`Unexpected request: ${url}`);
     });
     renderPilot(request, '/groups/12/gm/characters');
     const search = await screen.findByRole('textbox', { name: 'Поиск персонажей' });
-    const article = await screen.findByRole('article');
-    expect(within(article).getByRole('heading', { name: playerCharacters[0].name, level: 3 })).toBeInTheDocument();
-    expect(within(article).getAllByText('Ключевой')).toHaveLength(1);
+    const keyGroup = await screen.findByRole('region', { name: 'Ключевые' });
+    const article = within(keyGroup).getByRole('article');
+    expect(within(article).getByRole('heading', { name: playerCharacters[0].name, level: 4 })).toBeInTheDocument();
+    expect(await within(article).findByText('Pilot description')).toBeInTheDocument();
     expect(within(article).queryByText('Можно вести и редактировать')).not.toBeInTheDocument();
     expect(within(article).queryByText('Только просмотр')).not.toBeInTheDocument();
     expect(within(article).getByRole('link', { name: `Открыть лист ${playerCharacters[0].name}` })).toHaveAttribute('href', `/tdn/groups/12/gm/characters/${playerCharacters[0].id}/overview`);
@@ -126,7 +129,7 @@ describe('campaign SDK pilot', () => {
     fireEvent.change(search, { target: { value: 'not found' } });
     expect(await screen.findByText('Совпадений нет.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Очистить поиск' }));
-    expect(await screen.findByRole('heading', { name: playerCharacters[0].name, level: 3 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: playerCharacters[0].name, level: 4 })).toBeInTheDocument();
     expect(request.mock.calls.filter(([url]) => url === '/api/campaigns/12/characters')).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
     await waitFor(() => expect(screen.getByLabelText('Current pathname')).toHaveTextContent('/groups/12/player/characters'));

@@ -74,3 +74,21 @@ h2.title {
   font-size: 0.875em;
   overflow-wrap: anywhere;
 }
+
+.compact {
+  gap: 0.5rem;
+  padding: 0.625rem;
+}
+
+.compact .header {
+  gap: 0.375rem 0.5rem;
+}
+
+.compact .body {
+  gap: 0.375rem;
+}
+
+.compact .title,
+.compact h2.title {
+  font-size: 1rem;
+}

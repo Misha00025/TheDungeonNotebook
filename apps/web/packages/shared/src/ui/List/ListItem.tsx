@@ -9,6 +9,7 @@ export interface ListItemProps {
   clickable?: boolean;
   meta?: ReactNode;
   actions?: ReactNode;
+  density?: 'default' | 'compact';
 }
 
 const ListItem: React.FC<ListItemProps> = ({
@@ -17,14 +18,15 @@ const ListItem: React.FC<ListItemProps> = ({
   onClick,
   clickable = false,
   meta,
-  actions
+  actions,
+  density = 'default'
 }) => {
   const clickableClass = clickable ? styles.clickable : '';
   const hasDetails = meta != null || actions != null;
   
   return (
     <div 
-      className={`${styles.listItem} ${clickableClass} ${hasDetails ? styles.withDetails : ''} ${className}`}
+      className={`${styles.listItem} ${density === 'compact' ? styles.compact : ''} ${clickableClass} ${hasDetails ? styles.withDetails : ''} ${className}`}
       onClick={onClick}
       role={clickable ? 'button' : undefined}
       tabIndex={clickable ? 0 : undefined}
