@@ -12,6 +12,8 @@ const permissions = (canWrite = true) => ({ canRead: true, canWrite, canManageAc
 const renderApp = (initial: string, request: (url: string, options?: RequestInit) => Promise<Response>) => render(<MemoryRouter initialEntries={[initial]}><App auth={makeAuth(request)} /></MemoryRouter>);
 
 describe('campaign first iteration', () => {
+  beforeEach(() => window.localStorage.clear());
+
   it('creates with one stable request id and routes to the returned campaign', async () => {
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url === '/api/campaigns' && options?.method === 'POST') return response(campaign(21), 201);
@@ -297,11 +299,12 @@ describe('campaign first iteration', () => {
     const request = vi.fn(async () => response([]));
     const standalone = renderApp('/', request);
     expect(await screen.findByRole('heading', { name: 'Кампании' })).toBeInTheDocument();
+    standalone.unmount();
     const home = render(<MemoryRouter initialEntries={['/groups']}><Routes><Route path="/groups/*" element={<Home auth={makeAuth(request)} />} /></Routes></MemoryRouter>);
+    expect(await screen.findByRole('heading', { name: 'Главная' })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Создать кампанию' })).toHaveAttribute('href', '/groups?create=1');
     expect(screen.queryByLabelText('Название')).not.toBeInTheDocument();
     home.unmount();
-    standalone.unmount();
     const nestedRequest = vi.fn(async (url: string) => url === '/api/campaigns' ? response([campaign()]) : url.endsWith('/permissions') ? response(permissions()) : response([]));
     render(<MemoryRouter basename="/tdn" initialEntries={['/tdn']}><App auth={makeAuth(nestedRequest)} /></MemoryRouter>);
     expect(await screen.findByRole('heading', { name: 'Кампании' })).toBeInTheDocument();

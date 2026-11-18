@@ -5,6 +5,7 @@ import commonStyles from '@tdn/shared/styles/common.module.css';
 import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
 import type { Campaign, Permissions } from './types';
 import { useWorkspace } from './Workspace';
+import { useVisitHistory } from './VisitHistory';
 import { useResource } from './hooks';
 import { ApiError } from './Feedback';
 import styles from './Workspace.module.css';
@@ -16,6 +17,7 @@ const CampaignShell: React.FC = () => {
   const { groupId = '' } = useParams();
   const id = Number(groupId);
   const { api, path, sessionKey, invalidation, navigate } = useWorkspace();
+  const { visitGroup } = useVisitHistory();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [switchBusy, setSwitchBusy] = useState(false);
@@ -25,6 +27,7 @@ const CampaignShell: React.FC = () => {
   const mounted = useRef(true);
   const route = useRef(location.pathname);
   const scope = useRef(`${sessionKey}:${id}:${invalidation}`);
+  const recordedGroup = useRef<string | null>(null);
   const valid = Boolean(groupId.trim()) && Number.isInteger(id) && id >= -2147483648 && id <= 2147483647;
   const campaign = useResource(`${sessionKey}:${id}:campaign`, () => valid ? api.getCampaign(id) : Promise.reject(new Error('Invalid campaign id')));
   const permission = useResource(`${sessionKey}:${id}:permissions`, () => valid ? api.campaignPermissions(id) : Promise.reject(new Error('Invalid campaign id')));
@@ -35,6 +38,12 @@ const CampaignShell: React.FC = () => {
   useLayoutEffect(() => { const next = `${sessionKey}:${id}:${invalidation}`; if (scope.current !== next) { scope.current = next; sequence.current += 1; busy.current = false; setSwitchBusy(false); setSwitchError(undefined); } }, [sessionKey, id, invalidation]);
   const initialInvalidation = useRef(invalidation);
   useEffect(() => { if (initialInvalidation.current === invalidation) return; initialInvalidation.current = invalidation; campaign.reload(); permission.reload(); }, [invalidation, campaign.reload, permission.reload]);
+  useEffect(() => {
+    const identity = `${sessionKey}:${id}`;
+    if (!valid || !campaign.data || campaign.loading || campaign.error || !permission.data || permission.loading || permission.error || (!permission.data.canRead && !permission.data.canWrite) || recordedGroup.current === identity) return;
+    recordedGroup.current = identity;
+    visitGroup(id);
+  }, [sessionKey, id, valid, campaign.data, campaign.loading, campaign.error, permission.data, permission.loading, permission.error, visitGroup]);
   if (!valid) return <p role="alert">Некорректный идентификатор кампании.</p>;
   if (campaign.loading && !campaign.data) return <p>Загрузка кампании…</p>;
   if (campaign.error && !campaign.data) return <ApiError error={campaign.error} onRetry={campaign.reload} />;

@@ -1,19 +1,22 @@
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { createPath, UNSAFE_NavigationContext, useLocation, useNavigate, useNavigationType, useResolvedPath } from 'react-router-dom';
+import { createPath, UNSAFE_NavigationContext, UNSAFE_RouteContext, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import type { To } from 'react-router-dom';
 import { useAuth } from '@tdn/shared';
 import type { AuthenticatedRequest } from '@tdn/shared';
 import { createCampaignApi } from './api';
+import { VisitHistoryProvider } from './VisitHistory';
 
 type WorkspaceValue = { api: ReturnType<typeof createCampaignApi>; mountPath: string; path: (relative?: string) => string; navigate: ReturnType<typeof useNavigate>; notifyInvalidation: (key?: string) => void; invalidation: number; sessionKey: string };
 const Context = createContext<WorkspaceValue | null>(null);
 export const WorkspaceProvider: React.FC<React.PropsWithChildren<{ mountPath?: string }>> = ({ children, mountPath }) => {
   const auth = useAuth();
-  const resolved = useResolvedPath('.');
+  const routeContext = useContext(UNSAFE_RouteContext);
   const navigate = useNavigate();
   const [invalidation, setInvalidation] = useState(0);
   const sessionKey = String(auth.userId);
-  const base = (mountPath ?? resolved.pathname).replace(/\/$/, '') || '/';
+  const matchedRoute = routeContext.matches[routeContext.matches.length - 1];
+  const matchedBase = matchedRoute?.pathnameBase ?? '/';
+  const base = (mountPath ?? matchedBase).replace(/\/$/, '') || '/';
   const api = useMemo(() => createCampaignApi(auth.request as AuthenticatedRequest), [auth.request]);
   const path = useCallback((relative = '') => {
     const result = `${base === '/' ? '' : base}${relative.startsWith('/') ? relative : relative ? `/${relative}` : ''}`;
@@ -21,7 +24,7 @@ export const WorkspaceProvider: React.FC<React.PropsWithChildren<{ mountPath?: s
   }, [base]);
   const notifyInvalidation = useCallback((_key?: string) => setInvalidation(value => value + 1), []);
   const value = useMemo(() => ({ api, mountPath: base, path, navigate, notifyInvalidation, invalidation, sessionKey }), [api, base, path, navigate, notifyInvalidation, invalidation, sessionKey]);
-  return <Context.Provider value={value}>{children}</Context.Provider>;
+  return <Context.Provider value={value}><VisitHistoryProvider key={sessionKey} sessionKey={sessionKey}>{children}</VisitHistoryProvider></Context.Provider>;
 };
 export const useWorkspace = () => {
   const value = useContext(Context);

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useWorkspace, useDirtyDraft, useDirtyState } from './Workspace';
+import { useVisitHistory } from './VisitHistory';
 import { useMutation, useResource } from './hooks';
 import { CampaignApiError } from './api';
 import type { CharacterMetadata, ComputedSheet, JsonValue, Permissions, Revision } from './types';
@@ -19,6 +20,7 @@ type MetadataDraft = { name: string; importance: CharacterMetadata['importance']
 
 const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats: boolean }> = ({ campaignId, characterId, stats }) => {
   const { api, path, sessionKey } = useWorkspace();
+  const { visitCharacter } = useVisitHistory();
   const anyDraftDirty = useDirtyState();
   const navigate = useNavigate();
   const mode = useLocation().pathname.includes('/gm/') ? 'gm' : 'player';
@@ -53,6 +55,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
   const lastPermissionRef = useRef<Permissions | undefined>(undefined);
   const initializedRef = useRef(false);
   const previousStatsRef = useRef(stats);
+  const recordedCharacter = useRef<string | null>(null);
   const activeRef = useRef(true);
   useEffect(() => {
     activeRef.current = true;
@@ -68,6 +71,12 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
   useEffect(() => {
     if (sheetResource.data) setPresentationRefreshKey(value => value + 1);
   }, [sheetResource.data]);
+  useEffect(() => {
+    const identity = `${sessionKey}:${campaignId}:${characterId.toLowerCase()}`;
+    if (!metadataResource.data || metadataResource.loading || metadataResource.error || !permissionResource.data || permissionResource.loading || permissionResource.error || (!permissionResource.data.canRead && !permissionResource.data.canWrite) || recordedCharacter.current === identity) return;
+    recordedCharacter.current = identity;
+    visitCharacter(campaignId, characterId);
+  }, [sessionKey, campaignId, characterId, metadataResource.data, metadataResource.loading, metadataResource.error, permissionResource.data, permissionResource.loading, permissionResource.error, visitCharacter]);
   useEffect(() => {
     const returningToStats = stats && !previousStatsRef.current;
     previousStatsRef.current = stats;

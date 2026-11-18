@@ -1,173 +1,76 @@
-import React, { useState, useEffect } from 'react';
-import { useVisited } from '../contexts/VisitedContext';
-import { groupAPI, charactersAPI } from '../services/api';
-import { Group } from '../types/group';
-import { Character } from '../types/characters';
-import { useCampaignNavigate } from '../navigation';
-import styles from '@tdn/shared/styles/common.module.css';
+import React from 'react';
+import { Link } from 'react-router-dom';
+import List from '@tdn/shared/ui/List/List';
+import ListItem from '@tdn/shared/ui/List/ListItem';
 import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
-import dashStyles from './Dashboard.module.css';
-import defaultAvatar from '../assets/default-avatar.png';
+import commonStyles from '@tdn/shared/styles/common.module.css';
+import { useWorkspace } from '../workspace/Workspace';
+import { useResource } from '../workspace/hooks';
+import { useVisitHistory } from '../workspace/VisitHistory';
+import { ApiError } from '../workspace/Feedback';
+import type { Campaign, CharacterMetadata, Permissions } from '../workspace/types';
+import type { CharacterVisit } from '../workspace/VisitHistory';
+import styles from './Dashboard.module.css';
+
+type CampaignAccess = { campaign: Campaign; permissions: Permissions };
+type CharacterAccess = { character: CharacterMetadata; characterPermissions: Permissions; campaign: Campaign; campaignPermissions: Permissions };
+
+const allowed = (permissions: Permissions) => permissions.canRead || permissions.canWrite;
+const inaccessible = (error: unknown) => Boolean(error && typeof error === 'object' && 'status' in error && [403, 404].includes(Number(error.status)));
+
+const LastCampaignCard: React.FC<{ campaignId: number | null }> = ({ campaignId }) => {
+  const { api, path, sessionKey } = useWorkspace();
+  const resource = useResource<CampaignAccess>(`${sessionKey}:home-campaign:${campaignId}`, async () => {
+    if (campaignId === null) throw new Error('No campaign visit');
+    const [campaign, permissions] = await Promise.all([api.getCampaign(campaignId), api.campaignPermissions(campaignId)]);
+    return { campaign, permissions };
+  }, campaignId !== null);
+  const header = <h2 className={styles.headerTitle}>Последняя кампания</h2>;
+  if (campaignId === null) return <section>{header}<List><ListItem><p className={styles.emptyText}>История посещений кампаний пока пуста.</p><Link className={buttonStyles.button} to={path('/')}>Перейти к кампаниям</Link></ListItem></List></section>;
+  if (resource.loading) return <section>{header}<p className={styles.loading}>Загрузка кампании…</p></section>;
+  if (resource.error) return <section>{header}{inaccessible(resource.error) && <p>Последняя кампания недоступна.</p>}<ApiError error={resource.error} onRetry={resource.reload} /></section>;
+  if (!resource.data || !allowed(resource.data.permissions)) return <section>{header}<List><ListItem><p>Последняя кампания недоступна.</p></ListItem></List></section>;
+  const destination = resource.data.permissions.canWrite ? 'gm/overview' : 'player/characters';
+  return <section>{header}<List><ListItem><h3 className={styles.title}>{resource.data.campaign.name}</h3><Link className={buttonStyles.button} to={path(`/${campaignId}/${destination}`)}>Продолжить кампанию</Link></ListItem></List></section>;
+};
+
+const RecentCharacter: React.FC<{ visit: CharacterVisit }> = ({ visit }) => {
+  const { api, path, sessionKey } = useWorkspace();
+  const resource = useResource<CharacterAccess>(`${sessionKey}:home-character:${visit.groupId}:${visit.characterId.toLowerCase()}`, async () => {
+    const [character, characterPermissions, campaign, campaignPermissions] = await Promise.all([
+      api.getCharacter(visit.groupId, visit.characterId),
+      api.characterPermissions(visit.groupId, visit.characterId),
+      api.getCampaign(visit.groupId),
+      api.campaignPermissions(visit.groupId)
+    ]);
+    return { character, characterPermissions, campaign, campaignPermissions };
+  });
+  const cardKey = `${sessionKey}:${visit.groupId}:${visit.characterId}`;
+  if (resource.loading) return <ListItem key={cardKey}><p className={styles.loading}>Загрузка персонажа…</p></ListItem>;
+  if (resource.error) return <ListItem key={cardKey}>{inaccessible(resource.error) && <p>Персонаж или кампания недоступны.</p>}<ApiError error={resource.error} onRetry={resource.reload} /></ListItem>;
+  if (!resource.data || !allowed(resource.data.characterPermissions) || !allowed(resource.data.campaignPermissions)) return <ListItem key={cardKey}><p>Персонаж или кампания недоступны.</p></ListItem>;
+  const mode = resource.data.campaignPermissions.canWrite ? 'gm' : 'player';
+  const href = path(`/${visit.groupId}/${mode}/characters/${encodeURIComponent(visit.characterId)}/overview`);
+  return <ListItem key={cardKey}><h3 className={styles.title}>{resource.data.character.name}</h3><p className={styles.subtitle}>{resource.data.campaign.name}</p><p className={styles.subtitle}>{resource.data.characterPermissions.canWrite ? 'Можно редактировать' : 'Только просмотр'}</p><Link className={buttonStyles.button} to={href}>Открыть персонажа</Link></ListItem>;
+};
 
 const Dashboard: React.FC = () => {
-  const { lastVisitedGroupId, lastVisitedCharacters } = useVisited();
-  const navigate = useCampaignNavigate();
-
-  const [lastGroup, setLastGroup] = useState<Group | null | undefined>(undefined);
-  const [lastCharactersData, setLastCharactersData] = useState<(Character | null)[] | undefined>(undefined);
-
-  useEffect(() => {
-    if (lastVisitedGroupId !== null) {
-      groupAPI.getGroup(lastVisitedGroupId)
-        .then(setLastGroup)
-        .catch(() => setLastGroup(null));
-    } else {
-      setLastGroup(null);
-    }
-  }, [lastVisitedGroupId]);
-
-  useEffect(() => {
-    setLastCharactersData(undefined);
-    if (lastVisitedCharacters.length === 0) {
-      setLastCharactersData([]);
-      return;
-    }
-
-    Promise.allSettled(
-      lastVisitedCharacters.map(entry =>
-        charactersAPI.getCharacter(entry.groupId, entry.characterId)
-      )
-    ).then(results => {
-      const loaded = results.map(r => r.status === 'fulfilled' ? r.value : null);
-      setLastCharactersData(loaded);
-    });
-  }, [lastVisitedCharacters]);
-
-  const renderGroupBlock = () => {
-    const header = (
-      <div className={dashStyles.header}>
-        <h2 className={dashStyles.headerTitle}>Последняя группа</h2>
-        <p className={dashStyles.headerSubtitle}>Быстрый доступ к последней просмотренной группе</p>
-      </div>
-    );
-
-    if (lastVisitedGroupId === null || lastGroup === null) {
-      return (
-        <div>
-          {header}
-          <div className={dashStyles.emptyCard}>
-            <p className={dashStyles.emptyText}>Посетите группы, чтобы они отображались здесь</p>
-            <button className={buttonStyles.button} onClick={() => navigate('/groups')}>
-              Перейти к группам
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    if (lastGroup === undefined) {
-      return (
-        <div>
-          {header}
-          <p className={dashStyles.loading}>Загрузка...</p>
-        </div>
-      );
-    }
-
-    return (
-      <div>
-        {header}
-        <div className={dashStyles.card} onClick={() => navigate(`/groups/${lastGroup.id}`)}>
-          {lastGroup.icon ? (
-            <img src={lastGroup.icon} alt="" className={dashStyles.avatar} onError={(e) => { e.currentTarget.src = defaultAvatar; }} />
-          ) : (
-            <div className={dashStyles.avatarPlaceholder}>G</div>
-          )}
-          <div className={dashStyles.info}>
-            <h3 className={dashStyles.title}>{lastGroup.name}</h3>
-          </div>
-          <div className={dashStyles.action}>
-            <button className={buttonStyles.button} onClick={(e) => { e.stopPropagation(); navigate(`/groups/${lastGroup.id}`); }}>
-              →
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderCharacterBlock = () => {
-    const header = (
-      <div className={dashStyles.header}>
-        <h2 className={dashStyles.headerTitle}>Последние персонажи</h2>
-        <p className={dashStyles.headerSubtitle}>Быстрый доступ к последним просмотренным персонажам</p>
-      </div>
-    );
-
-    if (lastVisitedCharacters.length === 0 || lastCharactersData?.every(c => c === null)) {
-      return (
-        <div>
-          {header}
-          <div className={dashStyles.emptyCard}>
-            <p className={dashStyles.emptyText}>Посетите персонажа, чтобы они отображались здесь</p>
-            <button className={buttonStyles.button} onClick={() => navigate('/groups')}>
-              Перейти к группам
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    if (lastCharactersData === undefined) {
-      return (
-        <div>
-          {header}
-          <p className={dashStyles.loading}>Загрузка...</p>
-        </div>
-      );
-    }
-
-    return (
-      <div>
-        {header}
-        <div className={dashStyles.list}>
-          {lastCharactersData.map((character, index) => {
-            if (!character) return null;
-            return (
-              <div
-                key={character.id}
-                className={dashStyles.card}
-                onClick={() => navigate(`/groups/${lastVisitedCharacters[index]?.groupId}/character/${character.id}`)}
-              >
-                <div className={dashStyles.avatarPlaceholder}>C</div>
-                <div className={dashStyles.info}>
-                  <h3 className={dashStyles.title}>{character.name}</h3>
-                  <p className={dashStyles.subtitle}>{character.group?.name}</p>
-                </div>
-                <div className={dashStyles.action}>
-                  <button
-                    className={buttonStyles.button}
-                    onClick={(e) => { e.stopPropagation(); navigate(`/groups/${lastVisitedCharacters[index]?.groupId}/character/${character.id}`); }}
-                  >
-                    →
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className={styles.container}>
-      <div className={dashStyles.grid}>
-        {renderGroupBlock()}
-        {renderCharacterBlock()}
-      </div>
+  const { path, sessionKey } = useWorkspace();
+  const { lastVisitedGroupId, lastVisitedCharacters } = useVisitHistory();
+  const campaignId = lastVisitedGroupId;
+  const createHref = `${path('/')}?create=1`;
+  return <main className={commonStyles.container}>
+    <h1 className={styles.headerTitle}>Главная</h1>
+    <div className={styles.grid}>
+      <LastCampaignCard key={`${sessionKey}:campaign:${campaignId}`} campaignId={campaignId} />
+      <section>
+        <h2 className={styles.headerTitle}>Последние персонажи</h2>
+        {lastVisitedCharacters.length === 0 ? <List><ListItem><p className={styles.emptyText}>История посещений персонажей пока пуста.</p><Link className={buttonStyles.button} to={path('/')}>Перейти к кампаниям</Link></ListItem></List> : <List>{lastVisitedCharacters.map(visit => <RecentCharacter key={`${sessionKey}:${visit.groupId}:${visit.characterId}`} visit={visit} />)}</List>}
+      </section>
     </div>
-  );
+    <Link className={buttonStyles.button} to={path('/')}>Все кампании</Link>
+    <Link className={buttonStyles.button} to={createHref}>Создать кампанию</Link>
+  </main>;
 };
 
 export default Dashboard;
