@@ -126,3 +126,13 @@
   color: var(--text-secondary);
   padding: 1rem;
 }
+
+a.card {
+  color: inherit;
+  text-decoration: none;
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}

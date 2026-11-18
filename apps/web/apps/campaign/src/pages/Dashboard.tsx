@@ -1,7 +1,5 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import List from '@tdn/shared/ui/List/List';
-import ListItem from '@tdn/shared/ui/List/ListItem';
 import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
 import commonStyles from '@tdn/shared/styles/common.module.css';
 import { useWorkspace } from '../workspace/Workspace';
@@ -25,13 +23,13 @@ const LastCampaignCard: React.FC<{ campaignId: number | null }> = ({ campaignId 
     const [campaign, permissions] = await Promise.all([api.getCampaign(campaignId), api.campaignPermissions(campaignId)]);
     return { campaign, permissions };
   }, campaignId !== null);
-  const header = <h2 className={styles.headerTitle}>Последняя кампания</h2>;
-  if (campaignId === null) return <section>{header}<List><ListItem><p className={styles.emptyText}>История посещений кампаний пока пуста.</p><Link className={buttonStyles.button} to={path('/')}>Перейти к кампаниям</Link></ListItem></List></section>;
-  if (resource.loading) return <section>{header}<p className={styles.loading}>Загрузка кампании…</p></section>;
-  if (resource.error) return <section>{header}{inaccessible(resource.error) && <p>Последняя кампания недоступна.</p>}<ApiError error={resource.error} onRetry={resource.reload} /></section>;
-  if (!resource.data || !allowed(resource.data.permissions)) return <section>{header}<List><ListItem><p>Последняя кампания недоступна.</p></ListItem></List></section>;
+  const header = <div className={styles.header}><h2 className={styles.headerTitle}>Последняя группа</h2><p className={styles.headerSubtitle}>Быстрый доступ к последней просмотренной группе</p></div>;
+  if (campaignId === null) return <section>{header}<div className={styles.emptyCard}><p className={styles.emptyText}>Посетите группы, чтобы они отображались здесь</p><Link className={buttonStyles.button} to={path('/')}>Перейти к группам</Link></div></section>;
+  if (resource.loading) return <section>{header}<p className={styles.loading}>Загрузка группы…</p></section>;
+  if (resource.error) return <section>{header}{inaccessible(resource.error) && <p>Последняя группа недоступна.</p>}<ApiError error={resource.error} onRetry={resource.reload} /></section>;
+  if (!resource.data || !allowed(resource.data.permissions)) return <section>{header}<div className={styles.emptyCard}><p className={styles.emptyText}>Последняя группа недоступна.</p></div></section>;
   const destination = resource.data.permissions.canWrite ? 'gm/overview' : 'player/characters';
-  return <section>{header}<List><ListItem><h3 className={styles.title}>{resource.data.campaign.name}</h3><Link className={buttonStyles.button} to={path(`/${campaignId}/${destination}`)}>Продолжить кампанию</Link></ListItem></List></section>;
+  return <section>{header}<div className={styles.list}><Link aria-label="Продолжить кампанию" className={styles.card} to={path(`/${campaignId}/${destination}`)}><span className={styles.avatarPlaceholder}>G</span><div className={styles.info}><h3 className={styles.title}>{resource.data.campaign.name}</h3></div><span className={`${buttonStyles.button} ${styles.action}`}>→</span></Link></div></section>;
 };
 
 const RecentCharacter: React.FC<{ visit: CharacterVisit }> = ({ visit }) => {
@@ -46,31 +44,27 @@ const RecentCharacter: React.FC<{ visit: CharacterVisit }> = ({ visit }) => {
     return { character, characterPermissions, campaign, campaignPermissions };
   });
   const cardKey = `${sessionKey}:${visit.groupId}:${visit.characterId}`;
-  if (resource.loading) return <ListItem key={cardKey}><p className={styles.loading}>Загрузка персонажа…</p></ListItem>;
-  if (resource.error) return <ListItem key={cardKey}>{inaccessible(resource.error) && <p>Персонаж или кампания недоступны.</p>}<ApiError error={resource.error} onRetry={resource.reload} /></ListItem>;
-  if (!resource.data || !allowed(resource.data.characterPermissions) || !allowed(resource.data.campaignPermissions)) return <ListItem key={cardKey}><p>Персонаж или кампания недоступны.</p></ListItem>;
+  if (resource.loading) return <div key={cardKey}><p className={styles.loading}>Загрузка персонажа…</p></div>;
+  if (resource.error) return <div key={cardKey}>{inaccessible(resource.error) && <p>Персонаж или кампания недоступны.</p>}<ApiError error={resource.error} onRetry={resource.reload} /></div>;
+  if (!resource.data || !allowed(resource.data.characterPermissions) || !allowed(resource.data.campaignPermissions)) return <div key={cardKey}><p>Персонаж или кампания недоступны.</p></div>;
   const mode = resource.data.campaignPermissions.canWrite ? 'gm' : 'player';
   const href = path(`/${visit.groupId}/${mode}/characters/${encodeURIComponent(visit.characterId)}/overview`);
-  return <ListItem key={cardKey}><h3 className={styles.title}>{resource.data.character.name}</h3><p className={styles.subtitle}>{resource.data.campaign.name}</p><p className={styles.subtitle}>{resource.data.characterPermissions.canWrite ? 'Можно редактировать' : 'Только просмотр'}</p><Link className={buttonStyles.button} to={href}>Открыть персонажа</Link></ListItem>;
+  return <Link key={cardKey} aria-label={`Открыть персонажа ${resource.data.character.name}`} className={styles.card} to={href}><span className={styles.avatarPlaceholder}>C</span><div className={styles.info}><h3 className={styles.title}>{resource.data.character.name}</h3><p className={styles.subtitle}>{resource.data.campaign.name}</p></div><span className={`${buttonStyles.button} ${styles.action}`}>→</span></Link>;
 };
 
 const Dashboard: React.FC = () => {
   const { path, sessionKey } = useWorkspace();
   const { lastVisitedGroupId, lastVisitedCharacters } = useVisitHistory();
   const campaignId = lastVisitedGroupId;
-  const createHref = `${path('/')}?create=1`;
-  return <main className={commonStyles.container}>
-    <h1 className={styles.headerTitle}>Главная</h1>
+  return <div className={commonStyles.container}>
     <div className={styles.grid}>
       <LastCampaignCard key={`${sessionKey}:campaign:${campaignId}`} campaignId={campaignId} />
       <section>
-        <h2 className={styles.headerTitle}>Последние персонажи</h2>
-        {lastVisitedCharacters.length === 0 ? <List><ListItem><p className={styles.emptyText}>История посещений персонажей пока пуста.</p><Link className={buttonStyles.button} to={path('/')}>Перейти к кампаниям</Link></ListItem></List> : <List>{lastVisitedCharacters.map(visit => <RecentCharacter key={`${sessionKey}:${visit.groupId}:${visit.characterId}`} visit={visit} />)}</List>}
+        <div className={styles.header}><h2 className={styles.headerTitle}>Последние персонажи</h2><p className={styles.headerSubtitle}>Быстрый доступ к последним просмотренным персонажам</p></div>
+        {lastVisitedCharacters.length === 0 ? <div className={styles.emptyCard}><p className={styles.emptyText}>Посетите персонажа, чтобы они отображались здесь</p><Link className={buttonStyles.button} to={path('/')}>Перейти к группам</Link></div> : <div className={styles.list}>{lastVisitedCharacters.map(visit => <RecentCharacter key={`${sessionKey}:${visit.groupId}:${visit.characterId}`} visit={visit} />)}</div>}
       </section>
     </div>
-    <Link className={buttonStyles.button} to={path('/')}>Все кампании</Link>
-    <Link className={buttonStyles.button} to={createHref}>Создать кампанию</Link>
-  </main>;
+  </div>;
 };
 
 export default Dashboard;

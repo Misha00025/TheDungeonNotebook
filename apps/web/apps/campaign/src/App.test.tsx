@@ -321,8 +321,9 @@ describe('campaign first iteration', () => {
     expect(await screen.findByRole('heading', { name: 'Кампании' })).toBeInTheDocument();
     standalone.unmount();
     const home = render(<MemoryRouter initialEntries={['/groups']}><Routes><Route path="/groups/*" element={<Home auth={makeAuth(request)} />} /></Routes></MemoryRouter>);
-    expect(await screen.findByRole('heading', { name: 'Главная' })).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'Создать кампанию' })).toHaveAttribute('href', '/groups?create=1');
+    expect(await screen.findByRole('heading', { name: 'Последняя группа' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Последние персонажи' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Создать кампанию' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Название')).not.toBeInTheDocument();
     home.unmount();
     const nestedRequest = vi.fn(async (url: string) => url === '/api/campaigns' ? response([campaign()]) : url.endsWith('/permissions') ? response(permissions()) : response([]));

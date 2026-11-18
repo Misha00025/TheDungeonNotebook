@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import Home from './Home';
 import App from './App';
+import styles from './pages/Dashboard.module.css';
 import { visitHistoryStorageKey } from './workspace/VisitHistory';
 import type { HubRemoteProps } from '@tdn/shared';
 
@@ -27,12 +28,14 @@ describe('Home dashboard', () => {
       return response([]);
     });
     const home = renderHome(request);
-    expect(await screen.findByRole('heading', { name: 'Главная' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Последняя кампания' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Последняя группа' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Последние персонажи' })).toBeInTheDocument();
-    expect(screen.getByText('История посещений кампаний пока пуста.')).toBeInTheDocument();
-    expect(screen.getByText('История посещений персонажей пока пуста.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Создать кампанию' })).toHaveAttribute('href', '/groups?create=1');
+    expect(screen.getByText('Быстрый доступ к последней просмотренной группе')).toBeInTheDocument();
+    expect(screen.getByText('Быстрый доступ к последним просмотренным персонажам')).toBeInTheDocument();
+    expect(screen.getByText('Посетите группы, чтобы они отображались здесь')).toBeInTheDocument();
+    expect(screen.getByText('Посетите персонажа, чтобы они отображались здесь')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Перейти к группам' })).toHaveLength(2);
+    expect(screen.queryByRole('link', { name: 'Создать кампанию' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Название')).not.toBeInTheDocument();
     expect(request).not.toHaveBeenCalled();
     home.unmount();
@@ -59,12 +62,20 @@ describe('Home dashboard', () => {
     });
     renderHome(request);
     expect(await screen.findByRole('link', { name: 'Продолжить кампанию' })).toHaveAttribute('href', '/groups/12/player/characters');
-    await waitFor(() => expect(screen.getAllByRole('link', { name: 'Открыть персонажа' })).toHaveLength(2));
-    const orderedCharacterLinks = screen.getAllByRole('link', { name: 'Открыть персонажа' });
+    await waitFor(() => expect(screen.getAllByRole('link', { name: /^Открыть персонажа/ })).toHaveLength(2));
+    const orderedCharacterLinks = screen.getAllByRole('link', { name: /^Открыть персонажа/ });
     expect(orderedCharacterLinks[0]).toHaveAttribute('href', `/groups/13/gm/characters/${guidA}/overview`);
     expect(orderedCharacterLinks[1]).toHaveAttribute('href', `/groups/12/player/characters/${guidB}/overview`);
-    expect(screen.getByText('Только просмотр')).toBeInTheDocument();
-    expect(screen.getByText('Можно редактировать')).toBeInTheDocument();
+    const groupCard = screen.getByRole('link', { name: 'Продолжить кампанию' });
+    expect(groupCard.querySelector(`.${styles.avatarPlaceholder}`)).toHaveTextContent('G');
+    expect(groupCard.querySelector(`.${styles.info} h3`)).toHaveTextContent('Campaign 12');
+    expect(groupCard.querySelector(`.${styles.action}`)).toHaveTextContent('→');
+    const firstCard = orderedCharacterLinks[0];
+    expect(firstCard.querySelector(`.${styles.avatarPlaceholder}`)).toHaveTextContent('C');
+    expect(firstCard.querySelector(`.${styles.info} h3`)).toHaveTextContent('Recent A');
+    expect(firstCard.querySelector(`.${styles.info} p`)).toHaveTextContent('Campaign 13');
+    expect(firstCard.querySelector(`.${styles.action}`)).toHaveTextContent('→');
+    expect(orderedCharacterLinks[1].querySelector(`.${styles.info} h3`)).toHaveTextContent('Recent B');
     expect(screen.getByText('Campaign 13')).toBeInTheDocument();
     expect(request.mock.calls.some(([url]) => /list|computed-sheet|template|formulas|content/.test(url))).toBe(false);
   });
@@ -87,10 +98,10 @@ describe('Home dashboard', () => {
       throw new Error(`Unexpected request: ${url}`);
     });
     renderHome(request);
-    expect(await screen.findByText('Последняя кампания недоступна.')).toBeInTheDocument();
+    expect(await screen.findByText('Последняя группа недоступна.')).toBeInTheDocument();
     expect(await screen.findByText('Still available')).toBeInTheDocument();
     expect(await screen.findByText('Try again')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Открыть персонажа' })).toHaveAttribute('href', `/groups/13/gm/characters/${guidB}/overview`);
+    expect(screen.getByRole('link', { name: 'Открыть персонажа Still available' })).toHaveAttribute('href', `/groups/13/gm/characters/${guidB}/overview`);
     expect(request.mock.calls.some(([url]) => url.includes('/characters/987'))).toBe(false);
     expect(window.localStorage.getItem('lastVisitedCharacters')).toBe(legacyCharacters);
     failCharacter = false;
@@ -115,7 +126,7 @@ describe('Home dashboard', () => {
     expect(await screen.findByText('Персонаж или кампания недоступны.')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Повторить загрузку' }).length).toBeGreaterThan(0);
     expect(await screen.findByText('Available character')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Открыть персонажа' })).toHaveAttribute('href', `/groups/12/gm/characters/${guidB}/overview`);
+    expect(screen.getByRole('link', { name: 'Открыть персонажа Available character' })).toHaveAttribute('href', `/groups/12/gm/characters/${guidB}/overview`);
     expect(window.localStorage.getItem(visitHistoryStorageKey('4'))).toBe(saved);
   });
 
@@ -132,9 +143,9 @@ describe('Home dashboard', () => {
     });
     renderHome(request);
     await screen.findByText('Загрузка персонажа…');
-    expect(screen.queryByRole('link', { name: 'Открыть персонажа' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Открыть персонажа/ })).not.toBeInTheDocument();
     await act(async () => { resolvePermissions(response(permissions(false))); });
-    expect(await screen.findByRole('link', { name: 'Открыть персонажа' })).toHaveAttribute('href', `/groups/12/gm/characters/${guidA}/overview`);
+    expect(await screen.findByRole('link', { name: `Открыть персонажа Hero 12` })).toHaveAttribute('href', `/groups/12/gm/characters/${guidA}/overview`);
   });
 
   it('switches account history without exposing the previous account after an in-flight read resolves', async () => {
@@ -151,7 +162,7 @@ describe('Home dashboard', () => {
     });
     const makeTree = (userId: number) => <MemoryRouter initialEntries={['/groups']}><Routes><Route path="/groups/*" element={<Home auth={makeAuth(request, userId)} />} /></Routes></MemoryRouter>;
     const mounted = render(makeTree(4));
-    expect(await screen.findByText('Загрузка кампании…')).toBeInTheDocument();
+    expect(await screen.findByText('Загрузка группы…')).toBeInTheDocument();
     mounted.rerender(makeTree(5));
     expect(await screen.findByRole('link', { name: 'Продолжить кампанию' })).toHaveAttribute('href', '/groups/13/player/characters');
     await act(async () => { resolveOldCampaign(response({ ...campaign(12), name: 'Old account campaign' })); });
@@ -174,9 +185,9 @@ describe('Home dashboard', () => {
     render(<MemoryRouter initialEntries={[`/groups/12/gm/characters/${guidA}/stats`]}><Link to="/">Home route</Link><Routes><Route path="/groups/*" element={<App auth={makeAuth(request)} />} /><Route path="*" element={<Home auth={makeAuth(request)} />} /></Routes></MemoryRouter>);
     expect(await screen.findByRole('heading', { name: 'Visited Hero' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: 'Home route' }));
-    expect(await screen.findByRole('heading', { name: 'Главная' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Последняя группа' })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Продолжить кампанию' })).toHaveAttribute('href', '/groups/12/gm/overview');
-    expect(await screen.findByRole('link', { name: 'Открыть персонажа' })).toHaveAttribute('href', `/groups/12/gm/characters/${guidA}/overview`);
+    expect(await screen.findByRole('link', { name: 'Открыть персонажа Visited Hero' })).toHaveAttribute('href', `/groups/12/gm/characters/${guidA}/overview`);
     expect(JSON.parse(window.localStorage.getItem(visitHistoryStorageKey('4'))!)).toEqual(history(12, [{ groupId: 12, characterId: guidA }]));
   });
 
@@ -195,7 +206,7 @@ describe('Home dashboard', () => {
     render(<MemoryRouter initialEntries={[`/groups/12/gm/characters/${guidA}/stats`]}><Link to="/">Home route</Link><Routes><Route path="/groups/*" element={<App auth={makeAuth(request)} />} /><Route path="*" element={<Home auth={makeAuth(request)} />} /></Routes></MemoryRouter>);
     expect(await screen.findByText('Доступ запрещён.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('link', { name: 'Home route' }));
-    expect(await screen.findByRole('heading', { name: 'Главная' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Последняя группа' })).toBeInTheDocument();
     await waitFor(() => expect(JSON.parse(window.localStorage.getItem(visitHistoryStorageKey('4'))!)).toEqual(history(12, [])));
   });
 });
