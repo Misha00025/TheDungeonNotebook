@@ -16,101 +16,51 @@ public sealed class SheetService(
     IContentStore content,
     IOptions<SheetOptions> options)
 {
-    private const string TemplateCollection = "templateContents";
+    private const string TemplateCollection = "campaignTemplates";
+    private static readonly Guid TemplateResourceId = Guid.Empty;
     private const string CharacterCollection = "characterSheets";
 
-    public async Task<IReadOnlyList<TemplateMetadataDto>> ListTemplatesAsync(Subject? subject, int campaignId, CancellationToken cancellationToken)
+    public async Task<TemplateMetadataDto> GetTemplateAsync(Subject? subject, int campaignId, CancellationToken cancellationToken)
     {
         await RequireDefinitionsReadAsync(subject, campaignId, cancellationToken);
-        return (await resources.ListTemplatesAsync(campaignId, cancellationToken)).Select(ToDto).ToArray();
-    }
-
-    public async Task<TemplateCreateDto> CreateTemplateAsync(Subject? subject, int campaignId, TemplateCreateRequest request, CancellationToken cancellationToken)
-    {
-        await RequireAdminAsync(subject, campaignId, cancellationToken);
-        RequireName(request.Name);
-        var requestId = RequireRequestId(request.RequestId);
-        if (request.Description is null || request.BaseFields is null)
-            throw BadRequest("invalid_template", "description and baseFields are required.");
-        var existing = await resources.GetTemplateAsync(campaignId, requestId, cancellationToken);
-        if (existing is not null)
-            throw AlreadyPublished(requestId);
-        var data = new TemplateContent(request.Description, BuildFields(request.BaseFields, []));
-        ContentEnvelope<TemplateContent> prepared;
-        try
-        {
-            prepared = await content.CreateAsync(TemplateCollection, campaignId, requestId, data, cancellationToken);
-        }
-        catch (ContentAlreadyPreparedException)
-        {
-            throw new DomainException(409, "content_already_prepared", "Content for this resource is already prepared.", requestId, requestId);
-        }
-
-        var metadata = new TemplateMetadata { Id = requestId, CampaignId = campaignId, Name = request.Name! };
-        try
-        {
-            var created = await resources.CreateTemplateAsync(metadata, cancellationToken);
-            var dto = ToDto(created);
-            return new TemplateCreateDto(dto.Id, dto.Key, dto.CampaignId, dto.Name, dto.MetadataRevision, prepared.ContentRevision);
-        }
-        catch (DuplicateResourceException)
-        {
-            throw AlreadyPublished(requestId);
-        }
-        catch (Exception exception) when (IsSqlWriteFailure(exception))
-        {
-            throw PublicationOutcomeUnknown(requestId);
-        }
-    }
-
-    public async Task<TemplateMetadataDto> GetTemplateAsync(Subject? subject, int campaignId, Guid templateId, CancellationToken cancellationToken)
-    {
-        await RequireDefinitionsReadAsync(subject, campaignId, cancellationToken);
-        var template = await RequireTemplateAsync(campaignId, templateId, cancellationToken);
+        var template = await RequireTemplateAsync(campaignId, cancellationToken);
         return ToDto(template);
     }
 
-    public async Task<TemplateMetadataDto> RenameTemplateAsync(Subject? subject, int campaignId, Guid templateId, TemplateRenameRequest request, CancellationToken cancellationToken)
+    public async Task<TemplateMetadataDto> RenameTemplateAsync(Subject? subject, int campaignId, TemplateRenameRequest request, CancellationToken cancellationToken)
     {
         await RequireAdminAsync(subject, campaignId, cancellationToken);
         RequireName(request.Name);
         var expected = RequireRevision(request.ExpectedRevision);
-        var template = await RequireTemplateAsync(campaignId, templateId, cancellationToken);
-        if (!await resources.RenameTemplateAsync(campaignId, templateId, request.Name!, expected, cancellationToken))
+        var template = await RequireTemplateAsync(campaignId, cancellationToken);
+        if (!await resources.RenameTemplateAsync(campaignId, request.Name!, expected, cancellationToken))
         {
-            if (await resources.GetTemplateAsync(campaignId, templateId, cancellationToken) is null)
+            if (await resources.GetTemplateAsync(campaignId, cancellationToken) is null)
                 throw NotFound();
-            throw RevisionConflict(templateId);
+            throw RevisionConflict(campaignId);
         }
-        return new TemplateMetadataDto(template.Id, template.Id.ToString("N"), template.CampaignId, request.Name!, expected + 1);
+        return new TemplateMetadataDto(template.CampaignId, request.Name!, expected + 1);
     }
 
-    public async Task<TemplateContentEnvelope> GetTemplateContentAsync(Subject? subject, int campaignId, Guid templateId, CancellationToken cancellationToken)
+    public async Task<TemplateContentEnvelope> GetTemplateContentAsync(Subject? subject, int campaignId, CancellationToken cancellationToken)
     {
         await RequireDefinitionsReadAsync(subject, campaignId, cancellationToken);
-        await RequireTemplateAsync(campaignId, templateId, cancellationToken);
-        var envelope = await content.GetAsync<TemplateContent>(TemplateCollection, campaignId, templateId, cancellationToken);
-        if (envelope is null)
-            throw ContentMissing(templateId);
-        return new TemplateContentEnvelope(envelope.CampaignId, envelope.ResourceId, envelope.ContentRevision, envelope.Data);
+        var envelope = await GetTemplateDocumentAsync(campaignId, cancellationToken);
+        return new TemplateContentEnvelope(envelope.CampaignId, envelope.ContentRevision, envelope.Data);
     }
 
-    public async Task<TemplateContentEnvelope> UpdateTemplateContentAsync(Subject? subject, int campaignId, Guid templateId, TemplateContentUpdateRequest request, CancellationToken cancellationToken)
+    public async Task<TemplateContentEnvelope> UpdateTemplateContentAsync(Subject? subject, int campaignId, TemplateContentUpdateRequest request, CancellationToken cancellationToken)
     {
         await RequireAdminAsync(subject, campaignId, cancellationToken);
-        var expected = RequireRevision(request.ExpectedRevision);
+        var expected = RequireNonnegativeRevision(request.ExpectedRevision);
         if (request.Description is null || request.BaseFields is null)
             throw BadRequest("invalid_template", "description and baseFields are required.");
-        await RequireTemplateAsync(campaignId, templateId, cancellationToken);
-        var current = await content.GetAsync<TemplateContent>(TemplateCollection, campaignId, templateId, cancellationToken)
-            ?? throw ContentMissing(templateId);
+        var current = await GetTemplateDocumentAsync(campaignId, cancellationToken);
         if (current.ContentRevision != expected)
-            throw RevisionConflict(templateId, "content_revision_conflict");
+            throw TemplateContentRevisionConflict(campaignId);
         var updated = current.Data with { Description = request.Description, BaseFields = BuildFields(request.BaseFields, current.Data.BaseFields) };
-        var result = await content.ReplaceAsync(TemplateCollection, campaignId, templateId, expected, updated, cancellationToken);
-        if (result is null)
-            throw RevisionConflict(templateId, "content_revision_conflict");
-        return new TemplateContentEnvelope(result.CampaignId, result.ResourceId, result.ContentRevision, result.Data);
+        var result = await ReplaceTemplateDocumentAsync(campaignId, expected, updated, cancellationToken);
+        return new TemplateContentEnvelope(result.CampaignId, result.ContentRevision, result.Data);
     }
 
     public async Task<IReadOnlyList<CharacterMetadataDto>> ListCharactersAsync(Subject? subject, int campaignId, CancellationToken cancellationToken)
@@ -129,12 +79,9 @@ public sealed class SheetService(
         var requestId = RequireRequestId(request.RequestId);
         if (await resources.GetCharacterAsync(campaignId, requestId, cancellationToken) is not null)
             throw AlreadyPublished(requestId);
-        if (request.TemplateId is null || request.TemplateId == Guid.Empty)
-            throw BadRequest("invalid_template", "A non-empty templateId is required.");
         var importance = request.Importance ?? ParseDefaultImportance();
         RequireImportance(importance);
-        if (await resources.GetTemplateAsync(campaignId, request.TemplateId.Value, cancellationToken) is null)
-            throw BadRequest("invalid_template", "templateId must identify a template in this campaign.");
+        await RequireTemplateAsync(campaignId, cancellationToken);
         var emptySheet = new CharacterSheet(string.Empty, []);
         try
         {
@@ -149,7 +96,6 @@ public sealed class SheetService(
         {
             Id = requestId,
             CampaignId = campaignId,
-            TemplateId = request.TemplateId.Value,
             Name = request.Name!,
             Importance = importance
         };
@@ -193,7 +139,7 @@ public sealed class SheetService(
                 throw NotFound();
             throw RevisionConflict(characterId);
         }
-        return new CharacterMetadataDto(character.Id, character.CampaignId, character.TemplateId, request.Name!, request.Importance.Value, expected + 1);
+        return new CharacterMetadataDto(character.Id, character.CampaignId, request.Name!, request.Importance.Value, expected + 1);
     }
 
     public async Task<CharacterSheetEnvelope> GetCharacterSheetAsync(Subject? subject, int campaignId, Guid characterId, CancellationToken cancellationToken)
@@ -222,7 +168,7 @@ public sealed class SheetService(
     {
         var expected = RequireRevision(request.ExpectedRevision);
         var (character, _) = await RequireCharacterAccessAsync(subject, campaignId, characterId, true, cancellationToken);
-        var template = await GetTemplateDocumentAsync(campaignId, character.TemplateId, cancellationToken);
+        var template = await GetTemplateDocumentAsync(campaignId, cancellationToken);
         var field = template.Data.BaseFields.SingleOrDefault(x => x.Id == fieldId) ?? throw NotFound();
         var current = await GetCharacterDocumentAsync(campaignId, characterId, cancellationToken);
         if (current.ContentRevision != expected)
@@ -242,7 +188,7 @@ public sealed class SheetService(
     {
         var expected = RequireRevision(expectedRevision);
         var (character, _) = await RequireCharacterAccessAsync(subject, campaignId, characterId, true, cancellationToken);
-        var template = await GetTemplateDocumentAsync(campaignId, character.TemplateId, cancellationToken);
+        var template = await GetTemplateDocumentAsync(campaignId, cancellationToken);
         if (template.Data.BaseFields.All(x => x.Id != fieldId))
             throw NotFound();
         var current = await GetCharacterDocumentAsync(campaignId, characterId, cancellationToken);
@@ -314,7 +260,7 @@ public sealed class SheetService(
     public async Task<CalculationInputs> GetCalculationInputsAsync(Subject? subject, int campaignId, Guid characterId, CancellationToken cancellationToken)
     {
         var character = await EnsureCharacterAccessAsync(subject, campaignId, characterId, false, cancellationToken);
-        var template = await GetTemplateDocumentAsync(campaignId, character.TemplateId, cancellationToken);
+        var template = await GetTemplateDocumentAsync(campaignId, cancellationToken);
         var sheet = await GetCharacterDocumentAsync(campaignId, characterId, cancellationToken);
         return new CalculationInputs(character, template, sheet, ResolveEffectiveBaseValues(template.Data, sheet.Data));
     }
@@ -349,14 +295,37 @@ public sealed class SheetService(
     private async Task<CharacterMetadata> RequireCharacterAsync(int campaignId, Guid characterId, CancellationToken cancellationToken) =>
         await resources.GetCharacterAsync(campaignId, characterId, cancellationToken) ?? throw NotFound();
 
-    private async Task<TemplateMetadata> RequireTemplateAsync(int campaignId, Guid templateId, CancellationToken cancellationToken) =>
-        await resources.GetTemplateAsync(campaignId, templateId, cancellationToken) ?? throw NotFound();
+    private async Task<TemplateMetadata> RequireTemplateAsync(int campaignId, CancellationToken cancellationToken) =>
+        await resources.GetTemplateAsync(campaignId, cancellationToken) ?? throw NotFound();
 
     private async Task<ContentEnvelope<CharacterSheet>> GetCharacterDocumentAsync(int campaignId, Guid characterId, CancellationToken cancellationToken) =>
         await content.GetAsync<CharacterSheet>(CharacterCollection, campaignId, characterId, cancellationToken) ?? throw ContentMissing(characterId);
 
-    private async Task<ContentEnvelope<TemplateContent>> GetTemplateDocumentAsync(int campaignId, Guid templateId, CancellationToken cancellationToken) =>
-        await content.GetAsync<TemplateContent>(TemplateCollection, campaignId, templateId, cancellationToken) ?? throw ContentMissing(templateId);
+    internal async Task<ContentEnvelope<TemplateContent>> GetTemplateDocumentAsync(int campaignId, CancellationToken cancellationToken)
+    {
+        await RequireTemplateAsync(campaignId, cancellationToken);
+        var envelope = await content.GetAsync<TemplateContent>(TemplateCollection, campaignId, TemplateResourceId, cancellationToken);
+        return envelope ?? new ContentEnvelope<TemplateContent>(campaignId, Guid.Empty, 0, new TemplateContent(string.Empty, []));
+    }
+
+    internal async Task<ContentEnvelope<TemplateContent>> ReplaceTemplateDocumentAsync(int campaignId, long expectedRevision, TemplateContent data, CancellationToken cancellationToken)
+    {
+        await RequireTemplateAsync(campaignId, cancellationToken);
+        if (expectedRevision == 0)
+        {
+            try
+            {
+                return await content.CreateAsync(TemplateCollection, campaignId, TemplateResourceId, data, cancellationToken);
+            }
+            catch (ContentAlreadyPreparedException)
+            {
+                throw TemplateContentRevisionConflict(campaignId);
+            }
+        }
+
+        var result = await content.ReplaceAsync(TemplateCollection, campaignId, TemplateResourceId, expectedRevision, data, cancellationToken);
+        return result ?? throw TemplateContentRevisionConflict(campaignId);
+    }
 
     private async Task<CharacterSheetEnvelope> ReadEffectiveSheetAsync(int campaignId, CharacterMetadata character, CancellationToken cancellationToken)
     {
@@ -366,7 +335,7 @@ public sealed class SheetService(
 
     private async Task<CharacterSheetEnvelope> BuildEffectiveSheetAsync(int campaignId, CharacterMetadata character, ContentEnvelope<CharacterSheet> sheet, CancellationToken cancellationToken)
     {
-        var template = await GetTemplateDocumentAsync(campaignId, character.TemplateId, cancellationToken);
+        var template = await GetTemplateDocumentAsync(campaignId, cancellationToken);
         var fields = ResolveEffectiveBaseValues(template.Data, sheet.Data);
         return new CharacterSheetEnvelope(sheet.ContentRevision, template.ContentRevision, sheet.Data.Description, fields);
     }
@@ -528,14 +497,23 @@ public sealed class SheetService(
         return revision.Value;
     }
 
-    private static TemplateMetadataDto ToDto(TemplateMetadata template) => new(template.Id, template.Id.ToString("N"), template.CampaignId, template.Name, template.MetadataRevision);
-    private static CharacterMetadataDto ToDto(CharacterMetadata character) => new(character.Id, character.CampaignId, character.TemplateId, character.Name, character.Importance, character.MetadataRevision);
+    private static long RequireNonnegativeRevision(long? revision)
+    {
+        if (revision is null || revision < 0)
+            throw BadRequest("invalid_revision", "expectedRevision must be nonnegative.");
+        return revision.Value;
+    }
+
+    private static TemplateMetadataDto ToDto(TemplateMetadata template) => new(template.CampaignId, template.Name, template.MetadataRevision);
+    private static CharacterMetadataDto ToDto(CharacterMetadata character) => new(character.Id, character.CampaignId, character.Name, character.Importance, character.MetadataRevision);
     private static CharacterAssignmentDto ToDto(CharacterAssignment assignment) => new(assignment.CampaignId, assignment.CharacterId, assignment.UserId, assignment.CanWrite, assignment.MetadataRevision);
     private static DomainException Forbidden() => new(403, "forbidden", "The operation is not permitted.");
     private static DomainException NotFound() => new(404, "not_found", "The requested resource was not found.");
     private static DomainException BadRequest(string code, string message) => new(400, code, message);
     private static DomainException AlreadyPublished(Guid id) => new(409, "already_published", "The resource has already been published.", id, id);
     private static DomainException RevisionConflict(Guid id, string code = "revision_conflict") => new(409, code, "The resource revision no longer matches.", id);
+    private static DomainException RevisionConflict(int campaignId) => new(409, "revision_conflict", "The resource revision no longer matches.", campaignId);
+    private static DomainException TemplateContentRevisionConflict(int campaignId) => new(409, "content_revision_conflict", "The content revision no longer matches.", campaignId);
     private static DomainException ContentMissing(Guid id) => new(503, "content_unavailable", "The content store does not contain the published resource.", id);
     private static DomainException PublicationOutcomeUnknown(Guid id) => new(503, "publication_outcome_unknown", "The metadata publication outcome could not be confirmed.", id, id);
     private static bool IsSqlWriteFailure(Exception exception) => exception is DbUpdateException or DbException or CampaignStoreException;

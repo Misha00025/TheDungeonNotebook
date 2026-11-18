@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MySqlConnector;
 using Tdn.Campaigns.Access;
 using Tdn.Campaigns.Campaigns;
+using Tdn.Campaigns.Sheets;
 
 namespace Tdn.Campaigns.Persistence;
 
@@ -38,6 +39,7 @@ public sealed class EfCampaignStore(CampaignDbContext db) : ICampaignStore
 
     public async Task<Campaign> CreateAsync(Campaign campaign, int administratorUserId, CancellationToken cancellationToken)
     {
+        campaign.Template ??= new TemplateMetadata { Name = campaign.Name };
         db.Campaigns.Add(campaign);
         db.CampaignMembers.Add(new CampaignMember { Campaign = campaign, UserId = administratorUserId, IsAdmin = true });
         try

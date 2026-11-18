@@ -18,7 +18,8 @@ public sealed record WidgetNode(string NodeKey, string Title, JsonElement Params
     WidgetSource[] Sources, string Format)
     : ViewNode(NodeKey, Title, Params, Children);
 
-public sealed record WidgetSource(Guid TemplateId, [property: JsonRequired] FieldSourceKind Kind, Guid FieldId);
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record WidgetSource([property: JsonRequired] FieldSourceKind Kind, Guid FieldId);
 public sealed record ViewContent(ViewNode[] Roots);
 public sealed record ViewContentEnvelope(int CampaignId, Guid ResourceId, long ContentRevision, ViewContent Data);
 public sealed record ViewMetadataDto(Guid Id, string Key, int CampaignId, string Name, long MetadataRevision);

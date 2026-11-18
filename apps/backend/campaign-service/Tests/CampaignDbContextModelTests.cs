@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
 using Tdn.Campaigns.Campaigns;
@@ -23,11 +24,18 @@ public class CampaignDbContextModelTests
 
         Assert.Contains("CREATE TABLE `Campaigns`", script);
         Assert.Contains("CREATE TABLE `CampaignMembers`", script);
-        Assert.Contains("CREATE TABLE `TemplateMetadata`", script);
+        Assert.Contains("CREATE TABLE `CampaignTemplates`", script);
         Assert.Contains("CREATE TABLE `CharacterMetadata`", script);
         Assert.Contains("CREATE TABLE `CharacterAssignments`", script);
         Assert.Contains("CREATE TABLE `FormulaMetadata`", script);
         Assert.Contains("CREATE TABLE `ViewMetadata`", script);
+
+        var forward = context.Database.GetService<IMigrator>().GenerateScript("20261117000500_Views", "20261118000100_CampaignTemplate");
+        Assert.Contains("DROP COLUMN `TemplateId`", forward);
+        Assert.Contains("DROP TABLE `TemplateMetadata`", forward);
+        Assert.Contains("CREATE TABLE `CampaignTemplates`", forward);
+        Assert.Contains("PRIMARY KEY (`CampaignId`)", forward);
+        Assert.Contains("INSERT INTO `CampaignTemplates` (`CampaignId`, `Name`, `MetadataRevision`) SELECT `Id`, `Name`, 1 FROM `Campaigns`", forward);
     }
 
     [Fact]
@@ -54,22 +62,25 @@ public class CampaignDbContextModelTests
         Assert.True(member.FindProperty(nameof(CampaignMember.MetadataRevision))!.IsConcurrencyToken);
         Assert.Equal(DeleteBehavior.Restrict, Assert.Single(member.GetForeignKeys()).DeleteBehavior);
 
-        Assert.Equal(new[] { "Id" }, template.FindPrimaryKey()!.Properties.Select(x => x.Name));
-        Assert.Contains(template.GetKeys(), key => key.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }));
+        Assert.Equal(new[] { "CampaignId" }, template.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Equal(ValueGenerated.Never, template.FindProperty(nameof(TemplateMetadata.CampaignId))!.ValueGenerated);
+        Assert.Null(template.FindProperty("Id"));
         Assert.True(template.FindProperty(nameof(TemplateMetadata.MetadataRevision))!.IsConcurrencyToken);
         var templateCampaign = Assert.Single(template.GetForeignKeys());
         Assert.Equal(typeof(Campaign), templateCampaign.PrincipalEntityType.ClrType);
+        Assert.Equal(new[] { "CampaignId" }, templateCampaign.Properties.Select(x => x.Name));
+        Assert.True(templateCampaign.IsUnique);
         Assert.Equal(DeleteBehavior.Restrict, templateCampaign.DeleteBehavior);
+        Assert.Same(template, campaign.FindNavigation(nameof(Campaign.Template))!.TargetEntityType);
 
         Assert.Equal(new[] { "Id" }, character.FindPrimaryKey()!.Properties.Select(x => x.Name));
         Assert.Contains(character.GetKeys(), key => key.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }));
         Assert.True(character.FindProperty(nameof(CharacterMetadata.MetadataRevision))!.IsConcurrencyToken);
-        Assert.Equal(2, character.GetForeignKeys().Count());
+        Assert.Single(character.GetForeignKeys());
         Assert.All(character.GetForeignKeys(), foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
-        Assert.Contains(character.GetForeignKeys(), foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(TemplateMetadata) &&
-            foreignKey.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "TemplateId" }) &&
-            foreignKey.PrincipalKey.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }));
-        Assert.Contains(character.GetIndexes(), index => index.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "TemplateId" }));
+        Assert.DoesNotContain(character.GetForeignKeys(), foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(TemplateMetadata));
+        Assert.Null(character.FindProperty("TemplateId"));
+        Assert.Null(character.FindNavigation("Template"));
 
         Assert.Equal(new[] { "CampaignId", "CharacterId", "UserId" }, assignment.FindPrimaryKey()!.Properties.Select(x => x.Name));
         Assert.True(assignment.FindProperty(nameof(CharacterAssignment.MetadataRevision))!.IsConcurrencyToken);

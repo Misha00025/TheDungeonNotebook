@@ -1,5 +1,6 @@
 using Tdn.Campaigns.Access;
 using Tdn.Campaigns.Campaigns;
+using Tdn.Campaigns.Sheets;
 
 namespace CampaignService.Tests;
 
@@ -165,11 +166,20 @@ public class CampaignServiceTests
         var requestId = Guid.NewGuid();
         var user = new Subject(SubjectType.User, 71);
         var created = await service.CreateAsync(user, new CreateCampaignRequest { Name = "A", RequestId = requestId }, default);
+        var second = await service.CreateAsync(user, new CreateCampaignRequest { Name = "Second", RequestId = Guid.NewGuid() }, default);
+
+        var firstRoot = store.Campaigns.Single(x => x.Id == created.Id);
+        Assert.NotNull(firstRoot.Template);
+        Assert.Equal(firstRoot.Id, firstRoot.Template!.CampaignId);
+        Assert.Same(firstRoot, firstRoot.Template.Campaign);
+        Assert.NotNull(store.Campaigns.Single(x => x.Id == second.Id).Template);
+        Assert.Equal(2, store.Campaigns.Count(x => x.Template is not null));
 
         Assert.Equal(created.Id, (await service.GetCreationStatusAsync(user, requestId, default)).ResourceId);
         var duplicate = await Assert.ThrowsAsync<DomainException>(() => service.CreateAsync(user,
             new CreateCampaignRequest { Name = "B", RequestId = requestId }, default));
         Assert.Equal("creation_already_published", duplicate.Code);
+        Assert.Equal(2, store.Campaigns.Count(x => x.Template is not null));
         Assert.Equal(403, (await Assert.ThrowsAsync<DomainException>(() => service.CreateAsync(new Subject(SubjectType.User, 72),
             new CreateCampaignRequest { Name = "B", RequestId = requestId }, default))).StatusCode);
         Assert.Equal(403, (await Assert.ThrowsAsync<DomainException>(() => service.GetCreationStatusAsync(new Subject(SubjectType.Group, 1), requestId, default))).StatusCode);
@@ -186,7 +196,9 @@ public class CampaignServiceTests
 
         public void SeedCampaign(int id)
         {
-            Campaigns.Add(new Campaign { Id = id, Name = $"Campaign {id}", CreationRequestId = Guid.NewGuid(), CreatedByType = SubjectType.User, CreatedById = 1 });
+            var campaign = new Campaign { Id = id, Name = $"Campaign {id}", CreationRequestId = Guid.NewGuid(), CreatedByType = SubjectType.User, CreatedById = 1 };
+            campaign.Template = new TemplateMetadata { CampaignId = id, Campaign = campaign, Name = campaign.Name };
+            Campaigns.Add(campaign);
             _nextId = Math.Max(_nextId, id + 1);
         }
 
@@ -209,6 +221,9 @@ public class CampaignServiceTests
                 throw new DuplicateCreationRequestException();
             campaign.Id = _nextId++;
             campaign.MetadataRevision = 1;
+            campaign.Template ??= new TemplateMetadata { Campaign = campaign, CampaignId = campaign.Id, Name = campaign.Name };
+            campaign.Template.Campaign = campaign;
+            campaign.Template.CampaignId = campaign.Id;
             Campaigns.Add(campaign);
             SeedMember(campaign.Id, administratorUserId, true);
             return Task.FromResult(campaign);

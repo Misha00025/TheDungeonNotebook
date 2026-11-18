@@ -73,6 +73,11 @@ public sealed record VirtualFieldsUpdateRequest
     [Required, Range(1, long.MaxValue)] public long? ExpectedRevision { get; init; }
     [Required] public VirtualFieldInput[]? VirtualFields { get; init; }
 }
+public sealed record TemplateVirtualFieldsUpdateRequest
+{
+    [Required, Range(0, long.MaxValue)] public long? ExpectedRevision { get; init; }
+    [Required] public VirtualFieldInput[]? VirtualFields { get; init; }
+}
 public sealed record VirtualFieldsEnvelope(long ContentRevision, IReadOnlyList<VirtualField> VirtualFields);
 public sealed record OverrideInput
 {

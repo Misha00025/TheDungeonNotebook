@@ -1,4 +1,5 @@
 using Tdn.Campaigns.Access;
+using Tdn.Campaigns.Sheets;
 
 namespace Tdn.Campaigns.Campaigns;
 
@@ -58,6 +59,7 @@ public sealed class CampaignService(ICampaignStore store)
         var entity = new Campaign
         {
             Name = request.Name,
+            Template = new TemplateMetadata { Name = request.Name },
             CreationRequestId = request.RequestId.Value,
             CreatedByType = current.Type,
             CreatedById = current.Id

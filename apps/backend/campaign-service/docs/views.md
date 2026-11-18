@@ -8,7 +8,7 @@ The service stores View metadata in SQL and View content/configuration in MongoD
 
 `roots` is a required array and may be empty. Every node has `kind`, `nodeKey`, `title`, `params`, and `children`. `kind` is `layout` or `widget`. Both node types may contain either node type in ordered `children`. `nodeKey` is non-whitespace and unique across the complete tree. `title` and `children` are required; `params` is any native JSON value, including explicit `null`.
 
-A Widget additionally requires `sources` (an array) and `format` (any non-null string, including the empty string). A source contains `templateId`, an explicitly required `kind` (`base` or `virtual`), and `fieldId`. This source `kind` is distinct from the node `kind` discriminator (`layout` or `widget`); omitting it is invalid rather than defaulting to `base`. Source IDs identify active fields by ID in a published template in the same campaign. Multiple templates may be referenced by one View. Layout has no widget-specific fields.
+A Widget additionally requires `sources` (an array) and `format` (any non-null string, including the empty string). A source contains only an explicitly required `kind` (`base` or `virtual`) and `fieldId`; it has no template selector. This source `kind` is distinct from the node `kind` discriminator (`layout` or `widget`); omitting it is invalid rather than defaulting to `base`. Each source must identify an active base or virtual field in the campaign's single canonical template. Foreign-campaign fields and character custom virtual fields are invalid View definitions and return `400 invalid_source`. Layout has no widget-specific fields.
 
 Parameters and format are opaque to this service: it preserves JSON values and strings but does not interpret parameters, parse formats, resolve embedded references, render, or preview a View.
 
@@ -43,7 +43,6 @@ Parameters and format are opaque to this service: it preserves JSON values and s
                   "children": [],
                   "sources": [
                     {
-                      "templateId": "79a9cf01-6202-42f7-8dc2-d05f87ea96e7",
                       "kind": "base",
                       "fieldId": "97378740-5060-4cc5-91f1-946a7cad3fa4"
                     }
@@ -81,7 +80,7 @@ Parameters and format are opaque to this service: it preserves JSON values and s
 - **Body:** required JSON object; `requestId` is required non-empty GUID, `name` is required non-whitespace string, `roots` is required array (possibly empty) of the node types above.
 - **Access:** campaign administrator.
 - **201:** metadata `{id, key, campaignId, name, metadataRevision, contentRevision}` and `Location` pointing to `GET /views/{id}`.
-- **Errors:** `400` invalid body/tree/source or unknown node kind; `403` absent/invalid subject or access denied; `404` campaign not found; `409` resource already published or content already prepared; `503` Mongo/SQL unavailable or SQL publication outcome unknown. An unknown SQL publication outcome includes `resourceId`; prepared content is not deleted or retried.
+- **Errors:** `400` invalid body/tree/source or unknown node kind; source must be an active field of this campaign's canonical template; `403` absent/invalid subject or access denied; `404` campaign not found; `409` resource already published or content already prepared; `503` Mongo/SQL unavailable or SQL publication outcome unknown. An unknown SQL publication outcome includes `resourceId`; prepared content is not deleted or retried.
 
 ### `GET /views/{id}`
 
@@ -128,7 +127,7 @@ Parameters and format are opaque to this service: it preserves JSON values and s
 - **Query:** required non-empty GUID `characterId`.
 - **Body:** none.
 - **Access:** definition-read permission and read access to the specifically requested character.
-- **200:** `{viewContentRevision, contentRevision, templateContentRevision, formulaContentRevisions, widgets}`. Each widget item has `nodeKey` and an ordered `sources` array; each source item has its `sourceIndex`, declared `source`, and either `value` or a safe `diagnostic` code. Nested Widgets are included. Base and virtual source kinds remain distinct. A source from another template yields `not_in_context`; a deleted/missing active field yields `unknown_reference`. Only declared sources are projected; format and params are not scanned. Revision values describe the observed inputs and do not promise a global snapshot.
+- **200:** `{viewContentRevision, contentRevision, templateContentRevision, formulaContentRevisions, widgets}`. Each widget item has `nodeKey` and an ordered `sources` array; each source item has its `sourceIndex`, declared `source`, and either `value` or a safe `diagnostic` code. Nested Widgets are included. Base and virtual source kinds remain distinct. Projection resolves sources only against active fields in the campaign's canonical template. A field removed from that template yields `unknown_reference`, even if a character custom virtual field has the same ID. Only declared sources are projected; format and params are not scanned. Revision values describe the observed inputs and do not promise a global snapshot.
 - **Errors:** `400` missing/empty/malformed character ID, `403` absent/invalid subject, access denied, or no character assignment, `404` campaign/View/character not found (a malformed path GUID does not match the constrained route), `503` SQL/Mongo dependency unavailable or published content missing.
 
 ## Presentation configuration endpoints

@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Tdn.Campaigns.Sheets;
 
@@ -20,10 +21,9 @@ public enum ValueType
     MultiChoice
 }
 
-public sealed record TemplateMetadataDto(Guid Id, string Key, int CampaignId, string Name, long MetadataRevision);
-public sealed record TemplateCreateDto(Guid Id, string Key, int CampaignId, string Name, long MetadataRevision, long ContentRevision);
-public sealed record TemplateContentEnvelope(int CampaignId, Guid ResourceId, long ContentRevision, TemplateContent Data);
-public sealed record CharacterMetadataDto(Guid Id, int CampaignId, Guid TemplateId, string Name, Importance Importance, long MetadataRevision);
+public sealed record TemplateMetadataDto(int CampaignId, string Name, long MetadataRevision);
+public sealed record TemplateContentEnvelope(int CampaignId, long ContentRevision, TemplateContent Data);
+public sealed record CharacterMetadataDto(Guid Id, int CampaignId, string Name, Importance Importance, long MetadataRevision);
 public sealed record CharacterAssignmentDto(int CampaignId, Guid CharacterId, int UserId, bool CanWrite, long MetadataRevision);
 public sealed record ContentRevisionDto(long ContentRevision);
 public sealed record CharacterSheetEnvelope(long ContentRevision, long TemplateContentRevision, string Description, IReadOnlyList<EffectiveBaseField> BaseFields);
@@ -41,18 +41,6 @@ public sealed record CharacterSheet(string Description, SavedBaseValue[] BaseVal
 {
     public Tdn.Campaigns.Computation.VirtualFormulaOverride[] VirtualFormulaOverrides { get; init; } = [];
     public Tdn.Campaigns.Computation.VirtualField[] CustomVirtualFields { get; init; } = [];
-}
-
-public sealed class TemplateCreateRequest
-{
-    [Required]
-    public Guid? RequestId { get; init; }
-    [Required]
-    public string? Name { get; init; }
-    [Required(AllowEmptyStrings = true)]
-    public string? Description { get; init; }
-    [Required]
-    public BaseFieldInput[]? BaseFields { get; init; }
 }
 
 public sealed class BaseFieldInput
@@ -84,7 +72,7 @@ public sealed class TemplateRenameRequest
 public sealed class TemplateContentUpdateRequest
 {
     [Required]
-    [Range(1, long.MaxValue)]
+    [Range(0, long.MaxValue)]
     public long? ExpectedRevision { get; init; }
     [Required(AllowEmptyStrings = true)]
     public string? Description { get; init; }
@@ -92,14 +80,13 @@ public sealed class TemplateContentUpdateRequest
     public BaseFieldInput[]? BaseFields { get; init; }
 }
 
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed class CharacterCreateRequest
 {
     [Required]
     public Guid? RequestId { get; init; }
     [Required]
     public string? Name { get; init; }
-    [Required]
-    public Guid? TemplateId { get; init; }
     public Importance? Importance { get; init; }
 }
 

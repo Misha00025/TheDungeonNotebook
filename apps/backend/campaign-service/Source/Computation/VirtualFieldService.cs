@@ -6,30 +6,26 @@ namespace Tdn.Campaigns.Computation;
 
 public sealed class VirtualFieldService(IResourceStore resources, IContentStore content, SheetService sheets)
 {
-    private const string TemplateCollection = "templateContents";
     private const string CharacterCollection = "characterSheets";
     private const string FormulaCollection = "formulaContents";
 
-    public async Task<VirtualFieldsEnvelope> GetTemplateFieldsAsync(Subject? subject, int campaignId, Guid templateId, CancellationToken cancellationToken)
+    public async Task<VirtualFieldsEnvelope> GetTemplateFieldsAsync(Subject? subject, int campaignId, CancellationToken cancellationToken)
     {
         await sheets.EnsureDefinitionsReadAsync(subject, campaignId, cancellationToken);
-        await RequireTemplate(campaignId, templateId, cancellationToken);
-        var current = await ReadTemplate(campaignId, templateId, cancellationToken);
+        var current = await sheets.GetTemplateDocumentAsync(campaignId, cancellationToken);
         return new VirtualFieldsEnvelope(current.ContentRevision, current.Data.VirtualFields);
     }
 
-    public async Task<VirtualFieldsEnvelope> UpdateTemplateFieldsAsync(Subject? subject, int campaignId, Guid templateId, VirtualFieldsUpdateRequest request, CancellationToken cancellationToken)
+    public async Task<VirtualFieldsEnvelope> UpdateTemplateFieldsAsync(Subject? subject, int campaignId, TemplateVirtualFieldsUpdateRequest request, CancellationToken cancellationToken)
     {
         await sheets.EnsureAdminAsync(subject, campaignId, cancellationToken);
-        await RequireTemplate(campaignId, templateId, cancellationToken);
-        var current = await ReadTemplate(campaignId, templateId, cancellationToken);
-        var expected = RequireRevision(request.ExpectedRevision);
-        if (current.ContentRevision != expected) throw RevisionConflict(templateId);
+        var current = await sheets.GetTemplateDocumentAsync(campaignId, cancellationToken);
+        var expected = RequireNonnegativeRevision(request.ExpectedRevision);
+        if (current.ContentRevision != expected) throw RevisionConflict(campaignId);
         var fields = await ValidateFields(campaignId, request.VirtualFields!, current.Data.VirtualFields, current.Data.BaseFields,
             current.Data.VirtualFields, [], true, cancellationToken);
         var updated = current.Data with { VirtualFields = fields };
-        var result = await content.ReplaceAsync(TemplateCollection, campaignId, templateId, expected, updated, cancellationToken);
-        if (result is null) throw RevisionConflict(templateId);
+        var result = await sheets.ReplaceTemplateDocumentAsync(campaignId, expected, updated, cancellationToken);
         return new VirtualFieldsEnvelope(result.ContentRevision, result.Data.VirtualFields);
     }
 
@@ -175,12 +171,10 @@ public sealed class VirtualFieldService(IResourceStore resources, IContentStore 
         return document ?? throw new DomainException(503, "content_unavailable", "The content store does not contain the published resource.", formulaId);
     }
 
-    private async Task<ContentEnvelope<TemplateContent>> ReadTemplate(int campaignId, Guid templateId, CancellationToken cancellationToken) =>
-        await content.GetAsync<TemplateContent>(TemplateCollection, campaignId, templateId, cancellationToken) ?? throw new DomainException(503, "content_unavailable", "The content store does not contain the published resource.", templateId);
-    private async Task<TemplateMetadata> RequireTemplate(int campaignId, Guid templateId, CancellationToken cancellationToken) =>
-        await resources.GetTemplateAsync(campaignId, templateId, cancellationToken) ?? throw NotFound();
     private static VirtualField ToModel(VirtualFieldInput input) => new(input.Id!.Value, input.Key!, input.Title!, input.Description!, input.ResultType!.Value, input.FormulaId!.Value, input.Bindings!, input.ParentBaseFieldId, input.ParentVirtualFieldId);
     private static long RequireRevision(long? revision) => revision is > 0 ? revision.Value : throw BadRequest("invalid_revision", "expectedRevision must be at least 1.");
+    private static long RequireNonnegativeRevision(long? revision) => revision is >= 0 ? revision.Value : throw BadRequest("invalid_revision", "expectedRevision must be nonnegative.");
+    private static DomainException RevisionConflict(int campaignId) => new(409, "content_revision_conflict", "The content revision no longer matches.", campaignId);
     private static DomainException RevisionConflict(Guid id) => new(409, "content_revision_conflict", "The content revision no longer matches.", id);
     private static DomainException NotFound() => new(404, "not_found", "The requested resource was not found.");
     private static DomainException BadRequest(string code, string message) => new(400, code, message);

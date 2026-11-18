@@ -34,12 +34,12 @@ public sealed class CampaignDbContext(DbContextOptions<CampaignDbContext> option
         member.HasOne(x => x.Campaign).WithMany().HasForeignKey(x => x.CampaignId).OnDelete(DeleteBehavior.Restrict);
 
         var template = modelBuilder.Entity<TemplateMetadata>();
-        template.ToTable("TemplateMetadata", table => table.HasCheckConstraint("CK_TemplateMetadata_MetadataRevision", "MetadataRevision >= 1"));
-        template.HasKey(x => x.Id);
-        template.HasAlternateKey(x => new { x.CampaignId, x.Id });
+        template.ToTable("CampaignTemplates", table => table.HasCheckConstraint("CK_CampaignTemplates_MetadataRevision", "MetadataRevision >= 1"));
+        template.HasKey(x => x.CampaignId);
+        template.Property(x => x.CampaignId).ValueGeneratedNever();
         template.Property(x => x.Name).IsRequired().HasColumnType("longtext");
         template.Property(x => x.MetadataRevision).IsRequired().IsConcurrencyToken();
-        template.HasOne(x => x.Campaign).WithMany().HasForeignKey(x => x.CampaignId).OnDelete(DeleteBehavior.Restrict);
+        template.HasOne(x => x.Campaign).WithOne(x => x.Template).HasForeignKey<TemplateMetadata>(x => x.CampaignId).OnDelete(DeleteBehavior.Restrict);
 
         var character = modelBuilder.Entity<CharacterMetadata>();
         character.ToTable("CharacterMetadata", table => table.HasCheckConstraint("CK_CharacterMetadata_MetadataRevision", "MetadataRevision >= 1"));
@@ -49,7 +49,6 @@ public sealed class CampaignDbContext(DbContextOptions<CampaignDbContext> option
         character.Property(x => x.Importance).IsRequired();
         character.Property(x => x.MetadataRevision).IsRequired().IsConcurrencyToken();
         character.HasOne(x => x.Campaign).WithMany().HasForeignKey(x => x.CampaignId).OnDelete(DeleteBehavior.Restrict);
-        character.HasOne(x => x.Template).WithMany().HasForeignKey(x => new { x.CampaignId, x.TemplateId }).HasPrincipalKey(x => new { x.CampaignId, x.Id }).OnDelete(DeleteBehavior.Restrict);
 
         var assignment = modelBuilder.Entity<CharacterAssignment>();
         assignment.ToTable("CharacterAssignments", table => table.HasCheckConstraint("CK_CharacterAssignments_MetadataRevision", "MetadataRevision >= 1"));

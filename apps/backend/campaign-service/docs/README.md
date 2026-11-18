@@ -9,6 +9,7 @@ Current API contracts:
 - [Formulas, virtual fields, and computed sheets](formulas.md)
 - [Views and presentation contexts](views.md)
 - [API Gateway routing](gateway.md)
+- [Singleton-template Web handoff](singleton-template-web.md)
 
 Routes in the [legacy public HTML API documentation](../../../../docs/api/index.html) are historical and are not served by this host.
 

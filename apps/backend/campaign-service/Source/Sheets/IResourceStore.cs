@@ -4,10 +4,8 @@ namespace Tdn.Campaigns.Sheets;
 
 public interface IResourceStore
 {
-    Task<IReadOnlyList<TemplateMetadata>> ListTemplatesAsync(int campaignId, CancellationToken cancellationToken);
-    Task<TemplateMetadata?> GetTemplateAsync(int campaignId, Guid templateId, CancellationToken cancellationToken);
-    Task<TemplateMetadata> CreateTemplateAsync(TemplateMetadata template, CancellationToken cancellationToken);
-    Task<bool> RenameTemplateAsync(int campaignId, Guid templateId, string name, long expectedRevision, CancellationToken cancellationToken);
+    Task<TemplateMetadata?> GetTemplateAsync(int campaignId, CancellationToken cancellationToken);
+    Task<bool> RenameTemplateAsync(int campaignId, string name, long expectedRevision, CancellationToken cancellationToken);
     Task<IReadOnlyList<CharacterMetadata>> ListCharactersAsync(int campaignId, CancellationToken cancellationToken);
     Task<CharacterMetadata?> GetCharacterAsync(int campaignId, Guid characterId, CancellationToken cancellationToken);
     Task<IReadOnlyList<CharacterMetadata>> ListCharactersForUserAsync(int campaignId, int userId, CancellationToken cancellationToken);

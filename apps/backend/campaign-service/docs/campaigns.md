@@ -38,7 +38,7 @@ Create a campaign. JSON body fields:
 | `requestId` | GUID | yes | Must not be `Guid.Empty`; unique creation request identity. |
 | `administratorUserId` | int32 | Admin subject only | Initial member who is campaign admin. Required for Admin. User may omit it or set it to their own subject ID; another value is `403`. |
 
-A User creates a campaign and is automatically its first admin. A Group or unknown subject type receives `403`. The campaign and initial membership are saved together. Success is `201 Created`, with a campaign DTO and `Location: /api/campaigns/{id}`.
+A User creates a campaign and is automatically its first admin. A Group or unknown subject type receives `403`. The campaign, its initial singleton template metadata (named after the campaign, revision `1`), and initial membership are saved together in one SQL `SaveChanges`. Success is `201 Created`, with a campaign DTO and `Location: /api/campaigns/{id}`. Template content remains logically empty at revision `0` until its first content update.
 
 Reusing a published `requestId` returns `409` with `code: creation_already_published` and `resourceId` when the caller is its original creator or a global Admin. A different creator receives `403` without resource details. A failed or unknown database commit is not automatically retried; use the creation-status endpoint to check publication.
 

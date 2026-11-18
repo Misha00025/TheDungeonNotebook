@@ -7,7 +7,7 @@ Character custom virtual fields, formula overrides, and the computed-sheet respo
 ## Character metadata
 
 ```json
-{"id":"4abe7cae-3a0a-42f3-82bf-75347f96daf2","campaignId":7,"templateId":"54ce37ea-40a5-481c-ae08-92a0eb8fe5c0","name":"Mira","importance":"Background","metadataRevision":1}
+{"id":"4abe7cae-3a0a-42f3-82bf-75347f96daf2","campaignId":7,"name":"Mira","importance":"Background","metadataRevision":1}
 ```
 
 Importance is `Background`, `Secondary`, or `Key` (numeric enum values `0`, `1`, `2` are also accepted). New characters default to `Characters:DefaultImportance` (`background`); POST can explicitly provide another valid value. PUT requires importance.
@@ -18,7 +18,7 @@ Returns `200` metadata array. Admins receive all characters; Users receive only 
 
 ## `POST /api/campaigns/{campaignId}/characters`
 
-Admin only. Required body fields: `requestId` (non-empty GUID), `name` (non-whitespace string), and `templateId` (GUID belonging to this campaign). `importance` is optional and must be a known enum value when supplied. The new character ID is `requestId`. A missing/cross-campaign template link is `400` (`invalid_template`). The service creates an empty Mongo sheet without copying any template values, then publishes SQL metadata. Success is `201 Created` with a metadata DTO.
+Admin only. Required body fields: `requestId` (non-empty GUID) and `name` (non-whitespace string). `importance` is optional and must be a known enum value when supplied. The request has no template selector: character creation checks that the campaign's canonical template metadata exists and creates the character in that campaign. The new character ID is `requestId`. The service creates an empty Mongo sheet without copying template values, then publishes SQL metadata. Success is `201 Created` with a metadata DTO.
 
 An already published request ID returns `409` (`already_published`). A prepared Mongo document without SQL metadata returns `409` (`content_already_prepared`). An uncertain SQL publication result returns `503` (`publication_outcome_unknown`) with the resource ID. Prepared content is not exposed until SQL metadata exists; it is not automatically deleted or retried.
 
@@ -34,9 +34,9 @@ Admin or an assigned User with `canWrite=true`. Body requires `name` (non-whites
 
 ## `GET /api/campaigns/{campaignId}/characters/{characterId:guid}/sheet`
 
-Admin or directly assigned User, regardless of `canWrite`. Returns `200` effective sheet only; it never returns the stored raw `BaseValues` array. The response contains character `contentRevision`, current `templateContentRevision`, character `description`, and active template base-field definitions with `effectiveValue` and `isExplicit`.
+Admin or directly assigned User, regardless of `canWrite`. Returns `200` effective sheet only; it never returns the stored raw `BaseValues` array. The response contains character `contentRevision`, current campaign `templateContentRevision`, character `description`, and active base-field definitions from the campaign's single template with `effectiveValue` and `isExplicit`.
 
-For an active field, a stored value is explicit only when field ID, `typeRevision`, and value type match and the value remains compatible with current options. Otherwise the current template value is returned. If any key in an explicit single- or multi-choice record was removed from current options, the entire explicit record is incompatible and the complete template fallback is returned. GET never copies template defaults, writes Mongo content, cleans incompatible values, or exposes values for deleted fields.
+For an active field, a stored value is explicit only when field ID, `typeRevision`, and value type match and the value remains compatible with current options. Otherwise the current campaign template value is returned. If any key in an explicit single- or multi-choice record was removed from current options, the entire explicit record is incompatible and the complete template fallback is returned. GET never copies template defaults, writes Mongo content, cleans incompatible values, or exposes values for deleted fields.
 
 ## `PUT /api/campaigns/{campaignId}/characters/{characterId:guid}/description`
 
@@ -44,7 +44,7 @@ Admin or assigned User with `canWrite=true`. Body requires `description` (string
 
 ## `PUT /api/campaigns/{campaignId}/characters/{characterId:guid}/base-values/{fieldId:guid}`
 
-Admin or assigned writer. Body requires native JSON `value` and `expectedRevision` (int64 >= 1). The field must be currently active or the request returns `404`; incompatible values/options return `400`. The service reads the current template and sheet, replaces only that field's explicit record (using server-owned current type and `typeRevision`), preserves every other stored record, including custom virtual fields and formula overrides, and atomically replaces the Mongo document at the expected revision. Success returns `200` effective sheet with the new revision; stale content revision is `409`.
+Admin or assigned writer. Body requires native JSON `value` and `expectedRevision` (int64 >= 1). The field must be currently active in the campaign's single template or the request returns `404`; incompatible values/options return `400`. The service reads the current template and sheet, replaces only that field's explicit record (using server-owned current type and `typeRevision`), preserves every other stored record, including custom virtual fields and formula overrides, and atomically replaces the Mongo document at the expected revision. Success returns `200` effective sheet with the new revision; stale content revision is `409`.
 
 Values are native JSON: `Integer` is int64 and accepts integral forms such as `1.0`; `Number` is finite double without rounding; `String` includes the empty string; `Boolean` includes false; `SingleChoice` is one existing option key; `MultiChoice` is a unique array of existing keys and may be empty. JSON null is not a value for these field types.
 
@@ -68,4 +68,4 @@ Character assignments use restrictive foreign keys to campaign membership. Expli
 
 ## Publication, revisions, and failures
 
-Template and character IDs are their creation `requestId`. Mongo content is inserted first with content revision 1 and never upserted. SQL metadata is published only after content preparation. Existing published IDs return `409` (`already_published`); an orphan prepared document returns `409` (`content_already_prepared`). An uncertain SQL commit returns safe `503` (`publication_outcome_unknown`) with `resourceId`; the service does not delete prepared content or retry. Mongo write errors with unknown outcomes return safe `503` (`content_write_outcome_unknown`); Mongo read errors return `503` (`dependency_unavailable`). No distributed SQL/Mongo transaction or automatic orphan cleanup is claimed. DB/Mongo details and credentials are not exposed.
+Character IDs are their creation `requestId`. Character Mongo sheets are inserted first with content revision 1 and never upserted; SQL metadata is published only after sheet preparation. Existing published character IDs return `409` (`already_published`); an orphan prepared sheet returns `409` (`content_already_prepared`). Template metadata is created with its campaign, and template content is optional until first update, which creates it at revision 1 from logical revision 0. Character sheet operations always use the current campaign template; no public template ID or character-to-template selector exists. An uncertain SQL commit returns safe `503` (`publication_outcome_unknown`) with `resourceId`; the service does not delete prepared character content or retry. Mongo write errors with unknown outcomes return safe `503` (`content_write_outcome_unknown`); Mongo read errors return `503` (`dependency_unavailable`). No distributed SQL/Mongo transaction or automatic orphan cleanup is claimed. DB/Mongo details and credentials are not exposed.

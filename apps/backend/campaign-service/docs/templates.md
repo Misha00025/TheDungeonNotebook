@@ -1,16 +1,18 @@
-# Templates and base-field definitions
+# Campaign template and base-field definitions
 
-These routes are scoped to `/api/campaigns/{campaignId:int}` and use the shared JSON `X-Subject` header documented in [the API overview](README.md). A global Admin and a Group whose subject ID matches the campaign are campaign admins. A User must be a current campaign member; only a campaign admin can write definitions. Members may read template definitions when `Access:MembersCanReadDefinitions` is `true` (default); this setting does not grant access to unassigned characters.
+Each campaign has exactly one `TemplateMetadata` row. `CampaignId` is both its primary key and a restrictive foreign key to `Campaigns.Id`; the campaign navigation is one-to-one. Campaign creation stores the campaign, its initial template metadata, and its first administrator in the same SQL save. The initial template name matches the campaign name and `metadataRevision` starts at `1`. There is no separate template create, list, delete, resource-ID, or key endpoint.
 
-Template virtual fields and formula definitions are documented in [formulas, virtual fields, and computed sheets](formulas.md).
+These routes use `/api/campaigns/{campaignId:int}` and the JSON `X-Subject` contract in [the API overview](README.md). A global Admin or matching Group can administer definitions. A User must be a campaign member and an admin member to write; members may read definitions when `Access:MembersCanReadDefinitions` is enabled (default). The setting does not grant access to unassigned character sheets. Missing or out-of-scope campaigns return `404`; insufficient rights return `403`.
 
-## Metadata shape
+Template virtual fields and formulas are documented in [formulas, virtual fields, and computed sheets](formulas.md).
+
+## Metadata
 
 ```json
-{"id":"54ce37ea-40a5-481c-ae08-92a0eb8fe5c0","key":"54ce37ea40a5481cae0892a0eb8fe5c0","campaignId":7,"name":"Adventurer","metadataRevision":1}
+{"campaignId":7,"name":"Campaign","metadataRevision":1}
 ```
 
-`key` is derived from `id` in GUID `N` format (32 hexadecimal digits without hyphens); it is not stored as a second mutable field. `metadataRevision` is an int64 and starts at 1.
+`metadataRevision` is int64 and starts at `1`. Renaming template metadata changes SQL only; it does not change the content revision.
 
 ## Base-field input and stored definitions
 
@@ -18,57 +20,58 @@ Template virtual fields and formula definitions are documented in [formulas, vir
 
 | Field | Type | Required | Meaning |
 | --- | --- | --- | --- |
-| `id` | GUID or null/omitted | no | Omit/null to create a new field. An ID must identify a currently active field in this template to update it. |
-| `key` | string | yes | Stable field key, unique among active fields. Existing keys cannot be changed. No application length limit is imposed. |
+| `id` | GUID or null/omitted | no | Omit/null to create a field. A supplied ID must identify an active field in this campaign's template. |
+| `key` | string | yes | Stable key, unique among active base fields. Existing keys cannot be changed. |
 | `title` | string | yes | Display title. |
 | `description` | string | yes | Field description. |
 | `valueType` | enum string | yes | `Integer`, `Number`, `String`, `Boolean`, `SingleChoice`, or `MultiChoice`. |
-| `value` | JSON value | yes | Required template default, compatible with its type and options. |
-| `options` | array of `{optionKey,title}` | yes | Choice options; use an empty array for non-choice fields. Keys must be unique. |
+| `value` | JSON value | yes | Template default, compatible with the type and options. |
+| `options` | array of `{optionKey,title}` | yes | Choice options; empty for non-choice fields. Keys must be unique. |
 
-Enum names are accepted case-insensitively; the standard JSON enum converter also accepts their numeric values: `Integer=0`, `Number=1`, `String=2`, `Boolean=3`, `SingleChoice=4`, `MultiChoice=5`. Unknown values return `400`.
+Enum names are case-insensitive; the standard JSON enum converter also accepts numeric values: `Integer=0`, `Number=1`, `String=2`, `Boolean=3`, `SingleChoice=4`, and `MultiChoice=5`. Unknown values return `400`.
 
-Values are native JSON values. `Integer` accepts int64 values, including integral JSON spellings such as `1.0`; `Number` is finite IEEE-754 double and is not rounded. `String` accepts strings, including `""`; `Boolean` accepts both `true` and `false`. `SingleChoice` is one existing option key. `MultiChoice` is an array of unique existing option keys; an empty array is valid. A saved template value must use the current options. Unknown options and incompatible values return `400`.
+Values are native JSON. `Integer` accepts int64 values, including integral spellings such as `1.0`; `Number` is a finite IEEE-754 double; `String` includes `""`; `Boolean` accepts both `true` and `false`. `SingleChoice` is one existing option key. `MultiChoice` is an array of unique existing option keys, and an empty array is valid. A saved default must be compatible with the current options.
 
-An omitted `id` generates a new GUID with `typeRevision: 1`. A supplied ID must be active in this template or the request returns `400` (`unknown_field`). Existing keys are immutable. Changing `valueType` increments `typeRevision`; other edits do not. Removing a field from the submitted active list does not delete stored character values. Re-adding the same key creates a new field identity.
+An omitted field ID generates a new GUID with `typeRevision: 1`. A supplied ID must be active or the request returns `400` (`unknown_field`). Existing keys are immutable. Changing `valueType` increments `typeRevision`; other edits do not. Removing a field from the submitted active list does not delete stored character values. Re-adding the same key creates a new field identity.
 
-## `GET /api/campaigns/{campaignId}/templates`
+## `GET /api/campaigns/{campaignId}/template`
 
-Returns `200` and an array of template metadata. Admins see all campaign templates. A User member can read the list when `Access:MembersCanReadDefinitions=true`; otherwise they receive `403`. Non-member/out-of-scope campaign is `404`.
-
-## `POST /api/campaigns/{campaignId}/templates`
-
-Admin only. Required JSON body:
-
-| Field | Type | Required | Meaning |
-| --- | --- | --- | --- |
-| `requestId` | non-empty GUID | yes | Also becomes the immutable template `id`. |
-| `name` | non-whitespace string | yes | Template name; no application length limit. |
-| `description` | string | yes | May be empty. |
-| `baseFields` | array of `BaseFieldInput` | yes | Initial active definitions; may be empty. |
-
-Returns `201 Created`, a template metadata DTO with `contentRevision: 1`, and `Location: /api/campaigns/{campaignId}/templates/{id}`. Content is prepared in MongoDB before SQL metadata is published. A previously published ID returns `409` (`already_published`); a pre-existing prepared document without SQL metadata returns `409` (`content_already_prepared`). An uncertain SQL publication result returns safe `503` (`publication_outcome_unknown`) with `resourceId`; an unknown Mongo write result returns safe `503` (`content_write_outcome_unknown`). The service does not delete prepared documents or retry publication automatically; unpublished prepared documents are not readable through API routes.
-
-## `GET /api/campaigns/{campaignId}/templates/{templateId:guid}`
-
-Returns `200` metadata. Read permissions are the same as the template list. Missing/out-of-campaign template is `404`.
-
-## `PUT /api/campaigns/{campaignId}/templates/{templateId:guid}`
-
-Admin only. Body requires `name` (non-whitespace string) and `expectedRevision` (int64 >= 1). This changes SQL metadata only; content revision is untouched. Success returns `200` metadata with incremented `metadataRevision`. Missing resource is `404`; stale revision is `409` (`revision_conflict`); invalid body is `400`.
-
-## `GET /api/campaigns/{campaignId}/templates/{templateId:guid}/content`
-
-Returns `200` with the complete current template content envelope:
+Returns `200` with the campaign's single metadata row:
 
 ```json
-{"campaignId":7,"resourceId":"54ce37ea-40a5-481c-ae08-92a0eb8fe5c0","contentRevision":1,"data":{"description":"","baseFields":[],"virtualFields":[]}}
+{"campaignId":7,"name":"Campaign","metadataRevision":1}
 ```
 
-The envelope `contentRevision` is independent of SQL `metadataRevision`. Read permissions match the metadata GET. Missing metadata is `404`; published metadata with unavailable content returns safe `503` (`content_unavailable`).
+## `PUT /api/campaigns/{campaignId}/template`
 
-## `PUT /api/campaigns/{campaignId}/templates/{templateId:guid}/content`
+Admin only. Body requires a non-whitespace `name` and `expectedRevision` (int64 >= 1). Success returns `200` metadata with incremented `metadataRevision`; only SQL metadata changes. Missing campaign/template is `404`, stale revision is `409` (`revision_conflict`), and invalid input is `400`.
 
-Admin only. Body requires `expectedRevision` (int64 >= 1), `description` (string; empty allowed), and the complete new active `baseFields` array. The update replaces the active base definitions as one Mongo document revision and preserves `virtualFields`. Success returns `200` with the updated envelope and `contentRevision + 1`. Stale revision is `409` (`content_revision_conflict`); unknown field IDs, duplicate active keys/IDs, immutable-key changes, and incompatible values/options return `400`; missing template is `404`; unknown Mongo write outcomes return safe `503` (`content_write_outcome_unknown`), while Mongo read errors return `503` (`dependency_unavailable`).
+## `GET /api/campaigns/{campaignId}/template/content`
 
-There is no template deletion endpoint because reference/removal behavior has not been specified.
+Returns `200` with the complete content envelope:
+
+```json
+{"campaignId":7,"contentRevision":0,"data":{"description":"","baseFields":[],"virtualFields":[]}}
+```
+
+The SQL template row exists from campaign creation, while its Mongo document is optional until the first content edit. An absent document is returned logically as empty revision `0`; GET performs no writes. The envelope has no `resourceId`. SQL `metadataRevision` and Mongo `contentRevision` are independent.
+
+## `PUT /api/campaigns/{campaignId}/template/content`
+
+Admin only. Body requires `expectedRevision` (int64 >= 0), `description` (string; empty is allowed), and the complete active `baseFields` array. On a campaign with no content document, revision `0` creates the first document at revision `1`. Repeating revision `0` after creation or submitting a stale revision returns `409` (`content_revision_conflict`) without overwriting content. Later successful compare-and-swap updates increment the shared content revision. Existing `virtualFields` are preserved.
+
+Null required values, invalid field entries, unknown IDs, duplicate active keys/IDs, immutable-key changes, invalid options, and incompatible values return `400`. Missing campaign/template is `404`. Mongo write failures with unknown outcomes return safe `503` (`content_write_outcome_unknown`); Mongo read failures return safe `503` (`dependency_unavailable`).
+
+## `GET /api/campaigns/{campaignId}/template/virtual-fields`
+
+Returns `200` with `{contentRevision,virtualFields}`. It reads the same canonical template content document and revision as the base-field content endpoint; a new or unchanged empty template returns revision `0` and an empty array without writing MongoDB.
+
+## `PUT /api/campaigns/{campaignId}/template/virtual-fields`
+
+Admin only. Body requires `expectedRevision` (int64 >= 0) and the complete `virtualFields` array. Revision `0` creates the first shared template content document at revision `1`; subsequent writes use the same compare-and-swap revision as base-field content. The update preserves `description` and `baseFields`. Formula, binding, field-ID, and validation rules are described in [formulas](formulas.md). Stale revisions return `409` (`content_revision_conflict`); invalid input returns `400`; Mongo failures use the safe errors described above.
+
+Template contents use the `campaignTemplates` MongoDB collection, one document per campaign. The former `templateContents` collection is not read, migrated, or used as a fallback.
+
+## Breaking migration
+
+Migration `20261118000100_CampaignTemplate` removes the old `TemplateMetadata` table and `CharacterMetadata.TemplateId`, creates the shared-primary-key `CampaignTemplates` table, and initializes an empty template for every existing campaign using that campaign's name. Old many-template SQL rows are discarded; old `templateContents` documents are not transferred or selected. The migration cannot automatically restore the old many-template data; downgrade is unsupported. This describes the migration contract, not a claim that any particular database has been migrated.

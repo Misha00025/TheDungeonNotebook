@@ -151,15 +151,13 @@ public sealed class ResourcePermissionsTests
         Assert.Equal(JsonValueKind.False, permissions.GetProperty("canManageAccess").ValueKind);
 
         AssertNoPermissions(JsonSerializer.Serialize(new CampaignDto(7, "Campaign", 1), new JsonSerializerOptions(JsonSerializerDefaults.Web)));
-        AssertNoPermissions(JsonSerializer.Serialize(new CharacterMetadataDto(Guid.NewGuid(), 7, Guid.NewGuid(), "Character", Importance.Background, 1), new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+        AssertNoPermissions(JsonSerializer.Serialize(new CharacterMetadataDto(Guid.NewGuid(), 7, "Character", Importance.Background, 1), new JsonSerializerOptions(JsonSerializerDefaults.Web)));
         AssertNoPermissions(JsonSerializer.Serialize(new CharacterSheetEnvelope(1, 1, string.Empty, []), new JsonSerializerOptions(JsonSerializerDefaults.Web)));
     }
 
     private static CharacterMetadata SeedCharacter(SheetServiceTests.Fixture fixture, int campaignId)
     {
-        var template = new TemplateMetadata { Id = Guid.NewGuid(), CampaignId = campaignId, Name = "Template" };
-        fixture.Resources.Templates.Add(template);
-        var character = new CharacterMetadata { Id = Guid.NewGuid(), CampaignId = campaignId, TemplateId = template.Id, Name = "Character" };
+        var character = new CharacterMetadata { Id = Guid.NewGuid(), CampaignId = campaignId, Name = "Character" };
         fixture.Resources.Characters.Add(character);
         return character;
     }

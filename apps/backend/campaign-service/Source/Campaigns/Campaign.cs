@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Tdn.Campaigns.Access;
+using Tdn.Campaigns.Sheets;
 
 namespace Tdn.Campaigns.Campaigns;
 
@@ -8,6 +9,7 @@ public sealed class Campaign
     public int Id { get; set; }
     public required string Name { get; set; }
     public long MetadataRevision { get; set; } = 1;
+    public TemplateMetadata? Template { get; set; }
     public Guid CreationRequestId { get; set; }
     public SubjectType CreatedByType { get; set; }
     public int CreatedById { get; set; }

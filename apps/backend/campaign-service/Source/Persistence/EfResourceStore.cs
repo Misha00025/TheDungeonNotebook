@@ -7,29 +7,11 @@ namespace Tdn.Campaigns.Persistence;
 
 public sealed class EfResourceStore(CampaignDbContext db) : IResourceStore
 {
-    public async Task<IReadOnlyList<TemplateMetadata>> ListTemplatesAsync(int campaignId, CancellationToken cancellationToken) =>
-        await db.TemplateMetadata.AsNoTracking().Where(x => x.CampaignId == campaignId).OrderBy(x => x.Name).ToArrayAsync(cancellationToken);
+    public Task<TemplateMetadata?> GetTemplateAsync(int campaignId, CancellationToken cancellationToken) =>
+        db.TemplateMetadata.AsNoTracking().SingleOrDefaultAsync(x => x.CampaignId == campaignId, cancellationToken);
 
-    public Task<TemplateMetadata?> GetTemplateAsync(int campaignId, Guid templateId, CancellationToken cancellationToken) =>
-        db.TemplateMetadata.AsNoTracking().SingleOrDefaultAsync(x => x.CampaignId == campaignId && x.Id == templateId, cancellationToken);
-
-    public async Task<TemplateMetadata> CreateTemplateAsync(TemplateMetadata template, CancellationToken cancellationToken)
-    {
-        db.TemplateMetadata.Add(template);
-        try
-        {
-            await db.SaveChangesAsync(cancellationToken);
-            return template;
-        }
-        catch (DbUpdateException exception) when (IsMySqlDuplicate(exception))
-        {
-            db.ChangeTracker.Clear();
-            throw new DuplicateResourceException();
-        }
-    }
-
-    public async Task<bool> RenameTemplateAsync(int campaignId, Guid templateId, string name, long expectedRevision, CancellationToken cancellationToken) =>
-        await db.TemplateMetadata.Where(x => x.CampaignId == campaignId && x.Id == templateId && x.MetadataRevision == expectedRevision)
+    public async Task<bool> RenameTemplateAsync(int campaignId, string name, long expectedRevision, CancellationToken cancellationToken) =>
+        await db.TemplateMetadata.Where(x => x.CampaignId == campaignId && x.MetadataRevision == expectedRevision)
             .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.Name, name).SetProperty(x => x.MetadataRevision, x => x.MetadataRevision + 1), cancellationToken) == 1;
 
     public async Task<IReadOnlyList<CharacterMetadata>> ListCharactersAsync(int campaignId, CancellationToken cancellationToken) =>

@@ -93,6 +93,26 @@ class CampaignRouteTests(unittest.TestCase):
             self.assertFalse(path.startswith("/groups"))
             self.assertNotIn("/polices/", path)
 
+    def test_singleton_template_routes_have_only_get_and_put_methods(self):
+        config = yaml.safe_load((GATEWAY / "configs" / "routes.yaml").read_text())
+        routes = {route["path"]: route for route in config["routes"] if isinstance(route, dict)}
+        expected = {
+            "/api/campaigns/{campaignId}/template",
+            "/api/campaigns/{campaignId}/template/content",
+            "/api/campaigns/{campaignId}/template/virtual-fields",
+        }
+        singleton = {path: route for path, route in routes.items() if "/template" in path}
+        self.assertEqual(expected, set(singleton))
+        for path, route in singleton.items():
+            self.assertEqual(["GET", "PUT"], route["methods"])
+            self.assertEqual(path, route["proxy"]["path"])
+            self.assertEqual("{state.x_subject}", route["proxy"]["headers"]["X-Subject"])
+            self.assertEqual("campaign_upstream", route["pre_request_handler"])
+            self.assertEqual("campaign_response", route["response_handler"])
+            self.assertEqual("required", route["auth"])
+        self.assertNotIn("/api/campaigns/{campaignId}/templates", routes)
+        self.assertFalse(any(re.search(r"/templates/\{[^}]+\}", path) for path in routes))
+
     def test_app_configs_include_routes_without_game_systems(self):
         for filename in ("app.json", "app.test.json"):
             config = json.loads((GATEWAY / "configs" / filename).read_text())

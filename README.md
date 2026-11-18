@@ -86,3 +86,5 @@ cd monitoring && docker compose up -d
 ## API
 
 [Публичная HTML-документация](docs/api/index.html)
+
+Current Campaign Service contracts are documented in [the service API index](apps/backend/campaign-service/docs/README.md). The singleton-template contract and Web handoff are described in [singleton-template Web handoff](apps/backend/campaign-service/docs/singleton-template-web.md); its breaking database migration behavior is documented in [templates](apps/backend/campaign-service/docs/templates.md).

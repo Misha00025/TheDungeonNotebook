@@ -21,7 +21,7 @@ public class ViewServiceTests
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         options.Converters.Add(new JsonStringEnumConverter());
         const string json = """
-            {"roots":[{"kind":"layout","nodeKey":"root","title":"Root","params":{"unknown":{"nested":[1,null,"text"]}},"children":[{"kind":"widget","nodeKey":"outer","title":"Outer","params":null,"children":[{"kind":"widget","nodeKey":"inner","title":"Inner","params":{"id":"a1b2c3d4-e5f6-4789-8abc-def012345678"},"children":[],"sources":[{"templateId":"a1b2c3d4-e5f6-4789-8abc-def012345678","kind":"Base","fieldId":"b1b2c3d4-e5f6-4789-8abc-def012345678"}],"format":"$1 (${2:s}) %q"}],"sources":[],"format":"opaque"}]}]}
+            {"roots":[{"kind":"layout","nodeKey":"root","title":"Root","params":{"unknown":{"nested":[1,null,"text"]}},"children":[{"kind":"widget","nodeKey":"outer","title":"Outer","params":null,"children":[{"kind":"widget","nodeKey":"inner","title":"Inner","params":{"id":"a1b2c3d4-e5f6-4789-8abc-def012345678"},"children":[],"sources":[{"kind":"Base","fieldId":"b1b2c3d4-e5f6-4789-8abc-def012345678"}],"format":"$1 (${2:s}) %q"}],"sources":[],"format":"opaque"}]}]}
             """;
 
         var view = JsonSerializer.Deserialize<ViewContent>(json, options)!;
@@ -33,16 +33,18 @@ public class ViewServiceTests
 
         var missingSourceKind = json.Replace("\"kind\":\"Base\",", "", StringComparison.Ordinal);
         Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<ViewContent>(missingSourceKind, options));
+        var legacySelector = json.Replace("\"kind\":\"Base\",", "\"templateId\":\"a1b2c3d4-e5f6-4789-8abc-def012345678\",\"kind\":\"Base\",", StringComparison.Ordinal);
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<ViewContent>(legacySelector, options));
     }
 
     [Fact]
     public async Task NestedNodesPreserveOrderNativeParamsAndOpaqueFormatThroughJsonRoundTrip()
     {
         var fixture = SheetServiceTests.CreateFixture();
-        var templateId = await CreateTemplate(fixture);
-        var baseId = fixture.Content.GetData<TemplateContent>("templateContents", 7, templateId).BaseFields.Single().Id;
+        await CreateTemplate(fixture);
+        var baseId = fixture.Content.GetData<TemplateContent>("campaignTemplates", 7, Guid.Empty).BaseFields.Single().Id;
         var nestedWidget = new WidgetNode("nested-widget", "Nested widget", Json("[1, true, null, {\"unknown\":\"value\"}]"),
-            [new LayoutNode("nested-layout", "Nested layout", Json("null"), [])], [new WidgetSource(templateId, FieldSourceKind.Base, baseId)], "$1 (${2:s})");
+            [new LayoutNode("nested-layout", "Nested layout", Json("null"), [])], [new WidgetSource(FieldSourceKind.Base, baseId)], "$1 (${2:s})");
         var widget = new WidgetNode("widget", "Widget title", Json("{\"unknown\":{\"id\":\"" + Guid.NewGuid().ToString("D") + "\"},\"number\":1234567890123456789}"),
             [nestedWidget], [], "format-with-unknown-%q syntax");
         var roots = new ViewNode[]
@@ -81,14 +83,14 @@ public class ViewServiceTests
     public async Task NestedWidgetSourcesAreValidatedAndProjectionReturnsOnlyDeclaredSources()
     {
         var fixture = SheetServiceTests.CreateFixture();
-        var templateId = await CreateTemplate(fixture);
-        var template = fixture.Content.GetData<TemplateContent>("templateContents", 7, templateId);
+        await CreateTemplate(fixture);
+        var template = fixture.Content.GetData<TemplateContent>("campaignTemplates", 7, Guid.Empty);
         var characterId = Guid.NewGuid();
         await fixture.Sheets.CreateCharacterAsync(Admin, 7, new CharacterCreateRequest
         {
-            RequestId = characterId, Name = "Character", TemplateId = templateId
+            RequestId = characterId, Name = "Character"
         }, default);
-        var source = new WidgetSource(templateId, FieldSourceKind.Base, template.BaseFields.Single().Id);
+        var source = new WidgetSource(FieldSourceKind.Base, template.BaseFields.Single().Id);
         var roots = new ViewNode[]
         {
             new LayoutNode("root", "Root", Json("{\"looksLikeGuid\":\"" + Guid.NewGuid().ToString("D") + "\"}"),
@@ -110,17 +112,40 @@ public class ViewServiceTests
             new ViewCreateRequest
             {
                 RequestId = Guid.NewGuid(), Name = "Invalid", Roots = [new WidgetNode("bad", "Bad", Json("{}"), [],
-                    [new WidgetSource(templateId, FieldSourceKind.Base, Guid.NewGuid())], "")]
+                    [new WidgetSource(FieldSourceKind.Base, Guid.NewGuid())], "")]
             }, default));
         Assert.Equal("invalid_source", invalid.Code);
 
-        var foreignTemplateId = Guid.NewGuid();
-        fixture.Resources.Templates.Add(new TemplateMetadata { Id = foreignTemplateId, CampaignId = 8, Name = "Foreign" });
+        var formula = await new FormulaService(fixture.Resources, fixture.Content, fixture.Sheets).CreateAsync(Admin, 7,
+            new FormulaCreateRequest { RequestId = Guid.NewGuid(), Name = "Custom", Expression = "2", Parameters = [] }, default);
+        var customFields = new VirtualFieldService(fixture.Resources, fixture.Content, fixture.Sheets);
+        var custom = await customFields.UpdateCustomFieldsAsync(Admin, 7, characterId,
+            new VirtualFieldsUpdateRequest
+            {
+                ExpectedRevision = 1,
+                VirtualFields = [new VirtualFieldInput { Key = "custom", Title = "Custom", Description = "", ResultType = NumericResultType.Integer, FormulaId = formula.Id, Bindings = new() }]
+            }, default);
+        var customSource = await Assert.ThrowsAsync<DomainException>(() => service.CreateAsync(Admin, 7,
+            new ViewCreateRequest
+            {
+                RequestId = Guid.NewGuid(), Name = "Custom source", Roots = [new WidgetNode("custom", "Custom", Json("{}"), [],
+                    [new WidgetSource(FieldSourceKind.Virtual, custom.VirtualFields.Single().Id)], "")]
+            }, default));
+        Assert.Equal("invalid_source", customSource.Code);
+
+        fixture.Campaigns.SeedCampaign(8);
+        await fixture.Sheets.UpdateTemplateContentAsync(Admin, 8, new TemplateContentUpdateRequest
+        {
+            ExpectedRevision = 0,
+            Description = "",
+            BaseFields = [new BaseFieldInput { Key = "foreign", Title = "Foreign", Description = "", ValueType = FieldValueType.Integer, Value = Json("1"), Options = [] }]
+        }, default);
+        var foreignFieldId = fixture.Content.GetData<TemplateContent>("campaignTemplates", 8, Guid.Empty).BaseFields.Single().Id;
         var crossCampaign = await Assert.ThrowsAsync<DomainException>(() => service.CreateAsync(Admin, 7,
             new ViewCreateRequest
             {
                 RequestId = Guid.NewGuid(), Name = "Cross campaign", Roots = [new WidgetNode("foreign", "Foreign", Json("{}"), [],
-                    [new WidgetSource(foreignTemplateId, FieldSourceKind.Base, Guid.NewGuid())], "")]
+                    [new WidgetSource(FieldSourceKind.Base, foreignFieldId)], "")]
             }, default));
         Assert.Equal("invalid_source", crossCampaign.Code);
     }
@@ -184,43 +209,53 @@ public class ViewServiceTests
     }
 
     [Fact]
-    public async Task ProjectionDoesNotSearchOtherTemplateFieldsOrResolveDeletedOrWrongKindReferences()
+    public async Task MultipleCharactersResolveExplicitValuesFromOneCampaignTemplate()
     {
         var fixture = SheetServiceTests.CreateFixture();
-        var characterTemplateId = await CreateTemplate(fixture);
-        var otherTemplateId = await CreateTemplate(fixture);
-        var characterTemplate = fixture.Content.GetData<TemplateContent>("templateContents", 7, characterTemplateId);
-        var otherTemplate = fixture.Content.GetData<TemplateContent>("templateContents", 7, otherTemplateId);
-        var characterId = Guid.NewGuid();
-        await fixture.Sheets.CreateCharacterAsync(Admin, 7, new CharacterCreateRequest
-        {
-            RequestId = characterId, Name = "Character", TemplateId = characterTemplateId
-        }, default);
-        await fixture.Sheets.SetBaseValueAsync(Admin, 7, characterId, characterTemplate.BaseFields[0].Id,
+        await CreateTemplate(fixture);
+        var template = fixture.Content.GetData<TemplateContent>("campaignTemplates", 7, Guid.Empty);
+        var first = await fixture.Sheets.CreateCharacterAsync(Admin, 7, new CharacterCreateRequest { RequestId = Guid.NewGuid(), Name = "First" }, default);
+        var second = await fixture.Sheets.CreateCharacterAsync(Admin, 7, new CharacterCreateRequest { RequestId = Guid.NewGuid(), Name = "Second" }, default);
+        await fixture.Sheets.SetBaseValueAsync(Admin, 7, first.Id, template.BaseFields[0].Id,
             new BaseValueRequest { Value = Json("99"), ExpectedRevision = 1 }, default);
 
-        var wrongKindId = characterTemplate.BaseFields[0].Id;
+        var service = CreateViewService(fixture);
+        var view = await service.CreateAsync(Admin, 7, new ViewCreateRequest
+        {
+            RequestId = Guid.NewGuid(), Name = "Sources",
+            Roots = [new WidgetNode("w", "Widget", Json("{}"), [], [new WidgetSource(FieldSourceKind.Base, template.BaseFields[0].Id)], "")]
+        }, default);
+
+        var firstProjection = await service.GetSourcesAsync(Admin, 7, view.Id, first.Id, default);
+        var secondProjection = await service.GetSourcesAsync(Admin, 7, view.Id, second.Id, default);
+        Assert.Equal("99", Assert.Single(Assert.Single(firstProjection.Widgets).Sources).Value!.Value.GetRawText());
+        Assert.Equal("1", Assert.Single(Assert.Single(secondProjection.Widgets).Sources).Value!.Value.GetRawText());
+    }
+
+    [Fact]
+    public async Task DeletedTemplateVirtualFieldDoesNotResolveFromCharacterCustomFields()
+    {
+        var fixture = SheetServiceTests.CreateFixture();
+        await CreateTemplate(fixture);
+        var formula = await new FormulaService(fixture.Resources, fixture.Content, fixture.Sheets).CreateAsync(Admin, 7,
+            new FormulaCreateRequest { RequestId = Guid.NewGuid(), Name = "Value", Expression = "7", Parameters = [] }, default);
+        var virtualField = new VirtualField(Guid.NewGuid(), "shared", "Shared", "", NumericResultType.Integer, formula.Id, new(), null, null);
+        var template = fixture.Content.GetData<TemplateContent>("campaignTemplates", 7, Guid.Empty);
+        await fixture.Content.ReplaceAsync("campaignTemplates", 7, Guid.Empty, 1, template with { VirtualFields = [virtualField] }, default);
+        var character = await fixture.Sheets.CreateCharacterAsync(Admin, 7, new CharacterCreateRequest { RequestId = Guid.NewGuid(), Name = "Character" }, default);
+        var sheet = fixture.Content.GetData<CharacterSheet>("characterSheets", 7, character.Id);
+        await fixture.Content.ReplaceAsync("characterSheets", 7, character.Id, 1, sheet with { CustomVirtualFields = [virtualField] }, default);
         var viewId = Guid.NewGuid();
         fixture.Resources.Views.Add(new ViewMetadata { Id = viewId, CampaignId = 7, Name = "Sources" });
-        var widget = new WidgetNode("w", "Widget", Json("{\"reference\":\"" + wrongKindId.ToString("D") + "\"}"), [],
-            [new WidgetSource(otherTemplateId, FieldSourceKind.Base, otherTemplate.BaseFields[0].Id),
-             new WidgetSource(characterTemplateId, FieldSourceKind.Base, wrongKindId),
-             new WidgetSource(characterTemplateId, FieldSourceKind.Virtual, wrongKindId)],
-            "${unknown-reference:" + wrongKindId.ToString("D") + "}");
-        await fixture.Content.CreateAsync("viewContents", 7, viewId, new ViewContent([widget]), default);
-        var service = CreateViewService(fixture);
+        await fixture.Content.CreateAsync("viewContents", 7, viewId, new ViewContent([
+            new WidgetNode("w", "Widget", Json("{}"), [], [new WidgetSource(FieldSourceKind.Virtual, virtualField.Id)], "")]), default);
 
-        var projection = await service.GetSourcesAsync(Admin, 7, viewId, characterId, default);
-        Assert.Equal(3, Assert.Single(projection.Widgets).Sources.Count);
-        Assert.Equal("not_in_context", projection.Widgets[0].Sources[0].Diagnostic!.Code);
-        Assert.Equal("99", projection.Widgets[0].Sources[1].Value!.Value.GetRawText());
-        Assert.Equal("unknown_reference", projection.Widgets[0].Sources[2].Diagnostic!.Code);
-
-        await fixture.Sheets.UpdateTemplateContentAsync(Admin, 7, characterTemplateId,
-            new TemplateContentUpdateRequest { ExpectedRevision = 1, Description = "", BaseFields = [] }, default);
-        var afterDelete = await service.GetSourcesAsync(Admin, 7, viewId, characterId, default);
-        Assert.Equal("unknown_reference", afterDelete.Widgets[0].Sources[1].Diagnostic!.Code);
-        Assert.Null(afterDelete.Widgets[0].Sources[1].Value);
+        await new VirtualFieldService(fixture.Resources, fixture.Content, fixture.Sheets).UpdateTemplateFieldsAsync(Admin, 7,
+            new TemplateVirtualFieldsUpdateRequest { ExpectedRevision = 2, VirtualFields = [] }, default);
+        var projection = await CreateViewService(fixture).GetSourcesAsync(Admin, 7, viewId, character.Id, default);
+        var resolved = Assert.Single(Assert.Single(projection.Widgets).Sources);
+        Assert.Equal("unknown_reference", resolved.Diagnostic!.Code);
+        Assert.Null(resolved.Value);
     }
 
     [Fact]
@@ -230,10 +265,10 @@ public class ViewServiceTests
         var service = CreateViewService(fixture);
         var view = await service.CreateAsync(Admin, 7,
             new ViewCreateRequest { RequestId = Guid.NewGuid(), Name = "Empty", Roots = [] }, default);
-        var templateId = await CreateTemplate(fixture);
+        await CreateTemplate(fixture);
         var character = await fixture.Sheets.CreateCharacterAsync(Admin, 7, new CharacterCreateRequest
         {
-            RequestId = Guid.NewGuid(), Name = "Unassigned", TemplateId = templateId
+            RequestId = Guid.NewGuid(), Name = "Unassigned"
         }, default);
         var member = new Subject(SubjectType.User, 200);
 
@@ -247,13 +282,11 @@ public class ViewServiceTests
     private static ViewService CreateViewService(SheetServiceTests.Fixture fixture) =>
         new(fixture.Resources, fixture.Content, fixture.Sheets, new ComputedSheetService(fixture.Resources, fixture.Content, fixture.Sheets));
 
-    private static async Task<Guid> CreateTemplate(SheetServiceTests.Fixture fixture)
+    private static Task<TemplateContentEnvelope> CreateTemplate(SheetServiceTests.Fixture fixture)
     {
-        var templateId = Guid.NewGuid();
-        await fixture.Sheets.CreateTemplateAsync(Admin, 7, new TemplateCreateRequest
+        return fixture.Sheets.UpdateTemplateContentAsync(Admin, 7, new TemplateContentUpdateRequest
         {
-            RequestId = templateId,
-            Name = "Template",
+            ExpectedRevision = 0,
             Description = "",
             BaseFields = [new BaseFieldInput
             {
@@ -261,7 +294,6 @@ public class ViewServiceTests
                 Value = Json("1"), Options = []
             }]
         }, default);
-        return templateId;
     }
 
     private static JsonElement Json(string json)
