@@ -4,6 +4,10 @@
   margin-bottom: 1.5rem;
 }
 
+.compact {
+  margin-bottom: 0;
+}
+
 .searchWrapper {
   position: relative;
   width: 100%;
@@ -76,6 +80,11 @@
   opacity: 1;
   color: var(--text-primary);
   background-color: var(--bg-hover);
+}
+
+.clearButton:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
 }
 
 .clearIcon {

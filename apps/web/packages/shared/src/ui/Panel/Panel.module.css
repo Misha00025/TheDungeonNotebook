@@ -1,0 +1,76 @@
+.panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  height: 100%;
+  min-width: 0;
+  padding: 1.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.headingContent,
+.body {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.3;
+}
+
+h2.title {
+  font-size: 1.25rem;
+}
+
+.body {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.body:empty {
+  display: none;
+}
+
+.body > p {
+  margin: 0;
+}
+
+.description {
+  color: var(--text-secondary);
+}
+
+.status {
+  margin-inline-start: auto;
+}
+
+.actions {
+  margin-top: auto;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.875em;
+  overflow-wrap: anywhere;
+}

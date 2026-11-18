@@ -53,7 +53,10 @@ describe('singleton campaign template editor', () => {
 
   it('saves populated base content with its current revision and omits field type revisions', async () => {
     renderTemplates();
+    await waitFor(() => expect(baseDescription()).toHaveValue('desc'));
+    await screen.findByDisplayValue('immutable');
     fireEvent.click(await screen.findByRole('button', { name: 'Добавить поле' }));
+    expect(await screen.findByRole('group', { name: 'Новое поле' })).toBeInTheDocument();
     fireEvent.change(baseDescription(), { target: { value: 'updated description' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить базовые поля' }));
     await waitFor(() => expect(api.putTemplateContent).toHaveBeenCalledWith(4, expect.objectContaining({ expectedRevision: 11, description: 'updated description' })));
@@ -112,6 +115,7 @@ describe('singleton campaign template editor', () => {
   it('keeps metadata and content revisions independent and preserves a content draft on metadata save', async () => {
     renderTemplates();
     await screen.findByRole('heading', { name: 'Базовое содержимое' });
+    await waitFor(() => expect(baseDescription()).toHaveValue('desc'));
     fireEvent.change(baseDescription(), { target: { value: 'Unsaved content draft' } });
     fireEvent.change(screen.getByLabelText('Название'), { target: { value: 'Renamed' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить название' }));
@@ -124,6 +128,10 @@ describe('singleton campaign template editor', () => {
   it('retains controls and drafts while permission refresh gates mutations', async () => {
     const view = renderTemplates();
     await screen.findByRole('heading', { name: 'Базовое содержимое' });
+    await waitFor(() => {
+      expect(baseDescription()).toHaveValue('desc');
+      expect(baseDescription()).toBeEnabled();
+    });
     fireEvent.change(baseDescription(), { target: { value: 'Draft during refresh' } });
     shared.permissionsLoading = true;
     view.rerender(tree());
@@ -144,6 +152,7 @@ describe('singleton campaign template editor', () => {
     api.getTemplateContent.mockResolvedValueOnce(content).mockResolvedValueOnce({ ...content, contentRevision: 14 });
     renderTemplates();
     await screen.findByRole('heading', { name: 'Базовое содержимое' });
+    await waitFor(() => expect(baseDescription()).toHaveValue('desc'));
     const description = baseDescription();
     fireEvent.change(description, { target: { value: 'Content draft' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить базовые поля' }));

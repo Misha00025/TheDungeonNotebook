@@ -1,0 +1,17 @@
+.field {
+  display: grid;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.label {
+  font-weight: 600;
+}
+
+.hint {
+  color: var(--text-secondary);
+}
+
+.error {
+  color: var(--danger-color);
+}

@@ -1,0 +1,43 @@
+.navigation {
+  display: grid;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.link {
+  display: block;
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--border-radius-md);
+  color: var(--text-secondary);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.link:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.link[aria-current='page'] {
+  background-color: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+@container tdn-workspace (max-width: 52rem) {
+  .navigation {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .link {
+    flex: 0 0 auto;
+    max-width: 18rem;
+  }
+}

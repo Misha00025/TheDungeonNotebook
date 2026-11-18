@@ -1,0 +1,38 @@
+.workspace {
+  width: 100%;
+  max-width: 102.5rem;
+  min-width: 0;
+  margin-inline: auto;
+  container-name: tdn-workspace;
+  container-type: inline-size;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 13.75rem minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+  min-width: 0;
+}
+
+.navigation {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.content {
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  max-width: 87.5rem;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+@container tdn-workspace (max-width: 52rem) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+}

@@ -7,6 +7,8 @@ export interface PageHeaderProps {
   imageUrl?: string;
   imageAlt?: string;
   actions?: React.ReactNode;
+  headingLevel?: 1 | 2 | 3;
+  id?: string;
 }
 
 const PageHeader: React.FC<PageHeaderProps> = ({
@@ -15,9 +17,12 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   imageUrl,
   imageAlt,
   actions,
+  headingLevel = 1,
+  id,
 }) => {
+  const Heading = `h${headingLevel}` as const;
   return (
-    <div className={styles.pageHeader}>
+    <header className={styles.pageHeader}>
       {imageUrl && (
         <img
           src={imageUrl}
@@ -25,12 +30,12 @@ const PageHeader: React.FC<PageHeaderProps> = ({
           className={styles.headerImage}
         />
       )}
-      <div>
-        <div className={styles.headerTitle}>{title}</div>
+      <div className={styles.headerText}>
+        <Heading id={id} className={styles.headerTitle}>{title}</Heading>
         {subtitle && <div className={styles.headerSubtitle}>{subtitle}</div>}
       </div>
       {actions && <div className={styles.headerActions}>{actions}</div>}
-    </div>
+    </header>
   );
 };
 

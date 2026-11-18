@@ -1,14 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { ActionRow, Button, Field, Input, List, Panel, Select, StatePanel } from '@tdn/shared';
 import { useWorkspace, useDirtyDraft } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 import { useMutation } from './hooks';
 import { runCreation, CampaignApiError } from './api';
 import type { Importance } from './types';
 import { ApiError } from './Feedback';
-import commonStyles from '@tdn/shared/styles/common.module.css';
-import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
-import inputStyles from '@tdn/shared/styles/components/Input.module.css';
-import styles from './Workspace.module.css';
 
 const isUncertain = (error: unknown) => error instanceof CampaignApiError && (error.unknownOutcome || ['creation_already_published', 'already_published', 'content_already_prepared'].includes(error.problem.code));
 
@@ -22,6 +19,8 @@ const CreateCharacter: React.FC<{ campaignId: number; onClose: () => void }> = (
   const [createError, setCreateError] = useState<unknown>();
   const [checkError, setCheckError] = useState<unknown>();
   const [uncertain, setUncertain] = useState(false);
+  const nameId = React.useId();
+  const importanceId = React.useId();
   const active = useRef(true);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   const clearDirty = useDirtyDraft(`character-create-${campaignId}-${requestId}`, Boolean(name || importance));
@@ -60,13 +59,20 @@ const CreateCharacter: React.FC<{ campaignId: number; onClose: () => void }> = (
   const cancel = () => { if (!name && !importance || window.confirm('Отказаться от черновика персонажа?')) close(); };
   const abandon = () => { if (window.confirm('Отказаться от проверки операции? Результат создания может оставаться неизвестным.')) close(); };
   if (mode !== 'gm' || !lastKnownPermissions.canWrite) return null;
-  return <form className={`${commonStyles.form} ${styles.page}`} onSubmit={submit}>
-    <h2>Создать персонажа</h2>
-    {permissionsLoading && <p>Обновление прав кампании…</p>}
-    <label className={commonStyles.formGroup}>Имя<input className={inputStyles.input} required value={name} disabled={!writable || uncertain || creation.busy} onChange={event => setName(event.target.value)} /></label>
-    <label className={commonStyles.formGroup}>Важность<select className={inputStyles.input} value={importance} disabled={!writable || uncertain || creation.busy} onChange={event => setImportance(event.target.value as Importance | '')}><option value="">По умолчанию (фоновый)</option><option value="Background">Фоновый</option><option value="Secondary">Второстепенный</option><option value="Key">Ключевой</option></select></label>
-    {Boolean(createError) && <ApiError error={createError} />}{Boolean(checkError) && <ApiError error={checkError} />}
-    <div className={commonStyles.formActions}>{uncertain ? <button className={buttonStyles.button} type="button" disabled={creation.busy} onClick={() => void checkCreation()}>Проверить создание</button> : <button className={buttonStyles.button} disabled={!writable || creation.busy || !name.trim()}>{creation.busy ? 'Создание…' : 'Создать'}</button>}<button className={buttonStyles.button} type="button" disabled={creation.busy} onClick={uncertain ? abandon : cancel}>{uncertain ? 'Отказаться от операции' : 'Отмена'}</button></div>
+  return <form onSubmit={submit}>
+    <Panel title="Создать персонажа" headingLevel={2} description="Персонаж использует единственный шаблон кампании." actions={<ActionRow>
+      {uncertain
+        ? <Button type="button" disabled={creation.busy} onClick={() => void checkCreation()}>Проверить создание</Button>
+        : <Button type="submit" busy={creation.busy} disabled={!writable || uncertain || !name.trim()}>{creation.busy ? 'Создание…' : 'Создать'}</Button>}
+      <Button variant="secondary" type="button" disabled={creation.busy} onClick={uncertain ? abandon : cancel}>{uncertain ? 'Отказаться от операции' : 'Отмена'}</Button>
+    </ActionRow>}>
+      {permissionsLoading && <StatePanel kind="loading">Обновление прав кампании…</StatePanel>}
+      <List layout="grid" gridSize="small">
+        <Field label="Имя" htmlFor={nameId}><Input id={nameId} required value={name} disabled={!writable || uncertain || creation.busy} onChange={event => setName(event.target.value)} /></Field>
+        <Field label="Важность" htmlFor={importanceId}><Select id={importanceId} value={importance} disabled={!writable || uncertain || creation.busy} onChange={event => setImportance(event.target.value as Importance | '')}><option value="">По умолчанию (фоновый)</option><option value="Background">Фоновый</option><option value="Secondary">Второстепенный</option><option value="Key">Ключевой</option></Select></Field>
+      </List>
+      {Boolean(createError) && <ApiError error={createError} />}{Boolean(checkError) && <ApiError error={checkError} />}
+    </Panel>
   </form>;
 };
 

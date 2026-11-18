@@ -1,14 +1,11 @@
 import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Link, Navigate, Outlet, useLocation, useParams } from 'react-router-dom';
-import { Breadcrumbs } from '@tdn/shared';
-import commonStyles from '@tdn/shared/styles/common.module.css';
-import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
+import { Navigate, Outlet, useLocation, useParams } from 'react-router-dom';
+import { Badge, Breadcrumbs, Button, Field, PageHeader, SectionNav, Select, StatePanel, WorkspaceLayout } from '@tdn/shared';
 import type { Campaign, Permissions } from './types';
 import { useWorkspace } from './Workspace';
 import { useVisitHistory } from './VisitHistory';
 import { useResource } from './hooks';
 import { ApiError } from './Feedback';
-import styles from './Workspace.module.css';
 
 export type CampaignWorkspaceValue = { campaign: Campaign; permissions: Permissions; lastKnownPermissions: Permissions; permissionsLoading?: boolean; mode: 'gm' | 'player'; reloadCampaign: () => void };
 const CampaignContext = createContext<CampaignWorkspaceValue | null>(null);
@@ -19,7 +16,7 @@ const CampaignShell: React.FC = () => {
   const { api, path, sessionKey, invalidation, navigate } = useWorkspace();
   const { visitGroup } = useVisitHistory();
   const location = useLocation();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const campaignSelectId = React.useId();
   const [switchBusy, setSwitchBusy] = useState(false);
   const [switchError, setSwitchError] = useState<unknown>();
   const busy = useRef(false);
@@ -44,13 +41,13 @@ const CampaignShell: React.FC = () => {
     recordedGroup.current = identity;
     visitGroup(id);
   }, [sessionKey, id, valid, campaign.data, campaign.loading, campaign.error, permission.data, permission.loading, permission.error, visitGroup]);
-  if (!valid) return <p role="alert">Некорректный идентификатор кампании.</p>;
-  if (campaign.loading && !campaign.data) return <p>Загрузка кампании…</p>;
+  if (!valid) return <StatePanel kind="error">Некорректный идентификатор кампании.</StatePanel>;
+  if (campaign.loading && !campaign.data) return <StatePanel kind="loading">Загрузка кампании…</StatePanel>;
   if (campaign.error && !campaign.data) return <ApiError error={campaign.error} onRetry={campaign.reload} />;
-  if (!campaign.data) return <p role="alert">Данные кампании недоступны.</p>;
-  if (permission.loading && !permission.data) return <p>Загрузка прав кампании…</p>;
+  if (!campaign.data) return <StatePanel kind="error">Данные кампании недоступны.</StatePanel>;
+  if (permission.loading && !permission.data) return <StatePanel kind="loading">Загрузка прав кампании…</StatePanel>;
   if (permission.error && !permission.data) return <ApiError error={permission.error} onRetry={permission.reload} />;
-  if (!permission.data) return <p role="alert">Права кампании недоступны.</p>;
+  if (!permission.data) return <StatePanel kind="error">Права кампании недоступны.</StatePanel>;
   if (mode === 'gm' && !permission.loading && !permission.error && !permission.data.canWrite) return <Navigate to={path(`/${id}/player/characters`)} replace />;
   const effective = permission.loading || permission.error ? { ...permission.data, canWrite: false, canManageAccess: false } : permission.data;
   const canEnterGm = effective.canWrite;
@@ -59,12 +56,11 @@ const CampaignShell: React.FC = () => {
     if (busy.current) return;
     const target = mode === 'gm' ? 'player' : 'gm';
     const sheetRoute = location.pathname.match(/\/(?:gm|player)\/characters\/([^/]+)\/(overview|stats)$/);
-    if (!sheetRoute) { setMenuOpen(false); navigate(targetMode(target)); return; }
+    if (!sheetRoute) { navigate(targetMode(target)); return; }
     busy.current = true; const current = ++sequence.current; const pathname = location.pathname; setSwitchBusy(true); setSwitchError(undefined);
     try {
       const access = await api.characterPermissions(id, decodeURIComponent(sheetRoute[1]));
       if (mounted.current && sequence.current === current && route.current === pathname) {
-        setMenuOpen(false);
         if (target === 'gm' && !canEnterGm) navigate(targetMode(target));
         else if (access.canRead || access.canWrite) navigate(path(`/${id}/${target}/characters/${encodeURIComponent(decodeURIComponent(sheetRoute[1]))}/${sheetRoute[2]}`));
         else navigate(targetMode(target));
@@ -80,23 +76,36 @@ const CampaignShell: React.FC = () => {
   const changeCampaign = async (next: number) => {
     if (busy.current) return;
     busy.current = true; const current = ++sequence.current; const pathname = location.pathname; setSwitchBusy(true); setSwitchError(undefined);
-    try { const access = await api.campaignPermissions(next); if (mounted.current && sequence.current === current && route.current === pathname) { setMenuOpen(false); navigate(path(`/${next}/${mode === 'gm' && access.canWrite ? 'gm/overview' : 'player/characters'}`)); } }
+    try { const access = await api.campaignPermissions(next); if (mounted.current && sequence.current === current && route.current === pathname) { navigate(path(`/${next}/${mode === 'gm' && access.canWrite ? 'gm/overview' : 'player/characters'}`)); } }
     catch (error) { if (mounted.current && sequence.current === current && route.current === pathname) setSwitchError(error); }
     finally { if (mounted.current && sequence.current === current) { busy.current = false; setSwitchBusy(false); } }
   };
   const nav = mode === 'gm' ? [['Обзор', 'gm/overview'], ['Персонажи', 'gm/characters'], ['Шаблон', 'gm/templates'], ['Формулы', 'gm/formulas'], ['Представления', 'gm/views'], ['Участники и доступ', 'gm/members'], ['Настройки', 'gm/settings']] : [['Мои персонажи', 'player/characters']];
   const title = nav.find(([, suffix]) => location.pathname.endsWith(`/${suffix}`))?.[0] ?? campaign.data.name;
+  const campaignItems = campaigns.data ?? [];
+  const campaignOptions = campaignItems.some(item => item.id === id)
+    ? campaignItems
+    : [{ id, name: campaign.data.name }, ...campaignItems];
   return <CampaignContext.Provider value={{ campaign: campaign.data, permissions: effective, lastKnownPermissions: permission.data, permissionsLoading: permission.loading || Boolean(permission.error), mode, reloadCampaign: campaign.reload }}>
-    <div className={styles.workspace}><button className={`${buttonStyles.button} ${styles.mobileToggle}`} aria-expanded={menuOpen} aria-controls="campaign-navigation" onClick={() => setMenuOpen(value => !value)}>Меню</button><aside id="campaign-navigation" className={`${commonStyles.card} ${styles.sidebar} ${menuOpen ? styles.open : ''}`}>
-      <p>Режим: {mode === 'gm' ? 'Мастер' : 'Игрок'}</p>
-      <label>Кампания<select value={String(id)} disabled={switchBusy} onChange={event => { setMenuOpen(false); void changeCampaign(Number(event.target.value)); }} aria-label="Кампания">{campaigns.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      {campaigns.loading && <p>Загрузка списка кампаний…</p>}
+    <WorkspaceLayout navigation={<>
+      <Badge>Режим: {mode === 'gm' ? 'Мастер' : 'Игрок'}</Badge>
+      <Field label="Кампания" htmlFor={campaignSelectId}>
+        <Select id={campaignSelectId} value={String(id)} disabled={switchBusy} onChange={event => { void changeCampaign(Number(event.target.value)); }}>
+          {campaignOptions.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </Select>
+      </Field>
+      {campaigns.loading && <StatePanel kind="loading">Загрузка списка кампаний…</StatePanel>}
       {Boolean(campaigns.error) && <ApiError error={campaigns.error} onRetry={campaigns.reload} />}
-      <nav aria-label="Разделы кампании">{nav.map(([label, route]) => <Link key={route} to={path(`/${id}/${route}`)} aria-current={location.pathname.endsWith(`/${route}`) ? 'page' : undefined} onClick={() => setMenuOpen(false)}>{label}</Link>)}</nav>
-      {effective.canWrite && <button className={buttonStyles.button} disabled={switchBusy} onClick={switchMode}>{mode === 'gm' ? 'Пространство игрока' : 'Пространство мастера'}</button>}
-    </aside><main className={styles.content}><Breadcrumbs items={[{ label: 'Кампании', path: path('/') }, { label: campaign.data.name, path: targetMode(mode) }, { label: title }]} /><h1>{campaign.data.name}</h1>
-      {permission.loading && <p>Обновление прав кампании…</p>}{Boolean(permission.error) && <ApiError error={permission.error} onRetry={permission.reload} />}{Boolean(switchError) && <ApiError error={switchError} />}<Outlet />
-    </main></div>
+      {effective.canWrite && <Button variant="secondary" disabled={switchBusy} onClick={switchMode}>{mode === 'gm' ? 'Пространство игрока' : 'Пространство мастера'}</Button>}
+      <SectionNav aria-label="Разделы кампании" items={nav.map(([label, route]) => {
+        const to = path(`/${id}/${route}`);
+        return { label, to, active: location.pathname === to || location.pathname.startsWith(`${to}/`) };
+      })} />
+    </>}>
+      <Breadcrumbs items={[{ label: 'Кампании', path: path('/') }, { label: campaign.data.name, path: targetMode(mode) }, { label: title }]} />
+      <PageHeader title={campaign.data.name} headingLevel={1} />
+      {permission.loading && <StatePanel kind="loading">Обновление прав кампании…</StatePanel>}{Boolean(permission.error) && <ApiError error={permission.error} onRetry={permission.reload} />}{Boolean(switchError) && <ApiError error={switchError} />}<Outlet />
+    </WorkspaceLayout>
   </CampaignContext.Provider>;
 };
 const Shell: React.FC = () => { const { groupId = '' } = useParams(); return <CampaignShell key={groupId} />; };

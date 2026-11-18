@@ -1,20 +1,45 @@
-  .button {
-      border-radius: var(--border-radius-lg);
-      padding: 0.75rem 1.5rem;
-      border: none;
-      background-color: var(--accent-color);
-      color: white;
-      font-weight: 600;
-      cursor: pointer;
-      transition: var(--transition);
-      font-size: small;
-    }
-    
-  .button:hover {
-    opacity: 0.9;
-    transform: translateY(-1px);
-  }
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-lg);
+  font: inherit;
+  text-align: center;
+  text-decoration: none;
+  box-sizing: border-box;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  background-color: var(--accent-color);
+  color: var(--text-on-accent);
+  text-shadow: var(--text-shadow);
+}
 
-  .button:active {
-    transform: translateY(0);
-  }
+.button:hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+.button:active:not(:disabled) {
+  filter: brightness(0.88);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.secondary {
+  border-color: var(--border-color);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  text-shadow: none;
+}
