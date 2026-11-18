@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AuthenticatedRequest } from '@tdn/shared';
 import { CampaignApiError, createCampaignApi, runCreation } from './api';
 import { parseJson } from './json';
+import type { WidgetSource } from './types';
 
 function harness(responses: Response[]) {
   const calls: [string, RequestInit | undefined][] = [];
@@ -17,11 +18,11 @@ const json = (value: unknown, status = 200) => new Response(JSON.stringify(value
 
 describe('campaign typed client', () => {
   it('uses campaign root arrays and GUID path segments without parsing identifiers', async () => {
-    const { api, calls } = harness([json([]), json({ id: 'a/b', key: 'k', campaignId: 3, name: 'N', metadataRevision: 1 })]);
+    const { api, calls } = harness([json([]), json({ id: 'a/b', campaignId: 3, name: 'N', importance: 'Key', metadataRevision: 1 })]);
     await api.listCampaigns();
-    await api.getTemplate(3, 'a/b');
+    await api.getCharacter(3, 'a/b');
     expect(calls[0][0]).toBe('/api/campaigns');
-    expect(calls[1][0]).toBe('/api/campaigns/3/templates/a%2Fb');
+    expect(calls[1][0]).toBe('/api/campaigns/3/characters/a%2Fb');
   });
 
   it('parses response text losslessly and accepts 201 responses without Location', async () => {
@@ -55,12 +56,90 @@ describe('campaign typed client', () => {
 
   it('uses exact character and effective base field response shapes', async () => {
     const effectiveField = { id: 'f', key: 'hp', title: 'HP', description: '', valueType: 'Integer', typeRevision: 1, options: [], effectiveValue: 0, isExplicit: false };
-    const character = { id: 'char', campaignId: 1, templateId: 'tpl', name: 'Hero', importance: 'Key', metadataRevision: 1 };
+    const character = { id: 'char', campaignId: 1, name: 'Hero', importance: 'Key', metadataRevision: 1 };
     const { api } = harness([json(character), json({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [effectiveField] })]);
     expect(await api.getCharacter(1, 'char')).not.toHaveProperty('key');
     const sheet = await api.getSheet(1, 'char');
     expect(sheet.baseFields[0]).toHaveProperty('effectiveValue', 0);
     expect(sheet.baseFields[0]).not.toHaveProperty('value');
+  });
+
+  it('uses singleton template metadata, content, and virtual-field routes and payloads', async () => {
+    const metadata = { campaignId: 7, name: 'Campaign', metadataRevision: 1 };
+    const content = { campaignId: 7, contentRevision: 0, data: { description: '', baseFields: [], virtualFields: [] } };
+    const virtualFields = { contentRevision: 1, virtualFields: [] };
+    const { api, calls } = harness([json(metadata), json(metadata), json(content), json(content), json(virtualFields), json(virtualFields)]);
+    const fetchedMetadata = await api.getTemplate(7);
+    expect(fetchedMetadata).not.toHaveProperty('id');
+    expect(fetchedMetadata).not.toHaveProperty('key');
+    await api.renameTemplate(7, { name: 'Renamed', expectedRevision: 1 });
+    const initial = await api.getTemplateContent(7);
+    expect(initial.contentRevision).toBe(0);
+    expect(initial).not.toHaveProperty('resourceId');
+    expect(initial).not.toHaveProperty('id');
+    expect(initial).not.toHaveProperty('key');
+    await api.putTemplateContent(7, { expectedRevision: 0, description: '', baseFields: [] });
+    await api.getTemplateVirtualFields(7);
+    await api.putTemplateVirtualFields(7, { expectedRevision: 1, virtualFields: [] });
+    expect(calls.map(([url]) => url)).toEqual([
+      '/api/campaigns/7/template',
+      '/api/campaigns/7/template',
+      '/api/campaigns/7/template/content',
+      '/api/campaigns/7/template/content',
+      '/api/campaigns/7/template/virtual-fields',
+      '/api/campaigns/7/template/virtual-fields'
+    ]);
+    expect(JSON.parse(calls[1][1]?.body as string)).toEqual({ name: 'Renamed', expectedRevision: 1 });
+    expect(JSON.parse(calls[3][1]?.body as string)).toEqual({ expectedRevision: 0, description: '', baseFields: [] });
+    expect(JSON.parse(calls[3][1]?.body as string).expectedRevision).toBe(0);
+    expect(JSON.parse(calls[5][1]?.body as string)).toEqual({ expectedRevision: 1, virtualFields: [] });
+    expect(calls.map(([, options]) => options?.method ?? 'GET')).toEqual(['GET', 'PUT', 'GET', 'PUT', 'GET', 'PUT']);
+    expect(api).not.toHaveProperty('listTemplates');
+    expect(api).not.toHaveProperty('createTemplate');
+  });
+
+  it('creates characters without a template selector with or without importance', async () => {
+    const response = { id: 'char', campaignId: 1, name: 'Hero', importance: 'Key', metadataRevision: 1 };
+    const { api, calls } = harness([json(response), json(response)]);
+    await api.createCharacter(1, { requestId: 'req-1', name: 'Hero' });
+    await api.createCharacter(1, { requestId: 'req-2', name: 'Hero', importance: 'Key' });
+    expect(JSON.parse(calls[0][1]?.body as string)).toEqual({ requestId: 'req-1', name: 'Hero' });
+    expect(JSON.parse(calls[1][1]?.body as string)).toEqual({ requestId: 'req-2', name: 'Hero', importance: 'Key' });
+  });
+
+  it('preserves widget source kinds and classifies template source errors', async () => {
+    const source: WidgetSource = { kind: 'Base', fieldId: 'field' };
+    const { api, calls } = harness([
+      json({ id: 'view', campaignId: 1, name: 'View', metadataRevision: 1 }),
+      json({ id: 'view', campaignId: 1, name: 'View', metadataRevision: 1 }),
+      json({ code: 'invalid_source', title: 'Invalid source', detail: 'invalid' }, 400),
+      json({ code: 'content_revision_conflict', title: 'Conflict', detail: 'stale' }, 409),
+      json({ code: 'content_write_outcome_unknown', title: 'Unavailable', detail: 'unknown' }, 503)
+    ]);
+    await api.createView(1, { requestId: 'req', name: 'View', roots: [{ kind: 'layout', nodeKey: 'root', title: '', params: null, children: [{ kind: 'widget', nodeKey: 'widget', title: '', params: null, children: [], sources: [source], format: '' }] }] });
+    await api.putViewContent(1, 'view', { expectedRevision: 1, roots: [{ kind: 'layout', nodeKey: 'root', title: '', params: null, children: [{ kind: 'widget', nodeKey: 'widget', title: '', params: null, children: [], sources: [source], format: '' }] }] });
+    for (const call of calls.slice(0, 2)) {
+      expect(call[1]?.body).toContain('"kind":"Base"');
+      expect(call[1]?.body).toContain('"fieldId":"field"');
+      expect(call[1]?.body).not.toContain('templateId');
+    }
+    await expect(api.getView(1, 'view')).rejects.toMatchObject({ status: 400, problem: { code: 'invalid_source' }, unknownOutcome: false });
+    const roots = [{ kind: 'layout' as const, nodeKey: 'root', title: '', params: null, children: [] }];
+    await expect(api.putViewContent(1, 'view', { expectedRevision: 1, roots })).rejects.toMatchObject({ status: 409, problem: { code: 'content_revision_conflict' }, conflict: true, unknownOutcome: false });
+    await expect(api.putViewContent(1, 'view', { expectedRevision: 1, roots })).rejects.toMatchObject({ status: 503, problem: { code: 'content_write_outcome_unknown' }, unknownOutcome: true });
+  });
+
+  it('round-trips native JSON and lossless singleton revisions in content writes', async () => {
+    const { api, calls } = harness([json({ campaignId: 7, contentRevision: 9223372036854775807, data: { description: '', baseFields: [], virtualFields: [] } })]);
+    await api.putTemplateContent(7, {
+      expectedRevision: parseJson('9223372036854775806') as any,
+      description: '',
+      baseFields: [{ key: 'large', title: 'Large', description: '', valueType: 'Integer', value: parseJson('9007199254740993'), options: [] }]
+    });
+    const body = String(calls[0][1]?.body);
+    expect(body).toContain('"expectedRevision":9223372036854775806');
+    expect(body).toContain('"value":9007199254740993');
+    expect(body).not.toContain('"value":"9007199254740993"');
   });
 
   it('distinguishes authorization errors and conflicts', async () => {

@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useWorkspace, useDirtyDraft, useDirtyState } from './Workspace';
+import { useWorkspace, useDirtyDraft } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 import { useMutation, useResource } from './hooks';
-import { runCreation, CampaignApiError } from './api';
-import type { BaseField, BaseFieldInput, ChoiceOption, DefinitionCreate, DefinitionMetadata, JsonValue, ValueType, TemplateContentEnvelope, VirtualField, VirtualFieldInput } from './types';
+import { CampaignApiError } from './api';
+import type { BaseField, BaseFieldInput, DefinitionMetadata, JsonValue, ValueType, TemplateContentEnvelope, TemplateMetadata, VirtualField, VirtualFieldInput } from './types';
 import { VirtualFieldsEditor } from './VirtualFieldsEditor';
 import { ApiError } from './Feedback';
 import { ValueInput, validateFieldValue } from './ValueInput';
@@ -21,48 +21,16 @@ const inputFrom = (field: BaseField): BaseFieldInput => ({ id: field.id, key: fi
 const rowsFrom = (fields: BaseField[]): Row[] => fields.map(field => ({ rowKey: guid(), field: inputFrom(field), existing: true }));
 const same = (a: unknown, b: unknown) => stringifyJson(a) === stringifyJson(b);
 
-const CreateTemplate: React.FC<{ campaignId: number; requestId: string; writable: boolean; onCreated: (template: DefinitionCreate) => void; onCancel: () => void }> = ({ campaignId, requestId, writable, onCreated, onCancel }) => {
-  const { api } = useWorkspace();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [failure, setFailure] = useState<unknown>();
-  const [checkFailure, setCheckFailure] = useState<unknown>();
-  const [uncertain, setUncertain] = useState(false);
-  const active = useRef(true);
-  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
-  const clearDirty = useDirtyDraft(`template-create-${campaignId}-${requestId}`, Boolean(name || description));
-  const lookup = async () => {
-    const [metadata, content] = await Promise.all([api.getTemplate(campaignId, requestId), api.getTemplateContent(campaignId, requestId)]);
-    return { ...metadata, contentRevision: content.contentRevision } as DefinitionCreate;
-  };
-  const mutation = useMutation((payload: { name: string; description: string; baseFields: BaseFieldInput[]; requestId: string }) => runCreation(() => api.createTemplate(campaignId, payload), lookup));
-  const finish = (value: DefinitionCreate) => { if (active.current) { clearDirty(); onCreated(value); } };
-  const cancel = () => { if ((!name && !description) || window.confirm('Отказаться от черновика шаблона?')) { clearDirty(); onCancel(); } };
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!writable || !name.trim() || uncertain || mutation.busy) return;
-    try { const created = await mutation.run({ name: name.trim(), description, baseFields: [], requestId }); if (created) finish(created); }
-    catch (error) { if (active.current) { setFailure(error); setUncertain(error instanceof CampaignApiError && (error.unknownOutcome || error.status === 409)); } }
-  };
-  const check = async () => { if (mutation.busy) return; setCheckFailure(undefined); try { const value = await lookup(); finish(value); } catch (error) { if (active.current) setCheckFailure(error); } };
-  return <form className={commonStyles.form} onSubmit={submit}><h2>Создать шаблон</h2>
-    <fieldset disabled={!writable || uncertain || mutation.busy}><label className={commonStyles.formGroup}>Название<input className={inputStyles.input} value={name} onChange={event => setName(event.target.value)} required /></label>
-    <label className={commonStyles.formGroup}>Описание<textarea className={inputStyles.input} value={description} onChange={event => setDescription(event.target.value)} /></label></fieldset>
-    {Boolean(failure) && <ApiError error={failure} />}{Boolean(checkFailure) && <ApiError error={checkFailure} />}
-    <div className={commonStyles.formActions}>{uncertain ? <button className={buttonStyles.button} type="button" disabled={mutation.busy} onClick={() => void check()}>Проверить создание</button> : <button className={buttonStyles.button} disabled={!writable || mutation.busy || !name.trim()}>Создать</button>}<button className={buttonStyles.button} type="button" disabled={mutation.busy} onClick={cancel}>Отмена</button></div>
-  </form>;
-};
-
-export const TemplateEditor: React.FC<{ campaignId: number; template: DefinitionMetadata; onChanged: () => void }> = ({ campaignId, template, onChanged }) => {
-  const { api, sessionKey, notifyInvalidation } = useWorkspace();
+export const TemplateEditor: React.FC<{ campaignId: number }> = ({ campaignId }) => {
+  const { api, sessionKey, notifyInvalidation, invalidation } = useWorkspace();
   const { permissions, permissionsLoading } = useCampaignWorkspace();
   const writable = permissions.canWrite && !permissionsLoading;
-  const identity = `${sessionKey}:${campaignId}:${template.id}`;
-  const metadataResource = useResource(`${identity}:metadata`, () => api.getTemplate(campaignId, template.id));
-  const contentResource = useResource<TemplateContentEnvelope>(`${identity}:content`, () => api.getTemplateContent(campaignId, template.id));
+  const identity = `${sessionKey}:${campaignId}`;
+  const metadataResource = useResource<TemplateMetadata>(`${identity}:metadata`, () => api.getTemplate(campaignId));
+  const contentResource = useResource<TemplateContentEnvelope>(`${identity}:content`, () => api.getTemplateContent(campaignId));
   const [name, setName] = useState('');
   const [baselineName, setBaselineName] = useState('');
-  const [metadataRevision, setMetadataRevision] = useState<DefinitionMetadata['metadataRevision']>(template.metadataRevision);
+  const [metadataRevision, setMetadataRevision] = useState<TemplateMetadata['metadataRevision']>(1);
   const [description, setDescription] = useState('');
   const [baselineDescription, setBaselineDescription] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
@@ -74,14 +42,14 @@ export const TemplateEditor: React.FC<{ campaignId: number; template: Definition
   const [formulaLoading, setFormulaLoading] = useState(false);
   const [formulaError, setFormulaError] = useState<unknown>();
   const [virtualError, setVirtualError] = useState<unknown>();
-  const contentRevisionRef = useRef<TemplateContentEnvelope['contentRevision']>(1);
-  const [contentRevision, setContentRevision] = useState<TemplateContentEnvelope['contentRevision']>(1);
+  const contentRevisionRef = useRef<TemplateContentEnvelope['contentRevision']>(0);
+  const [contentRevision, setContentRevision] = useState<TemplateContentEnvelope['contentRevision']>(0);
   const [loaded, setLoaded] = useState(false);
   const initializedMetadata = useRef(false);
   const initializedContent = useRef(false);
   const [metadataBlocked, setMetadataBlocked] = useState(false);
   const [contentBlocked, setContentBlocked] = useState(false);
-  const [latestMetadata, setLatestMetadata] = useState<DefinitionMetadata>();
+  const [latestMetadata, setLatestMetadata] = useState<TemplateMetadata>();
   const [latestContent, setLatestContent] = useState<TemplateContentEnvelope>();
   const [valueErrors, setValueErrors] = useState<Record<string, string | undefined>>({});
   const [metadataError, setMetadataError] = useState<unknown>();
@@ -97,24 +65,26 @@ export const TemplateEditor: React.FC<{ campaignId: number; template: Definition
   const clearMetadataDirty = useDirtyDraft(`template-metadata-${identity}`, metadataDirty);
   const clearContentDirty = useDirtyDraft(`template-content-${identity}`, contentDirty);
   const clearVirtualDirty = useDirtyDraft(`template-virtual-content-${identity}`, virtualDirty);
+  const previousInvalidation = useRef(invalidation);
+  useEffect(() => { if (previousInvalidation.current !== invalidation) { previousInvalidation.current = invalidation; metadataResource.reload(); contentResource.reload(); } }, [invalidation, metadataResource.reload, contentResource.reload]);
   useEffect(() => { if (metadataResource.data && !initializedMetadata.current) { setName(metadataResource.data.name); setBaselineName(metadataResource.data.name); setMetadataRevision(metadataResource.data.metadataRevision); initializedMetadata.current = true; } }, [metadataResource.data]);
   useEffect(() => { if (contentResource.data && !initializedContent.current) { const data = contentResource.data.data; setDescription(data.description); setBaselineDescription(data.description); const base = data.baseFields.map(inputFrom); setBaselineFields(base); setRows(rowsFrom(data.baseFields)); const virtual = (data.virtualFields ?? []).map(field => ({ ...field, bindings: { ...field.bindings } })); setVirtualFields(virtual); setBaselineVirtualFields(virtual); contentRevisionRef.current = contentResource.data.contentRevision; setContentRevision(contentResource.data.contentRevision); setLoaded(true); initializedContent.current = true; } }, [contentResource.data]);
   const rename = useMutation(async () => {
-    if (!writable || metadataBlocked || !name.trim()) return;
-    try { const saved = await api.renameTemplate(campaignId, template.id, { name: name.trim(), expectedRevision: metadataRevision }); setName(saved.name); setBaselineName(saved.name); setMetadataRevision(saved.metadataRevision); setMetadataBlocked(false); setLatestMetadata(undefined); setMetadataError(undefined); setMetadataSaved(true); clearMetadataDirty(); onChanged(); }
+    if (!writable || !loaded || !initializedMetadata.current || metadataBlocked || !name.trim()) return;
+    try { const saved = await api.renameTemplate(campaignId, { name: name.trim(), expectedRevision: metadataRevision }); setName(saved.name); setBaselineName(saved.name); setMetadataRevision(saved.metadataRevision); setMetadataBlocked(false); setLatestMetadata(undefined); setMetadataError(undefined); setMetadataSaved(true); clearMetadataDirty(); }
     catch (error) { setMetadataError(error); if (error instanceof CampaignApiError && error.status === 403) notifyInvalidation(); if (error instanceof CampaignApiError && (error.status === 409 || error.unknownOutcome)) setMetadataBlocked(true); throw error; }
   });
   const saveContent = useMutation(async () => {
-    if (!writable || contentBlocked || busyRef.current) return;
+    if (!writable || !loaded || contentBlocked || busyRef.current) return;
     const fields = rows.map(row => row.field);
     if (fields.some(field => validateFieldValue({ valueType: field.valueType, options: field.options }, field.value)) || Object.values(valueErrors).some(Boolean)) return;
     busyRef.current = true; setContentBusy(true);
-    try { const result = await api.putTemplateContent(campaignId, template.id, { expectedRevision: contentRevisionRef.current, description, baseFields: fields }); const savedFields = result.data.baseFields.map(inputFrom); const responseVirtual = result.data.virtualFields.map(field => ({ ...field, bindings: { ...field.bindings } })); contentRevisionRef.current = result.contentRevision; setContentRevision(result.contentRevision); setDescription(result.data.description); setBaselineDescription(result.data.description); setBaselineFields(savedFields); setRows(rowsFrom(result.data.baseFields)); setBaselineVirtualFields(responseVirtual); if (!virtualDirty) setVirtualFields(responseVirtual); setValueErrors({}); setContentBlocked(false); setLatestContent(undefined); setContentError(undefined); setContentSaved(true); clearContentDirty(); }
+    try { const result = await api.putTemplateContent(campaignId, { expectedRevision: contentRevisionRef.current, description, baseFields: fields }); const savedFields = result.data.baseFields.map(inputFrom); const responseVirtual = result.data.virtualFields.map(field => ({ ...field, bindings: { ...field.bindings } })); contentRevisionRef.current = result.contentRevision; setContentRevision(result.contentRevision); setDescription(result.data.description); setBaselineDescription(result.data.description); setBaselineFields(savedFields); setRows(rowsFrom(result.data.baseFields)); setBaselineVirtualFields(responseVirtual); if (!virtualDirty) setVirtualFields(responseVirtual); setValueErrors({}); setContentBlocked(false); setLatestContent(undefined); setContentError(undefined); setContentSaved(true); clearContentDirty(); }
     catch (error) { setContentError(error); if (error instanceof CampaignApiError && error.status === 403) notifyInvalidation(); if (error instanceof CampaignApiError && (error.status === 409 || error.unknownOutcome)) setContentBlocked(true); throw error; }
     finally { busyRef.current = false; setContentBusy(false); }
   });
-  const refreshMetadata = async () => { setReloadError(undefined); try { const fresh = await api.getTemplate(campaignId, template.id); setMetadataRevision(fresh.metadataRevision); setLatestMetadata(fresh); setMetadataBlocked(false); setMetadataError(undefined); } catch (error) { setReloadError(error); } };
-  const refreshContent = async () => { setReloadError(undefined); try { const fresh = await api.getTemplateContent(campaignId, template.id); contentRevisionRef.current = fresh.contentRevision; setContentRevision(fresh.contentRevision); setLatestContent(fresh); setContentBlocked(false); setContentError(undefined); } catch (error) { setReloadError(error); } };
+  const refreshMetadata = async () => { setReloadError(undefined); try { const fresh = await api.getTemplate(campaignId); setMetadataRevision(fresh.metadataRevision); setLatestMetadata(fresh); setMetadataBlocked(false); setMetadataError(undefined); } catch (error) { setReloadError(error); } };
+  const refreshContent = async () => { setReloadError(undefined); try { const fresh = await api.getTemplateContent(campaignId); contentRevisionRef.current = fresh.contentRevision; setContentRevision(fresh.contentRevision); setLatestContent(fresh); setContentBlocked(false); setContentError(undefined); } catch (error) { setReloadError(error); } };
   const openVirtualEditor = async () => {
     setVirtualEditorOpen(true);
     if (formulaMetadata.length || formulaLoading) return;
@@ -122,10 +92,10 @@ export const TemplateEditor: React.FC<{ campaignId: number; template: Definition
     try { setFormulaMetadata(await api.listFormulas(campaignId)); } catch (error) { setFormulaError(error); if (error instanceof CampaignApiError && error.status === 403) notifyInvalidation(); } finally { setFormulaLoading(false); }
   };
   const saveVirtualFields = useMutation(async () => {
-    if (!writable || contentBlocked || busyRef.current) return;
+    if (!writable || !loaded || contentBlocked || busyRef.current) return;
     busyRef.current = true; setContentBusy(true);
     try {
-      const result = await api.putTemplateVirtualFields(campaignId, template.id, { expectedRevision: contentRevisionRef.current, virtualFields });
+      const result = await api.putTemplateVirtualFields(campaignId, { expectedRevision: contentRevisionRef.current, virtualFields });
       const savedVirtual = result.virtualFields.map(field => ({ ...field, bindings: { ...field.bindings } }));
       contentRevisionRef.current = result.contentRevision; setContentRevision(result.contentRevision);
       setVirtualFields(savedVirtual); setBaselineVirtualFields(savedVirtual); setContentBlocked(false); setLatestContent(undefined); setContentError(undefined); setVirtualError(undefined); setContentSaved(true); clearVirtualDirty();
@@ -137,7 +107,7 @@ export const TemplateEditor: React.FC<{ campaignId: number; template: Definition
   if (!metadataResource.data && metadataResource.error) return <ApiError error={metadataResource.error} onRetry={metadataResource.reload} />;
   if (!contentResource.data && contentResource.error) return <ApiError error={contentResource.error} onRetry={contentResource.reload} />;
   return <div className={styles.page}>
-    <form className={commonStyles.form} onSubmit={event => { event.preventDefault(); if (!writable || metadataBlocked) return; void rename.run().catch(() => undefined); }}><h2>Метаданные</h2><fieldset disabled={!writable || rename.busy}><label className={commonStyles.formGroup}>Название<input className={inputStyles.input} value={name} onChange={event => { setName(event.target.value); setMetadataSaved(false); }} required /></label></fieldset>{Boolean(metadataError) && <ApiError error={metadataError} />}{metadataBlocked && <button type="button" className={buttonStyles.button} onClick={() => void refreshMetadata()}>Перечитать метаданные</button>}{latestMetadata && <p>Актуальное название: {latestMetadata.name}. Черновик сохранён отдельно.</p>}<div className={commonStyles.formActions}><button className={buttonStyles.button} disabled={!writable || !metadataDirty || rename.busy || metadataBlocked || !name.trim()}>Сохранить название</button><button className={buttonStyles.button} type="button" disabled={!writable || rename.busy} onClick={() => { if (!metadataDirty || window.confirm('Отменить черновик названия?')) { setName(baselineName); setMetadataSaved(false); clearMetadataDirty(); } }}>Отменить</button></div>{metadataSaved && <p role="status">Название сохранено.</p>}</form>
+    <form className={commonStyles.form} onSubmit={event => { event.preventDefault(); if (!writable || !loaded || metadataBlocked) return; void rename.run().catch(() => undefined); }}><h2>Метаданные</h2><fieldset disabled={!writable || !loaded || rename.busy}><label className={commonStyles.formGroup}>Название<input className={inputStyles.input} value={name} onChange={event => { setName(event.target.value); setMetadataSaved(false); }} required /></label></fieldset>{Boolean(metadataError) && <ApiError error={metadataError} />}{metadataBlocked && <button type="button" className={buttonStyles.button} onClick={() => void refreshMetadata()}>Перечитать метаданные</button>}{latestMetadata && <p>Актуальное название: {latestMetadata.name}. Черновик сохранён отдельно.</p>}<div className={commonStyles.formActions}><button className={buttonStyles.button} disabled={!writable || !loaded || !metadataDirty || rename.busy || metadataBlocked || !name.trim()}>Сохранить название</button><button className={buttonStyles.button} type="button" disabled={!writable || !loaded || rename.busy} onClick={() => { if (!metadataDirty || window.confirm('Отменить черновик названия?')) { setName(baselineName); setMetadataSaved(false); clearMetadataDirty(); } }}>Отменить</button></div>{metadataSaved && <p role="status">Название сохранено.</p>}</form>
     <form className={commonStyles.form} onSubmit={event => { event.preventDefault(); if (!writable || contentBlocked || contentBusy) return; void saveContent.run().catch(() => undefined); }}><h2>Базовое содержимое</h2><fieldset disabled={!writable || contentBusy || contentBlocked}><label className={commonStyles.formGroup}>Описание<textarea className={inputStyles.input} value={description} onChange={event => { setDescription(event.target.value); setContentSaved(false); }} /></label><h3>Базовые поля</h3>
       {rows.map(row => <fieldset className={commonStyles.card} key={row.rowKey}><legend>{row.field.title || 'Новое поле'}</legend><label>Ключ<input className={inputStyles.input} value={row.field.key} disabled={row.existing} onChange={event => mutate(row.rowKey, field => ({ ...field, key: event.target.value }))} /></label><label>Заголовок<input className={inputStyles.input} value={row.field.title} onChange={event => { mutate(row.rowKey, field => ({ ...field, title: event.target.value })); setContentSaved(false); }} /></label><label>Описание поля<textarea className={inputStyles.input} value={row.field.description} onChange={event => { mutate(row.rowKey, field => ({ ...field, description: event.target.value })); setContentSaved(false); }} /></label><label>Тип<select className={inputStyles.input} value={row.field.valueType} onChange={event => { const valueType = event.target.value as ValueType; mutate(row.rowKey, field => ({ ...field, valueType, value: defaultFor(valueType), options: valueType === 'SingleChoice' || valueType === 'MultiChoice' ? field.options : [] })); setContentSaved(false); }}><option>Integer</option><option>Number</option><option>String</option><option>Boolean</option><option>SingleChoice</option><option>MultiChoice</option></select></label>
         {(row.field.valueType === 'SingleChoice' || row.field.valueType === 'MultiChoice') && <div><h4>Варианты</h4>{row.field.options.map((option, index) => <div key={`${row.rowKey}:${index}`}><label>Ключ<input className={inputStyles.input} value={option.optionKey} onChange={event => { mutate(row.rowKey, field => ({ ...field, options: field.options.map((item, i) => i === index ? { ...item, optionKey: event.target.value } : item) })); setContentSaved(false); }} /></label><label>Название<input className={inputStyles.input} value={option.title} onChange={event => { mutate(row.rowKey, field => ({ ...field, options: field.options.map((item, i) => i === index ? { ...item, title: event.target.value } : item) })); setContentSaved(false); }} /></label><button type="button" className={buttonStyles.button} onClick={() => { mutate(row.rowKey, field => ({ ...field, options: field.options.filter((_, i) => i !== index) })); setContentSaved(false); }}>Удалить вариант</button></div>)}<button type="button" className={buttonStyles.button} onClick={() => { mutate(row.rowKey, field => ({ ...field, options: [...field.options, { optionKey: '', title: '' }] })); setContentSaved(false); }}>Добавить вариант</button></div>}
@@ -158,29 +128,7 @@ export const TemplateEditor: React.FC<{ campaignId: number; template: Definition
 const Templates: React.FC = () => {
   const { groupId = '' } = useParams();
   const campaignId = Number(groupId);
-  const { api, sessionKey, invalidation } = useWorkspace();
-  const { permissions, permissionsLoading } = useCampaignWorkspace();
-  const writable = permissions.canWrite && !permissionsLoading;
-  const resource = useResource<DefinitionMetadata[]>(`${sessionKey}:${campaignId}:templates`, () => api.listTemplates(campaignId));
-  const [selectedId, setSelectedId] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState<DefinitionMetadata>();
-  const [creating, setCreating] = useState(false);
-  const [requestId, setRequestId] = useState(guid);
-  const dirty = useDirtyState();
-  const previousInvalidation = useRef(invalidation);
-  useEffect(() => { if (previousInvalidation.current !== invalidation) { previousInvalidation.current = invalidation; resource.reload(); } }, [invalidation, resource.reload]);
-  const select = (id: string) => {
-    if (id === selectedId && !creating) return;
-    if (dirty && !window.confirm('Есть несохранённые изменения. Переключить шаблон?')) return;
-    setSelectedId(id);
-    setSelectedTemplate(resource.data?.find(item => item.id === id));
-    setCreating(false);
-  };
-  if (!resource.data && resource.loading) return <p>Загрузка шаблонов…</p>;
-  return <main className={styles.page}><h1>Шаблоны</h1>{Boolean(resource.error) && <ApiError error={resource.error} onRetry={resource.reload} />}<label>Выбранный шаблон<select className={inputStyles.input} value={selectedId} onChange={event => select(event.target.value)}><option value="">Выберите шаблон</option>{resource.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-    {!creating && <button className={buttonStyles.button} type="button" disabled={!writable} onClick={() => { if (dirty && !window.confirm('Есть несохранённые изменения. Открыть создание шаблона?')) return; setRequestId(guid()); setCreating(true); }}>Создать шаблон</button>}
-    {creating && <CreateTemplate key={requestId} campaignId={campaignId} requestId={requestId} writable={writable} onCreated={item => { setSelectedId(item.id); setSelectedTemplate(item); setCreating(false); resource.reload(); }} onCancel={() => setCreating(false)} />}
-    {!creating && selectedId && selectedTemplate && <TemplateEditor key={`${sessionKey}:${campaignId}:${selectedId}`} campaignId={campaignId} template={selectedTemplate} onChanged={() => resource.reload()} />}
-  </main>;
+  const { sessionKey } = useWorkspace();
+  return <main className={styles.page}><h1>Шаблон кампании</h1><TemplateEditor key={`${sessionKey}:${campaignId}`} campaignId={campaignId} /></main>;
 };
 export default Templates;

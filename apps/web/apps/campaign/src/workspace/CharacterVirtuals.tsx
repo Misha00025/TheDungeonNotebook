@@ -9,8 +9,8 @@ import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
 import inputStyles from '@tdn/shared/styles/components/Input.module.css';
 import commonStyles from '@tdn/shared/styles/common.module.css';
 
-type Props = { campaignId: number; characterId: string; templateId: string; baseFields: EffectiveBaseField[]; virtualFields: ComputedField[]; canWrite: boolean; busy: boolean; blocked: boolean; write: <T extends { contentRevision: Revision }>(operation: (revision: Revision) => Promise<T>, confirmed: (result: T) => void) => Promise<void> };
-const CharacterVirtuals: React.FC<Props> = ({ campaignId, characterId, templateId, baseFields, virtualFields, canWrite, busy, blocked, write }) => {
+type Props = { campaignId: number; characterId: string; baseFields: EffectiveBaseField[]; virtualFields: ComputedField[]; canWrite: boolean; busy: boolean; blocked: boolean; write: <T extends { contentRevision: Revision }>(operation: (revision: Revision) => Promise<T>, confirmed: (result: T) => void) => Promise<void> };
+const CharacterVirtuals: React.FC<Props> = ({ campaignId, characterId, baseFields, virtualFields, canWrite, busy, blocked, write }) => {
   const { api, sessionKey } = useWorkspace();
   const scope = `${sessionKey}:${campaignId}:${characterId}`;
   const [open, setOpen] = useState(false);
@@ -35,7 +35,7 @@ const CharacterVirtuals: React.FC<Props> = ({ campaignId, characterId, templateI
   useEffect(() => {
     if (!open) return;
     let active = true;
-    Promise.allSettled([api.listFormulas(campaignId), api.getTemplateVirtualFields(campaignId, templateId)]).then(results => {
+    Promise.allSettled([api.listFormulas(campaignId), api.getTemplateVirtualFields(campaignId)]).then(results => {
       if (!active) return;
       const failures: unknown[] = [];
       if (results[0].status === 'fulfilled') setFormulas(results[0].value); else failures.push(results[0].reason);
@@ -43,7 +43,7 @@ const CharacterVirtuals: React.FC<Props> = ({ campaignId, characterId, templateI
       setDefinitionError(failures);
     });
     return () => { active = false; };
-  }, [open, api, campaignId, templateId]);
+  }, [open, api, campaignId]);
   useEffect(() => {
     if (!overrides.data) return;
     const next = Object.fromEntries(overrides.data.overrides.map(item => [item.virtualFieldId, item.expression]));

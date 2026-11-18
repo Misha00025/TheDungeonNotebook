@@ -285,7 +285,6 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
     <Link to={path(`/${campaignId}/${mode}/characters`)}>К персонажам</Link>
     <h2>{metadata.name}</h2>
     <p>{importanceLabel[metadata.importance] ?? metadata.importance}</p>
-    <p>Шаблон: {metadata.templateId}</p>
     {permissionResource.loading && <p>Обновление прав персонажа…</p>}
     {Boolean(permissionResource.error) && <ApiError error={permissionResource.error} onRetry={permissionResource.reload} />}
     {permissionResource.data && !permissionResource.loading && !permissionResource.error && !permissionResource.data.canWrite && <p>Только чтение</p>}
@@ -329,7 +328,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
         <button className={buttonStyles.button} type="button" disabled={descriptionDraft === undefined || contentBusy || !canWrite} onClick={cancelDescription}>Отмена</button>
       </>}
     </div>}
-    {editorAllowed && <div hidden={!stats}><CharacterVirtuals key={`${scope}:virtual-editor`} campaignId={campaignId} characterId={characterId} templateId={metadata.templateId} baseFields={sheet.baseFields} virtualFields={sheet.virtualFields} canWrite={canWrite} busy={contentBusy} blocked={sheetBlocked} write={runContent} /></div>}
+    {editorAllowed && <div hidden={!stats}><CharacterVirtuals key={`${scope}:virtual-editor`} campaignId={campaignId} characterId={characterId} baseFields={sheet.baseFields} virtualFields={sheet.virtualFields} canWrite={canWrite} busy={contentBusy} blocked={sheetBlocked} write={runContent} /></div>}
     {editorAllowed && <fieldset className={commonStyles.card} disabled={permissionPending || !canWrite || metadataMutation.busy || metadataBlocked}>
       <label>Имя<input className={inputStyles.input} value={metadataDraft?.name ?? metadata.name} onFocus={ensureMetadataDraft} onChange={event => { ensureMetadataDraft(); setMetadataDraft(current => ({ ...(current ?? { name: metadata.name, importance: metadata.importance }), name: event.target.value })); }} /></label>
       <label>Важность<select className={inputStyles.input} value={metadataDraft?.importance ?? metadata.importance} onFocus={ensureMetadataDraft} onChange={event => { ensureMetadataDraft(); setMetadataDraft(current => ({ ...(current ?? { name: metadata.name, importance: metadata.importance }), importance: event.target.value as CharacterMetadata['importance'] })); }}><option value="Background">Фоновый</option><option value="Secondary">Второстепенный</option><option value="Key">Ключевой</option></select></label>

@@ -12,7 +12,7 @@ const templateField = { id: 'template-field', key: 'temp', title: 'Template fiel
 const computed = [{ id: 'template-field', key: 'temp', title: 'Template field', description: '', resultType: 'Number' as const, value: 0, diagnostic: null }];
 const custom = { contentRevision: 4, virtualFields: [{ id: 'custom-saved', key: 'custom', title: 'Custom field', description: '', resultType: 'Number' as const, formulaId: 'formula-id', bindings: {} }] };
 const writeContent = async <T extends { contentRevision: Revision }>(operation: (revision: Revision) => Promise<T>, confirmed: (result: T) => void) => { const result = await operation(7); confirmed(result); };
-const renderPanel = (overrides: Partial<React.ComponentProps<typeof CharacterVirtuals>> = {}) => render(<CharacterVirtuals campaignId={12} characterId="char-id" templateId="character-template" baseFields={baseFields} virtualFields={computed} canWrite={true} busy={false} blocked={false} write={writeContent} {...overrides} />);
+const renderPanel = (overrides: Partial<React.ComponentProps<typeof CharacterVirtuals>> = {}) => render(<CharacterVirtuals campaignId={12} characterId="char-id" baseFields={baseFields} virtualFields={computed} canWrite={true} busy={false} blocked={false} write={writeContent} {...overrides} />);
 const openPanel = async () => { renderPanel(); fireEvent.click(screen.getByRole('button', { name: 'Индивидуальные формулы' })); await screen.findByRole('heading', { name: 'Индивидуальные формулы' }); };
 
 describe('CharacterVirtuals', () => {
@@ -34,10 +34,13 @@ describe('CharacterVirtuals', () => {
     expect(api.getCustomVirtualFields).not.toHaveBeenCalled();
     expect(api.getOverrides).not.toHaveBeenCalled();
     expect(api.listFormulas).not.toHaveBeenCalled();
+    expect(api.getTemplateVirtualFields).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Индивидуальные формулы' }));
     await screen.findByRole('heading', { name: 'Индивидуальные формулы' });
     await waitFor(() => expect(api.getCustomVirtualFields).toHaveBeenCalledWith(12, 'char-id'));
-    expect(api.getTemplateVirtualFields).toHaveBeenCalledWith(12, 'character-template');
+    expect(api.getTemplateVirtualFields).toHaveBeenCalledTimes(1);
+    expect(api.getTemplateVirtualFields).toHaveBeenCalledWith(12);
+    expect(api.getTemplateVirtualFields.mock.calls[0]).toEqual([12]);
   });
 
   it('allows a character writer with a shared revision even when campaign editing is unavailable', async () => {

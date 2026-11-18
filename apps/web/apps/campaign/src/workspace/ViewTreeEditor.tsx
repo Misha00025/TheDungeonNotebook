@@ -60,7 +60,7 @@ export const ViewTreeEditor: React.FC<Props> = ({ roots, onChange, disabled = fa
       try { params = parseJson(text); } catch (error) { paramsError = error instanceof Error ? error.message : String(error); }
       publish(setAt(at, item => ({ ...item, paramsText: text, paramsError, node: paramsError ? item.node : { ...item.node, params } as ViewNode })));
     };
-    const addSource = () => update({ sources: [...(node.kind === 'widget' ? node.sources : []), { templateId: '', kind: 'Base', fieldId: '' }] } as Partial<WidgetNode>);
+    const addSource = () => update({ sources: [...(node.kind === 'widget' ? node.sources : []), { kind: 'Base', fieldId: '' }] } as Partial<WidgetNode>);
     return <section className={commonStyles.card} key={row.id} aria-label={`Узел ${node.title || node.nodeKey || index + 1}`}>
       <fieldset disabled={disabled} className={styles.nodeFields} aria-label={`Поля узла ${node.title || node.nodeKey || index + 1}`}>
         <label className={commonStyles.formGroup}>Тип<select className={inputStyles.input} value={node.kind} onChange={event => {
@@ -78,7 +78,6 @@ export const ViewTreeEditor: React.FC<Props> = ({ roots, onChange, disabled = fa
           <label className={commonStyles.formGroup}>Формат<textarea className={inputStyles.input} value={node.format} onChange={event => update({ format: event.target.value } as Partial<WidgetNode>)} /></label>
           <p>Формат сохраняется как непрозрачный текст; синтаксис проверяется только в предпросмотре.</p>
           {node.sources.map((source, sourceIndex) => <div className={styles.grid} role="group" aria-label={`Источник ${sourceIndex + 1}`} key={`${row.id}-source-${sourceIndex}`}>
-            <label>Template ID<input className={inputStyles.input} value={source.templateId} onChange={event => { const sources = node.sources.map((item, i) => i === sourceIndex ? { ...item, templateId: event.target.value } : item); update({ sources } as Partial<WidgetNode>); }} /></label>
             <label>Вид<select className={inputStyles.input} value={source.kind} onChange={event => { const sources = node.sources.map((item, i) => i === sourceIndex ? { ...item, kind: event.target.value as WidgetSource['kind'] } : item); update({ sources } as Partial<WidgetNode>); }}><option value="Base">Base</option><option value="Virtual">Virtual</option></select></label>
             <label>Field ID<input className={inputStyles.input} value={source.fieldId} onChange={event => { const sources = node.sources.map((item, i) => i === sourceIndex ? { ...item, fieldId: event.target.value } : item); update({ sources } as Partial<WidgetNode>); }} /></label>
             <button type="button" className={buttonStyles.button} onClick={() => update({ sources: node.sources.filter((_, i) => i !== sourceIndex) } as Partial<WidgetNode>)}>Удалить источник</button>

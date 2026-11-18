@@ -8,7 +8,7 @@ import { parseJson, stringifyJson } from './json';
 const drafts = vi.hoisted(() => ({ values: {} as Record<string, boolean> }));
 vi.mock('./Workspace', () => ({ useDirtyDraft: (owner: string, dirty: boolean) => { drafts.values[owner] = dirty; } }));
 
-const initial: ViewNode[] = [{ kind: 'layout', nodeKey: 'root', title: 'Root', params: parseJson('{"direction":"row","future":9007199254740993}'), children: [{ kind: 'widget', nodeKey: 'widget', title: 'Widget', params: parseJson('{"opaque":9007199254740993}'), children: [{ kind: 'layout', nodeKey: 'inner', title: 'Inner', params: ['x', null], children: [] }], sources: [{ templateId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', kind: 'Virtual', fieldId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' }, { templateId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', kind: 'Base', fieldId: 'dddddddd-dddd-dddd-dddd-dddddddddddd' }], format: '$1 ${4:s} <opaque>' }] }];
+const initial: ViewNode[] = [{ kind: 'layout', nodeKey: 'root', title: 'Root', params: parseJson('{"direction":"row","future":9007199254740993}'), children: [{ kind: 'widget', nodeKey: 'widget', title: 'Widget', params: parseJson('{"opaque":9007199254740993}'), children: [{ kind: 'layout', nodeKey: 'inner', title: 'Inner', params: ['x', null], children: [] }], sources: [{ kind: 'Virtual', fieldId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' }, { kind: 'Base', fieldId: 'dddddddd-dddd-dddd-dddd-dddddddddddd' }], format: '$1 ${4:s} <opaque>' }] }];
 
 const Harness: React.FC<{ resetKey?: number; validity?: (valid: boolean) => void; onChange?: (roots: ViewNode[]) => void }> = ({ resetKey = 0, validity, onChange }) => {
   const [roots, setRoots] = useState(initial);
@@ -22,7 +22,8 @@ describe('ViewTreeEditor', () => {
     fireEvent.change(screen.getAllByLabelText('Заголовок')[0], { target: { value: 'Updated' } });
     fireEvent.change(screen.getAllByLabelText('Заголовок')[2], { target: { value: 'Changed inner' } });
     expect(screen.getByDisplayValue('$1 ${4:s} <opaque>')).toBeTruthy();
-    expect(screen.getAllByLabelText('Template ID').map(input => (input as HTMLInputElement).value)).toEqual(['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'cccccccc-cccc-cccc-cccc-cccccccccccc']);
+    expect(screen.queryByLabelText('Template ID')).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText('Field ID').map(input => (input as HTMLInputElement).value)).toEqual(['bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'dddddddd-dddd-dddd-dddd-dddddddddddd']);
     expect(stringifyJson(initial[0].params)).toContain('9007199254740993');
   });
 
@@ -89,13 +90,18 @@ describe('ViewTreeEditor', () => {
 
   it('supports sibling insertion, source ordering and duplicate node-key validation', () => {
     const validity = vi.fn();
-    render(<Harness validity={validity} />);
+    const onChange = vi.fn();
+    render(<Harness validity={validity} onChange={onChange} />);
     const widget = screen.getByLabelText('Узел Widget');
     fireEvent.click(within(within(widget).getByRole('group', { name: 'Источник 1' })).getByRole('button', { name: 'Источник 1: вниз' }));
     const firstSource = within(screen.getByRole('group', { name: 'Источник 1' }));
-    expect((firstSource.getByLabelText('Template ID') as HTMLInputElement).value).toBe('cccccccc-cccc-cccc-cccc-cccccccccccc');
     expect((firstSource.getByLabelText('Field ID') as HTMLInputElement).value).toBe('dddddddd-dddd-dddd-dddd-dddddddddddd');
     expect((firstSource.getByLabelText('Вид') as HTMLSelectElement).value).toBe('Base');
+    fireEvent.change(firstSource.getByLabelText('Field ID'), { target: { value: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' } });
+    const ordered = onChange.mock.calls[onChange.mock.calls.length - 1]?.[0][0].children[0].sources;
+    expect(ordered).toEqual([{ kind: 'Base', fieldId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' }, { kind: 'Virtual', fieldId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' }]);
+    fireEvent.click(within(screen.getByLabelText('Узел Widget')).getByRole('button', { name: 'Добавить источник' }));
+    expect(onChange.mock.calls[onChange.mock.calls.length - 1]?.[0][0].children[0].sources[2]).toEqual({ kind: 'Base', fieldId: '' });
     fireEvent.change(screen.getAllByLabelText('nodeKey')[2], { target: { value: 'root' } });
     expect(screen.getByText('nodeKey должен быть уникален во всём дереве.')).toBeTruthy();
     expect(validity).toHaveBeenLastCalledWith(false);

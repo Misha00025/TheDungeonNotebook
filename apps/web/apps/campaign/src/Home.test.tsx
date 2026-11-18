@@ -8,7 +8,7 @@ import type { HubRemoteProps } from '@tdn/shared';
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const campaign = (id: number) => ({ id, name: `Campaign ${id}`, metadataRevision: 1 });
-const character = (groupId: number, characterId: string, name = `Hero ${groupId}`) => ({ id: characterId, campaignId: groupId, templateId: 'template', name, importance: 'Key', metadataRevision: 1 });
+const character = (groupId: number, characterId: string, name = `Hero ${groupId}`) => ({ id: characterId, campaignId: groupId, name, importance: 'Key', metadataRevision: 1 });
 const permissions = (canWrite: boolean) => ({ canRead: true, canWrite, canManageAccess: false });
 const makeAuth = (request: (url: string, options?: RequestInit) => Promise<Response>, userId = 4) => ({ status: 'authenticated', authenticated: true, userId, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
 const history = (lastVisitedGroupId: number | null, lastVisitedCharacters: { groupId: number; characterId: string }[]) => ({ lastVisitedGroupId, lastVisitedCharacters });

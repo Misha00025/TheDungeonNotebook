@@ -1,211 +1,228 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import Templates from './Templates';
 import { CampaignApiError } from './api';
 import type { VirtualField, VirtualFieldsEnvelope } from './types';
 
-const shared = vi.hoisted(() => ({ dirty: false, canWrite: true, permissionsLoading: false, invalidation: 0 }));
-const api = vi.hoisted(() => ({ listTemplates: vi.fn(), listFormulas: vi.fn(), getFormulaContent: vi.fn(), getTemplate: vi.fn(), getTemplateContent: vi.fn(), createTemplate: vi.fn(), renameTemplate: vi.fn(), putTemplateContent: vi.fn(), putTemplateVirtualFields: vi.fn() }));
-vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, sessionKey: 'user', invalidation: shared.invalidation, notifyInvalidation: vi.fn() }), useDirtyDraft: (_owner: string, dirty: boolean) => { shared.dirty = dirty; return () => { shared.dirty = false; }; }, useDirtyState: () => shared.dirty }));
+const shared = vi.hoisted(() => ({ dirty: false, canWrite: true, permissionsLoading: false, invalidation: 0, sessionKey: 'user' }));
+const api = vi.hoisted(() => ({ listFormulas: vi.fn(), getFormulaContent: vi.fn(), getTemplate: vi.fn(), getTemplateContent: vi.fn(), renameTemplate: vi.fn(), putTemplateContent: vi.fn(), putTemplateVirtualFields: vi.fn() }));
+vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, sessionKey: shared.sessionKey, invalidation: shared.invalidation, notifyInvalidation: vi.fn() }), useDirtyDraft: (_owner: string, dirty: boolean) => { shared.dirty = dirty; return () => { shared.dirty = false; }; } }));
 vi.mock('./Shell', () => ({ useCampaignWorkspace: () => ({ campaign: { id: 4 }, permissions: { canWrite: shared.canWrite }, lastKnownPermissions: { canWrite: shared.canWrite }, permissionsLoading: shared.permissionsLoading }) }));
 
-const first = { id: 'template-1', key: 'key-1', campaignId: 4, name: 'First', metadataRevision: 3 };
-const second = { id: 'template-2', key: 'key-2', campaignId: 4, name: 'Second', metadataRevision: 7 };
-const content = { campaignId: 4, resourceId: first.id, contentRevision: 11, data: { description: 'desc', virtualFields: [{ id: 'opaque', formulaId: 'formula' }], baseFields: [{ id: 'field-1', key: 'immutable', title: 'Title', description: '', valueType: 'String', typeRevision: 5, value: '', options: [] }] } };
-const editableVirtual: VirtualField = { id: 'opaque', key: 'opaque-key', title: 'Opaque field', description: '', resultType: 'Number', formulaId: 'formula', bindings: {} };
-const tree = () => <MemoryRouter initialEntries={['/4/gm/templates']}><Routes><Route path=":groupId/gm/templates" element={<Templates />} /></Routes></MemoryRouter>;
-const renderTemplates = () => render(tree());
+const metadata = { campaignId: 4, name: 'Campaign', metadataRevision: 3 };
+const field = { id: 'field-1', key: 'immutable', title: 'Title', description: '', valueType: 'String', typeRevision: 5, value: '', options: [] };
+const virtual: VirtualField = { id: 'opaque', key: 'opaque-key', title: 'Opaque field', description: '', resultType: 'Number', formulaId: 'formula', bindings: { value: { kind: 'Base', fieldId: 'field-1' } } };
+const content = { campaignId: 4, contentRevision: 11, data: { description: 'desc', virtualFields: [virtual], baseFields: [field] } };
+const emptyContent = { campaignId: 4, contentRevision: 0, data: { description: '', baseFields: [], virtualFields: [] } };
+const RouteChange: React.FC = () => { const navigate = useNavigate(); return <button type="button" onClick={() => navigate('/5/gm/templates')}>Другую кампанию</button>; };
+const tree = (path = '/4/gm/templates') => <MemoryRouter initialEntries={[path]}><RouteChange /><Routes><Route path=":groupId/gm/templates" element={<Templates />} /></Routes></MemoryRouter>;
+const renderTemplates = (path?: string) => render(tree(path));
+const baseForm = () => within(screen.getByRole('heading', { name: 'Базовое содержимое' }).closest('form')!);
+const baseDescription = () => baseForm().getByLabelText('Описание');
 
-describe('base template editor', () => {
+describe('singleton campaign template editor', () => {
   beforeEach(() => {
-    shared.dirty = false; shared.canWrite = true; shared.permissionsLoading = false; shared.invalidation = 0;
-    Object.values(api).forEach(method => method.mockReset());
-    api.listTemplates.mockResolvedValue([first, second]);
-    api.listFormulas.mockResolvedValue([{ id: 'formula-1', key: 'f1', campaignId: 4, name: 'Formula', metadataRevision: 9 }]);
-    api.getTemplate.mockImplementation(async (_id: number, id: string) => id === second.id ? second : first);
-    api.getTemplateContent.mockResolvedValue(content);
-    api.createTemplate.mockResolvedValue({ ...first, contentRevision: 1 });
-    api.renameTemplate.mockResolvedValue({ ...first, name: 'Renamed', metadataRevision: 4 });
-    api.putTemplateContent.mockResolvedValue({ ...content, contentRevision: 12, data: { ...content.data, description: 'updated' } });
-    api.putTemplateVirtualFields.mockResolvedValue({ contentRevision: 12, virtualFields: content.data.virtualFields });
-  });
-
-  it('requires explicit selection and sends base content without field type revisions', async () => {
-    renderTemplates();
-    const select = await screen.findByLabelText('Выбранный шаблон');
-    expect(select).toHaveValue('');
-    fireEvent.change(select, { target: { value: second.id } });
-    expect(await screen.findByDisplayValue('immutable')).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Добавить поле' }));
-    fireEvent.change(screen.getByLabelText('Описание'), { target: { value: 'updated description' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить базовые поля' }));
-    await waitFor(() => expect(api.putTemplateContent).toHaveBeenCalled());
-    const payload = api.putTemplateContent.mock.calls[0][2];
-    expect(payload.expectedRevision).toBe(11);
-    expect(payload.baseFields[0]).toMatchObject({ id: 'field-1', key: 'immutable' });
-    expect(payload.baseFields[1]).not.toHaveProperty('id');
-    expect(payload.baseFields[0]).not.toHaveProperty('typeRevision');
-    expect(payload).not.toHaveProperty('virtualFields');
-    expect(content.data.virtualFields).toEqual([{ id: 'opaque', formulaId: 'formula' }]);
-  });
-
-  it('keeps metadata and content revisions independent and preserves drafts across conflict refresh', async () => {
-    api.putTemplateContent.mockRejectedValueOnce(new CampaignApiError(409, { code: 'conflict', title: 'Conflict', detail: 'Conflict' }));
-    renderTemplates();
-    fireEvent.change(await screen.findByLabelText('Выбранный шаблон'), { target: { value: first.id } });
-    fireEvent.change(await screen.findByLabelText('Название'), { target: { value: 'Metadata draft' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить название' }));
-    await waitFor(() => expect(api.renameTemplate).toHaveBeenCalledWith(4, first.id, { name: 'Metadata draft', expectedRevision: 3 }));
-    const description = await screen.findByLabelText('Описание');
-    fireEvent.change(description, { target: { value: 'Content draft' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить базовые поля' }));
-    await screen.findByText('Conflict');
-    fireEvent.click(screen.getByRole('button', { name: 'Перечитать содержимое' }));
-    await waitFor(() => expect(api.getTemplateContent).toHaveBeenCalledTimes(2));
-    expect(description).toHaveValue('Content draft');
-    expect(screen.getByRole('button', { name: 'Сохранить базовые поля' })).toBeEnabled();
-    expect(api.putTemplateContent).toHaveBeenCalledWith(4, first.id, expect.objectContaining({ expectedRevision: 11, description: 'Content draft' }));
-  });
-
-  it('keeps a content draft while metadata saves independently', async () => {
-    renderTemplates();
-    fireEvent.change(await screen.findByLabelText('Выбранный шаблон'), { target: { value: first.id } });
-    fireEvent.change(await screen.findByLabelText('Описание'), { target: { value: 'Unsaved content draft' } });
-    fireEvent.change(screen.getByLabelText('Название'), { target: { value: 'Renamed' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить название' }));
-    expect(await screen.findByRole('status')).toHaveTextContent('Название сохранено.');
-    expect(screen.getByLabelText('Описание')).toHaveValue('Unsaved content draft');
-    expect(api.putTemplateContent).not.toHaveBeenCalled();
-  });
-
-  it('retains editor controls and draft during permission refresh', async () => {
-    const view = renderTemplates();
-    fireEvent.change(await screen.findByLabelText('Выбранный шаблон'), { target: { value: first.id } });
-    const description = await screen.findByLabelText('Описание');
-    fireEvent.change(description, { target: { value: 'Draft during refresh' } });
-    shared.permissionsLoading = true;
-    view.rerender(tree());
-    expect(screen.getByLabelText('Описание')).toHaveValue('Draft during refresh');
-    expect(screen.getByLabelText('Описание')).toBeDisabled();
-    fireEvent.submit(screen.getByLabelText('Описание').closest('form')!);
-    expect(api.putTemplateContent).not.toHaveBeenCalled();
-    fireEvent.submit(screen.getByLabelText('Название').closest('form')!);
-    expect(api.renameTemplate).not.toHaveBeenCalled();
+    shared.dirty = false;
+    shared.canWrite = true;
     shared.permissionsLoading = false;
-    view.rerender(tree());
-    expect(screen.getByLabelText('Описание')).toHaveValue('Draft during refresh');
-    expect(screen.getByLabelText('Описание')).toBeEnabled();
-  });
-
-  it('uses the request GUID for creation lookup and omits new field IDs', async () => {
-    api.getTemplate.mockResolvedValue(first);
+    shared.invalidation = 0;
+    shared.sessionKey = 'user';
+    Object.values(api).forEach(method => method.mockReset());
+    api.getTemplate.mockResolvedValue(metadata);
     api.getTemplateContent.mockResolvedValue(content);
-    renderTemplates();
-    fireEvent.click(await screen.findByRole('button', { name: 'Создать шаблон' }));
-    fireEvent.change(screen.getByLabelText('Название'), { target: { value: 'New' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
-    await waitFor(() => expect(api.createTemplate).toHaveBeenCalled());
-    expect(api.createTemplate.mock.calls[0][1]).toMatchObject({ name: 'New', baseFields: [] });
-    expect(api.createTemplate.mock.calls[0][1].requestId).toMatch(/^[0-9a-f-]{36}$/i);
+    api.listFormulas.mockResolvedValue([{ id: 'formula', key: 'f', campaignId: 4, name: 'Formula', metadataRevision: 1 }]);
+    api.getFormulaContent.mockResolvedValue({ campaignId: 4, resourceId: 'formula', contentRevision: 1, data: { expression: '', parameters: [] } });
+    api.renameTemplate.mockImplementation(async (_id: number, body: { name: string; expectedRevision: number }) => ({ ...metadata, name: body.name, metadataRevision: body.expectedRevision + 1 }));
+    api.putTemplateContent.mockImplementation(async (_id: number, body: { expectedRevision: number; description: string }) => ({ ...content, contentRevision: body.expectedRevision + 1, data: { ...content.data, description: body.description } }));
+    api.putTemplateVirtualFields.mockImplementation(async (_id: number, body: { expectedRevision: number; virtualFields: VirtualField[] }) => ({ contentRevision: body.expectedRevision + 1, virtualFields: body.virtualFields.map((field, index) => ({ ...field, id: field.id ?? `created-${index}` })) }));
   });
 
-  it('tracks a new-template draft and confirms before abandoning it', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('automatically displays one template and reads metadata and content using only the campaign ID', async () => {
     renderTemplates();
-    fireEvent.click(await screen.findByRole('button', { name: 'Создать шаблон' }));
-    fireEvent.change(screen.getByLabelText('Название'), { target: { value: 'Draft' } });
-    expect(shared.dirty).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
-    expect(confirm).toHaveBeenCalledWith('Отказаться от черновика шаблона?');
-    expect(screen.getByLabelText('Название')).toHaveValue('Draft');
-    confirm.mockReturnValue(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
-    expect(await screen.findByRole('button', { name: 'Создать шаблон' })).toBeInTheDocument();
-    confirm.mockRestore();
+    expect(await screen.findByRole('heading', { name: 'Шаблон кампании' })).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('immutable')).toBeDisabled();
+    expect(api.getTemplate).toHaveBeenCalledWith(4);
+    expect(api.getTemplateContent).toHaveBeenCalledWith(4);
+    expect(api).not.toHaveProperty('listTemplates');
+    expect(api).not.toHaveProperty('createTemplate');
+    expect(screen.queryByText('Выбранный шаблон')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Создать шаблон' })).not.toBeInTheDocument();
   });
 
-  it('does not select a creation response after switching away while it is pending', async () => {
-    let resolveCreate!: (value: typeof first & { contentRevision: number }) => void;
-    api.createTemplate.mockReturnValueOnce(new Promise(resolve => { resolveCreate = resolve; }));
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    const view = renderTemplates();
-    const selector = await screen.findByLabelText('Выбранный шаблон');
-    fireEvent.click(screen.getByRole('button', { name: 'Создать шаблон' }));
-    fireEvent.change(screen.getByLabelText('Название'), { target: { value: 'Pending' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
-    await waitFor(() => expect(api.createTemplate).toHaveBeenCalledTimes(1));
-    view.rerender(tree());
-    fireEvent.change(selector, { target: { value: second.id } });
-    expect(await screen.findByDisplayValue('immutable')).toBeInTheDocument();
-    resolveCreate({ ...first, id: 'late-created', contentRevision: 1 });
-    await waitFor(() => expect(selector).toHaveValue(second.id));
-    expect(api.getTemplate).toHaveBeenCalledWith(4, second.id);
-    expect(api.getTemplate).not.toHaveBeenCalledWith(4, 'late-created');
-    confirm.mockRestore();
-  });
-
-  it('shares content revisions across base and virtual writes while keeping the other draft intact', async () => {
-    const savedVirtual = { id: 'virtual-saved', key: 'calc', title: 'Calc', description: '', resultType: 'Number', formulaId: 'formula-1', bindings: {} };
-    api.getTemplate.mockResolvedValueOnce({ ...first, metadataRevision: 9 });
-    api.putTemplateContent
-      .mockResolvedValueOnce({ ...content, contentRevision: 12, data: { ...content.data, description: 'server description', virtualFields: content.data.virtualFields } })
-      .mockResolvedValueOnce({ ...content, contentRevision: 14, data: { ...content.data, description: 'final description', virtualFields: [savedVirtual] } });
-    api.putTemplateVirtualFields.mockResolvedValueOnce({ contentRevision: 13, virtualFields: [editableVirtual, savedVirtual] });
-    api.getTemplateContent.mockResolvedValue({ ...content, data: { ...content.data, virtualFields: [editableVirtual] } });
-    api.getFormulaContent.mockResolvedValue({ data: { parameters: [] } });
+  it('saves populated base content with its current revision and omits field type revisions', async () => {
     renderTemplates();
-    fireEvent.change(await screen.findByLabelText('Выбранный шаблон'), { target: { value: first.id } });
-    fireEvent.change(await screen.findByLabelText('Название'), { target: { value: 'Independent metadata' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить название' }));
-    await waitFor(() => expect(api.renameTemplate).toHaveBeenCalledWith(4, first.id, { name: 'Independent metadata', expectedRevision: 9 }));
-    const baseForm = within(screen.getByRole('heading', { name: 'Базовое содержимое' }).closest('form')!);
-    fireEvent.click(await screen.findByRole('button', { name: 'Открыть виртуальные поля' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Добавить виртуальное поле' }));
-    const newVirtual = within(screen.getAllByRole('group', { name: 'Новое виртуальное поле' })[0]);
-    fireEvent.change(newVirtual.getByLabelText('Ключ'), { target: { value: 'calc' } });
-    const virtualName = newVirtual.getByLabelText('Название');
-    fireEvent.change(virtualName, { target: { value: 'Calc draft' } });
-    fireEvent.change(newVirtual.getByLabelText('Формула'), { target: { value: 'formula-1' } });
-    fireEvent.change(baseForm.getByLabelText('Описание'), { target: { value: 'base draft' } });
-
+    fireEvent.click(await screen.findByRole('button', { name: 'Добавить поле' }));
+    fireEvent.change(baseDescription(), { target: { value: 'updated description' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить базовые поля' }));
-    await waitFor(() => expect(api.putTemplateContent).toHaveBeenCalledTimes(1));
-    expect(api.putTemplateContent.mock.calls[0][2]).toMatchObject({ expectedRevision: 11, description: 'base draft' });
-    expect(api.putTemplateContent.mock.calls[0][2]).not.toHaveProperty('virtualFields');
-    expect(virtualName).toHaveValue('Calc draft');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить виртуальные поля' }));
-    await waitFor(() => expect(api.putTemplateVirtualFields).toHaveBeenCalledTimes(1));
-    expect(api.putTemplateVirtualFields.mock.calls[0][2]).toMatchObject({ expectedRevision: 12 });
-    expect(api.putTemplateVirtualFields.mock.calls[0][2].virtualFields[1]).not.toHaveProperty('id');
-
-    fireEvent.change(baseForm.getByLabelText('Описание'), { target: { value: 'final description' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить базовые поля' }));
-    await waitFor(() => expect(api.putTemplateContent).toHaveBeenCalledTimes(2));
-    expect(api.putTemplateContent.mock.calls[1][2]).toMatchObject({ expectedRevision: 13 });
-    expect(api.putTemplateContent.mock.calls[1][2]).not.toHaveProperty('virtualFields');
-    expect(api.renameTemplate).toHaveBeenCalledTimes(1);
-    expect(first.metadataRevision).toBe(3);
+    await waitFor(() => expect(api.putTemplateContent).toHaveBeenCalledWith(4, expect.objectContaining({ expectedRevision: 11, description: 'updated description' })));
+    const payload = api.putTemplateContent.mock.calls[0][1];
+    expect(payload.baseFields[0]).toMatchObject({ id: 'field-1', key: 'immutable' });
+    expect(payload.baseFields[0]).not.toHaveProperty('typeRevision');
+    expect(payload.baseFields[1]).not.toHaveProperty('id');
+    expect(payload).not.toHaveProperty('virtualFields');
   });
 
-  it('disables both shared-revision writes while either content request is pending', async () => {
-    let resolveWrite!: (value: VirtualFieldsEnvelope) => void;
-    api.putTemplateVirtualFields.mockReturnValueOnce(new Promise(resolve => { resolveWrite = resolve; }));
-    api.getFormulaContent.mockResolvedValue({ data: { parameters: [] } });
-    api.getTemplateContent.mockResolvedValue({ ...content, data: { ...content.data, virtualFields: [editableVirtual] } });
+  it('allows the first virtual write at revision zero and saves the pending base draft at revision one', async () => {
+    api.getTemplateContent.mockResolvedValue(emptyContent);
     renderTemplates();
-    fireEvent.change(await screen.findByLabelText('Выбранный шаблон'), { target: { value: first.id } });
     fireEvent.click(await screen.findByRole('button', { name: 'Открыть виртуальные поля' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Добавить виртуальное поле' }));
     const newVirtual = within(screen.getAllByRole('group', { name: 'Новое виртуальное поле' })[0]);
     fireEvent.change(newVirtual.getByLabelText('Ключ'), { target: { value: 'calc' } });
     fireEvent.change(newVirtual.getByLabelText('Название'), { target: { value: 'Calc' } });
-    fireEvent.change(newVirtual.getByLabelText('Формула'), { target: { value: 'formula-1' } });
+    fireEvent.change(newVirtual.getByLabelText('Формула'), { target: { value: 'formula' } });
+    fireEvent.change(baseDescription(), { target: { value: 'pending base draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить виртуальные поля' }));
+    await waitFor(() => expect(api.putTemplateVirtualFields).toHaveBeenCalledWith(4, expect.objectContaining({ expectedRevision: 0 })));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Содержимое сохранено.'));
+    expect(baseDescription()).toHaveValue('pending base draft');
+    fireEvent.change(baseDescription(), { target: { value: 'after virtual write' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить базовые поля' }));
+    await waitFor(() => expect(api.putTemplateContent).toHaveBeenCalledWith(4, expect.objectContaining({ expectedRevision: 1, description: 'after virtual write' })));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Содержимое сохранено.'));
+  });
+
+  it('allows the first base write at revision zero without discarding a pending virtual draft', async () => {
+    api.getTemplateContent.mockResolvedValue(emptyContent);
+    api.putTemplateContent.mockResolvedValueOnce({ campaignId: 4, contentRevision: 1, data: { description: 'first base write', baseFields: [], virtualFields: [] } });
+    renderTemplates();
+    fireEvent.click(await screen.findByRole('button', { name: 'Открыть виртуальные поля' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Добавить виртуальное поле' }));
+    const newVirtual = within(screen.getAllByRole('group', { name: 'Новое виртуальное поле' })[0]);
+    fireEvent.change(newVirtual.getByLabelText('Ключ'), { target: { value: 'draft-calc' } });
+    fireEvent.change(newVirtual.getByLabelText('Название'), { target: { value: 'Draft calculation' } });
+    fireEvent.change(newVirtual.getByLabelText('Формула'), { target: { value: 'formula' } });
+    fireEvent.change(baseDescription(), { target: { value: 'first base write' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить базовые поля' }));
+    await waitFor(() => expect(api.putTemplateContent).toHaveBeenCalledWith(4, expect.objectContaining({ expectedRevision: 0, description: 'first base write' })));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Содержимое сохранено.'));
+    expect(newVirtual.getByLabelText('Название')).toHaveValue('Draft calculation');
+    expect(baseDescription()).toHaveValue('first base write');
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Сохранить виртуальные поля' }));
+      await waitFor(() => expect(api.putTemplateVirtualFields).toHaveBeenCalledWith(4, expect.objectContaining({ expectedRevision: 1 })));
+      await api.putTemplateVirtualFields.mock.results[0].value;
+    });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить виртуальные поля' })).toBeDisabled());
+    expect(api.putTemplateVirtualFields.mock.calls[0][1].virtualFields[0]).not.toHaveProperty('id');
+  });
+
+  it('keeps metadata and content revisions independent and preserves a content draft on metadata save', async () => {
+    renderTemplates();
+    await screen.findByRole('heading', { name: 'Базовое содержимое' });
+    fireEvent.change(baseDescription(), { target: { value: 'Unsaved content draft' } });
+    fireEvent.change(screen.getByLabelText('Название'), { target: { value: 'Renamed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить название' }));
+    await waitFor(() => expect(api.renameTemplate).toHaveBeenCalledWith(4, { name: 'Renamed', expectedRevision: 3 }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Название сохранено.');
+    expect(baseDescription()).toHaveValue('Unsaved content draft');
+    expect(api.putTemplateContent).not.toHaveBeenCalled();
+  });
+
+  it('retains controls and drafts while permission refresh gates mutations', async () => {
+    const view = renderTemplates();
+    await screen.findByRole('heading', { name: 'Базовое содержимое' });
+    fireEvent.change(baseDescription(), { target: { value: 'Draft during refresh' } });
+    shared.permissionsLoading = true;
+    view.rerender(tree());
+    expect(baseDescription()).toHaveValue('Draft during refresh');
+    expect(baseDescription()).toBeDisabled();
+    fireEvent.submit(baseDescription().closest('form')!);
+    fireEvent.submit(screen.getByLabelText('Название').closest('form')!);
+    expect(api.putTemplateContent).not.toHaveBeenCalled();
+    expect(api.renameTemplate).not.toHaveBeenCalled();
+    shared.permissionsLoading = false;
+    view.rerender(tree());
+    expect(baseDescription()).toHaveValue('Draft during refresh');
+    expect(baseDescription()).toBeEnabled();
+  });
+
+  it('freezes content writes after conflict until an explicit read while preserving the draft', async () => {
+    api.putTemplateContent.mockRejectedValueOnce(new CampaignApiError(409, { code: 'content_revision_conflict', title: 'Conflict', detail: 'Conflict' }));
+    api.getTemplateContent.mockResolvedValueOnce(content).mockResolvedValueOnce({ ...content, contentRevision: 14 });
+    renderTemplates();
+    await screen.findByRole('heading', { name: 'Базовое содержимое' });
+    const description = baseDescription();
+    fireEvent.change(description, { target: { value: 'Content draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить базовые поля' }));
+    await screen.findByText('Conflict');
+    expect(screen.getByRole('button', { name: 'Сохранить базовые поля' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Перечитать содержимое' }));
+    await waitFor(() => expect(api.getTemplateContent).toHaveBeenCalledTimes(2));
+    expect(description).toHaveValue('Content draft');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить базовые поля' })).toBeEnabled());
+    expect(api.putTemplateContent).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить базовые поля' }));
+    await waitFor(() => expect(api.putTemplateContent).toHaveBeenCalledTimes(2));
+    expect(api.putTemplateContent.mock.calls[1][1]).toMatchObject({ expectedRevision: 14, description: 'Content draft' });
+  });
+
+  it('freezes unknown content outcomes and only unblocks after explicit content read', async () => {
+    api.putTemplateVirtualFields.mockRejectedValueOnce(new CampaignApiError(503, { code: 'content_write_outcome_unknown', title: 'Unknown', detail: 'Unknown' }, true));
+    renderTemplates();
+    fireEvent.click(await screen.findByRole('button', { name: 'Открыть виртуальные поля' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Добавить виртуальное поле' }));
+    const newVirtual = within(screen.getAllByRole('group', { name: 'Новое виртуальное поле' })[0]);
+    fireEvent.change(newVirtual.getByLabelText('Ключ'), { target: { value: 'calc' } });
+    fireEvent.change(newVirtual.getByLabelText('Название'), { target: { value: 'Calc' } });
+    fireEvent.change(newVirtual.getByLabelText('Формула'), { target: { value: 'formula' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить виртуальные поля' }));
+    await screen.findByText('Unknown');
+    expect(screen.getByRole('button', { name: 'Сохранить виртуальные поля' })).toBeDisabled();
+    expect(api.putTemplateVirtualFields).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Перечитать содержимое' })[1]);
+    await waitFor(() => expect(api.getTemplateContent).toHaveBeenCalledTimes(2));
+    expect(api.putTemplateVirtualFields).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить виртуальные поля' })).toBeEnabled());
+    expect(screen.getByDisplayValue('Calc')).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Сохранить виртуальные поля' }));
+      await waitFor(() => expect(api.putTemplateVirtualFields).toHaveBeenCalledTimes(2));
+      await api.putTemplateVirtualFields.mock.results[1].value;
+    });
+    expect(api.putTemplateVirtualFields.mock.calls[1][1].expectedRevision).toBe(11);
+  });
+
+  it('isolates editor state by campaign and ignores a prior campaign load completing late', async () => {
+    let resolveMetadata!: (value: typeof metadata) => void;
+    api.getTemplate.mockImplementation((id: number) => id === 4 ? new Promise(resolve => { resolveMetadata = resolve; }) : Promise.resolve({ ...metadata, campaignId: 5, name: 'Campaign 5' }));
+    api.getTemplateContent.mockImplementation((id: number) => Promise.resolve({ ...content, campaignId: id, data: { ...content.data, description: id === 5 ? 'Campaign 5 content' : content.data.description } }));
+    renderTemplates();
+    await waitFor(() => expect(api.getTemplate).toHaveBeenCalledWith(4));
+    fireEvent.click(screen.getByRole('button', { name: 'Другую кампанию' }));
+    await waitFor(() => expect(api.getTemplate).toHaveBeenCalledWith(5));
+    expect(await screen.findByDisplayValue('Campaign 5')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('Campaign 5 content')).toBeInTheDocument();
+    await act(async () => { resolveMetadata({ ...metadata, campaignId: 4, name: 'Stale campaign' }); });
+    expect(screen.queryByDisplayValue('Stale campaign')).not.toBeInTheDocument();
+    expect(api.getTemplateContent).toHaveBeenCalledWith(5);
+  });
+
+  it('coordinates shared base and virtual revisions while preserving the opposite draft', async () => {
+    let resolveWrite!: (value: VirtualFieldsEnvelope) => void;
+    api.putTemplateVirtualFields.mockReturnValueOnce(new Promise(resolve => { resolveWrite = resolve; }));
+    renderTemplates();
+    fireEvent.click(await screen.findByRole('button', { name: 'Открыть виртуальные поля' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Добавить виртуальное поле' }));
+    const newVirtual = within(screen.getAllByRole('group', { name: 'Новое виртуальное поле' })[0]);
+    fireEvent.change(newVirtual.getByLabelText('Ключ'), { target: { value: 'calc' } });
+    fireEvent.change(newVirtual.getByLabelText('Название'), { target: { value: 'Calc' } });
+    fireEvent.change(newVirtual.getByLabelText('Формула'), { target: { value: 'formula' } });
+    fireEvent.change(baseDescription(), { target: { value: 'base draft' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить виртуальные поля' }));
     await waitFor(() => expect(api.putTemplateVirtualFields).toHaveBeenCalledTimes(1));
+    expect(api.putTemplateVirtualFields.mock.calls[0][1]).toMatchObject({ expectedRevision: 11 });
     expect(screen.getByRole('button', { name: 'Сохранить базовые поля' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Сохранить виртуальные поля' })).toBeDisabled();
-    resolveWrite({ contentRevision: 12, virtualFields: [editableVirtual, { ...editableVirtual, id: 'created-virtual', key: 'calc', title: 'Calc' }] });
+    resolveWrite({ contentRevision: 13, virtualFields: [virtual] });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить базовые поля' })).toBeEnabled());
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Сохранить базовые поля' }));
+      await waitFor(() => expect(api.putTemplateContent).toHaveBeenCalledWith(4, expect.objectContaining({ expectedRevision: 13, description: 'base draft' })));
+      await api.putTemplateContent.mock.results[0].value;
+    });
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Содержимое сохранено.'));
   });
 });

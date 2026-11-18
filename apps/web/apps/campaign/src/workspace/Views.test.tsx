@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Views from './Views';
@@ -59,6 +59,37 @@ describe('Views workspace', () => {
     fireEvent.click(screen.getByText('Сохранить содержимое'));
     await waitFor(() => expect(api.putViewContent).toHaveBeenCalledWith(4, view.id, expect.objectContaining({ expectedRevision: 3 })));
     expect(stringifyJson(api.putViewContent.mock.calls[0][2].roots[0].params)).toContain('9007199254740993');
+  });
+
+  it('saves selector-free Base and Virtual sources and retains the draft after invalid_source', async () => {
+    api.putViewContent.mockRejectedValueOnce(new CampaignApiError(400, { code: 'invalid_source', title: 'Invalid source', detail: 'The source is invalid.' }));
+    renderPage();
+    fireEvent.change(await screen.findByLabelText('Выбранное представление'), { target: { value: view.id } });
+    const widget = await screen.findByLabelText('Узел Saved title');
+    fireEvent.click(within(widget).getByRole('button', { name: 'Добавить источник' }));
+    fireEvent.change(screen.getAllByLabelText('Field ID')[0], { target: { value: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' } });
+    fireEvent.click(within(widget).getByRole('button', { name: 'Добавить источник' }));
+    fireEvent.change(screen.getAllByLabelText('Вид')[1], { target: { value: 'Virtual' } });
+    fireEvent.change(screen.getAllByLabelText('Field ID')[1], { target: { value: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' } });
+    fireEvent.change(within(within(widget).getByRole('group', { name: 'Поля узла Saved title' })).getByLabelText('Заголовок'), { target: { value: 'Draft widget' } });
+    fireEvent.click(screen.getByText('Сохранить содержимое'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('invalid_source');
+    expect(screen.getByRole('alert')).toHaveTextContent('The source is invalid.');
+    expect(api.putViewContent).toHaveBeenCalledTimes(1);
+    const body = api.putViewContent.mock.calls[0][2];
+    expect(body.roots[0].sources).toEqual([{ kind: 'Base', fieldId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }, { kind: 'Virtual', fieldId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }]);
+    expect(body.roots[0].params).toEqual(parseJson('{"future":9007199254740993}'));
+    expect(body.roots[0].sources[0]).not.toHaveProperty('templateId');
+    expect(screen.getByDisplayValue('Draft widget')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')).toBeInTheDocument();
+    expect(api.putViewContent).toHaveBeenCalledTimes(1);
+    api.putViewContent.mockImplementationOnce(async (_campaignId: number, _viewId: string, submitted: { roots: typeof body.roots }) => ({ ...content, contentRevision: 4, data: { roots: submitted.roots } }));
+    fireEvent.change(screen.getAllByLabelText('Field ID')[0], { target: { value: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' } });
+    fireEvent.click(screen.getByText('Сохранить содержимое'));
+    await waitFor(() => expect(api.putViewContent).toHaveBeenCalledTimes(2));
+    expect(api.putViewContent.mock.calls[0][2].roots[0].sources).toEqual([{ kind: 'Base', fieldId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }, { kind: 'Virtual', fieldId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }]);
+    expect(api.putViewContent.mock.calls[1][2].roots[0].sources).toEqual([{ kind: 'Base', fieldId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' }, { kind: 'Virtual', fieldId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }]);
   });
 
   it('preserves arbitrary context params, revision zero, and removes a default without deleting params', async () => {
@@ -143,7 +174,7 @@ describe('Views workspace', () => {
     const oldResult = new Promise(resolve => { resolveOld = resolve; });
     api.listCharacters.mockResolvedValue([{ id: characterId, name: 'Hero' }, { id: secondId, name: 'Other' }]);
     api.getViewContent.mockResolvedValue({ ...content, data: { roots: [{ ...content.data.roots[0], format: '$1' }] } });
-    api.getViewSources.mockImplementation((_campaignId: number, _viewId: string, selected: string) => selected === characterId ? oldResult : Promise.resolve({ viewContentRevision: 3, widgets: [{ nodeKey: 'w', sources: [{ sourceIndex: 0, source: { templateId: 't', kind: 'Base', fieldId: 'f' }, value: 'New character', diagnostic: null }] }] }));
+    api.getViewSources.mockImplementation((_campaignId: number, _viewId: string, selected: string) => selected === characterId ? oldResult : Promise.resolve({ viewContentRevision: 3, widgets: [{ nodeKey: 'w', sources: [{ sourceIndex: 0, source: { kind: 'Base', fieldId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' }, value: 'New character', diagnostic: null }] }] }));
     renderPage(); fireEvent.change(await screen.findByLabelText('Выбранное представление'), { target: { value: view.id } });
     const chooser = await screen.findByLabelText('Персонаж');
     fireEvent.change(chooser, { target: { value: characterId } });
@@ -151,7 +182,7 @@ describe('Views workspace', () => {
     fireEvent.change(chooser, { target: { value: secondId } });
     fireEvent.click(screen.getByRole('button', { name: 'Предпросмотр сохранённой версии' }));
     expect(await screen.findByText('New character')).toBeTruthy();
-    resolveOld({ viewContentRevision: 3, widgets: [{ nodeKey: 'w', sources: [{ sourceIndex: 0, source: { templateId: 't', kind: 'Base', fieldId: 'f' }, value: 'Stale character', diagnostic: null }] }] });
+    resolveOld({ viewContentRevision: 3, widgets: [{ nodeKey: 'w', sources: [{ source: { kind: 'Base', fieldId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' }, sourceIndex: 0, value: 'Stale character', diagnostic: null }] }] });
     await waitFor(() => expect(screen.queryByText('Stale character')).toBeNull());
     expect(screen.getByText('New character')).toBeTruthy();
   });

@@ -72,10 +72,30 @@ describe('campaign first iteration', () => {
     const campaignNavigation = within(screen.getByRole('navigation', { name: 'Разделы кампании' }));
     expect(campaignNavigation.getByRole('link', { name: 'Обзор' })).toBeInTheDocument();
     expect(campaignNavigation.getByRole('link', { name: 'Персонажи' })).toBeInTheDocument();
-    expect(campaignNavigation.getByRole('link', { name: 'Шаблоны' })).toBeInTheDocument();
+    expect(campaignNavigation.getByRole('link', { name: 'Шаблон' })).toBeInTheDocument();
     expect(campaignNavigation.getByRole('link', { name: 'Представления' })).toBeInTheDocument();
     expect(campaignNavigation.queryByRole('link', { name: /Предметы|Навыки|Задания|Заметки|Отряды/ })).toBeNull();
     for (const label of ['Создать персонажа']) expect(screen.queryByText(label)).not.toBeInTheDocument();
+  });
+
+  it('opens the singleton campaign template from GM navigation without plural API routes', async () => {
+    const request = vi.fn(async (url: string) => {
+      if (url === '/api/campaigns/12') return response(campaign());
+      if (url === '/api/campaigns/12/permissions') return response(permissions());
+      if (url === '/api/campaigns/12/template') return response({ campaignId: 12, name: 'Campaign 12', metadataRevision: 1 });
+      if (url === '/api/campaigns/12/template/content') return response({ campaignId: 12, contentRevision: 0, data: { description: '', baseFields: [], virtualFields: [] } });
+      if (url === '/api/campaigns') return response([campaign()]);
+      return response([]);
+    });
+    renderApp('/12/gm/overview', request);
+    fireEvent.click(await screen.findByRole('link', { name: 'Шаблон' }));
+    expect(await screen.findByRole('heading', { name: 'Шаблон кампании' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Метаданные' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Выбранный шаблон')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Создать шаблон' })).not.toBeInTheDocument();
+    expect(request.mock.calls.map(([url]) => url).filter(url => url.startsWith('/api/')).some(url => url.includes('/templates'))).toBe(false);
+    expect(request.mock.calls.some(([url]) => url === '/api/campaigns/12/template')).toBe(true);
+    expect(request.mock.calls.some(([url]) => url === '/api/campaigns/12/template/content')).toBe(true);
   });
 
   it('routes GM access panels and the legacy members route to scoped membership data', async () => {
@@ -133,7 +153,7 @@ describe('campaign first iteration', () => {
     const request = vi.fn(async (url: string) => {
       if (url === '/api/campaigns/12') return response(campaign());
       if (url === '/api/campaigns/12/permissions') return response(permissions(false));
-      if (url === '/api/campaigns/12/characters') return response([{ id, campaignId: 12, templateId: 't', name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
+      if (url === '/api/campaigns/12/characters') return response([{ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
       if (url === `/api/campaigns/12/characters/${id}/permissions`) return response({ canRead: true, canWrite: true, canManageAccess: false });
       return response([]);
     });
@@ -151,7 +171,7 @@ describe('campaign first iteration', () => {
     let resolve!: (value: Response) => void;
     const pending = new Promise<Response>(done => { resolve = done; });
     const id = 'abcdef02-2345-6789-abcd-ef0123456789';
-    const request = vi.fn(async (url: string) => url === '/api/campaigns/12' ? response(campaign()) : url === '/api/campaigns/12/permissions' ? response(permissions(false)) : url === '/api/campaigns/12/characters' ? response([{ id, campaignId: 12, templateId: 't', name: 'Pending hero', importance: 'Secondary', metadataRevision: 1 }]) : url.endsWith(`/characters/${id}/permissions`) ? pending : response([]));
+    const request = vi.fn(async (url: string) => url === '/api/campaigns/12' ? response(campaign()) : url === '/api/campaigns/12/permissions' ? response(permissions(false)) : url === '/api/campaigns/12/characters' ? response([{ id, campaignId: 12, name: 'Pending hero', importance: 'Secondary', metadataRevision: 1 }]) : url.endsWith(`/characters/${id}/permissions`) ? pending : response([]));
     renderApp('/12/player/characters', request);
     expect(await screen.findByText('Загрузка прав персонажа «Pending hero»…')).toBeInTheDocument();
     expect(screen.queryByText('Только просмотр')).not.toBeInTheDocument();
@@ -161,7 +181,7 @@ describe('campaign first iteration', () => {
 
   it('separates empty and unmatched character searches without loading future APIs', async () => {
     const id = 'abcdef03-2345-6789-abcd-ef0123456789';
-    const request = vi.fn(async (url: string) => url === '/api/campaigns/12' ? response(campaign()) : url === '/api/campaigns/12/permissions' ? response(permissions(false)) : url === '/api/campaigns/12/characters' ? response([{ id, campaignId: 12, templateId: 't', name: 'Hero', importance: 'Background', metadataRevision: 1 }]) : url.endsWith('/permissions') ? response({ canRead: true, canWrite: false, canManageAccess: false }) : response([]));
+    const request = vi.fn(async (url: string) => url === '/api/campaigns/12' ? response(campaign()) : url === '/api/campaigns/12/permissions' ? response(permissions(false)) : url === '/api/campaigns/12/characters' ? response([{ id, campaignId: 12, name: 'Hero', importance: 'Background', metadataRevision: 1 }]) : url.endsWith('/permissions') ? response({ canRead: true, canWrite: false, canManageAccess: false }) : response([]));
     renderApp('/12/player/characters', request);
     expect(await screen.findByText('Hero')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Поиск персонажей'), { target: { value: 'missing' } });
@@ -175,11 +195,11 @@ describe('campaign first iteration', () => {
       const request = vi.fn(async (url: string) => {
         if (url === '/api/campaigns/12') return response(campaign());
         if (url === '/api/campaigns/12/permissions') return response(permissions());
-        if (url === `/api/campaigns/12/characters/${id}`) return response({ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+        if (url === `/api/campaigns/12/characters/${id}`) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
         if (url.endsWith('/character-permissions')) return response(permissions());
         if (url.endsWith(`/characters/${id}/permissions`)) return response(permissions());
         if (url.endsWith(`/characters/${id}/computed-sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [], virtualFields: [], formulaContentRevisions: [] });
-        if (url.endsWith('/characters')) return response([{ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
+        if (url.endsWith('/characters')) return response([{ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
         return response([]);
       });
       const view = renderApp(`/12/character/${id}${legacy}`, request);
@@ -198,8 +218,8 @@ describe('campaign first iteration', () => {
       if (url === '/api/campaigns/12/permissions') return response(permissions());
       if (url.endsWith(`/characters/${id}/permissions`)) return response(permissions(false));
       if (url.endsWith(`/characters/${id}/computed-sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [], virtualFields: [], formulaContentRevisions: [] });
-      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 });
-      if (url.endsWith('/characters')) return response([{ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith('/characters')) return response([{ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
       return response([]);
     });
     renderApp(`/12/gm/characters/${id}/stats`, request);
@@ -224,8 +244,8 @@ describe('campaign first iteration', () => {
         return characterPermissionReads === 1 ? response({ canRead: true, canWrite: false, canManageAccess: false }) : response({ code: 'forbidden', title: 'Denied', detail: 'Denied' }, status);
       }
       if (url.endsWith(`/characters/${id}/computed-sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [], virtualFields: [], formulaContentRevisions: [] });
-      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 });
-      if (url.endsWith('/characters')) return response([{ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith('/characters')) return response([{ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
       return response([]);
     });
     renderApp(`/12/gm/characters/${id}/stats`, request);
@@ -246,7 +266,7 @@ describe('campaign first iteration', () => {
         return characterPermissionReads === 1 ? response({ canRead: true, canWrite: false, canManageAccess: false }) : response({ code: 'dependency_unavailable', title: 'Unavailable', detail: 'Try later' }, 503);
       }
       if (url.endsWith(`/characters/${id}/computed-sheet`)) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [], virtualFields: [], formulaContentRevisions: [] });
-      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       return response([]);
     });
     renderApp(`/12/gm/characters/${id}/stats`, request);

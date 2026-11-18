@@ -4,12 +4,11 @@ import { MemoryRouter } from 'react-router-dom';
 import CreateCharacter from './CreateCharacter';
 import { CampaignApiError } from './api';
 
-const shared = vi.hoisted(() => ({ mode: 'gm' as 'gm' | 'player', canWrite: true, permissionsLoading: false, api: { listTemplates: vi.fn(), createCharacter: vi.fn(), getCharacter: vi.fn() }, navigate: vi.fn(), close: vi.fn() }));
+const shared = vi.hoisted(() => ({ mode: 'gm' as 'gm' | 'player', canWrite: true, permissionsLoading: false, api: { createCharacter: vi.fn(), getCharacter: vi.fn() }, navigate: vi.fn(), close: vi.fn() }));
 vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api: shared.api, path: (value: string) => `/app${value}`, navigate: shared.navigate, sessionKey: 'user', invalidation: 0, notifyInvalidation: vi.fn() }), useDirtyDraft: () => vi.fn() }));
 vi.mock('./Shell', () => ({ useCampaignWorkspace: () => ({ campaign: { id: 4 }, mode: shared.mode, permissions: { canWrite: shared.canWrite && !shared.permissionsLoading }, lastKnownPermissions: { canWrite: shared.canWrite }, permissionsLoading: shared.permissionsLoading }) }));
 
-const templates = [{ id: 'template-a', name: 'A' }, { id: 'template-b', name: 'B' }];
-const character = { id: 'returned-character-guid', campaignId: 4, templateId: 'template-b', name: 'Hero', importance: 'Key', metadataRevision: 1 };
+const character = { id: 'returned-character-guid', campaignId: 4, name: 'Hero', importance: 'Key', metadataRevision: 1 };
 const tree = () => <MemoryRouter><CreateCharacter campaignId={4} onClose={shared.close} /></MemoryRouter>;
 const renderForm = () => render(tree());
 
@@ -18,28 +17,31 @@ describe('CreateCharacter', () => {
     shared.mode = 'gm'; shared.canWrite = true; shared.permissionsLoading = false;
     shared.navigate.mockReset(); shared.close.mockReset();
     Object.values(shared.api).forEach(method => method.mockReset());
-    shared.api.listTemplates.mockResolvedValue(templates);
     shared.api.createCharacter.mockResolvedValue(character);
     shared.api.getCharacter.mockResolvedValue(character);
   });
 
-  it('requires explicit template and importance and sends the native GUID request', async () => {
+  it('creates without optional importance and sends only the singleton character fields', async () => {
     renderForm();
-    expect(await screen.findByRole('option', { name: 'A' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Шаблон')).toHaveValue('');
     expect(screen.getByLabelText('Важность')).toHaveValue('');
+    expect(screen.getByRole('option', { name: 'По умолчанию (фоновый)' })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Имя'), { target: { value: ' Hero ' } });
-    fireEvent.change(screen.getByLabelText('Шаблон'), { target: { value: 'template-b' } });
-    fireEvent.change(screen.getByLabelText('Важность'), { target: { value: 'Key' } });
     fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
     await waitFor(() => expect(shared.api.createCharacter).toHaveBeenCalledTimes(1));
     const payload = shared.api.createCharacter.mock.calls[0][1];
-    expect(payload).toMatchObject({ name: 'Hero', templateId: 'template-b', importance: 'Key' });
+    expect(payload).toEqual({ requestId: expect.any(String), name: 'Hero' });
     expect(payload.requestId).toMatch(/^[0-9a-f-]{36}$/i);
-    expect(payload).not.toHaveProperty('description');
-    expect(payload).not.toHaveProperty('defaultValues');
     expect(shared.navigate).toHaveBeenCalledWith('/app/4/gm/characters/returned-character-guid/overview');
     expect(shared.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends an explicitly selected importance without template selectors', async () => {
+    renderForm();
+    fireEvent.change(await screen.findByLabelText('Имя'), { target: { value: 'Hero' } });
+    fireEvent.change(screen.getByLabelText('Важность'), { target: { value: 'Key' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
+    await waitFor(() => expect(shared.api.createCharacter).toHaveBeenCalledTimes(1));
+    expect(shared.api.createCharacter.mock.calls[0][1]).toEqual({ requestId: expect.stringMatching(/^[0-9a-f-]{36}$/i), name: 'Hero', importance: 'Key' });
   });
 
   it('keeps request ID fixed while an unknown outcome is checked manually', async () => {
@@ -48,10 +50,7 @@ describe('CreateCharacter', () => {
       .mockRejectedValueOnce(new CampaignApiError(404, { code: 'not_found', title: 'Missing', detail: 'Missing' }))
       .mockRejectedValueOnce(new CampaignApiError(404, { code: 'not_found', title: 'Missing', detail: 'Missing' }));
     renderForm();
-    await screen.findByRole('option', { name: 'A' });
     fireEvent.change(await screen.findByLabelText('Имя'), { target: { value: 'Hero' } });
-    fireEvent.change(screen.getByLabelText('Шаблон'), { target: { value: 'template-a' } });
-    fireEvent.change(screen.getByLabelText('Важность'), { target: { value: 'Background' } });
     fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
     await screen.findByRole('button', { name: 'Проверить создание' });
     fireEvent.click(screen.getByRole('button', { name: 'Проверить создание' }));
@@ -71,7 +70,6 @@ describe('CreateCharacter', () => {
     shared.mode = 'player'; shared.canWrite = false;
     const { container } = renderForm();
     expect(container).toBeEmptyDOMElement();
-    expect(shared.api.listTemplates).not.toHaveBeenCalled();
     expect(shared.api.createCharacter).not.toHaveBeenCalled();
   });
 
@@ -82,7 +80,6 @@ describe('CreateCharacter', () => {
     view.rerender(tree());
     expect(screen.getByLabelText('Имя')).toHaveValue('Draft');
     expect(screen.getByLabelText('Имя')).toBeDisabled();
-    expect(shared.api.listTemplates).toHaveBeenCalledTimes(1);
     shared.permissionsLoading = false;
     view.rerender(tree());
     expect(screen.getByLabelText('Имя')).toHaveValue('Draft');
@@ -94,8 +91,6 @@ describe('CreateCharacter', () => {
     shared.api.createCharacter.mockReturnValueOnce(new Promise(resolve => { resolveCreate = resolve; }));
     const view = renderForm();
     fireEvent.change(await screen.findByLabelText('Имя'), { target: { value: 'Hero' } });
-    fireEvent.change(screen.getByLabelText('Шаблон'), { target: { value: 'template-a' } });
-    fireEvent.change(screen.getByLabelText('Важность'), { target: { value: 'Key' } });
     fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
     await waitFor(() => expect(shared.api.createCharacter).toHaveBeenCalledTimes(1));
     view.unmount();

@@ -1,7 +1,7 @@
 import { makeAuthenticatedRequest } from '@tdn/shared';
 import type { AuthenticatedRequest } from '@tdn/shared';
 import { parseJson, stringifyJson } from './json';
-import type { Assignment, BaseFieldInput, Campaign, CharacterMetadata, CharacterSheetEnvelope, ComputedSheet, ContentRevisionDto, DefinitionCreate, DefinitionMetadata, FormulaContent, FormulaContentEnvelope, FormulaMetadata, Importance, JsonValue, Member, OverridesEnvelope, Permissions, PresentationEnvelope, ResolvedPresentation, TemplateContentEnvelope, User, ViewContentEnvelope, ViewMetadata, ViewNode, ViewSourcesResponse, VirtualFieldInput, VirtualFieldsEnvelope } from './types';
+import type { Assignment, BaseFieldInput, Campaign, CharacterMetadata, CharacterSheetEnvelope, ComputedSheet, ContentRevisionDto, DefinitionCreate, DefinitionMetadata, FormulaContent, FormulaContentEnvelope, FormulaMetadata, Importance, JsonValue, Member, OverridesEnvelope, Permissions, PresentationEnvelope, ResolvedPresentation, TemplateContentEnvelope, TemplateMetadata, User, ViewContentEnvelope, ViewMetadata, ViewNode, ViewSourcesResponse, VirtualFieldInput, VirtualFieldsEnvelope } from './types';
 
 export interface Problem { code: string; title: string; detail: string; errors?: Record<string, string[]>; resourceId?: string; requestId?: string }
 export class CampaignApiError extends Error {
@@ -54,7 +54,7 @@ export function createCampaignApi(request: AuthenticatedRequest) {
     return parsed as T;
   }
   const c = (id: number) => `/${enc(id)}`;
-  const templates = (id: number) => `${c(id)}/templates`;
+  const template = (id: number) => `${c(id)}/template`;
   const characters = (id: number) => `${c(id)}/characters`;
   const formulas = (id: number) => `${c(id)}/formulas`;
   const views = (id: number) => `${c(id)}/views`;
@@ -71,17 +71,15 @@ export function createCampaignApi(request: AuthenticatedRequest) {
     listMembers: (id: number) => send<Member[]>(`${c(id)}/members`),
     putMember: (id: number, userId: number, body: { isAdmin: boolean; expectedRevision: RevisionPayload['expectedRevision'] }) => put<Member>(`${c(id)}/members/${enc(userId)}`, body),
     deleteMember: (id: number, userId: number, expectedRevision: RevisionPayload['expectedRevision']) => send<void>(`${c(id)}/members/${enc(userId)}`, 'DELETE', undefined, revQuery(expectedRevision)),
-    listTemplates: (id: number) => send<DefinitionMetadata[]>(templates(id)),
-    getTemplate: (id: number, templateId: Id) => send<DefinitionMetadata>(`${templates(id)}/${enc(templateId)}`),
-    createTemplate: (id: number, body: { requestId: Id; name: string; description: string; baseFields: BaseFieldInput[] }) => create<DefinitionCreate>(templates(id), body),
-    renameTemplate: (id: number, templateId: Id, body: { name: string; expectedRevision: RevisionPayload['expectedRevision'] }) => put<DefinitionMetadata>(`${templates(id)}/${enc(templateId)}`, body),
-    getTemplateContent: (id: number, templateId: Id) => send<TemplateContentEnvelope>(`${templates(id)}/${enc(templateId)}/content`),
-     putTemplateContent: (id: number, templateId: Id, body: { expectedRevision: RevisionPayload['expectedRevision']; description: string; baseFields: BaseFieldInput[] }) => put<TemplateContentEnvelope>(`${templates(id)}/${enc(templateId)}/content`, body),
-    getTemplateVirtualFields: (id: number, templateId: Id) => send<VirtualFieldsEnvelope>(`${templates(id)}/${enc(templateId)}/virtual-fields`),
-    putTemplateVirtualFields: (id: number, templateId: Id, body: { expectedRevision: RevisionPayload['expectedRevision']; virtualFields: VirtualFieldInput[] }) => put<VirtualFieldsEnvelope>(`${templates(id)}/${enc(templateId)}/virtual-fields`, body),
+    getTemplate: (id: number) => send<TemplateMetadata>(template(id)),
+    renameTemplate: (id: number, body: { name: string; expectedRevision: RevisionPayload['expectedRevision'] }) => put<TemplateMetadata>(template(id), body),
+    getTemplateContent: (id: number) => send<TemplateContentEnvelope>(`${template(id)}/content`),
+    putTemplateContent: (id: number, body: { expectedRevision: RevisionPayload['expectedRevision']; description: string; baseFields: BaseFieldInput[] }) => put<TemplateContentEnvelope>(`${template(id)}/content`, body),
+    getTemplateVirtualFields: (id: number) => send<VirtualFieldsEnvelope>(`${template(id)}/virtual-fields`),
+    putTemplateVirtualFields: (id: number, body: { expectedRevision: RevisionPayload['expectedRevision']; virtualFields: VirtualFieldInput[] }) => put<VirtualFieldsEnvelope>(`${template(id)}/virtual-fields`, body),
     listCharacters: (id: number) => send<CharacterMetadata[]>(characters(id)),
     getCharacter: (id: number, charId: Id) => send<CharacterMetadata>(`${characters(id)}/${enc(charId)}`),
-    createCharacter: (id: number, body: { requestId: Id; name: string; templateId: Id; importance?: Importance }) => create<CharacterMetadata>(characters(id), body),
+    createCharacter: (id: number, body: { requestId: Id; name: string; importance?: Importance }) => create<CharacterMetadata>(characters(id), body),
     putCharacter: (id: number, charId: Id, body: { name: string; importance: Importance; expectedRevision: RevisionPayload['expectedRevision'] }) => put<CharacterMetadata>(`${characters(id)}/${enc(charId)}`, body),
     characterPermissions: (id: number, charId: Id) => send<Permissions>(`${characters(id)}/${enc(charId)}/permissions`, 'GET', undefined, undefined, true),
     getSheet: (id: number, charId: Id) => send<CharacterSheetEnvelope>(`${characters(id)}/${enc(charId)}/sheet`),

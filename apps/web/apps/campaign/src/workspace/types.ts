@@ -13,7 +13,8 @@ export interface Member { campaignId: number; userId: number; isAdmin: boolean; 
 export interface Assignment { campaignId: number; characterId: string; userId: number; canWrite: boolean; metadataRevision: Revision }
 export interface DefinitionMetadata { id: string; key: string; campaignId: number; name: string; metadataRevision: Revision }
 export interface DefinitionCreate extends DefinitionMetadata { contentRevision: Revision }
-export interface CharacterMetadata { id: string; campaignId: number; templateId: string; name: string; importance: Importance; metadataRevision: Revision }
+export interface TemplateMetadata { campaignId: number; name: string; metadataRevision: Revision }
+export interface CharacterMetadata { id: string; campaignId: number; name: string; importance: Importance; metadataRevision: Revision }
 export interface User { id: number; nickname: string; visibleName: string; imageLink?: string }
 export interface ChoiceOption { optionKey: string; title: string }
 export interface BaseFieldInput { id?: string; key: string; title: string; description: string; valueType: ValueType; value: JsonValue; options: ChoiceOption[] }
@@ -24,6 +25,7 @@ export interface VirtualFieldInput { id?: string; key: string; title: string; de
 export interface VirtualField extends Omit<VirtualFieldInput, 'id'> { id: string }
 export interface TemplateContent { description: string; baseFields: BaseField[]; virtualFields: VirtualField[] }
 export interface ContentEnvelope<T> { campaignId: number; resourceId: string; contentRevision: Revision; data: T }
+export interface TemplateContentEnvelope { campaignId: number; contentRevision: Revision; data: TemplateContent }
 export interface BasicSheet { contentRevision: Revision; templateContentRevision: Revision; description: string; baseFields: EffectiveBaseField[] }
 export interface Diagnostic { code: string; message: string }
 export interface FormulaRevision { id: string; contentRevision: Revision }
@@ -33,7 +35,7 @@ export interface FormulaContent { expression: string; parameters: string[] }
 export interface FormulaMetadata extends DefinitionMetadata {}
 export interface ViewNodeBase { nodeKey: string; title: string; params: JsonValue; children: ViewNode[] }
 export interface LayoutNode extends ViewNodeBase { kind: 'layout' }
-export interface WidgetSource { templateId: string; kind: FieldSourceKind; fieldId: string }
+export interface WidgetSource { kind: FieldSourceKind; fieldId: string }
 export interface WidgetNode extends ViewNodeBase { kind: 'widget'; sources: WidgetSource[]; format: string }
 export type ViewNode = LayoutNode | WidgetNode;
 export interface ViewContent { roots: ViewNode[] }
@@ -43,7 +45,6 @@ export interface PresentationEnvelope extends Presentation {}
 export interface ResolvedPresentation { contextKey: string; viewMetadata: ViewMetadata; viewContent: ContentEnvelope<ViewContent>; contextParams: JsonValue | null; contentRevision: Revision }
 export interface ViewSourcesResponse { viewContentRevision: Revision; contentRevision: Revision; templateContentRevision: Revision; formulaContentRevisions: FormulaRevision[]; widgets: { nodeKey: string; sources: { sourceIndex: number; source: WidgetSource; value: JsonValue | null; diagnostic: { code: string } | null }[] }[] }
 export interface FormulaContentEnvelope extends ContentEnvelope<FormulaContent> {}
-export interface TemplateContentEnvelope extends ContentEnvelope<TemplateContent> {}
 export interface ViewContentEnvelope extends ContentEnvelope<ViewContent> {}
 export interface CharacterSheetEnvelope extends BasicSheet {}
 export interface VirtualFieldsEnvelope { contentRevision: Revision; virtualFields: VirtualField[] }

@@ -28,7 +28,7 @@ describe('CharacterSheet', () => {
     const request = vi.fn(async (url: string) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: false, canManageAccess: false });
       if (url.endsWith('/computed-sheet')) return response(computed);
-      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       return response([]);
     });
     renderSheet(request);
@@ -37,13 +37,14 @@ describe('CharacterSheet', () => {
     const errorCard = screen.getByRole('heading', { name: 'Broken value' }).parentElement;
     expect(errorCard).toHaveTextContent('formula_error: Broken formula');
     expect(errorCard).not.toHaveTextContent('0');
+    expect(screen.queryByText(/^Шаблон:/)).not.toBeInTheDocument();
   });
 
   it('loads computed fields for read access without requesting editing definitions', async () => {
     const request = vi.fn(async (url: string) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: false, canManageAccess: false });
       if (url.endsWith('/computed-sheet')) return response(sheet);
-      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       return response([]);
     });
     renderSheet(request);
@@ -60,10 +61,10 @@ describe('CharacterSheet', () => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: false, canManageAccess: false });
       if (url.endsWith('/computed-sheet')) return response(sheet);
       if (url.endsWith('/characters')) return response([
-        { id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 },
-        { id: otherId, campaignId: 12, templateId: 'template', name: 'Other', importance: 'Secondary', metadataRevision: 1 }
+        { id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 },
+        { id: otherId, campaignId: 12, name: 'Other', importance: 'Secondary', metadataRevision: 1 }
       ]);
-      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       return response([]);
     });
     renderSheet(request);
@@ -76,7 +77,7 @@ describe('CharacterSheet', () => {
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
       if (url.endsWith('/computed-sheet')) return response(latest);
-      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       if (url.endsWith('/base-values/string') && options?.method === 'PUT') { latest = { ...sheet, contentRevision: 2, baseFields: fields.map(field => field.id === 'string' ? { ...field, isExplicit: true, effectiveValue: 'new value' } : field) }; return response(latest); }
       return response([]);
     });
@@ -99,7 +100,7 @@ describe('CharacterSheet', () => {
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
       if (url.endsWith('/computed-sheet')) { const current = reads++ === 0 ? inherited : saved; return response(current); }
-      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       if (url.endsWith('/base-values/boolean') && options?.method === 'PUT') return response(saved);
       return response([]);
     });
@@ -120,7 +121,7 @@ describe('CharacterSheet', () => {
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
       if (url.endsWith('/computed-sheet')) return response(sheetReads++ === 0 ? sheet : { ...latest, virtualFields: [], formulaContentRevisions: [] });
-      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       if (url.endsWith('/base-values/string') && options?.method === 'PUT') { writes += 1; return response({ code: 'conflict', title: 'Conflict', detail: 'Changed' }, 409); }
       return response([]);
     });
@@ -145,7 +146,7 @@ describe('CharacterSheet', () => {
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
       if (url.endsWith('/computed-sheet')) return response(reads++ === 0 ? sheet : latest);
-      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       if (url.endsWith('/base-values/string') && options?.method === 'PUT') { latest = { ...latest, contentRevision: 3, baseFields: latest.baseFields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'my retained draft' } : field) }; return response({ contentRevision: 3 }); }
       return response([]);
     });
@@ -169,7 +170,7 @@ describe('CharacterSheet', () => {
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
       if (url.endsWith('/computed-sheet')) return response(sheet);
-      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       if (url.endsWith('/base-values/string') && options?.method === 'PUT') { writes += 1; return response({ code: 'write_outcome_unknown', title: 'Unknown', detail: 'Unknown' }, 502); }
       return response([]);
     });
@@ -189,7 +190,7 @@ describe('CharacterSheet', () => {
         return response({ canRead: true, canWrite: permissionReads === 1, canManageAccess: false });
       }
       if (url.endsWith('/computed-sheet')) return response(sheet);
-      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       if (url.endsWith('/base-values/string') && options?.method === 'PUT') return response({ code: 'forbidden', title: 'Forbidden', detail: 'No longer allowed' }, 403);
       return response([]);
     });
@@ -205,7 +206,7 @@ describe('CharacterSheet', () => {
   it('serializes description and field writes while keeping independent drafts and metadata revision', async () => {
     let contentRevision = 1;
     let currentSheet = { ...sheet, contentRevision };
-    const meta = { id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 11 };
+    const meta = { id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 11 };
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
        if (url.endsWith('/computed-sheet')) return response(currentSheet);
@@ -255,7 +256,7 @@ describe('CharacterSheet', () => {
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
       if (url.endsWith('/computed-sheet')) return response({ ...base, virtualFields: [], formulaContentRevisions: [] });
-      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, templateId: 'template-id', name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       if (url.endsWith(`/base-values/${fieldId}`) && options?.method === 'PUT') return response({ ...base, contentRevision: 2, baseFields: [{ ...typedField, isExplicit: true }] });
       return response([]);
     });

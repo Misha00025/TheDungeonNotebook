@@ -5,7 +5,7 @@ import { formatWidget } from './ViewRenderer';
 import ViewRenderer from './ViewRenderer';
 import type { JsonValue } from './types';
 
-const source = (sourceIndex: number, value: JsonValue, diagnostic: { code: string } | null = null) => ({ sourceIndex, source: { templateId: 't', kind: 'Base' as const, fieldId: String(sourceIndex) }, value, diagnostic });
+const source = (sourceIndex: number, value: JsonValue, diagnostic: { code: string } | null = null) => ({ sourceIndex, source: { kind: 'Base' as const, fieldId: `00000000-0000-4000-8000-${String(sourceIndex).padStart(12, '0')}` }, value, diagnostic });
 
 describe('formatWidget', () => {
   it('parses indexed, signed, and escaped tokens losslessly', () => {
@@ -31,7 +31,7 @@ describe('ViewRenderer', () => {
   });
 
   it('reports declared sources missing from the response', () => {
-    render(<ViewRenderer roots={[{ kind: 'widget', nodeKey: 'missing', title: 'Missing', params: {}, children: [], sources: [{ templateId: 't', kind: 'Base', fieldId: 'f' }], format: '' }]} widgets={[{ nodeKey: 'missing', sources: [] }]} />);
+    render(<ViewRenderer roots={[{ kind: 'widget', nodeKey: 'missing', title: 'Missing', params: {}, children: [], sources: [{ kind: 'Base', fieldId: 'f' }], format: '' }]} widgets={[{ nodeKey: 'missing', sources: [] }]} />);
     expect(screen.getByRole('alert')).toHaveTextContent('Источник $1 отсутствует.');
   });
 });
