@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActionRow, Button, Field, Input, List, Panel, Select, StatePanel } from '@tdn/shared';
+import { ActionRow, Button, Field, Input, List, ModalPortal, Select, StatePanel } from '@tdn/shared';
 import { useWorkspace, useDirtyDraft } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 import { useMutation } from './hooks';
@@ -56,24 +56,26 @@ const CreateCharacter: React.FC<{ campaignId: number; onClose: () => void }> = (
     } catch (error) { if (active.current) setCheckError(error); }
   };
   const close = () => { clearDirty(); onClose(); };
-  const cancel = () => { if (!name && !importance || window.confirm('Отказаться от черновика персонажа?')) close(); };
-  const abandon = () => { if (window.confirm('Отказаться от проверки операции? Результат создания может оставаться неизвестным.')) close(); };
+  const cancel = () => { if (creation.busy) return; if (!name && !importance || window.confirm('Отказаться от черновика персонажа?')) close(); };
+  const abandon = () => { if (creation.busy) return; if (window.confirm('Отказаться от проверки операции? Результат создания может оставаться неизвестным.')) close(); };
   if (mode !== 'gm' || !lastKnownPermissions.canWrite) return null;
-  return <form onSubmit={submit}>
-    <Panel title="Создать персонажа" headingLevel={2} description="Персонаж использует единственный шаблон кампании." actions={<ActionRow>
+  return <ModalPortal isOpen title="Создать персонажа" onClose={uncertain ? abandon : cancel} dismissDisabled={creation.busy}>
+    <form onSubmit={submit}>
+      <p>Персонаж использует единственный шаблон кампании.</p>
+      {permissionsLoading && <StatePanel kind="loading">Обновление прав кампании…</StatePanel>}
+      <List layout="vertical" stretch>
+        <Field label="Имя" htmlFor={nameId}><Input id={nameId} autoFocus required value={name} disabled={!writable || uncertain || creation.busy} onChange={event => setName(event.target.value)} /></Field>
+        <Field label="Важность" htmlFor={importanceId}><Select id={importanceId} value={importance} disabled={!writable || uncertain || creation.busy} onChange={event => setImportance(event.target.value as Importance | '')}><option value="">По умолчанию (фоновый)</option><option value="Background">Фоновый</option><option value="Secondary">Второстепенный</option><option value="Key">Ключевой</option></Select></Field>
+      </List>
+      {Boolean(createError) && <ApiError error={createError} />}{Boolean(checkError) && <ApiError error={checkError} />}
+      <ActionRow>
       {uncertain
         ? <Button type="button" disabled={creation.busy} onClick={() => void checkCreation()}>Проверить создание</Button>
         : <Button type="submit" busy={creation.busy} disabled={!writable || uncertain || !name.trim()}>{creation.busy ? 'Создание…' : 'Создать'}</Button>}
       <Button variant="secondary" type="button" disabled={creation.busy} onClick={uncertain ? abandon : cancel}>{uncertain ? 'Отказаться от операции' : 'Отмена'}</Button>
-    </ActionRow>}>
-      {permissionsLoading && <StatePanel kind="loading">Обновление прав кампании…</StatePanel>}
-      <List layout="grid" gridSize="small">
-        <Field label="Имя" htmlFor={nameId}><Input id={nameId} required value={name} disabled={!writable || uncertain || creation.busy} onChange={event => setName(event.target.value)} /></Field>
-        <Field label="Важность" htmlFor={importanceId}><Select id={importanceId} value={importance} disabled={!writable || uncertain || creation.busy} onChange={event => setImportance(event.target.value as Importance | '')}><option value="">По умолчанию (фоновый)</option><option value="Background">Фоновый</option><option value="Secondary">Второстепенный</option><option value="Key">Ключевой</option></Select></Field>
-      </List>
-      {Boolean(createError) && <ApiError error={createError} />}{Boolean(checkError) && <ApiError error={checkError} />}
-    </Panel>
-  </form>;
+      </ActionRow>
+    </form>
+  </ModalPortal>;
 };
 
 export default CreateCharacter;

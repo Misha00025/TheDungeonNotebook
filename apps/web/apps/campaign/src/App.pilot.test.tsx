@@ -8,14 +8,15 @@ import { ApiError } from './workspace/Feedback';
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const campaign = { id: 12, name: 'Pilot campaign', metadataRevision: 1 };
+const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
 const playerCharacters = [
   { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', campaignId: 12, name: 'Writable hero', importance: 'Key', metadataRevision: 1 },
   { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', campaignId: 12, name: 'Read only hero', importance: 'Background', metadataRevision: 1 },
 ];
 const makeAuth = (request: (url: string, options?: RequestInit) => Promise<Response>) => ({ status: 'authenticated', authenticated: true, userId: 4, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
 const CurrentPath: React.FC = () => <output aria-label="Current pathname">{useLocation().pathname}</output>;
-const renderPilot = (request: (url: string, options?: RequestInit) => Promise<Response>, initial: string) => render(
-  <MemoryRouter basename="/tdn" initialEntries={[`/tdn${initial}`]}>
+const renderPilot = (request: (url: string, options?: RequestInit) => Promise<Response>, initial: string, basename = '/tdn') => render(
+  <MemoryRouter basename={basename || undefined} initialEntries={[`${basename}${initial}`]}>
     <Routes><Route path="/groups/*" element={<App auth={makeAuth(request)} />} /></Routes>
     <CurrentPath />
   </MemoryRouter>
@@ -23,7 +24,12 @@ const renderPilot = (request: (url: string, options?: RequestInit) => Promise<Re
 
 describe('campaign SDK pilot', () => {
   beforeEach(() => window.localStorage.clear());
-  afterEach(() => { vi.restoreAllMocks(); window.localStorage.clear(); });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+    if (originalMatchMedia) Object.defineProperty(window, 'matchMedia', originalMatchMedia);
+    else Reflect.deleteProperty(window, 'matchMedia');
+  });
 
   it.each([
     [403, 'Доступ запрещён.'],
@@ -84,6 +90,7 @@ describe('campaign SDK pilot', () => {
       if (url === '/api/campaigns/12') return response(campaign);
       if (url === '/api/campaigns/12/permissions') return response({ canRead: true, canWrite: true, canManageAccess: true });
       if (url === '/api/campaigns/12/characters') return response([playerCharacters[0]]);
+      if (url === '/api/campaigns/12/formulas' || url === '/api/campaigns/12/views') return response([]);
       if (url.endsWith(`${playerCharacters[0].id}/permissions`)) return response({ canRead: true, canWrite: true, canManageAccess: false });
       throw new Error(`Unexpected request: ${url}`);
     });
@@ -105,7 +112,7 @@ describe('campaign SDK pilot', () => {
     expect(request.mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true);
   });
 
-  it('marks the campaign characters link active on a nested sheet route and preserves dirty creation draft on cancelled local navigation', async () => {
+  it('marks the campaign characters link active on a nested sheet route and keeps a rejected modal close draft', async () => {
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url === '/api/campaigns') return response([campaign]);
       if (url === '/api/campaigns/12') return response(campaign);
@@ -124,12 +131,47 @@ describe('campaign SDK pilot', () => {
     fireEvent.click(within(nav).getByRole('link', { name: 'Персонажи' }));
     await waitFor(() => expect(screen.getByLabelText('Current pathname')).toHaveTextContent('/groups/12/gm/characters'));
     fireEvent.click(await screen.findByRole('button', { name: 'Создать персонажа' }));
-    fireEvent.change(await screen.findByLabelText('Имя'), { target: { value: 'Unsaved hero' } });
+    const dialog = await screen.findByRole('dialog', { name: 'Создать персонажа' });
+    const name = within(dialog).getByLabelText('Имя');
+    fireEvent.change(name, { target: { value: 'Unsaved hero' } });
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-    fireEvent.click(within(nav).getByRole('link', { name: 'Обзор' }));
-    expect(confirm).toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Закрыть' }));
+    expect(confirm).toHaveBeenCalledWith('Отказаться от черновика персонажа?');
+    expect(screen.getByRole('dialog', { name: 'Создать персонажа' })).toBeInTheDocument();
     expect(screen.getByLabelText('Current pathname')).toHaveTextContent('/groups/12/gm/characters');
-    expect(screen.getByLabelText('Имя')).toHaveValue('Unsaved hero');
+    expect(name).toHaveValue('Unsaved hero');
     expect(request.mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true);
+  });
+
+  it.each([
+    { basename: '', prefix: '/groups' },
+    { basename: '/tdn', prefix: '/tdn/groups' },
+  ])('shows sheet-only mobile navigation with a scoped Back route under $basename', async ({ basename, prefix }) => {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: (query: string) => ({ media: query, matches: true, onchange: null, addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn() }),
+    });
+    const characterId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const request = vi.fn(async (url: string) => {
+      if (url === '/api/campaigns') return response([campaign]);
+      if (url === '/api/campaigns/12') return response(campaign);
+      if (url === '/api/campaigns/12/permissions') return response({ canRead: true, canWrite: true, canManageAccess: true });
+      if (url === `/api/campaigns/12/characters/${characterId}`) return response({ ...playerCharacters[0], id: characterId });
+      if (url === `/api/campaigns/12/characters/${characterId}/permissions`) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url === `/api/campaigns/12/characters/${characterId}/computed-sheet`) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [], formulaContentRevisions: [], virtualFields: [] });
+      if (url === '/api/campaigns/12/characters') return response([]);
+      if (url === '/api/campaigns/12/presentation') return response({ contentRevision: 0, defaults: {}, contextParams: {} });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    renderPilot(request, `/groups/12/gm/characters/${characterId}/stats`, basename);
+    const navigation = await screen.findByRole('navigation', { name: 'Лист персонажа на телефоне' });
+    expect(screen.getAllByRole('navigation', { name: /на телефоне$/ })).toHaveLength(1);
+    expect(screen.queryByRole('navigation', { name: 'Разделы кампании' })).not.toBeInTheDocument();
+    const links = within(navigation).getAllByRole('link');
+    expect(links).toHaveLength(3);
+    expect(within(navigation).getByRole('link', { name: 'Назад' })).toHaveAttribute('href', `${prefix}/12/gm/characters`);
+    expect(within(navigation).getByRole('link', { name: 'Характеристики' })).toHaveAttribute('aria-current', 'page');
+    expect(within(navigation).queryByRole('link', { name: 'Персонажи' })).not.toBeInTheDocument();
+    expect(within(navigation).queryByRole('link', { name: 'Шаблон' })).not.toBeInTheDocument();
   });
 });

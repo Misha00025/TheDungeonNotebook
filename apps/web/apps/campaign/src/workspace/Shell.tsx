@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Navigate, Outlet, useLocation, useParams } from 'react-router-dom';
-import { Badge, Breadcrumbs, Button, Field, PageHeader, SectionNav, Select, StatePanel, WorkspaceLayout } from '@tdn/shared';
+import { Badge, BottomNavigation, Breadcrumbs, Button, Field, NavigationIcon, PageHeader, SectionNav, Select, StatePanel, WorkspaceLayout } from '@tdn/shared';
+import type { BottomNavigationItem, NavigationIconName } from '@tdn/shared';
 import type { Campaign, Permissions } from './types';
 import { useWorkspace } from './Workspace';
 import { useVisitHistory } from './VisitHistory';
@@ -80,8 +81,41 @@ const CampaignShell: React.FC = () => {
     catch (error) { if (mounted.current && sequence.current === current && route.current === pathname) setSwitchError(error); }
     finally { if (mounted.current && sequence.current === current) { busy.current = false; setSwitchBusy(false); } }
   };
-  const nav = mode === 'gm' ? [['Обзор', 'gm/overview'], ['Персонажи', 'gm/characters'], ['Шаблон', 'gm/templates'], ['Формулы', 'gm/formulas'], ['Представления', 'gm/views'], ['Участники и доступ', 'gm/members'], ['Настройки', 'gm/settings']] : [['Мои персонажи', 'player/characters']];
+  const nav: [string, string][] = mode === 'gm' ? [['Обзор', 'gm/overview'], ['Персонажи', 'gm/characters'], ['Шаблон', 'gm/templates'], ['Формулы', 'gm/formulas'], ['Представления', 'gm/views'], ['Участники и доступ', 'gm/members'], ['Настройки', 'gm/settings']] : [['Мои персонажи', 'player/characters']];
   const title = nav.find(([, suffix]) => location.pathname.endsWith(`/${suffix}`))?.[0] ?? campaign.data.name;
+  const sectionIcons: Record<string, NavigationIconName> = {
+    'gm/overview': 'home',
+    'gm/characters': 'people',
+    'gm/templates': 'document',
+    'gm/formulas': 'function',
+    'gm/views': 'layout',
+    'gm/members': 'access',
+    'gm/settings': 'settings',
+    'player/characters': 'people',
+  };
+  const campaignNavigation: BottomNavigationItem[] = nav.map(([label, route]) => {
+    const to = path(`/${id}/${route}`);
+    return {
+      id: route,
+      label: route === 'gm/members' ? 'Участники' : label,
+      icon: <NavigationIcon name={sectionIcons[route]} />,
+      to,
+      active: location.pathname === to || location.pathname.startsWith(`${to}/`),
+    };
+  });
+  const sheetRoute = location.pathname.match(/\/(?:gm|player)\/characters\/([^/]+)\/(overview|stats)$/);
+  const sheetCharacterId = sheetRoute?.[1];
+  const validSheetCharacter = Boolean(sheetCharacterId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sheetCharacterId));
+  const mobileItems: BottomNavigationItem[] = validSheetCharacter && sheetRoute && sheetCharacterId
+    ? [
+      { id: `back-${id}-${mode}-${sheetCharacterId}`, label: 'Назад', icon: <NavigationIcon name="arrow-left" />, to: path(`/${id}/${mode}/characters`) },
+      { id: `overview-${id}-${mode}-${sheetCharacterId}`, label: 'Обзор', icon: <NavigationIcon name="home" />, to: path(`/${id}/${mode}/characters/${sheetCharacterId}/overview`), active: sheetRoute[2] === 'overview' },
+      { id: `stats-${id}-${mode}-${sheetCharacterId}`, label: 'Характеристики', icon: <NavigationIcon name="chart" />, to: path(`/${id}/${mode}/characters/${sheetCharacterId}/stats`), active: sheetRoute[2] === 'stats' },
+    ]
+    : campaignNavigation;
+  const mobileNavigationKey = validSheetCharacter && sheetRoute && sheetCharacterId
+    ? `${id}:${mode}:${sheetCharacterId}:${sheetRoute[2]}`
+    : `${id}:${mode}:campaign`;
   const campaignItems = campaigns.data ?? [];
   const campaignOptions = campaignItems.some(item => item.id === id)
     ? campaignItems
@@ -97,11 +131,11 @@ const CampaignShell: React.FC = () => {
       {campaigns.loading && <StatePanel kind="loading">Загрузка списка кампаний…</StatePanel>}
       {Boolean(campaigns.error) && <ApiError error={campaigns.error} onRetry={campaigns.reload} />}
       {effective.canWrite && <Button variant="secondary" disabled={switchBusy} onClick={switchMode}>{mode === 'gm' ? 'Пространство игрока' : 'Пространство мастера'}</Button>}
-      <SectionNav aria-label="Разделы кампании" items={nav.map(([label, route]) => {
+       <SectionNav aria-label="Разделы кампании" hideOnMobile items={nav.map(([label, route]) => {
         const to = path(`/${id}/${route}`);
         return { label, to, active: location.pathname === to || location.pathname.startsWith(`${to}/`) };
       })} />
-    </>}>
+    </>} mobileNavigation={<BottomNavigation key={mobileNavigationKey} aria-label={validSheetCharacter ? 'Лист персонажа на телефоне' : 'Навигация кампании на телефоне'} items={mobileItems} />}>
       <Breadcrumbs items={[{ label: 'Кампании', path: path('/') }, { label: campaign.data.name, path: targetMode(mode) }, { label: title }]} />
       <PageHeader title={campaign.data.name} headingLevel={1} />
       {permission.loading && <StatePanel kind="loading">Обновление прав кампании…</StatePanel>}{Boolean(permission.error) && <ApiError error={permission.error} onRetry={permission.reload} />}{Boolean(switchError) && <ApiError error={switchError} />}<Outlet />

@@ -147,14 +147,57 @@ describe('Views workspace', () => {
   it('does not repost uncertain view creation and checks using the original UUID', async () => {
     api.createView.mockRejectedValue(new CampaignApiError(0, { code: 'unknown_outcome', title: 'Unknown', detail: 'Unknown' }, true));
     api.getView.mockRejectedValue(new Error('Not found'));
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderPage(); fireEvent.click(await screen.findByRole('button', { name: 'Создать представление' }));
-    fireEvent.change(await screen.findByLabelText('Название'), { target: { value: 'New view' } });
-    fireEvent.click(screen.getByText('Создать'));
-    await screen.findByText('Проверить создание');
-    fireEvent.click(screen.getByText('Проверить создание'));
+    const dialog = await screen.findByRole('dialog', { name: 'Создать представление' });
+    fireEvent.change(within(dialog).getByLabelText('Название'), { target: { value: 'New view' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Создать' }));
+    await within(dialog).findByRole('button', { name: 'Проверить создание' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Закрыть' }));
+    expect(confirm).toHaveBeenCalledWith('Результат создания неизвестен. Отказаться от проверки и оставить созданное представление в списке?');
+    expect(screen.getByRole('dialog', { name: 'Создать представление' })).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Проверить создание' }));
     await waitFor(() => expect(api.createView).toHaveBeenCalledTimes(1));
     const request = api.createView.mock.calls[0][1];
     expect(api.getView).toHaveBeenCalledWith(4, request.requestId);
+    expect(api.createView.mock.calls[0][1].roots).toEqual([]);
+    expect(screen.getByRole('dialog', { name: 'Создать представление' })).toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
+  it('keeps a rejected view modal cancel open and closes after confirmed cancellation', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderPage(); fireEvent.click(await screen.findByRole('button', { name: 'Создать представление' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Создать представление' });
+    const name = within(dialog).getByLabelText('Название');
+    fireEvent.change(name, { target: { value: 'Draft view' } });
+    const cancelEvent = new Event('cancel', { cancelable: true });
+    fireEvent(dialog, cancelEvent);
+    expect(cancelEvent.defaultPrevented).toBe(true);
+    expect(confirm).toHaveBeenCalledWith('Отказаться от черновика представления?');
+    expect(screen.getByRole('dialog', { name: 'Создать представление' })).toBeInTheDocument();
+    expect(name).toHaveValue('Draft view');
+    confirm.mockReturnValue(true);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    expect(screen.queryByRole('dialog', { name: 'Создать представление' })).not.toBeInTheDocument();
+    expect(api.createView).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
+  it('blocks view modal dismissal while creation is busy and closes after success', async () => {
+    let resolveCreate!: (value: typeof view & { contentRevision: number }) => void;
+    api.createView.mockReturnValueOnce(new Promise(resolve => { resolveCreate = resolve; }));
+    renderPage(); fireEvent.click(await screen.findByRole('button', { name: 'Создать представление' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Создать представление' });
+    fireEvent.change(within(dialog).getByLabelText('Название'), { target: { value: 'Busy view' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Создать' }));
+    await waitFor(() => expect(api.createView).toHaveBeenCalledTimes(1));
+    expect(within(dialog).getByRole('button', { name: 'Закрыть' })).toBeDisabled();
+    fireEvent(dialog, new Event('cancel', { cancelable: true }));
+    expect(screen.getByRole('dialog', { name: 'Создать представление' })).toBeInTheDocument();
+    resolveCreate({ ...view, contentRevision: 3 });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Создать представление' })).not.toBeInTheDocument());
+    expect(api.createView).toHaveBeenCalledTimes(1);
     expect(api.createView.mock.calls[0][1].roots).toEqual([]);
   });
 

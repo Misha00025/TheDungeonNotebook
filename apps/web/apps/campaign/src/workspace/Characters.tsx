@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ActionRow, Badge, Button, LinkButton, List, PageHeader, Panel, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
+import { ActionRow, Badge, Button, LinkButton, List, ListItem, PageHeader, Panel, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
 import { useWorkspace } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 import { useResource } from './hooks';
@@ -20,6 +20,15 @@ const CharacterCard: React.FC<{ character: CharacterMetadata; access: Permission
     status={<Badge>{access.canWrite ? 'Можно вести и редактировать' : 'Только просмотр'}</Badge>}
     actions={<ActionRow justify="end"><LinkButton to={href} variant="secondary" aria-label={`Открыть лист ${character.name}`}>Открыть лист</LinkButton></ActionRow>}
   />
+);
+
+const CharacterRow: React.FC<{ character: CharacterMetadata; access: Permissions; href: string }> = ({ character, access, href }) => (
+  <ListItem
+    meta={<><span>{importanceLabel[character.importance] ?? character.importance}</span> · <Badge>{access.canWrite ? 'Можно вести и редактировать' : 'Только просмотр'}</Badge></>}
+    actions={<LinkButton to={href} variant="secondary" aria-label={`Открыть лист ${character.name}`}>Открыть лист</LinkButton>}
+  >
+    <strong>{character.name}</strong>
+  </ListItem>
 );
 
 const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
@@ -53,8 +62,8 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
         title={mode === 'gm' ? 'Персонажи кампании' : 'Мои персонажи'}
         headingLevel={2}
         subtitle="Права на каждого персонажа определяются отдельно."
-        actions={mode === 'gm' && permissions.canWrite && !permissionsLoading && !createOpen
-          ? <Button type="button" onClick={() => setCreateOpen(true)}>Создать персонажа</Button>
+        actions={mode === 'gm'
+          ? <Button type="button" disabled={!permissions.canWrite || permissionsLoading || createOpen} onClick={() => setCreateOpen(true)}>Создать персонажа</Button>
           : undefined}
       />
       <Toolbar>
@@ -66,18 +75,22 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
     {!resource.data?.length && !resource.loading && !resource.error && <StatePanel kind="empty">{emptyText}</StatePanel>}
     {Boolean(resource.data?.length) && filtered.length === 0 && <StatePanel kind="empty">Совпадений нет.</StatePanel>}
     {filtered.map(character => <PermissionProbe key={`${key}:${character.id}`} character={character} campaignId={campaignId} resourceKey={key} onResult={onResult} />)}
-    {mode === 'gm' && <List layout="grid" gridSize="small">
-      {groups[0][1].map(item => <CharacterCard key={item.id} character={item} access={accessMap[item.id] as Permissions} href={characterHref(item.id)} mode="gm" />)}
+    {mode === 'gm' && <List layout={compact ? 'vertical' : 'grid'} stretch={compact} columns={compact ? undefined : 3} minItemWidth={compact ? undefined : '15rem'}>
+      {groups[0][1].map(item => compact
+        ? <CharacterRow key={item.id} character={item} access={accessMap[item.id] as Permissions} href={characterHref(item.id)} />
+        : <CharacterCard key={item.id} character={item} access={accessMap[item.id] as Permissions} href={characterHref(item.id)} mode="gm" />)}
     </List>}
-    {mode === 'player' && <List layout="grid" gridSize="large">
+    {mode === 'player' && <List layout="grid" columns={2} minItemWidth="18rem">
       {groups.map(([title, items], index) => {
         const id = `${headingId}-${index}`;
         const emptyLabel = index === 0 ? 'Нет персонажей для ведения.' : 'Нет персонажей только для просмотра.';
         const mayShowEmpty = filtered.length > 0 && settled && failed.length === 0 && !resource.loading && !resource.error && items.length === 0;
         return <section key={title} aria-labelledby={id}>
           <h3 id={id}>{title}</h3>
-          <List layout="vertical" stretch>
-            {items.map(item => <CharacterCard key={item.id} character={item} access={accessMap[item.id] as Permissions} href={characterHref(item.id)} mode="player" />)}
+          <List layout="grid" columns={2} minItemWidth="14rem">
+            {items.map(item => compact
+              ? <CharacterRow key={item.id} character={item} access={accessMap[item.id] as Permissions} href={characterHref(item.id)} />
+              : <CharacterCard key={item.id} character={item} access={accessMap[item.id] as Permissions} href={characterHref(item.id)} mode="player" />)}
             {mayShowEmpty && <StatePanel kind="empty">{emptyLabel}</StatePanel>}
           </List>
         </section>;

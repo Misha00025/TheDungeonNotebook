@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import CreateCharacter from './CreateCharacter';
 import { CampaignApiError } from './api';
@@ -9,7 +9,11 @@ vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api: shared.api, path: (v
 vi.mock('./Shell', () => ({ useCampaignWorkspace: () => ({ campaign: { id: 4 }, mode: shared.mode, permissions: { canWrite: shared.canWrite && !shared.permissionsLoading }, lastKnownPermissions: { canWrite: shared.canWrite }, permissionsLoading: shared.permissionsLoading }) }));
 
 const character = { id: 'returned-character-guid', campaignId: 4, name: 'Hero', importance: 'Key', metadataRevision: 1 };
-const tree = () => <MemoryRouter><CreateCharacter campaignId={4} onClose={shared.close} /></MemoryRouter>;
+const FormHarness: React.FC = () => {
+  const [open, setOpen] = React.useState(true);
+  return <>{open && <CreateCharacter campaignId={4} onClose={() => { shared.close(); setOpen(false); }} />}</>;
+};
+const tree = () => <MemoryRouter><FormHarness /></MemoryRouter>;
 const renderForm = () => render(tree());
 
 describe('CreateCharacter', () => {
@@ -23,23 +27,26 @@ describe('CreateCharacter', () => {
 
   it('creates without optional importance and sends only the singleton character fields', async () => {
     renderForm();
-    expect(screen.getByLabelText('Важность')).toHaveValue('');
-    expect(screen.getByRole('option', { name: 'По умолчанию (фоновый)' })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Имя'), { target: { value: ' Hero ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Создать персонажа' });
+    expect(within(dialog).getByLabelText('Важность')).toHaveValue('');
+    expect(within(dialog).getByRole('option', { name: 'По умолчанию (фоновый)' })).toBeInTheDocument();
+    fireEvent.change(within(dialog).getByLabelText('Имя'), { target: { value: ' Hero ' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Создать' }));
     await waitFor(() => expect(shared.api.createCharacter).toHaveBeenCalledTimes(1));
     const payload = shared.api.createCharacter.mock.calls[0][1];
     expect(payload).toEqual({ requestId: expect.any(String), name: 'Hero' });
     expect(payload.requestId).toMatch(/^[0-9a-f-]{36}$/i);
     expect(shared.navigate).toHaveBeenCalledWith('/app/4/gm/characters/returned-character-guid/overview');
     expect(shared.close).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog', { name: 'Создать персонажа' })).not.toBeInTheDocument();
   });
 
   it('sends an explicitly selected importance without template selectors', async () => {
     renderForm();
-    fireEvent.change(await screen.findByLabelText('Имя'), { target: { value: 'Hero' } });
-    fireEvent.change(screen.getByLabelText('Важность'), { target: { value: 'Key' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Создать персонажа' });
+    fireEvent.change(within(dialog).getByLabelText('Имя'), { target: { value: 'Hero' } });
+    fireEvent.change(within(dialog).getByLabelText('Важность'), { target: { value: 'Key' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Создать' }));
     await waitFor(() => expect(shared.api.createCharacter).toHaveBeenCalledTimes(1));
     expect(shared.api.createCharacter.mock.calls[0][1]).toEqual({ requestId: expect.stringMatching(/^[0-9a-f-]{36}$/i), name: 'Hero', importance: 'Key' });
   });
@@ -50,20 +57,67 @@ describe('CreateCharacter', () => {
       .mockRejectedValueOnce(new CampaignApiError(404, { code: 'not_found', title: 'Missing', detail: 'Missing' }))
       .mockRejectedValueOnce(new CampaignApiError(404, { code: 'not_found', title: 'Missing', detail: 'Missing' }));
     renderForm();
-    fireEvent.change(await screen.findByLabelText('Имя'), { target: { value: 'Hero' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
-    await screen.findByRole('button', { name: 'Проверить создание' });
-    fireEvent.click(screen.getByRole('button', { name: 'Проверить создание' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Создать персонажа' });
+    const name = within(dialog).getByLabelText('Имя');
+    fireEvent.change(name, { target: { value: 'Hero' } });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const escape = new Event('cancel', { cancelable: true });
+    fireEvent(dialog, escape);
+    expect(escape.defaultPrevented).toBe(true);
+    expect(confirm).toHaveBeenCalledWith('Отказаться от черновика персонажа?');
+    expect(screen.getByRole('dialog', { name: 'Создать персонажа' })).toBeInTheDocument();
+    expect(name).toHaveValue('Hero');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Закрыть' }));
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(name).toHaveValue('Hero');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Создать' }));
+    await within(dialog).findByRole('button', { name: 'Проверить создание' });
+    confirm.mockReturnValue(false);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Закрыть' }));
+    expect(confirm).toHaveBeenLastCalledWith('Отказаться от проверки операции? Результат создания может оставаться неизвестным.');
+    expect(screen.getByRole('dialog', { name: 'Создать персонажа' })).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Проверить создание' }));
     await screen.findByText('Missing');
     const requestId = shared.api.createCharacter.mock.calls[0][1].requestId;
     expect(shared.api.getCharacter).toHaveBeenNthCalledWith(1, 4, requestId);
     expect(shared.api.getCharacter).toHaveBeenNthCalledWith(2, 4, requestId);
     expect(shared.api.createCharacter).toHaveBeenCalledTimes(1);
     expect(shared.navigate).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Проверить создание' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Проверить создание' }));
     await waitFor(() => expect(shared.navigate).toHaveBeenCalledWith('/app/4/gm/characters/returned-character-guid/overview'));
     expect(shared.api.getCharacter).toHaveBeenNthCalledWith(3, 4, requestId);
     expect(shared.api.createCharacter).toHaveBeenCalledTimes(1);
+    confirm.mockRestore();
+  });
+
+  it('blocks modal dismissal while create is busy and closes after successful completion', async () => {
+    let resolveCreate!: (value: typeof character) => void;
+    shared.api.createCharacter.mockReturnValueOnce(new Promise(resolve => { resolveCreate = resolve; }));
+    renderForm();
+    const dialog = await screen.findByRole('dialog', { name: 'Создать персонажа' });
+    fireEvent.change(within(dialog).getByLabelText('Имя'), { target: { value: 'Hero' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Создать' }));
+    await waitFor(() => expect(shared.api.createCharacter).toHaveBeenCalledTimes(1));
+    expect(within(dialog).getByRole('button', { name: 'Закрыть' })).toBeDisabled();
+    const onClose = new Event('cancel', { cancelable: true });
+    fireEvent(dialog, onClose);
+    expect(onClose.defaultPrevented).toBe(true);
+    expect(screen.getByRole('dialog', { name: 'Создать персонажа' })).toBeInTheDocument();
+    resolveCreate(character);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Создать персонажа' })).not.toBeInTheDocument());
+    expect(shared.navigate).toHaveBeenCalledWith('/app/4/gm/characters/returned-character-guid/overview');
+  });
+
+  it('closes after a confirmed cancellation', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderForm();
+    const dialog = await screen.findByRole('dialog', { name: 'Создать персонажа' });
+    fireEvent.change(within(dialog).getByLabelText('Имя'), { target: { value: 'Draft' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    expect(confirm).toHaveBeenCalledWith('Отказаться от черновика персонажа?');
+    expect(screen.queryByRole('dialog', { name: 'Создать персонажа' })).not.toBeInTheDocument();
+    expect(shared.api.createCharacter).not.toHaveBeenCalled();
+    confirm.mockRestore();
   });
 
   it('does not load templates or create controls in player mode', () => {
@@ -75,23 +129,25 @@ describe('CreateCharacter', () => {
 
   it('keeps the creation draft mounted while campaign permissions reload', async () => {
     const view = renderForm();
-    fireEvent.change(await screen.findByLabelText('Имя'), { target: { value: 'Draft' } });
+    const dialog = await screen.findByRole('dialog', { name: 'Создать персонажа' });
+    fireEvent.change(within(dialog).getByLabelText('Имя'), { target: { value: 'Draft' } });
     shared.permissionsLoading = true;
     view.rerender(tree());
-    expect(screen.getByLabelText('Имя')).toHaveValue('Draft');
-    expect(screen.getByLabelText('Имя')).toBeDisabled();
+    expect(within(dialog).getByLabelText('Имя')).toHaveValue('Draft');
+    expect(within(dialog).getByLabelText('Имя')).toBeDisabled();
     shared.permissionsLoading = false;
     view.rerender(tree());
-    expect(screen.getByLabelText('Имя')).toHaveValue('Draft');
-    expect(screen.getByLabelText('Имя')).toBeEnabled();
+    expect(within(dialog).getByLabelText('Имя')).toHaveValue('Draft');
+    expect(within(dialog).getByLabelText('Имя')).toBeEnabled();
   });
 
   it('does not navigate when the form unmounts before the create request completes', async () => {
     let resolveCreate!: (value: typeof character) => void;
     shared.api.createCharacter.mockReturnValueOnce(new Promise(resolve => { resolveCreate = resolve; }));
     const view = renderForm();
-    fireEvent.change(await screen.findByLabelText('Имя'), { target: { value: 'Hero' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Создать персонажа' });
+    fireEvent.change(within(dialog).getByLabelText('Имя'), { target: { value: 'Hero' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Создать' }));
     await waitFor(() => expect(shared.api.createCharacter).toHaveBeenCalledTimes(1));
     view.unmount();
     resolveCreate(character);

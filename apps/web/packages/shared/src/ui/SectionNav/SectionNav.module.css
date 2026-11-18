@@ -41,3 +41,9 @@
     max-width: 18rem;
   }
 }
+
+@media (max-width: 768px) {
+  .hideOnMobile {
+    display: none;
+  }
+}

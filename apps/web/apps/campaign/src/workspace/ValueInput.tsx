@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { isLosslessNumber, LosslessNumber } from 'lossless-json';
 import type { ChoiceOption, JsonValue, ValueType } from './types';
 import { displayValue } from './json';
-import inputStyles from '@tdn/shared/styles/components/Input.module.css';
+import { Input, Select, Textarea } from '@tdn/shared';
 
 type Field = { valueType: ValueType; options: ChoiceOption[] };
 const intPattern = /^-?(?:0|[1-9]\d*)$/;
@@ -53,12 +53,12 @@ export const ValueInput: React.FC<{ field: Field; value: JsonValue; onChange: (v
   const error = validateFieldValue(field, value, numeric ? draft : undefined);
   useEffect(() => { validityCallback.current?.(error); }, [error]);
   if (disabled) return <output aria-label={label}>{displayValue(value)}</output>;
-  if (field.valueType === 'String') return <textarea className={inputStyles.input} aria-label={label} value={typeof value === 'string' ? value : ''} onChange={event => onChange(event.target.value)} />;
+  if (field.valueType === 'String') return <Textarea aria-label={label} value={typeof value === 'string' ? value : ''} onChange={event => onChange(event.target.value)} />;
   if (field.valueType === 'Boolean') return <input aria-label={label} type="checkbox" checked={value === true} onChange={event => onChange(event.target.checked)} />;
-  if (field.valueType === 'SingleChoice') return <select className={inputStyles.input} aria-label={label} value={typeof value === 'string' ? value : ''} onChange={event => onChange(event.target.value)}><option value="">Выберите вариант</option>{field.options.map(option => <option key={option.optionKey} value={option.optionKey}>{option.title}</option>)}</select>;
+  if (field.valueType === 'SingleChoice') return <Select aria-label={label} value={typeof value === 'string' ? value : ''} onChange={event => onChange(event.target.value)}><option value="">Выберите вариант</option>{field.options.map(option => <option key={option.optionKey} value={option.optionKey}>{option.title}</option>)}</Select>;
   if (field.valueType === 'MultiChoice') {
     const selected = Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
     return <fieldset aria-label={label}>{field.options.map(option => <label key={option.optionKey}><input type="checkbox" checked={selected.includes(option.optionKey)} onChange={event => onChange(event.target.checked ? [...new Set([...selected, option.optionKey])] : selected.filter(item => item !== option.optionKey))} />{option.title}</label>)}</fieldset>;
   }
-  return <div><input className={inputStyles.input} aria-label={label} inputMode="decimal" value={draft} onChange={event => { const next = event.target.value; setDraft(next); try { const parsed = parseFieldValue(field, next); const issue = validateFieldValue(field, parsed, next); validityCallback.current?.(issue); if (!issue) onChange(parsed); } catch { validityCallback.current?.(field.valueType === 'Integer' ? 'Введите целое число.' : 'Введите конечное число.'); } }} />{error && <span role="alert">{error}</span>}</div>;
+  return <div><Input aria-label={label} inputMode="decimal" value={draft} onChange={event => { const next = event.target.value; setDraft(next); try { const parsed = parseFieldValue(field, next); const issue = validateFieldValue(field, parsed, next); validityCallback.current?.(issue); if (!issue) onChange(parsed); } catch { validityCallback.current?.(field.valueType === 'Integer' ? 'Введите целое число.' : 'Введите конечное число.'); } }} />{error && <span role="alert">{error}</span>}</div>;
 };

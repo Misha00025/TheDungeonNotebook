@@ -1,6 +1,6 @@
 .workspace {
   width: 100%;
-  max-width: 102.5rem;
+  max-width: 82rem;
   min-width: 0;
   margin-inline: auto;
   container-name: tdn-workspace;
@@ -28,6 +28,12 @@
   max-width: 87.5rem;
   min-width: 0;
   margin-inline: auto;
+}
+
+@media (max-width: 768px) {
+  .hasMobileNavigation {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 @container tdn-workspace (max-width: 52rem) {

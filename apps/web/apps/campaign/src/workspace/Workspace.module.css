@@ -7,5 +7,8 @@
 .card { display: grid; gap: .75rem; padding: 1rem; border: 1px solid var(--border-color, currentColor); border-radius: .5rem; }
 .actions { display: flex; gap: 1rem; }
 .nodeFields { display: grid; gap: .75rem; min-width: 0; padding: 0; border: 0; }
+.characterSelector { width: 100%; max-width: 20rem; }
+.desktopOnly { display: inline-flex; }
 .mobileToggle { display: none; }
+@media (max-width: 768px) { .desktopOnly { display: none; } }
 @media (max-width: 700px) { .workspace { display: block; } .sidebar { display: none; } .sidebar.open { display: flex; } .mobileToggle { display: inline-block; } }

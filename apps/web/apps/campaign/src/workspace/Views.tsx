@@ -9,6 +9,7 @@ import { parseJson, stringifyJson } from './json';
 import { ApiError } from './Feedback';
 import ViewTreeEditor from './ViewTreeEditor';
 import ViewRenderer from './ViewRenderer';
+import { ActionRow, Button, Field, Input, ModalPortal } from '@tdn/shared';
 import commonStyles from '@tdn/shared/styles/common.module.css';
 import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
 import inputStyles from '@tdn/shared/styles/components/Input.module.css';
@@ -20,6 +21,7 @@ const sameRevision = (left: unknown, right: unknown) => String(left) === String(
 const CreateView: React.FC<{ campaignId: number; canWrite: boolean; onCancel: () => void; onCreated: (view: DefinitionCreate) => void }> = ({ campaignId, canWrite, onCancel, onCreated }) => {
   const { api } = useWorkspace();
   const [name, setName] = useState('');
+  const nameId = useId();
   const [requestId] = useState(() => crypto.randomUUID());
   const [error, setError] = useState<unknown>();
   const [blocked, setBlocked] = useState(false);
@@ -34,16 +36,22 @@ const CreateView: React.FC<{ campaignId: number; canWrite: boolean; onCancel: ()
   };
   const mutation = useMutation(() => runCreation(() => api.createView(campaignId, { requestId, name: name.trim(), roots: [] }), lookup));
   const check = async () => { if (!canWrite || mutation.busy || !blocked) return; setCheckError(undefined); try { const created = await lookup(); if (mounted.current) { clearDirty(); onCreated(created); } } catch (failure) { if (mounted.current) setCheckError(failure); } };
-  return <form className={commonStyles.form} onSubmit={event => {
+  const cancel = () => {
+    if (mutation.busy) return;
+    if (!name || window.confirm(blocked ? 'Результат создания неизвестен. Отказаться от проверки и оставить созданное представление в списке?' : 'Отказаться от черновика представления?')) {
+      clearDirty();
+      onCancel();
+    }
+  };
+  return <ModalPortal isOpen title="Создать представление" onClose={cancel} dismissDisabled={mutation.busy}><form onSubmit={event => {
     event.preventDefault(); if (!canWrite || !name.trim() || blocked || mutation.busy) return;
     void mutation.run().then(result => { if (result && mounted.current) { clearDirty(); onCreated(result); } }).catch(failure => { if (mounted.current) { setError(failure); setBlocked(uncertain(failure)); } });
   }}>
-    <h2>Создать представление</h2>
-    <label className={commonStyles.formGroup}>Название<input className={inputStyles.input} value={name} disabled={!canWrite || blocked || mutation.busy} onChange={event => setName(event.target.value)} /></label>
+    <Field label="Название" htmlFor={nameId}><Input id={nameId} autoFocus value={name} disabled={!canWrite || blocked || mutation.busy} onChange={event => setName(event.target.value)} /></Field>
     {Boolean(error) && <ApiError error={error} />}{Boolean(checkError) && <ApiError error={checkError} />}
-    <div className={commonStyles.formActions}>{blocked ? <button type="button" disabled={!canWrite || mutation.busy} className={buttonStyles.button} onClick={() => void check()}>Проверить создание</button> : <button className={buttonStyles.button} disabled={!canWrite || !name.trim() || mutation.busy}>Создать</button>}
-      <button type="button" disabled={mutation.busy} className={buttonStyles.button} onClick={() => { if (!name || window.confirm(blocked ? 'Результат создания неизвестен. Отказаться от проверки и оставить созданное представление в списке?' : 'Отказаться от черновика представления?')) { clearDirty(); onCancel(); } }}>Отмена</button></div>
-  </form>;
+    <ActionRow>{blocked ? <Button type="button" disabled={!canWrite || mutation.busy} onClick={() => void check()}>Проверить создание</Button> : <Button type="submit" disabled={!canWrite || !name.trim() || mutation.busy}>Создать</Button>}
+      <Button variant="secondary" type="button" disabled={mutation.busy} onClick={cancel}>{blocked ? 'Отказаться от проверки' : 'Отмена'}</Button></ActionRow>
+  </form></ModalPortal>;
 };
 
 const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boolean }> = ({ campaignId, viewId, canWrite }) => {
@@ -196,7 +204,7 @@ export const Views: React.FC = () => {
     <label className={commonStyles.formGroup}>Выбранное представление<select className={inputStyles.input} value={selectedId} onChange={event => changeSelection(event.target.value)}><option value="">Выберите представление</option>{resource.data?.map(view => <option key={view.id} value={view.id}>{view.name} ({view.id})</option>)}</select></label>
     <ul>{resource.data?.map(view => <li key={view.id}><button type="button" className={buttonStyles.button} onClick={() => changeSelection(view.id)}>{view.name} ({view.id})</button></li>)}</ul>
     {permissionsLoading && <p>Обновление прав кампании…</p>}
-    <div className={styles.actions}><button type="button" disabled={!canWrite || permissionsLoading} className={buttonStyles.button} onClick={() => { if (!dirty || window.confirm('Есть несохранённые изменения. Открыть создание представления?')) { setCreating(true); setSelectedId(''); setShowPresentation(false); } }}>Создать представление</button><button type="button" disabled={!canWrite || permissionsLoading} className={buttonStyles.button} onClick={() => { if (!dirty || window.confirm('Есть несохранённые изменения. Открыть настройки кампании?')) { setSelectedId(''); setCreating(false); setShowPresentation(true); } }}>Настройки представления кампании</button><button type="button" className={buttonStyles.button} onClick={resource.reload}>Обновить список</button></div>
+    <div className={styles.actions}><button type="button" disabled={!canWrite || permissionsLoading || creating} className={buttonStyles.button} onClick={() => { if (creating) return; if (!dirty || window.confirm('Есть несохранённые изменения. Открыть создание представления?')) { setCreating(true); setSelectedId(''); setShowPresentation(false); } }}>Создать представление</button><button type="button" disabled={!canWrite || permissionsLoading} className={buttonStyles.button} onClick={() => { if (!dirty || window.confirm('Есть несохранённые изменения. Открыть настройки кампании?')) { setSelectedId(''); setCreating(false); setShowPresentation(true); } }}>Настройки представления кампании</button><button type="button" className={buttonStyles.button} onClick={resource.reload}>Обновить список</button></div>
     {creating && <CreateView campaignId={campaignId} canWrite={canWrite && !permissionsLoading} onCancel={() => setCreating(false)} onCreated={created => { setSelectedId(created.id); setCreating(false); resource.reload(); }} />}
     {selectedId && !creating && <ViewEditor key={`${campaignId}:${selectedId}`} campaignId={campaignId} viewId={selectedId} canWrite={canWrite && !permissionsLoading} />}
     {showPresentation && !creating && !selectedId && <PresentationEditor key={campaignId} campaignId={campaignId} canWrite={canWrite && !permissionsLoading} />}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useWorkspace, useDirtyDraft, useDirtyState } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
@@ -6,6 +6,7 @@ import { CampaignApiError } from './api';
 import { useResource, useMutation } from './hooks';
 import type { DefinitionCreate, FormulaContentEnvelope, FormulaMetadata } from './types';
 import { ApiError } from './Feedback';
+import { ActionRow, Button, Field, Input, ModalPortal, Textarea } from '@tdn/shared';
 import commonStyles from '@tdn/shared/styles/common.module.css';
 import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
 import inputStyles from '@tdn/shared/styles/components/Input.module.css';
@@ -21,6 +22,9 @@ export const CreateFormula: React.FC<{ campaignId: number; onCreated: (formula: 
   const [name, setName] = useState('');
   const [expression, setExpression] = useState('');
   const [parametersText, setParametersText] = useState('');
+  const nameId = useId();
+  const expressionId = useId();
+  const parametersId = useId();
   const [requestId] = useState(() => crypto.randomUUID());
   const [error, setError] = useState<unknown>();
   const [checkError, setCheckError] = useState<unknown>();
@@ -52,17 +56,24 @@ export const CreateFormula: React.FC<{ campaignId: number; onCreated: (formula: 
     catch (failure) { if (active.current) setCheckError(failure); }
   };
   const cancel = () => {
-    if (dirty && !window.confirm('Отказаться от черновика формулы?')) return;
+    if (mutation.busy) return;
+    if (uncertain) {
+      if (!window.confirm('Результат создания формулы неизвестен. Отказаться от проверки? Формула может существовать.')) return;
+    } else if (dirty && !window.confirm('Отказаться от черновика формулы?')) return;
     clearDirty(); onCancel();
   };
-  return <form className={commonStyles.form} onSubmit={create}>
-    <h2>Создать формулу</h2>
-    <label className={commonStyles.formGroup}>Название<input className={inputStyles.input} value={name} disabled={!writable || uncertain || mutation.busy} onChange={event => setName(event.target.value)} /></label>
-    <label className={commonStyles.formGroup}>Выражение<textarea className={inputStyles.input} value={expression} disabled={!writable || uncertain || mutation.busy} onChange={event => setExpression(event.target.value)} /></label>
-    <label className={commonStyles.formGroup}>Параметры, по одному в строке<textarea className={inputStyles.input} value={parametersText} disabled={!writable || uncertain || mutation.busy} onChange={event => setParametersText(event.target.value)} /></label>
-    {Boolean(error) && <ApiError error={error} />}{Boolean(checkError) && <ApiError error={checkError} />}
-    <div className={commonStyles.formActions}>{uncertain ? <button className={buttonStyles.button} type="button" disabled={!writable} onClick={() => void check()}>Проверить создание</button> : <button className={buttonStyles.button} disabled={!writable || mutation.busy || !name.trim()}>Создать</button>}<button className={buttonStyles.button} type="button" disabled={mutation.busy} onClick={cancel}>Отмена</button></div>
-  </form>;
+  return <ModalPortal isOpen title="Создать формулу" onClose={cancel} dismissDisabled={mutation.busy}>
+    <form onSubmit={create}>
+      <Field label="Название" htmlFor={nameId}><Input id={nameId} autoFocus value={name} disabled={!writable || uncertain || mutation.busy} onChange={event => setName(event.target.value)} /></Field>
+      <Field label="Выражение" htmlFor={expressionId}><Textarea id={expressionId} value={expression} disabled={!writable || uncertain || mutation.busy} onChange={event => setExpression(event.target.value)} /></Field>
+      <Field label="Параметры, по одному в строке" htmlFor={parametersId}><Textarea id={parametersId} value={parametersText} disabled={!writable || uncertain || mutation.busy} onChange={event => setParametersText(event.target.value)} /></Field>
+      {Boolean(error) && <ApiError error={error} />}{Boolean(checkError) && <ApiError error={checkError} />}
+      <ActionRow>
+        {uncertain ? <Button type="button" disabled={!writable} onClick={() => void check()}>Проверить создание</Button> : <Button type="submit" disabled={!writable || mutation.busy || !name.trim()}>Создать</Button>}
+        <Button variant="secondary" type="button" disabled={mutation.busy} onClick={cancel}>{uncertain ? 'Отказаться от проверки' : 'Отмена'}</Button>
+      </ActionRow>
+    </form>
+  </ModalPortal>;
 };
 
 export const FormulaEditor: React.FC<{ campaignId: number; formula: FormulaMetadata }> = ({ campaignId, formula }) => {
@@ -172,7 +183,7 @@ export const Formulas: React.FC = () => {
     {Boolean(resource.error) && <ApiError error={resource.error} onRetry={resource.reload} />}
     <label>Выбранная формула<select className={inputStyles.input} value={selected?.id ?? ''} onChange={event => changeSelection(event.target.value)}><option value="">Выберите формулу</option>{resource.data?.map(item => <option key={item.id} value={item.id}>{item.name} ({item.id})</option>)}</select></label>
     {resource.data && <ul>{resource.data.map(item => <li key={item.id}><button type="button" className={buttonStyles.button} onClick={() => changeSelection(item.id)}>{item.name} ({item.id})</button></li>)}</ul>}
-    {!creating && <button type="button" className={buttonStyles.button} disabled={!writable} onClick={() => { if (writable && (!dirty || window.confirm('Есть несохранённые изменения. Открыть создание формулы?'))) setCreating(true); }}>Создать формулу</button>}
+    <button type="button" className={buttonStyles.button} disabled={!writable || creating} onClick={() => { if (writable && !creating && (!dirty || window.confirm('Есть несохранённые изменения. Открыть создание формулы?'))) setCreating(true); }}>Создать формулу</button>
     {creating && <CreateFormula campaignId={campaignId} onCancel={() => setCreating(false)} onCreated={created => { const metadata = created as FormulaMetadata; setSelected(metadata); setCreating(false); resource.reload(); }} />}
     {selected && !creating && <FormulaEditor key={`${campaignId}:${selected.id}`} campaignId={campaignId} formula={selected} />}
   </main>;

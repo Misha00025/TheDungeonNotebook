@@ -37,8 +37,12 @@
     border-radius: var(--border-radius-sm);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     z-index: 1000;
-    min-width: 180px;
-    overflow: hidden;
+    min-width: min(180px, calc(100vw - 1rem));
+    max-width: calc(100vw - 1rem);
+    max-height: calc(100vh - 1rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
     margin-top: 0.25rem;
   }
   
@@ -62,7 +66,7 @@
     bottom: auto;
   }
   
-  .menuItem {
+.menuItem {
     width: 100%;
     padding: 0.5rem 1rem;
     text-align: left;
@@ -73,18 +77,32 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.9rem;
-    transition: background-color 0.2s ease;
-  }
+  font: inherit;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
   
   .menuItem:hover:not(.disabled) {
     background-color: var(--bg-primary);
   }
   
-  .menuItem.disabled {
+.menuItem.disabled {
     opacity: 0.5;
     cursor: not-allowed;
-  }
+}
+
+.menuItem.active {
+  background-color: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.menuItem:focus-visible,
+.menuButton:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
   
   .menuItem.variant-danger {
     color: var(--danger-color, #dc3545);

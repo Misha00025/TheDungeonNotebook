@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import CharacterSheet from './CharacterSheet';
 import { WorkspaceProvider, DirtyProvider } from './Workspace';
@@ -7,6 +7,8 @@ import { RemoteAuthProvider } from '@tdn/shared';
 import type { HubRemoteProps } from '@tdn/shared';
 import { LosslessNumber } from 'lossless-json';
 import { stringifyJson } from './json';
+import { afterEach, vi } from 'vitest';
+import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
 
 const response = (body: unknown, status = 200) => new Response(stringifyJson(body), { status, headers: { 'Content-Type': 'application/json' } });
 const id = 'abcdef01-2345-6789-abcd-ef0123456789';
@@ -16,8 +18,15 @@ const fields = [
 const sheet = { contentRevision: 1, templateContentRevision: 1, description: 'Overview', baseFields: fields, virtualFields: [], formulaContentRevisions: [] };
 const auth = (request: (url: string, options?: RequestInit) => Promise<Response>) => ({ status: 'authenticated', authenticated: true, userId: 4, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request: async (url: string, options?: RequestInit) => { const result = await request(url, options); if (url.endsWith('/presentation')) { const body = await result.clone().json().catch(() => undefined); if (Array.isArray(body) && body.length === 0) return response({ contentRevision: 0, defaults: {}, contextParams: {} }); } return result; }, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
 const CurrentPath: React.FC = () => <output aria-label="Current path">{useLocation().pathname}</output>;
-const sheetTree = (request: (url: string, options?: RequestInit) => Promise<Response>, stats: boolean) => <MemoryRouter initialEntries={['/12/player/characters']}><RemoteAuthProvider auth={auth(request)}><WorkspaceProvider mountPath="/"><DirtyProvider><CharacterSheet campaignId={12} characterId={id} stats={stats} /><CurrentPath /></DirtyProvider></WorkspaceProvider></RemoteAuthProvider></MemoryRouter>;
+const sheetTree = (request: (url: string, options?: RequestInit) => Promise<Response>, stats: boolean, initial = '/12/player/characters') => <MemoryRouter initialEntries={[initial]}><RemoteAuthProvider auth={auth(request)}><WorkspaceProvider mountPath="/"><DirtyProvider><CharacterSheet campaignId={12} characterId={id} stats={stats} /><CurrentPath /></DirtyProvider></WorkspaceProvider></RemoteAuthProvider></MemoryRouter>;
 const renderSheet = (request: (url: string, options?: RequestInit) => Promise<Response>) => render(sheetTree(request, true));
+const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+
+afterEach(() => {
+  cleanup();
+  if (originalMatchMedia) Object.defineProperty(window, 'matchMedia', originalMatchMedia);
+  else Reflect.deleteProperty(window, 'matchMedia');
+});
 
 describe('CharacterSheet', () => {
   it('renders computed virtual values and diagnostic code without replacing diagnostics with zero', async () => {
@@ -33,8 +42,8 @@ describe('CharacterSheet', () => {
     });
     renderSheet(request);
     const valueCard = await screen.findByRole('heading', { name: 'Computed value' });
-    expect(valueCard.parentElement).toHaveTextContent('0');
-    const errorCard = screen.getByRole('heading', { name: 'Broken value' }).parentElement;
+    expect(valueCard.closest('article')).toHaveTextContent('0');
+    const errorCard = screen.getByRole('heading', { name: 'Broken value' }).closest('article');
     expect(errorCard).toHaveTextContent('formula_error: Broken formula');
     expect(errorCard).not.toHaveTextContent('0');
     expect(screen.queryByText(/^Шаблон:/)).not.toBeInTheDocument();
@@ -50,6 +59,9 @@ describe('CharacterSheet', () => {
     renderSheet(request);
     expect(await screen.findByText('Только чтение')).toBeInTheDocument();
     expect(screen.getAllByText('Задано явно')).toHaveLength(6);
+    expect(screen.getByRole('heading', { name: 'Базовые характеристики' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'string', level: 4 })).toBeInTheDocument();
+    expect(screen.getByLabelText('string').closest('fieldset')).toBeDisabled();
     expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(true);
     expect(request.mock.calls.map(([url]) => url).some(url => /virtual-fields|formulas|assignments/.test(url))).toBe(false);
     expect(screen.queryByRole('button', { name: /Сбросить/ })).not.toBeInTheDocument();
@@ -70,6 +82,46 @@ describe('CharacterSheet', () => {
     renderSheet(request);
     fireEvent.change(await screen.findByLabelText('Персонаж'), { target: { value: otherId } });
     expect(screen.getByLabelText('Current path')).toHaveTextContent(`/12/player/characters/${otherId}/stats`);
+  });
+
+  it('renders desktop sheet tabs as links with the current tab marked', async () => {
+    const request = vi.fn(async (url: string) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: false, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(sheet);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      return response([]);
+    });
+    render(sheetTree(request, true, `/12/player/characters/${id}/stats`));
+    expect(await screen.findByText('Только чтение')).toBeInTheDocument();
+    const tabs = await screen.findByRole('navigation', { name: 'Лист персонажа' });
+    expect(within(tabs).getByRole('link', { name: 'Обзор' })).toHaveAttribute('href', `/12/player/characters/${id}/overview`);
+    expect(within(tabs).getByRole('link', { name: 'Характеристики' })).toHaveAttribute('href', `/12/player/characters/${id}/stats`);
+    expect(within(tabs).getByRole('link', { name: 'Характеристики' })).toHaveAttribute('aria-current', 'page');
+    const back = screen.getByRole('link', { name: 'К персонажам' });
+    expect(back.tagName).toBe('A');
+    expect(back).toHaveClass(buttonStyles.button);
+  });
+
+  it('hides the sheet TabBar on mobile while keeping the overview presentation and description in readonly mode', async () => {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: (query: string) => ({ media: query, matches: true, onchange: null, addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn() }),
+    });
+    const request = vi.fn(async (url: string, _options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: false, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(sheet);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      return response([]);
+    });
+    render(sheetTree(request, false, `/12/player/characters/${id}/overview`));
+    expect(await screen.findByRole('heading', { name: 'Лист персонажа' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Описание' })).toBeInTheDocument();
+    expect(await screen.findByText('Представление не назначено.')).toBeInTheDocument();
+    expect(screen.getByText('Только чтение')).toBeInTheDocument();
+    expect(screen.getByLabelText('Описание')).toHaveValue('Overview');
+    expect(screen.getByLabelText('Описание')).toBeDisabled();
+    await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Лист персонажа' })).not.toBeInTheDocument());
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
   });
 
   it('saves exactly the changed explicit field with the sheet revision and supports typed falsy values', async () => {

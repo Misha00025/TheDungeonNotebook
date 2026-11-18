@@ -1,8 +1,29 @@
 .listItem {
+  min-width: 0;
   background-color: var(--bg-secondary);
   border-radius: var(--border-radius-md);
   padding: 1rem;
   transition: var(--transition);
+}
+
+.withDetails {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.content {
+  flex: 1 1 16rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.meta,
+.actions {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-inline-start: auto;
 }
 
 .listItem.clickable {

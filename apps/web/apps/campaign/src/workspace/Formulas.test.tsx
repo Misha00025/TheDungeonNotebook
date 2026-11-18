@@ -26,20 +26,23 @@ describe('formula workspace', () => {
   });
 
   it('keeps create drafts independent from selected editor drafts and never evaluates expressions', async () => {
+    api.createFormula.mockResolvedValueOnce({ ...formula, name: 'New formula', contentRevision: 1 });
     renderFormulas();
     fireEvent.change(await screen.findByLabelText('Выбранная формула'), { target: { value: formula.id } });
     const expression = await screen.findByLabelText('Выражение');
     fireEvent.change(expression, { target: { value: 'window.__executed = true' } });
     fireEvent.click(screen.getByRole('button', { name: 'Создать формулу' }));
-    const createExpression = await screen.findByLabelText('Выражение');
+    const dialog = await screen.findByRole('dialog', { name: 'Создать формулу' });
+    const createExpression = within(dialog).getByLabelText('Выражение');
     expect(createExpression).not.toBe(expression);
-    fireEvent.change(screen.getByLabelText('Название'), { target: { value: 'New formula' } });
+    fireEvent.change(within(dialog).getByLabelText('Название'), { target: { value: 'New formula' } });
     fireEvent.change(createExpression, { target: { value: '2 + 2' } });
-    fireEvent.change(screen.getByLabelText('Параметры, по одному в строке'), { target: { value: 'left\nright' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
+    fireEvent.change(within(dialog).getByLabelText('Параметры, по одному в строке'), { target: { value: 'left\nright' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Создать' }));
     await waitFor(() => expect(api.createFormula).toHaveBeenCalled());
     expect(api.createFormula.mock.calls[0][1]).toMatchObject({ name: 'New formula', expression: '2 + 2', parameters: ['left', 'right'] });
     expect(api.putFormulaContent).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Создать формулу' })).not.toBeInTheDocument());
   });
 
   it('saves content through revisions independently from metadata', async () => {
@@ -90,12 +93,61 @@ describe('formula workspace', () => {
     expect((screen.getByLabelText('Выбранная формула') as HTMLSelectElement).value).toBe(formula.id);
     confirm.mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: 'Создать формулу' }));
-    fireEvent.change(await screen.findByLabelText('Название'), { target: { value: 'Unknown result' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Создать' }));
-    await screen.findByRole('button', { name: 'Проверить создание' });
-    expect(screen.getByLabelText('Название')).toBeDisabled();
+    const dialog = await screen.findByRole('dialog', { name: 'Создать формулу' });
+    fireEvent.change(within(dialog).getByLabelText('Название'), { target: { value: 'Unknown result' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Создать' }));
+    await within(dialog).findByRole('button', { name: 'Проверить создание' });
+    expect(within(dialog).getByLabelText('Название')).toBeDisabled();
     expect(api.createFormula).toHaveBeenCalledTimes(1);
+    confirm.mockReturnValue(false);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Закрыть' }));
+    expect(confirm).toHaveBeenLastCalledWith('Результат создания формулы неизвестен. Отказаться от проверки? Формула может существовать.');
+    expect(screen.getByRole('dialog', { name: 'Создать формулу' })).toBeInTheDocument();
+    const requestId = api.createFormula.mock.calls[0][1].requestId;
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Проверить создание' }));
+    await waitFor(() => expect(api.getFormula).toHaveBeenCalledWith(4, requestId));
+    expect(api.getFormulaContent).toHaveBeenCalledWith(4, requestId);
+    expect(api.createFormula).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('dialog', { name: 'Создать формулу' })).not.toBeInTheDocument();
     confirm.mockRestore();
+  });
+
+  it('keeps a rejected native cancel open and closes on confirmed cancellation', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderFormulas();
+    fireEvent.click(await screen.findByRole('button', { name: 'Создать формулу' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Создать формулу' });
+    const name = within(dialog).getByLabelText('Название');
+    fireEvent.change(name, { target: { value: 'Draft formula' } });
+    const cancelEvent = new Event('cancel', { cancelable: true });
+    fireEvent(dialog, cancelEvent);
+    expect(cancelEvent.defaultPrevented).toBe(true);
+    expect(confirm).toHaveBeenCalledWith('Отказаться от черновика формулы?');
+    expect(screen.getByRole('dialog', { name: 'Создать формулу' })).toBeInTheDocument();
+    expect(name).toHaveValue('Draft formula');
+    confirm.mockReturnValue(true);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    expect(screen.queryByRole('dialog', { name: 'Создать формулу' })).not.toBeInTheDocument();
+    expect(api.createFormula).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
+  it('blocks formula modal dismissal while the create request is busy', async () => {
+    let resolveCreate!: (value: typeof formula) => void;
+    api.createFormula.mockReturnValueOnce(new Promise(resolve => { resolveCreate = resolve; }));
+    renderFormulas();
+    fireEvent.click(await screen.findByRole('button', { name: 'Создать формулу' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Создать формулу' });
+    fireEvent.change(within(dialog).getByLabelText('Название'), { target: { value: 'Busy formula' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Создать' }));
+    await waitFor(() => expect(api.createFormula).toHaveBeenCalledTimes(1));
+    expect(within(dialog).getByRole('button', { name: 'Закрыть' })).toBeDisabled();
+    const cancelEvent = new Event('cancel', { cancelable: true });
+    fireEvent(dialog, cancelEvent);
+    expect(screen.getByRole('dialog', { name: 'Создать формулу' })).toBeInTheDocument();
+    resolveCreate(formula);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Создать формулу' })).not.toBeInTheDocument());
+    expect(api.createFormula).toHaveBeenCalledTimes(1);
   });
 
   it('confirms canceling the formula content draft', async () => {

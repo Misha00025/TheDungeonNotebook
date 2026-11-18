@@ -23,15 +23,29 @@
 | --- | --- |
 | `Button`, `LinkButton` | `packages/shared/src/ui/Buttons/Button.tsx`, `packages/shared/src/ui/Buttons/LinkButton.tsx`, `packages/shared/src/styles/components/Button.module.css` |
 | `Panel`, `Badge`, `StatePanel` | `packages/shared/src/ui/Panel/Panel.tsx`, `packages/shared/src/ui/StatePanel/StatePanel.tsx`, `packages/shared/src/ui/Panel/Panel.module.css` |
-| `Field`, `Input`, `Select` | `packages/shared/src/ui/Form/Field.tsx`, `packages/shared/src/ui/Form/Input.tsx`, `packages/shared/src/ui/Form/Select.tsx`, `packages/shared/src/ui/Form/Field.module.css`, `packages/shared/src/styles/components/Input.module.css` |
+| `Field`, `Input`, `Select`, `Textarea` | `packages/shared/src/ui/Form/Field.tsx`, `packages/shared/src/ui/Form/Input.tsx`, `packages/shared/src/ui/Form/Select.tsx`, `packages/shared/src/ui/Form/Textarea.tsx`, `packages/shared/src/ui/Form/Field.module.css`, `packages/shared/src/styles/components/Input.module.css` |
 | `WorkspaceLayout` | `packages/shared/src/ui/WorkspaceLayout/WorkspaceLayout.tsx`, `packages/shared/src/ui/WorkspaceLayout/WorkspaceLayout.module.css` |
 | `SectionNav` | `packages/shared/src/ui/SectionNav/SectionNav.tsx`, `packages/shared/src/ui/SectionNav/SectionNav.module.css` |
 | `ActionRow`, `Toolbar` | `packages/shared/src/ui/Composition/ActionRow.tsx`, `packages/shared/src/ui/Composition/Toolbar.tsx`, `packages/shared/src/ui/Composition/Composition.module.css` |
 | `PageHeader` | `packages/shared/src/ui/PageLayout/PageHeader.tsx`, `packages/shared/src/ui/PageLayout/PageLayout.module.css` |
+| `TabBar` | `packages/shared/src/ui/PageLayout/TabBar.tsx`, `packages/shared/src/ui/PageLayout/PageLayout.module.css` |
 | `SearchBar` | `packages/shared/src/ui/Search/SearchBar.tsx`, `packages/shared/src/ui/Search/SearchBar.module.css` |
-| `List` | `packages/shared/src/ui/List/List.tsx`, `packages/shared/src/ui/List/List.module.css` |
+| `List`, `ListItem` | `packages/shared/src/ui/List/List.tsx`, `packages/shared/src/ui/List/ListItem.tsx`, `packages/shared/src/ui/List/List.module.css`, `packages/shared/src/ui/List/ListItem.module.css` |
+| `DropdownMenu` | `packages/shared/src/ui/DropdownMenu/DropdownMenu.tsx`, `packages/shared/src/ui/DropdownMenu/DropdownMenu.module.css` |
+| `BottomNavigation`, `NavigationIcon` | `packages/shared/src/ui/BottomNavigation/BottomNavigation.tsx`, `packages/shared/src/ui/BottomNavigation/BottomNavigation.module.css`, `packages/shared/src/ui/NavigationIcon/NavigationIcon.tsx`, private hook `packages/shared/src/ui/hooks/useMediaQuery.ts` |
+| `ModalPortal` | `packages/shared/src/ui/ModalPortal/ModalPortal.tsx`, `packages/shared/src/ui/ModalPortal/ModalPortal.module.css` |
 
 Публичный API shared-пакета объявляется в `packages/shared/src/index.ts`. При добавлении компонента экспортируйте сам компонент и его публичный тип пропсов. Сначала проверьте реальные потребители и существующие аналоги, затем вносите минимальное совместимое расширение и добавляйте unit/component-тесты поведения и семантики. Не считайте пилотную интеграцию миграцией всех экранов: остальные экраны переносятся отдельно.
+
+### Native modal и контекстная навигация
+
+`ModalPortal` с API `isOpen`, `onClose`, `children`, `title?`, `size?` (`compact` по умолчанию при title, либо `wide`) и `dismissDisabled?` сохраняет legacy-разметку, если `title` не задан. Указанный `title` включает native `<dialog>` с порталом в `document.body`; браузер отвечает за modal focus/inert поведение. Диалог остаётся смонтирован, пока потребитель держит `isOpen=true`. Потребитель владеет подтверждением отмены, dirty draft и busy guard в `onClose`, а `dismissDisabled` блокирует Escape, backdrop и кнопку закрытия во время busy. SDK не очищает данные и не закрывает диалог самостоятельно.
+
+`BottomNavigation` создаёт нижнюю полосу только при совпадении media query `(max-width: 768px)` и портирует её в `document.body`, чтобы контейнеры `WorkspaceLayout` не меняли fixed positioning. Потребитель передаёт строки label, иконки, реальные Router `to` и вычисленное active состояние. Переполнение превращается в кнопку «Ещё» справа с меню вверх; горизонтальной прокрутки нет. В desktop режиме компонента в DOM нет, обычная боковая навигация остаётся на месте. `WorkspaceLayout.mobileNavigation`, `SectionNav.hideOnMobile` и `TabBar.hideOnMobile` предназначены для согласования этих двух представлений.
+
+`List` поддерживает `columns={2|3}` и `minItemWidth` для сетки, которая рассчитывается от фактической ширины контейнера; число колонок ограничивает максимум, а не обещает его на узком месте. `auto-fill` оставляет одиночные карточки в track обычного размера. Для текстовой строки с дополнительными данными и действиями используйте `ListItem` props `meta` и `actions`; старый режим целой кликабельной строки не меняется.
+
+`Textarea` — нативный textarea с теми же theme-based контрол-стилями, что `Input`, и вертикальным resize. `Field` остаётся ответственным за label/hint/error association.
 
 Пример формы:
 

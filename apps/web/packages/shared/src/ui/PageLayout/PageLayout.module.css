@@ -96,6 +96,12 @@
   background: var(--bg-primary, #fff);
 }
 
+@media (max-width: 768px) {
+  .tabBarHiddenOnMobile {
+    display: none;
+  }
+}
+
 .tabBarBottom {
   position: fixed;
   bottom: 0;

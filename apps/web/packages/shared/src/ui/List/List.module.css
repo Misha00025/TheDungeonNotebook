@@ -43,13 +43,21 @@
 }
 
 .grid-small {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--list-min-width)), 1fr));
 }
 
 .grid-medium {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 350px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--list-min-width)), 1fr));
 }
 
 .grid-large {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 450px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--list-min-width)), 1fr));
+}
+
+.columns2 {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(var(--list-min-width), calc((100% - var(--list-gap)) / 2))), 1fr));
+}
+
+.columns3 {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(var(--list-min-width), calc((100% - var(--list-gap) - var(--list-gap)) / 3))), 1fr));
 }
