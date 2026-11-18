@@ -21,6 +21,7 @@ public static class CampaignApplication
     {
         var builder = WebApplication.CreateBuilder(args);
         var migrationValue = builder.Configuration["Database:ApplyMigrations"];
+        var applyMigrations = migrationValue is null || bool.TryParse(migrationValue, out var apply) && apply;
         var defaultImportance = builder.Configuration["Characters:DefaultImportance"] ?? "background";
         var membersCanReadDefinitions = builder.Configuration["Access:MembersCanReadDefinitions"];
         var mongoConnectionString = builder.Configuration["MONGO_CONNECTION_STRING"] ?? string.Empty;
@@ -54,7 +55,7 @@ public static class CampaignApplication
             {
                 options.ConnectionString = builder.Configuration["MYSQL_CONNECTION_STRING"] ?? string.Empty;
                 options.ServerVersion = builder.Configuration["MySql:ServerVersion"] ?? "8.0.36";
-                options.ApplyMigrations = bool.TryParse(migrationValue, out var apply) && apply;
+                options.ApplyMigrations = applyMigrations;
             })
             .Validate(options => !string.IsNullOrWhiteSpace(options.ConnectionString), "MYSQL_CONNECTION_STRING is required.")
             .Validate(options => Version.TryParse(options.ServerVersion, out _), "MySql:ServerVersion must be a valid version.")
@@ -96,7 +97,7 @@ public static class CampaignApplication
         builder.Services.AddScoped<ComputedSheetService>();
         builder.Services.AddScoped<ViewService>();
         builder.Services.AddScoped<PresentationService>();
-        if (bool.TryParse(migrationValue, out var applyMigrations) && applyMigrations)
+        if (applyMigrations)
             builder.Services.AddHostedService<DatabaseMigrationService>();
 
         var app = builder.Build();

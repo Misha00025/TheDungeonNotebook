@@ -18,4 +18,4 @@ Run the service from its root directory (`apps/backend/campaign-service`):
 dotnet run --project CampaignService.csproj --no-launch-profile --urls http://localhost:5100
 ```
 
-Configure `MYSQL_CONNECTION_STRING`, `MONGO_CONNECTION_STRING`, and `MONGO_DATABASE` before starting. Database migrations are not applied automatically unless `Database:ApplyMigrations` is set to `true`.
+Configure `MYSQL_CONNECTION_STRING`, `MONGO_CONNECTION_STRING`, and `MONGO_DATABASE` before starting. Pending database migrations are applied automatically on host startup by default; set `Database:ApplyMigrations` to `false` to disable them.

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using MySqlConnector;
 using Tdn.Campaigns;
@@ -11,6 +12,52 @@ namespace CampaignService.Tests;
 
 public class HostingTests
 {
+    [Fact]
+    public async Task BuildAppliesMigrationsByDefault()
+    {
+        await using var app = CampaignApplication.Build([
+            "--MYSQL_CONNECTION_STRING", "Server=127.0.0.1;Database=unit_campaign;User ID=unit_user;",
+            "--MONGO_CONNECTION_STRING", "mongodb://127.0.0.1:27017",
+            "--MONGO_DATABASE", "unit_content"
+        ]);
+
+        Assert.True(new CampaignDatabaseOptions().ApplyMigrations);
+        Assert.True(app.Services.GetRequiredService<IOptions<CampaignDatabaseOptions>>().Value.ApplyMigrations);
+        Assert.Single(app.Services.GetServices<IHostedService>().OfType<DatabaseMigrationService>());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task BuildRespectsExplicitMigrationSetting(bool expected)
+    {
+        await using var app = CampaignApplication.Build([
+            "--MYSQL_CONNECTION_STRING", "Server=127.0.0.1;Database=unit_campaign;User ID=unit_user;",
+            "--MONGO_CONNECTION_STRING", "mongodb://127.0.0.1:27017",
+            "--MONGO_DATABASE", "unit_content",
+            "--Database:ApplyMigrations", expected.ToString()
+        ]);
+
+        Assert.Equal(expected, app.Services.GetRequiredService<IOptions<CampaignDatabaseOptions>>().Value.ApplyMigrations);
+        Assert.Equal(expected ? 1 : 0, app.Services.GetServices<IHostedService>().OfType<DatabaseMigrationService>().Count());
+    }
+
+    [Fact]
+    public async Task BuildRejectsInvalidMigrationSettingWhenOptionsAreResolved()
+    {
+        await using var app = CampaignApplication.Build([
+            "--MYSQL_CONNECTION_STRING", "Server=127.0.0.1;Database=unit_campaign;User ID=unit_user;",
+            "--MONGO_CONNECTION_STRING", "mongodb://127.0.0.1:27017",
+            "--MONGO_DATABASE", "unit_content",
+            "--Database:ApplyMigrations", "not-a-boolean"
+        ]);
+
+        var exception = Assert.Throws<OptionsValidationException>(() =>
+            app.Services.GetRequiredService<IOptions<CampaignDatabaseOptions>>().Value);
+
+        Assert.Contains("Database:ApplyMigrations must be a boolean.", exception.Failures);
+    }
+
     [Fact]
     public async Task BuildUsesCommandLineUrlsAndRegistersConfiguration()
     {

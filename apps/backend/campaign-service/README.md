@@ -37,7 +37,7 @@ docker build -f apps/backend/campaign-service/Dockerfile apps/backend
 
 Configuration uses standard ASP.NET Core providers. Root `appsettings.json` is followed by `appsettings.{Environment}.json`, user secrets in Development, environment variables, and command-line arguments; later providers override earlier values. Environment variable hierarchy uses `__` for hierarchical settings, for example `Database__ApplyMigrations` or `Access__MembersCanReadDefinitions`. Environment variables and command-line changes require process restart. JSON settings support reload-on-change, including logging configuration.
 
-`CampaignApplication.Build` does not connect to MySQL. A connection string is required on host startup. Migrations run only when explicitly enabled.
+`CampaignApplication.Build` does not connect to MySQL. A connection string is required on host startup. Pending EF Core migrations are applied automatically when the host starts, after `Build`, using EF Core's tracked migration history.
 
 Mongo settings are also validated on host startup. `MongoClient` is created lazily through DI and the host build does not connect to MongoDB. `Access:MembersCanReadDefinitions` controls member reads of template, formula, and View definitions and presentation context configuration; it does not grant access to another user's unassigned character sheet.
 
@@ -53,7 +53,7 @@ SQL and MongoDB do not share a transaction. Resource content is prepared in Mong
 | --- | --- | --- |
 | `MYSQL_CONNECTION_STRING` | Required MySQL connection string | No default; configure for service startup |
 | `MySql:ServerVersion` | Pomelo version, parsed locally without network discovery | `8.0.36` |
-| `Database:ApplyMigrations` | Apply migrations during startup | `false` |
+| `Database:ApplyMigrations` | Apply migrations during startup | `true` |
 | `MONGO_CONNECTION_STRING` | Required MongoDB connection string | No default; configure for service startup |
 | `MONGO_DATABASE` | Required MongoDB database name | No default; configure for service startup |
 | `Characters:DefaultImportance` | Default importance when creating a character | `background` |
@@ -63,7 +63,7 @@ SQL and MongoDB do not share a transaction. Resource content is prepared in Mong
 | `Logging:LogLevel` | Logging thresholds | Root `appsettings.json`: `Default=Warning`, `Tdn.Api=Information`, `Microsoft.AspNetCore.Hosting.Diagnostics=Information` |
 | `AllowedHosts` | Host filtering | `*` from root `appsettings.json` |
 
-Configure `MYSQL_CONNECTION_STRING`, `MONGO_CONNECTION_STRING`, and `MONGO_DATABASE` before starting; optionally set `Database__ApplyMigrations=true`. The existing deploy compose configuration does not require renaming these three variables. Alternatively, from the service directory, restore the local tool and apply migrations:
+Configure `MYSQL_CONNECTION_STRING`, `MONGO_CONNECTION_STRING`, and `MONGO_DATABASE` before starting. With the existing deploy compose configuration, migrations are applied automatically; set `Database__ApplyMigrations=false` to disable this behavior. The existing deploy compose configuration does not require renaming these three variables. Alternatively, from the service directory, restore the local tool and apply migrations manually:
 
 ```sh
 dotnet tool restore
