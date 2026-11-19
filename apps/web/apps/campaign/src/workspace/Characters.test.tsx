@@ -5,13 +5,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Characters from './Characters';
 
 const api = vi.hoisted(() => ({ listCharacters: vi.fn(), characterPermissions: vi.fn(), getSheet: vi.fn() }));
+const navigate = vi.hoisted(() => vi.fn());
 const characters = [
   { id: 'key-id', campaignId: 12, name: 'Key hero', importance: 'Key', metadataRevision: 1 },
   { id: 'secondary-id', campaignId: 12, name: 'Secondary hero', importance: 'Secondary', metadataRevision: 1 },
   { id: 'background-id', campaignId: 12, name: 'Background hero', importance: 'Background', metadataRevision: 1 },
 ];
 
-vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, path: (relative = '') => `/groups${relative}`, sessionKey: 'session', invalidation: 0 }) }));
+vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, path: (relative = '') => `/groups${relative}`, navigate, sessionKey: 'session', invalidation: 0 }) }));
 vi.mock('./Shell', () => ({ useCampaignWorkspace: () => ({ campaign: { id: 12 }, mode: 'gm', permissions: { canRead: true, canWrite: true, canManageAccess: true }, permissionsLoading: false }) }));
 
 const renderCharacters = () => render(<MemoryRouter initialEntries={['/groups/12/gm/characters']}><Routes><Route path="/groups/:groupId/gm/characters" element={<Characters />} /></Routes></MemoryRouter>);
@@ -19,6 +20,7 @@ const renderCharacters = () => render(<MemoryRouter initialEntries={['/groups/12
 describe('GM Characters', () => {
   beforeEach(() => {
     Object.values(api).forEach(method => method.mockReset());
+    navigate.mockReset();
     api.listCharacters.mockResolvedValue(characters);
     api.characterPermissions.mockResolvedValue({ canRead: true, canWrite: true, canManageAccess: false });
     api.getSheet.mockImplementation(async (_campaignId: number, id: string) => ({ description: `${id} description` }));
@@ -30,15 +32,16 @@ describe('GM Characters', () => {
     const secondary = screen.getByRole('region', { name: 'Второстепенные' });
     const background = screen.getByRole('region', { name: 'Фоновые' });
     expect(screen.getAllByRole('heading', { level: 3 }).map(heading => heading.textContent)).toEqual(['Ключевые', 'Второстепенные', 'Фоновые']);
-    expect(within(key).getByRole('heading', { name: 'Key hero', level: 4 })).toBeInTheDocument();
-    expect(within(secondary).getByRole('heading', { name: /Secondary hero/, level: 4 })).toBeInTheDocument();
-    expect(within(background).getByText('Background hero')).toBeInTheDocument();
-    expect(await screen.findByText('key-id description')).toBeInTheDocument();
-    expect(await screen.findByText('secondary-id description')).toBeInTheDocument();
-    expect(await screen.findByText('background-id description')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Открыть лист Key hero' })).toHaveAttribute('href', '/groups/12/gm/characters/key-id/overview');
-    expect(screen.getByRole('link', { name: 'Открыть лист Secondary hero' })).toHaveAttribute('href', '/groups/12/gm/characters/secondary-id/overview');
-    expect(screen.getByRole('link', { name: 'Открыть лист Background hero' })).toHaveAttribute('href', '/groups/12/gm/characters/background-id/overview');
+    const keyEntry = within(key).getByRole('button', { name: 'Открыть лист Key hero' });
+    const secondaryEntry = within(secondary).getByRole('button', { name: 'Открыть лист Secondary hero' });
+    const backgroundEntry = within(background).getByRole('button', { name: 'Открыть лист Background hero' });
+    expect(await within(keyEntry).findByText('key-id description')).toBeInTheDocument();
+    expect(await within(secondaryEntry).findByText('secondary-id description')).toBeInTheDocument();
+    expect(await within(backgroundEntry).findByText('background-id description')).toBeInTheDocument();
+    for (const [name, id] of [['Key hero', 'key-id'], ['Secondary hero', 'secondary-id'], ['Background hero', 'background-id']]) {
+      fireEvent.click(screen.getByRole('button', { name: `Открыть лист ${name}` }));
+      expect(navigate).toHaveBeenLastCalledWith(`/groups/12/gm/characters/${id}/overview`);
+    }
     expect(screen.queryByText('Ключевой')).not.toBeInTheDocument();
     expect(screen.queryByText('Второстепенный')).not.toBeInTheDocument();
     expect(screen.queryByText('Фоновый')).not.toBeInTheDocument();
@@ -51,8 +54,11 @@ describe('GM Characters', () => {
     api.characterPermissions.mockImplementation(async (_campaignId: number, id: string) => id === characters[1].id ? { canRead: false, canWrite: false, canManageAccess: false } : { canRead: true, canWrite: true, canManageAccess: false });
     api.getSheet.mockResolvedValue({ description: '' });
     renderCharacters();
-    expect(await screen.findByText('Описание не задано.')).toBeInTheDocument();
+    const entry = await screen.findByRole('button', { name: 'Открыть лист Key hero' });
     await waitFor(() => expect(api.getSheet).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(within(entry).queryByText('Загрузка описания…')).not.toBeInTheDocument());
+    expect(entry).toHaveTextContent('Key hero');
+    expect(screen.queryByText('Описание не задано.')).not.toBeInTheDocument();
     expect(api.getSheet).toHaveBeenCalledWith(12, characters[0].id);
     expect(screen.queryByText('Secondary hero')).not.toBeInTheDocument();
   });
@@ -71,14 +77,15 @@ describe('GM Characters', () => {
   it('keeps sheet entrypoints visible when description loading fails', async () => {
     api.getSheet.mockRejectedValueOnce(new Error('sheet unavailable')).mockRejectedValueOnce(new Error('sheet unavailable')).mockRejectedValueOnce(new Error('sheet unavailable')).mockResolvedValue({ description: 'Recovered description' });
     renderCharacters();
-    expect(await screen.findByRole('link', { name: 'Открыть лист Key hero' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Открыть лист Key hero' })).toBeInTheDocument();
     await screen.findAllByText('Не удалось выполнить операцию. Попробуйте ещё раз.');
     await waitFor(() => expect(screen.getAllByText('Не удалось выполнить операцию. Попробуйте ещё раз.')).toHaveLength(3));
     expect(document.body.textContent).not.toContain('sheet unavailable');
     fireEvent.click(screen.getAllByRole('button', { name: 'Повторить загрузку' })[0]);
     expect(await screen.findByText('Recovered description')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Открыть лист Key hero' })).toHaveAttribute('href', '/groups/12/gm/characters/key-id/overview');
-    expect(screen.getByRole('link', { name: 'Открыть лист Secondary hero' })).toHaveAttribute('href', '/groups/12/gm/characters/secondary-id/overview');
-    expect(screen.getByRole('link', { name: 'Открыть лист Background hero' })).toHaveAttribute('href', '/groups/12/gm/characters/background-id/overview');
+    for (const [name, id] of [['Key hero', 'key-id'], ['Secondary hero', 'secondary-id'], ['Background hero', 'background-id']]) {
+      fireEvent.click(screen.getByRole('button', { name: `Открыть лист ${name}` }));
+      expect(navigate).toHaveBeenLastCalledWith(`/groups/12/gm/characters/${id}/overview`);
+    }
   });
 });

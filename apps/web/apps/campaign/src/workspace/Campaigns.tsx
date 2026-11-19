@@ -1,27 +1,31 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useWorkspace, useDirtyDraft } from './Workspace';
 import { useMutation, useResource } from './hooks';
 import { runCreation, CampaignApiError } from './api';
 import type { Campaign, Permissions } from './types';
 import { ApiError } from './Feedback';
+import { Badge, Button, List, Panel } from '@tdn/shared';
 import commonStyles from '@tdn/shared/styles/common.module.css';
 import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
 import inputStyles from '@tdn/shared/styles/components/Input.module.css';
 import styles from './Workspace.module.css';
+import cardStyles from './Campaigns.module.css';
 
 const newRequestId = () => crypto.randomUUID();
 const isUncertainCreation = (error: unknown) => error instanceof CampaignApiError && (error.unknownOutcome || ['creation_already_published', 'already_published'].includes(error.problem.code));
 
 const CampaignCard: React.FC<{ campaign: Campaign }> = ({ campaign }) => {
-  const { api, path, sessionKey, invalidation } = useWorkspace();
+  const { api, path, navigate, sessionKey, invalidation } = useWorkspace();
   const resource = useResource<Permissions>(`${sessionKey}:${campaign.id}:permissions:${invalidation}`, () => api.campaignPermissions(campaign.id));
-  return <article className={commonStyles.card}>
-    <h2>{campaign.name}</h2>
+  const canWrite = Boolean(resource.data?.canWrite);
+  const canRead = Boolean(resource.data?.canRead);
+  return <Panel as="article" className={cardStyles.card} actions={(canWrite || canRead) ? <Button className={cardStyles.entryButton} size="small" type="button" onClick={() => navigate(path(`/${campaign.id}/${canWrite ? 'gm/overview' : 'player/characters'}`))}>{canWrite ? 'Вести' : 'Играть'}</Button> : undefined}>
+    <div className={cardStyles.identity}><h2 className={cardStyles.title}>{campaign.name}</h2>{resource.data && (canWrite || canRead) && <Badge>{canWrite ? 'ГМ' : 'Игрок'}</Badge>}</div>
     {resource.loading && <p>Загрузка прав…</p>}
     {Boolean(resource.error) && <ApiError error={resource.error} onRetry={resource.reload} />}
-    {resource.data && <div className={styles.actions}>{resource.data.canRead && <Link to={path(`/${campaign.id}/player/characters`)}>Играть</Link>}{resource.data.canWrite && <Link to={path(`/${campaign.id}/gm/overview`)}>Вести</Link>}{!resource.data.canRead && !resource.data.canWrite && <p>Нет доступных действий.</p>}</div>}
-  </article>;
+    {resource.data && !canRead && !canWrite && <p>Нет доступных действий.</p>}
+  </Panel>;
 };
 
 const CampaignCreateForm: React.FC<{ onClose: () => void; requestId: string; onNewRequest: () => void }> = ({ onClose, requestId, onNewRequest }) => {
@@ -133,8 +137,8 @@ const Campaigns: React.FC<{ allowCreate?: boolean }> = ({ allowCreate = true }) 
     <h1>Кампании</h1>
     {campaigns.loading && <p>Загрузка кампаний…</p>}
     {Boolean(campaigns.error) && <ApiError error={campaigns.error} onRetry={campaigns.reload} />}
-    {campaigns.data && (campaigns.data.length ? <section className={styles.grid}>{campaigns.data.map((campaign: Campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)}</section> : <p>Кампаний пока нет.</p>)}
-    {!createOpen && (allowCreate ? <button className={buttonStyles.button} onClick={() => { setRequestId(newRequestId()); setCreateOpen(true); }}>Создать кампанию</button> : <Link className={buttonStyles.button} to={`${path('/')}?create=1`}>Создать кампанию</Link>)}
+    {campaigns.data && (campaigns.data.length ? <List layout="horizontal" gap="medium">{campaigns.data.map((campaign: Campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)}</List> : <p>Кампаний пока нет.</p>)}
+    {!createOpen && (allowCreate ? <Button type="button" onClick={() => { setRequestId(newRequestId()); setCreateOpen(true); }}>Создать кампанию</Button> : <Button type="button" onClick={() => navigate(`${path('/')}?create=1`)}>Создать кампанию</Button>)}
     {allowCreate && createOpen && <CampaignCreateForm key={requestId} requestId={requestId} onClose={() => setCreateOpen(false)} onNewRequest={() => setRequestId(newRequestId())} />}
   </main>;
 };

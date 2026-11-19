@@ -13,7 +13,7 @@ const LinkButton = forwardRef<HTMLAnchorElement, LinkButtonProps>(function LinkB
   { variant = 'primary', size = 'default', className, ...props },
   ref
 ) {
-  const classes = [styles.button, variant === 'secondary' && styles.secondary, size === 'small' && styles.small, className]
+  const classes = [styles.button, variant === 'secondary' && styles.secondary, variant === 'ghost' && styles.ghost, size === 'small' && styles.small, className]
     .filter(Boolean)
     .join(' ');
 

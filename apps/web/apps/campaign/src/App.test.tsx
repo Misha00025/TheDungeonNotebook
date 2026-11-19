@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import App from './App';
 import Home from './Home';
 import type { HubRemoteProps } from '@tdn/shared';
@@ -10,6 +10,7 @@ const makeAuth = (request: (url: string, options?: RequestInit) => Promise<Respo
 const campaign = (id = 12) => ({ id, name: `Campaign ${id}`, metadataRevision: 1 });
 const permissions = (canWrite = true) => ({ canRead: true, canWrite, canManageAccess: false });
 const renderApp = (initial: string, request: (url: string, options?: RequestInit) => Promise<Response>) => render(<MemoryRouter initialEntries={[initial]}><App auth={makeAuth(request)} /></MemoryRouter>);
+const CurrentPath: React.FC = () => <output aria-label="Current pathname">{useLocation().pathname}</output>;
 
 describe('campaign first iteration', () => {
   beforeEach(() => window.localStorage.clear());
@@ -343,9 +344,11 @@ describe('campaign first iteration', () => {
     expect(screen.queryByRole('link', { name: 'Создать кампанию' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Название')).not.toBeInTheDocument();
     home.unmount();
-    const nestedRequest = vi.fn(async (url: string) => url === '/api/campaigns' ? response([campaign()]) : url.endsWith('/permissions') ? response(permissions()) : response([]));
-    render(<MemoryRouter basename="/tdn" initialEntries={['/tdn']}><App auth={makeAuth(nestedRequest)} /></MemoryRouter>);
+    const nestedRequest = vi.fn(async (url: string) => url === '/api/campaigns' ? response([campaign()]) : url === '/api/campaigns/12' ? response(campaign()) : url.endsWith('/permissions') ? response(permissions()) : response([]));
+    render(<MemoryRouter basename="/tdn" initialEntries={['/tdn']}><App auth={makeAuth(nestedRequest)} /><CurrentPath /></MemoryRouter>);
     expect(await screen.findByRole('heading', { name: 'Кампании' })).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'Играть' })).toHaveAttribute('href', '/tdn/12/player/characters');
+    fireEvent.click(await screen.findByRole('button', { name: 'Вести' }));
+    expect(await screen.findByRole('heading', { name: 'Обзор кампании' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText('Current pathname')).toHaveTextContent('/12/gm/overview'));
   });
 });

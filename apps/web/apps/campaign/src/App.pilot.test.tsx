@@ -97,7 +97,7 @@ describe('campaign SDK pilot', () => {
     expect(within(canView).getByRole('heading', { name: playerCharacters[0].name, level: 4 })).toBeInTheDocument();
   });
 
-  it('filters locally, clears search, and renders a GM card with an explicit sheet action', async () => {
+  it('filters locally, clears search, and renders functional GM character entries', async () => {
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url === '/api/campaigns') return response([campaign]);
       if (url === '/api/campaigns/12') return response(campaign);
@@ -112,17 +112,14 @@ describe('campaign SDK pilot', () => {
     renderPilot(request, '/groups/12/gm/characters');
     const search = await screen.findByRole('textbox', { name: 'Поиск персонажей' });
     const keyGroup = await screen.findByRole('region', { name: 'Ключевые' });
-    const article = within(keyGroup).getByRole('article');
-    expect(within(article).getByRole('heading', { name: playerCharacters[0].name, level: 4 })).toBeInTheDocument();
-    expect(await within(article).findByText('Pilot description')).toBeInTheDocument();
-    expect(within(article).queryByText('Можно вести и редактировать')).not.toBeInTheDocument();
-    expect(within(article).queryByText('Только просмотр')).not.toBeInTheDocument();
-    expect(within(article).getByRole('link', { name: `Открыть лист ${playerCharacters[0].name}` })).toHaveAttribute('href', `/tdn/groups/12/gm/characters/${playerCharacters[0].id}/overview`);
-    expect(within(article).queryByRole('link', { name: playerCharacters[0].name })).not.toBeInTheDocument();
+    const entry = within(keyGroup).getByRole('button', { name: `Открыть лист ${playerCharacters[0].name}` });
+    expect(entry).toHaveTextContent(playerCharacters[0].name);
+    expect(await within(entry).findByText('Pilot description')).toBeInTheDocument();
     fireEvent.change(search, { target: { value: 'not found' } });
     expect(await screen.findByText('Совпадений нет.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Очистить поиск' }));
-    expect(await screen.findByRole('heading', { name: playerCharacters[0].name, level: 4 })).toBeInTheDocument();
+    const restoredKeyGroup = await screen.findByRole('region', { name: 'Ключевые' });
+    expect(within(restoredKeyGroup).getByRole('button', { name: `Открыть лист ${playerCharacters[0].name}` })).toHaveTextContent('Pilot description');
     expect(request.mock.calls.filter(([url]) => url === '/api/campaigns/12/characters')).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
     await waitFor(() => expect(screen.getByLabelText('Current pathname')).toHaveTextContent('/groups/12/player/characters'));

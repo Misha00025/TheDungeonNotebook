@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ActionRow, Badge, Button, LinkButton, List, ListItem, Notification, PageHeader, Panel, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
+import { useParams } from 'react-router-dom';
+import { ActionRow, Badge, Button, ClampedText, LinkButton, List, ListItem, Notification, PageHeader, Panel, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
 import { useWorkspace } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 import { useResource } from './hooks';
@@ -22,30 +22,41 @@ const CharacterCard: React.FC<{ character: CharacterMetadata; href: string; mode
   />
 );
 
-const CharacterRow: React.FC<{ character: CharacterMetadata; href: string }> = ({ character, href }) => (
+const CharacterRow: React.FC<{ character: CharacterMetadata; href: string; mode: 'gm' | 'player' }> = ({ character, href, mode }) => {
+  const { navigate } = useWorkspace();
+  if (mode === 'gm') return <Button className={styles.compactEntry} size="small" variant="ghost" type="button" aria-label={`Открыть лист ${character.name}`} onClick={() => navigate(href)}><span>{character.name}</span><Badge>{importanceLabel[character.importance] ?? character.importance}</Badge></Button>;
+  return (
   <ListItem
     meta={<Badge>{importanceLabel[character.importance] ?? character.importance}</Badge>}
     actions={<LinkButton to={href} variant="secondary" aria-label={`Открыть лист ${character.name}`}>Открыть лист</LinkButton>}
   >
     <strong>{character.name}</strong>
   </ListItem>
-);
+  );
+};
 
-const CharacterDescription: React.FC<{ character: CharacterMetadata; campaignId: number; resourceKey: string }> = ({ character, campaignId, resourceKey }) => {
-  const { api } = useWorkspace();
+const GMCharacterEntry: React.FC<{ character: CharacterMetadata; href: string; campaignId: number; resourceKey: string }> = ({ character, href, campaignId, resourceKey }) => {
+  const { api, navigate } = useWorkspace();
   const resource = useResource(`${resourceKey}:${character.id}:description`, async () => (await api.getSheet(campaignId, character.id)).description);
-  if (resource.loading && resource.data === undefined) return <span>Загрузка описания…</span>;
-  if (resource.error) return <ApiError error={resource.error} onRetry={resource.reload} />;
-  return <span className={styles.characterDescription}>{resource.data?.trim() || 'Описание не задано.'}</span>;
+  const description = resource.data?.trim() ? resource.data : undefined;
+  const entryClass = character.importance === 'Secondary' ? styles.secondaryEntry : character.importance === 'Background' ? styles.backgroundEntry : styles.keyEntry;
+  const hasDescriptionArea = Boolean(description || (resource.loading && resource.data === undefined));
+  return <div className={`${styles.entryWrapper} ${character.importance === 'Key' ? styles.keyWrapper : ''}`}>
+    <Button className={`${styles.characterEntry} ${entryClass}`} variant="ghost" type="button" aria-label={`Открыть лист ${character.name}`} onClick={() => navigate(href)}>
+      <span className={styles.entryContent}>
+        <span className={styles.characterName}>{character.name}</span>
+        {hasDescriptionArea && <span className={styles.descriptionArea}>
+          {resource.loading && resource.data === undefined
+            ? <span>Загрузка описания…</span>
+            : description && (character.importance === 'Key'
+              ? <ClampedText className={styles.characterDescription} maxHeight="calc(var(--key-card-width) * 4 / 3 * 0.4)">{description}</ClampedText>
+              : <span className={styles.characterDescription}>{description}</span>)}
+        </span>}
+      </span>
+    </Button>
+    {Boolean(resource.error) && <ApiError error={resource.error} onRetry={resource.reload} />}
+  </div>;
 };
-
-const GMCharacterCard: React.FC<{ character: CharacterMetadata; href: string; campaignId: number; resourceKey: string }> = ({ character, href, campaignId, resourceKey }) => {
-  const description = <CharacterDescription character={character} campaignId={campaignId} resourceKey={resourceKey} />;
-  if (character.importance === 'Secondary') return <Panel as="article" density="compact" title={<>{character.name} <Link to={href} aria-label={`Открыть лист ${character.name}`}>Открыть ↗</Link></>} headingLevel={4} description={description} />;
-  return <Panel as="article" title={character.name} headingLevel={4} description={description} actions={<LinkButton to={href} variant="secondary" aria-label={`Открыть лист ${character.name}`}>Открыть лист</LinkButton>} />;
-};
-
-const GMBackgroundRow: React.FC<{ character: CharacterMetadata; href: string; campaignId: number; resourceKey: string }> = ({ character, href, campaignId, resourceKey }) => <ListItem density="compact" meta={<Link to={href} aria-label={`Открыть лист ${character.name}`}>Открыть ↗</Link>}><strong>{character.name}</strong><div className={styles.characterDescription}><CharacterDescription character={character} campaignId={campaignId} resourceKey={resourceKey} /></div></ListItem>;
 
 const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const { groupId = '' } = useParams();
@@ -92,7 +103,7 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
     {filtered.map(character => <PermissionProbe key={`${key}:${character.id}`} character={character} campaignId={campaignId} resourceKey={key} onResult={onResult} />)}
     {mode === 'gm' && compact && <List layout="vertical" stretch>
       {groups[0][1].map(item => compact
-        ? <CharacterRow key={item.id} character={item} href={characterHref(item.id)} />
+         ? <CharacterRow key={item.id} character={item} href={characterHref(item.id)} mode="gm" />
         : <CharacterCard key={item.id} character={item} href={characterHref(item.id)} mode="gm" />)}
     </List>}
     {mode === 'gm' && !compact && <>
@@ -103,14 +114,14 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
         const id = `${headingId}-gm-${index}`;
         return <section key={importance} aria-labelledby={id}>
           <h3 id={id}>{titles[index]}</h3>
-          {importance === 'Key' && <List layout="grid" columns={2} minItemWidth="18rem">
-            {items.map(item => <GMCharacterCard key={item.id} character={item} href={characterHref(item.id)} campaignId={campaignId} resourceKey={key} />)}
+           {importance === 'Key' && <List layout="horizontal" gap="medium">
+             {items.map(item => <GMCharacterEntry key={item.id} character={item} href={characterHref(item.id)} campaignId={campaignId} resourceKey={key} />)}
           </List>}
-          {importance === 'Secondary' && <List layout="grid" columns={3} minItemWidth="14rem">
-            {items.map(item => <GMCharacterCard key={item.id} character={item} href={characterHref(item.id)} campaignId={campaignId} resourceKey={key} />)}
+           {importance === 'Secondary' && <List layout="vertical" stretch gap="small">
+             {items.map(item => <GMCharacterEntry key={item.id} character={item} href={characterHref(item.id)} campaignId={campaignId} resourceKey={key} />)}
           </List>}
           {importance === 'Background' && <List layout="vertical" stretch gap="small">
-            {items.map(item => <GMBackgroundRow key={item.id} character={item} href={characterHref(item.id)} campaignId={campaignId} resourceKey={key} />)}
+             {items.map(item => <GMCharacterEntry key={item.id} character={item} href={characterHref(item.id)} campaignId={campaignId} resourceKey={key} />)}
           </List>}
         </section>;
       })}
@@ -124,7 +135,7 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
           <h3 id={id}>{title}</h3>
           <List layout="vertical" stretch>
             {items.map(item => compact
-              ? <CharacterRow key={item.id} character={item} href={characterHref(item.id)} />
+              ? <CharacterRow key={item.id} character={item} href={characterHref(item.id)} mode="player" />
               : <CharacterCard key={item.id} character={item} href={characterHref(item.id)} mode="player" />)}
             {mayShowEmpty && <StatePanel kind="empty">{emptyLabel}</StatePanel>}
           </List>

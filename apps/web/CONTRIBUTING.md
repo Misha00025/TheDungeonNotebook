@@ -10,7 +10,11 @@
 ## Композиция GM Campaign UI
 
 - Обзор кампании показывает слева имя персонажа и отдельные теги назначенных ведущих с правом записи, а справа — компактную ссылку-кнопку `LinkButton size="small"` к GM-обзору; наблюдатели в этом списке не отображаются.
-- Полный список персонажей GM сгруппирован по важности. Описания карточек и фоновых строк загружаются из листа персонажа.
+- Список кампаний показывает одну кнопку входа: `Вести` при `canWrite` (с приоритетом над чтением), иначе `Играть` при `canRead`; рядом с названием доступна роль `ГМ` или `Игрок`. Карточки имеют приблизительные пропорции 2:1 и нижнюю кнопку входа во всю ширину.
+- Полный список персонажей GM сгруппирован по важности. Кнопки записей прозрачны без наведения и получают фон при наведении; имена и описания выравниваются слева.
+- Key-персонажи представлены карточками фиксированной ширины `10rem` с пропорцией 3:4, полной рамкой и именем с описанием у нижнего левого края.
+- Secondary отображаются вертикальными строками с короткой акцентной полосой слева; Background — компактными строками. Для обоих описания показываются в одну строку с многоточием, рамок нет.
+- Описание Key занимает не более 40% высоты карточки и может переноситься на несколько строк; короткий текст не создаёт пустой области. Пустые описания не показываются, полные значения остаются в данных.
 - Страница шаблона — singleton: metadata шаблона не редактируется; базовые и виртуальные поля отображаются в отдельных native `DataTable`, а общие команды «Сохранить» и «Отменить» находятся в шапке страницы.
 - Удаление поля сначала локально помечает его к удалению; строку можно восстановить до общего сохранения. Общая отмена возвращает последний подтверждённый baseline и удаляет новые черновики.
 - Общая команда сохранения отправляет полные массивы всех изменённых групп: сначала базовые поля, затем виртуальные, используя общую content revision. Запросы не атомарны: после частичного успеха подтверждённый baseline сохраняется, а общая отмена сбрасывает только оставшиеся черновики. Базовый PUT roundtrips пассивное описание шаблона.
@@ -22,7 +26,7 @@
 
 ## Нативная семантика и компоновка
 
-- `Button` рендерит настоящий `<button>` и по умолчанию имеет `type="button"`. Для отправки формы всегда указывайте `type="submit"` явно.
+- `Button` рендерит настоящий `<button>` и по умолчанию имеет `type="button"`; поддерживает общий параметр `size="small"` и вариант `ghost`, не меняющий стандартный вариант. Для отправки формы всегда указывайте `type="submit"` явно.
 - `LinkButton` и `SectionNav` рендерят настоящие ссылки React Router. Не имитируйте переходы через `onClick` на `div` и не вкладывайте интерактивные элементы друг в друга.
 - `Field` связывает подпись с контролом через обязательный `htmlFor`; hint/error получают ID `${htmlFor}-hint` и `${htmlFor}-error`. Если контролу нужно объявить эти связи, потребитель передаёт соответствующие ID в `aria-describedby`; `Field` не клонирует детей.
 - Расширяйте `List`, `AdaptiveLayout`, `PageHeader` и `SearchBar` обратно совместимо, сохраняя существующее поведение по умолчанию.
@@ -47,6 +51,7 @@
 | `TabBar` | `packages/shared/src/ui/PageLayout/TabBar.tsx`, `packages/shared/src/ui/PageLayout/PageLayout.module.css` |
 | `SearchBar` | `packages/shared/src/ui/Search/SearchBar.tsx`, `packages/shared/src/ui/Search/SearchBar.module.css` |
 | `List`, `ListItem` | `packages/shared/src/ui/List/List.tsx`, `packages/shared/src/ui/List/ListItem.tsx`, `packages/shared/src/ui/List/List.module.css`, `packages/shared/src/ui/List/ListItem.module.css` |
+| `ClampedText` | `packages/shared/src/ui/ClampedText/ClampedText.tsx`, `packages/shared/src/ui/ClampedText/ClampedText.module.css`; принимает строковые `children`, необязательный `className` и CSS-длину `maxHeight`. По умолчанию заполняет доступную область; с `maxHeight` ограничивает естественную высоту. Усечение относится только к отображению, полный текст остаётся в данных |
 | `DropdownMenu` | `packages/shared/src/ui/DropdownMenu/DropdownMenu.tsx`, `packages/shared/src/ui/DropdownMenu/DropdownMenu.module.css` |
 | `BottomNavigation`, `NavigationIcon` | `packages/shared/src/ui/BottomNavigation/BottomNavigation.tsx`, `packages/shared/src/ui/BottomNavigation/BottomNavigation.module.css`, `packages/shared/src/ui/NavigationIcon/NavigationIcon.tsx`, private hook `packages/shared/src/ui/hooks/useMediaQuery.ts` |
 | `ModalPortal` | `packages/shared/src/ui/ModalPortal/ModalPortal.tsx`, `packages/shared/src/ui/ModalPortal/ModalPortal.module.css` |

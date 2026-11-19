@@ -49,3 +49,19 @@
   color: var(--text-primary);
   text-shadow: none;
 }
+
+.ghost {
+  border-color: var(--border-color);
+  background-color: transparent;
+  color: var(--text-primary);
+  text-shadow: none;
+}
+
+.ghost:hover:not(:disabled) {
+  background-color: var(--bg-hover);
+  filter: none;
+}
+
+.ghost:active:not(:disabled) {
+  filter: none;
+}

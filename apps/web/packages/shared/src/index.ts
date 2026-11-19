@@ -88,6 +88,8 @@ export { default as List } from './ui/List/List';
 export type { ListProps } from './ui/List/List';
 export { default as ListItem } from './ui/List/ListItem';
 export type { ListItemProps } from './ui/List/ListItem';
+export { default as ClampedText } from './ui/ClampedText/ClampedText';
+export type { ClampedTextProps } from './ui/ClampedText/ClampedText';
 export { default as PersonalizeModal } from './ui/PersonalizeModal/PersonalizeModal';
 export { default as WorkspaceLayout } from './ui/WorkspaceLayout/WorkspaceLayout';
 export type { WorkspaceLayoutProps } from './ui/WorkspaceLayout/WorkspaceLayout';

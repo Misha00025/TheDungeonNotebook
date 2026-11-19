@@ -41,7 +41,8 @@ describe('Home dashboard', () => {
 
     render(<MemoryRouter initialEntries={['/groups']}><Routes><Route path="/groups/*" element={<App auth={makeAuth(request)} />} /></Routes></MemoryRouter>);
     expect(await screen.findByRole('heading', { name: 'Кампании' })).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'Играть' })).toHaveAttribute('href', '/groups/12/player/characters');
+    expect(await screen.findByRole('button', { name: 'Вести' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Играть' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Создать кампанию' })).toBeInTheDocument();
     expect(request.mock.calls.some(([url]) => url === '/api/campaigns')).toBe(true);
   });
