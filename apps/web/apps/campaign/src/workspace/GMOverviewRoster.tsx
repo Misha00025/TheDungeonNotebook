@@ -1,10 +1,10 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { List, ListItem, StatePanel } from '@tdn/shared';
+import { Badge, LinkButton, List, ListItem, StatePanel } from '@tdn/shared';
 import { useWorkspace } from './Workspace';
 import { useResource } from './hooks';
 import type { Assignment, CharacterMetadata, Permissions, User } from './types';
 import { ApiError } from './Feedback';
+import styles from './GMOverviewRoster.module.css';
 
 type RosterRow = { character: CharacterMetadata; names: string[] };
 type RosterData = { rows: RosterRow[]; errors: unknown[]; unavailable: boolean };
@@ -70,7 +70,13 @@ const GMOverviewRoster: React.FC<{ campaignId: number; characters: CharacterMeta
     {data.unavailable && <p>Сведения о ведущих недоступны.</p>}
     {!data.rows.length && !data.errors.length && !data.unavailable && !roster.error && !roster.loading && <StatePanel kind="empty">Нет персонажей с назначенными ведущими.</StatePanel>}
     {data.rows.map(({ character, names }) => <ListItem key={character.id} density="compact">
-      <Link to={path(`/${campaignId}/gm/characters/${encodeURIComponent(character.id)}/overview`)} aria-label={`Открыть лист ${character.name}`}>{character.name} <span aria-hidden="true">↗</span></Link>{` — ${names.join(', ')}`}
+      <div className={styles.row}>
+        <div className={styles.identity}>
+          <strong>{character.name}</strong>
+          {names.map((name, index) => <Badge key={index}>{name}</Badge>)}
+        </div>
+        <LinkButton size="small" variant="secondary" to={path(`/${campaignId}/gm/characters/${encodeURIComponent(character.id)}/overview`)} aria-label={`Открыть лист ${character.name}`}>Открыть</LinkButton>
+      </div>
     </ListItem>)}
   </List>;
 };

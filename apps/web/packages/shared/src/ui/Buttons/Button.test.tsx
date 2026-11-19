@@ -43,5 +43,22 @@ describe('LinkButton', () => {
     expect(link).toHaveAttribute('href', '/destination');
     expect(link).toHaveAttribute('target', '_blank');
     expect(link.className).toContain('secondary');
+    expect(link.className).not.toContain('small');
+    expect(link).not.toHaveAttribute('size');
+  });
+
+  test('supports a small secondary link button and retains its ref', () => {
+    const ref = React.createRef<HTMLAnchorElement>();
+    render(
+      <MemoryRouter>
+        <LinkButton to="/destination" variant="secondary" size="small" ref={ref}>Open</LinkButton>
+      </MemoryRouter>
+    );
+    const link = screen.getByRole('link', { name: 'Open' });
+    expect(link).toHaveAttribute('href', '/destination');
+    expect(link.className).toContain('secondary');
+    expect(link.className).toContain('small');
+    expect(link).not.toHaveAttribute('size');
+    expect(ref.current).toBe(link);
   });
 });

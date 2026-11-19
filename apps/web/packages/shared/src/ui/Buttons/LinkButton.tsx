@@ -6,13 +6,14 @@ import type { ButtonVariant } from './Button';
 
 export type LinkButtonProps = LinkProps & {
   variant?: ButtonVariant;
+  size?: 'default' | 'small';
 };
 
 const LinkButton = forwardRef<HTMLAnchorElement, LinkButtonProps>(function LinkButton(
-  { variant = 'primary', className, ...props },
+  { variant = 'primary', size = 'default', className, ...props },
   ref
 ) {
-  const classes = [styles.button, variant === 'secondary' && styles.secondary, className]
+  const classes = [styles.button, variant === 'secondary' && styles.secondary, size === 'small' && styles.small, className]
     .filter(Boolean)
     .join(' ');
 

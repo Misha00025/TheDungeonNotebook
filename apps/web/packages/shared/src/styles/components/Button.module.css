@@ -19,6 +19,12 @@
   text-shadow: var(--text-shadow);
 }
 
+.small {
+  min-height: 1.875rem;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.875rem;
+}
+
 .button:hover:not(:disabled) {
   filter: brightness(0.94);
 }

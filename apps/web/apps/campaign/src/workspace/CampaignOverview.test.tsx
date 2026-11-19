@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CampaignOverview from './CampaignOverview';
 import GMOverviewRoster from './GMOverviewRoster';
 import panelStyles from '@tdn/shared/ui/Panel/Panel.module.css';
+import rosterStyles from './GMOverviewRoster.module.css';
+import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
 import type { CharacterMetadata } from './types';
 
 const api = vi.hoisted(() => ({ listCharacters: vi.fn(), characterPermissions: vi.fn(), listAssignments: vi.fn(), getUser: vi.fn(), getSheet: vi.fn(), listFormulas: vi.fn(), listViews: vi.fn() }));
@@ -52,7 +54,18 @@ describe('CampaignOverview', () => {
     expect(within(notes as HTMLElement).queryByRole('link')).not.toBeInTheDocument();
     const rosterLink = await screen.findByRole('link', { name: 'Открыть лист Roster hero' });
     expect(rosterLink).toHaveAttribute('href', '/groups/12/gm/characters/hero%2Fone/overview');
-    expect(rosterLink.parentElement).toHaveTextContent('Roster hero ↗ — Visible GM');
+    expect(rosterLink).toHaveTextContent('Открыть');
+    expect(rosterLink).toHaveClass(buttonStyles.small);
+    const row = rosterLink.parentElement;
+    const identity = row?.firstElementChild;
+    expect(row).toHaveClass(rosterStyles.row);
+    expect(identity).toHaveClass(rosterStyles.identity);
+    expect(identity?.querySelector('strong')).toHaveTextContent('Roster hero');
+    expect(identity?.querySelectorAll(`.${panelStyles.badge}`)).toHaveLength(1);
+    expect(identity).toHaveTextContent('Visible GM');
+    expect(identity?.querySelector('a')).toBeNull();
+    expect(row).not.toHaveTextContent('↗');
+    expect(row).not.toHaveTextContent('—');
     expect(screen.queryByText('Ключевой')).not.toBeInTheDocument();
     expect(screen.queryByText('Можно вести и редактировать')).not.toBeInTheDocument();
     expect(screen.queryByText('Только просмотр')).not.toBeInTheDocument();
@@ -84,7 +97,7 @@ describe('CampaignOverview', () => {
     renderOverview();
     const link = await screen.findByRole('link', { name: 'Открыть лист Roster hero' });
     expect(link).toHaveAttribute('href', '/groups/12/gm/characters/hero%2Fone/overview');
-    expect(link.parentElement).toHaveTextContent('Roster hero ↗ — Visible writer');
+    expect(link.parentElement?.firstElementChild).toHaveTextContent('Roster heroVisible writer');
     expect(screen.queryByRole('link', { name: 'Открыть лист Read-only assignee' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Открыть лист Unassigned character' })).not.toBeInTheDocument();
     expect(screen.queryByText('Observer')).not.toBeInTheDocument();
@@ -95,6 +108,23 @@ describe('CampaignOverview', () => {
     expect(api.getUser).toHaveBeenCalledTimes(1);
     expect(api.getUser).toHaveBeenCalledWith(21);
     expect(api.getUser).not.toHaveBeenCalledWith(22);
+  });
+
+  it('renders multiple writer names as separate badges beside one open link', async () => {
+    api.listAssignments.mockResolvedValue([
+      { campaignId: 12, characterId: character.id, userId: 21, canWrite: true, metadataRevision: 1 },
+      { campaignId: 12, characterId: character.id, userId: 22, canWrite: true, metadataRevision: 1 },
+    ]);
+    api.getUser.mockImplementation(async (id: number) => ({ id, nickname: `user-${id}`, visibleName: `Writer ${id}` }));
+    renderOverview();
+    const link = await screen.findByRole('link', { name: 'Открыть лист Roster hero' });
+    const row = link.parentElement;
+    const identity = row?.firstElementChild;
+    expect(identity?.querySelectorAll(`.${panelStyles.badge}`)).toHaveLength(2);
+    expect(identity).toHaveTextContent('Writer 21');
+    expect(identity).toHaveTextContent('Writer 22');
+    expect(row?.querySelectorAll('a')).toHaveLength(1);
+    expect(link.textContent).toBe('Открыть');
   });
 
   it('shows a character count error without substituting zero or requesting unsupported counts', async () => {
@@ -127,8 +157,8 @@ describe('CampaignOverview', () => {
     renderOverview();
     const first = await screen.findByRole('link', { name: 'Открыть лист Roster hero' });
     const secondLink = await screen.findByRole('link', { name: 'Открыть лист Second hero' });
-    expect(first.parentElement).toHaveTextContent('Roster hero ↗ — Профиль недоступен');
-    expect(secondLink.parentElement).toHaveTextContent('Second hero ↗ — Профиль недоступен');
+    expect(first.parentElement?.firstElementChild).toHaveTextContent('Roster heroПрофиль недоступен');
+    expect(secondLink.parentElement?.firstElementChild).toHaveTextContent('Second heroПрофиль недоступен');
     expect(screen.queryByText('Observer hero')).not.toBeInTheDocument();
     expect(screen.queryByText('Unavailable hero')).not.toBeInTheDocument();
     expect(screen.getByText('Сведения о ведущих недоступны.')).toBeInTheDocument();
@@ -166,7 +196,7 @@ describe('CampaignOverview', () => {
 
     const newLink = await screen.findByRole('link', { name: 'Открыть лист New character' });
     expect(newLink).toHaveAttribute('href', '/groups/13/gm/characters/new-character/overview');
-    expect(newLink.parentElement).toHaveTextContent('New character ↗ — New GM');
+    expect(newLink.parentElement?.firstElementChild).toHaveTextContent('New characterNew GM');
     expect(screen.queryByRole('link', { name: 'Открыть лист Old character' })).not.toBeInTheDocument();
     expect(api.characterPermissions).toHaveBeenCalledWith(12, oldCharacter.id);
     expect(api.characterPermissions).toHaveBeenCalledWith(13, newCharacter.id);
