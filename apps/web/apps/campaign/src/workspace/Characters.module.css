@@ -40,7 +40,7 @@
   min-height: 5rem;
   border: 0;
   border-left: 3px solid var(--accent-color);
-  border-radius: 0;
+  border-radius: var(--border-radius-sm);
   font-size: 1.25rem;
   justify-content: center;
 }

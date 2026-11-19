@@ -120,7 +120,7 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
            {importance === 'Secondary' && <List layout="vertical" stretch gap="small">
              {items.map(item => <GMCharacterEntry key={item.id} character={item} href={characterHref(item.id)} campaignId={campaignId} resourceKey={key} />)}
           </List>}
-          {importance === 'Background' && <List layout="vertical" stretch gap="small">
+           {importance === 'Background' && <List layout="vertical" stretch gap="small" style={{ gap: '0.125rem' }}>
              {items.map(item => <GMCharacterEntry key={item.id} character={item} href={characterHref(item.id)} campaignId={campaignId} resourceKey={key} />)}
           </List>}
         </section>;
