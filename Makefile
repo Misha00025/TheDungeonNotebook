@@ -36,10 +36,10 @@ build-all:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) $(IMAGE_SERVICES)
 
 build-backend:
-	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) api-gateway users-service account-service campaign-service game-systems-service sync-service
+	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) api-gateway users-service account-service campaign-service
 
 build-web:
-	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) web-hub web-campaign web-profile web-login web-game-systems web-proxy
+	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) web-hub web-campaign web-profile web-login web-proxy
 
 build-api-gateway:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) api-gateway

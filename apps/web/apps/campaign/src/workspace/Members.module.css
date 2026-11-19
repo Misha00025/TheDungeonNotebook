@@ -1,0 +1,126 @@
+.page {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.addPanel {
+  min-width: 0;
+}
+
+.searchForm {
+  display: flex;
+  align-items: end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.searchField {
+  flex: 1 1 16rem;
+  min-width: min(100%, 12rem);
+}
+
+.searchResults {
+  max-height: 18rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-top: 0.75rem;
+}
+
+.searchResult {
+  min-width: 0;
+}
+
+.searchCardContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.membersTable {
+  table-layout: fixed;
+}
+
+.membersTable th,
+.membersTable td {
+  vertical-align: top;
+}
+
+.membersTable th:first-child,
+.membersTable td:first-child {
+  width: 3rem;
+}
+
+.membersTable th:nth-child(2),
+.membersTable td:nth-child(2) {
+  width: 16rem;
+}
+
+.membersTable th:nth-child(4),
+.membersTable td:nth-child(4) {
+  width: 11rem;
+}
+
+.nameCell {
+  overflow-wrap: anywhere;
+}
+
+.assignmentList {
+  min-width: 0;
+}
+
+.assignmentItem {
+  display: grid;
+  grid-template-columns: minmax(7rem, 1fr) minmax(8rem, 11rem) auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.assignmentName {
+  overflow-wrap: anywhere;
+}
+
+.assignmentItem > .operationError {
+  grid-column: 1 / -1;
+}
+
+.operationError {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.rowActions {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.crown {
+  display: inline-flex;
+  width: 1.5rem;
+  height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.crown svg {
+  width: 100%;
+  height: 100%;
+}
+
+.pendingAdd {
+  min-width: 0;
+}
+
+.dialogActions {
+  justify-content: end;
+  margin-top: 1rem;
+}
+
+@media (max-width: 44rem) {
+  .assignmentItem {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+}

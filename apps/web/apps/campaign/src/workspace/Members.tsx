@@ -1,188 +1,260 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useWorkspace, useDirtyDraft, useDirtyState } from './Workspace';
-import { useCampaignWorkspace } from './Shell';
-import { useMutation, useResource } from './hooks';
-import type { Assignment, CharacterMetadata, Member, Permissions, User } from './types';
+import { ActionRow, Button, DataTable, Field, IconButton, Input, List, ListItem, ModalPortal, Notification, PageHeader, Panel, Select } from '@tdn/shared';
+import { useWorkspace } from './Workspace';
+import { useResource } from './hooks';
 import { ApiError } from './Feedback';
-import { Notification } from '@tdn/shared';
-import commonStyles from '@tdn/shared/styles/common.module.css';
-import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
-import inputStyles from '@tdn/shared/styles/components/Input.module.css';
-import styles from './Workspace.module.css';
+import { useMembersAccess } from './useMembersAccess';
+import type { CharacterAccessEntry, MemberOperation } from './useMembersAccess';
+import type { Member, User } from './types';
+import styles from './Members.module.css';
 
-const isStatus = (error: unknown, status: number) => Boolean(error && typeof error === 'object' && 'status' in error && Number(error.status) === status);
-const isCode = (error: unknown, code: string) => Boolean(error && typeof error === 'object' && 'problem' in error && (error as { problem?: { code?: string } }).problem?.code === code);
-const unknownOutcome = (error: unknown) => Boolean(error && typeof error === 'object' && 'unknownOutcome' in error && error.unknownOutcome);
-const int32 = (value: string) => /^-?\d+$/.test(value) && Number.isInteger(Number(value)) && Number(value) >= -2147483648 && Number(value) <= 2147483647;
+const int32UserId = (value: number) => Number.isInteger(value) && value >= -2147483648 && value <= 2147483647;
+const errorCode = (error: unknown) => error && typeof error === 'object' && 'problem' in error && error.problem && typeof error.problem === 'object' && 'code' in error.problem ? error.problem.code : undefined;
+const isMemberAssignmentsConflict = (error: unknown) => errorCode(error) === 'member_has_assignments';
+const userName = (user?: User) => user?.visibleName?.trim() || user?.nickname?.trim() || 'Профиль недоступен';
+const userLabel = (user?: User) => user?.nickname ? `${userName(user)} (@${user.nickname})` : userName(user);
 
-const MemberOption: React.FC<{ campaignId: number; sessionKey: string; member: Member }> = ({ campaignId, sessionKey, member }) => {
+const Crown: React.FC = () => <span className={styles.crown} role="img" aria-label="Гейм-мастер" title="Гейм-мастер"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="m3 7 4.5 4L12 4l4.5 7L21 7l-2 12H5L3 7Z" /><path d="M5 16h14" /></svg></span>;
+
+const OperationRecovery: React.FC<{ op?: MemberOperation; onRead?: () => void; onRetry?: () => void; onDiscard?: () => void; readLabel: string; disabled?: boolean }> = ({ op, onRead, onRetry, onDiscard, readLabel, disabled = false }) => {
+  if (!op || op.busy || (!op.error && op.targetValue === undefined && !op.blocked)) return null;
+  return <div className={styles.operationError}>
+    {Boolean(op.error) && <ApiError error={op.error} />}
+    {op.blocked && onRead && <Button type="button" variant="secondary" size="small" disabled={disabled} onClick={onRead}>{readLabel}</Button>}
+    {!op.blocked && onRetry && (op.targetValue !== undefined || op.kind === 'member-add' || op.kind === 'assignment-add') && <ActionRow>
+      <Button type="button" variant="secondary" size="small" disabled={disabled || op.busy} onClick={onRetry}>Повторить</Button>
+      {onDiscard && <Button type="button" variant="secondary" size="small" disabled={disabled || op.busy} onClick={onDiscard}>Отказаться от изменения</Button>}
+    </ActionRow>}
+  </div>;
+};
+
+const AssignmentLine: React.FC<{ entry: CharacterAccessEntry; userName: string; userId: number; access: ReturnType<typeof useMembersAccess>; participantsLoading: boolean }> = ({ entry, userName: memberName, userId, access, participantsLoading }) => {
+  const characterId = entry.character.id;
+  const assignment = entry.assignments.find(item => item.userId === userId);
+  if (!assignment) return null;
+  const op = access.operationForAssignment(characterId, userId);
+  const canWrite = op?.kind === 'access' && op.targetValue !== undefined ? op.targetValue : assignment.canWrite;
+  const disabled = !access.writable || access.isBusy || participantsLoading || Boolean(access.charsError) || entry.loading || Boolean(entry.error || entry.unavailable) || !entry.permissions?.canManageAccess || Boolean(op?.blocked || op?.busy);
+  const remove = () => {
+    if (!window.confirm('Снять доступ к персонажу? Назначение будет удалено без каскада.')) return;
+    void access.removeAssignment(characterId, userId);
+  };
+  return <ListItem className={styles.assignmentItem} density="compact">
+    <span className={styles.assignmentName}>{entry.character.name}</span>
+    <Select aria-label={`Уровень доступа ${entry.character.name} для ${memberName}`} value={canWrite ? 'write' : 'read'} disabled={disabled} onChange={event => void access.setAssignmentAccess(characterId, userId, event.target.value === 'write')}>
+      <option value="read">Просмотр</option><option value="write">Редактирование</option>
+    </Select>
+    <IconButton icon="delete" variant="danger" title={`Снять доступ ${memberName} к ${entry.character.name}`} ariaLabel={`Снять доступ ${memberName} к ${entry.character.name}`} disabled={disabled} onClick={remove} />
+    <OperationRecovery op={op} onRead={() => void access.rereadAssignment(characterId, userId)} onRetry={() => void access.retryOperation(access.assignmentOperationKey(characterId, userId))} onDiscard={() => access.discardOperation(access.assignmentOperationKey(characterId, userId))} readLabel={`Перечитать доступ ${memberName} к ${entry.character.name}`} disabled={!access.writable || access.isBusy} />
+  </ListItem>;
+};
+
+const MemberRow: React.FC<{ member: Member; campaignId: number; sessionKey: string; access: ReturnType<typeof useMembersAccess>; onAssign: (member: Member, displayName: string) => void; charactersComplete: boolean; participantsLoading: boolean; onProfileState: (userId: number, state?: { loading: boolean; failed: boolean }) => void; profileRetryVersion: number }> = ({ member, campaignId, sessionKey, access, onAssign, charactersComplete, participantsLoading, onProfileState, profileRetryVersion }) => {
   const { api } = useWorkspace();
   const profile = useResource<User>(`${sessionKey}:${campaignId}:user:${member.userId}`, () => api.getUser(member.userId));
-  const visibleName = profile.data?.visibleName || profile.data?.nickname;
-  return <option value={member.userId}>{profile.loading ? 'Загрузка профиля…' : profile.error || !visibleName ? 'Профиль недоступен' : `${visibleName}${profile.data?.nickname ? ` (@${profile.data.nickname})` : ''}`}</option>;
-};
-
-const MemberRow: React.FC<{ campaignId: number; sessionKey: string; row: Member; writeAllowed: boolean; onChanged: () => void }> = ({ campaignId, sessionKey, row, writeAllowed, onChanged }) => {
-  const { api } = useWorkspace();
-  const profile = useResource<User>(`${sessionKey}:${campaignId}:user:${row.userId}`, () => api.getUser(row.userId));
-  const [baseline, setBaseline] = useState({ value: row.isAdmin, revision: row.metadataRevision });
-  const [admin, setAdmin] = useState(row.isAdmin);
-  const [frozen, setFrozen] = useState(false);
-  const [missing, setMissing] = useState(false);
-  const [readError, setReadError] = useState<unknown>();
-  const [saved, setSaved] = useState(false);
-  const [snapshot, setSnapshot] = useState<Member>();
-  const dirty = admin !== baseline.value;
-  const clearDirty = useDirtyDraft(`member-${campaignId}-${row.userId}`, dirty);
-  const pending = useRef(false);
-  const seenRevision = useRef(String(row.metadataRevision));
-  const ownSuccessRevision = useRef<string | undefined>(undefined);
+  const previousRetry = useRef(profileRetryVersion);
+  useEffect(() => { onProfileState(member.userId, { loading: profile.loading, failed: Boolean(profile.error) }); }, [member.userId, onProfileState, profile.error, profile.loading]);
+  useEffect(() => () => onProfileState(member.userId), [member.userId, onProfileState]);
   useEffect(() => {
-    const nextRevision = String(row.metadataRevision);
-    if (seenRevision.current === nextRevision) return;
-    seenRevision.current = nextRevision;
-    if (ownSuccessRevision.current === nextRevision) { ownSuccessRevision.current = undefined; return; }
-    if (!dirty) { setBaseline({ value: row.isAdmin, revision: row.metadataRevision }); setAdmin(row.isAdmin); setSnapshot(undefined); setFrozen(false); setSaved(false); }
-    else if (nextRevision !== String(baseline.revision)) { setSnapshot(row); setFrozen(true); }
-  }, [row, dirty, baseline.revision]);
-  const save = useMutation((value: boolean) => api.putMember(campaignId, row.userId, { isAdmin: value, expectedRevision: baseline.revision }));
-  const remove = useMutation(() => api.deleteMember(campaignId, row.userId, baseline.revision));
-  const reread = async () => { setReadError(undefined); try { const fresh = await api.listMembers(campaignId); const current = fresh.find(item => item.userId === row.userId); if (!current) { setMissing(true); setFrozen(true); setSnapshot(undefined); return; } setMissing(false); setBaseline({ value: current.isAdmin, revision: current.metadataRevision }); setSnapshot(current); setFrozen(false); } catch (error) { setReadError(error); setFrozen(true); if (isStatus(error, 403)) onChanged(); } };
-  const cancel = () => { if (dirty && !window.confirm('Отказаться от черновика участника?')) return; setAdmin(baseline.value); clearDirty(); };
-  const saveRow = async () => { if (!writeAllowed || frozen || missing || pending.current || save.busy || remove.busy) return; pending.current = true; const submitted = admin; try { const result = await save.run(submitted); if (result) { setBaseline({ value: result.isAdmin, revision: result.metadataRevision }); setAdmin(result.isAdmin); ownSuccessRevision.current = String(result.metadataRevision); setSnapshot(undefined); setFrozen(false); setMissing(false); setSaved(true); clearDirty(); onChanged(); } } catch (error) { if ((isStatus(error, 409) && !rowConflict(error)) || Boolean(error && typeof error === 'object' && 'unknownOutcome' in error && error.unknownOutcome)) setFrozen(true); if (isStatus(error, 403)) onChanged(); } finally { pending.current = false; } };
-  const deleteRow = async () => { if (!writeAllowed || frozen || missing || pending.current || save.busy || remove.busy) return; if (!window.confirm('Удалить членство в кампании? Доступы к персонажам автоматически не удаляются.')) return; pending.current = true; try { await remove.run(); onChanged(); } catch (error) { if ((isStatus(error, 409) && !rowConflict(error)) || Boolean(error && typeof error === 'object' && 'unknownOutcome' in error && error.unknownOutcome)) setFrozen(true); if (isStatus(error, 403)) onChanged(); } finally { pending.current = false; } };
-  return <article className={commonStyles.card}>
-     <h3>{profile.data?.visibleName || profile.data?.nickname || 'Профиль недоступен'}</h3>
-      {profile.loading && <p>Загрузка профиля…</p>}{Boolean(profile.error) && <ApiError error={profile.error} />}
-      <label><input type="checkbox" checked={admin} disabled={!writeAllowed || save.busy || remove.busy || frozen || missing} onChange={event => { setAdmin(event.target.checked); setSaved(false); }} /> Администратор кампании</label>
-       {saved && <Notification kind="success" eventKey={String(baseline.revision)}>Изменения сохранены.</Notification>}
-       {snapshot && <p>Актуальная версия: {snapshot.isAdmin ? 'администратор' : 'участник'}. Черновик сохранён отдельно.</p>}{missing && <Notification kind="warning" eventKey={String(baseline.revision)}>Запись отсутствует на сервере. Черновик оставлен только для чтения.</Notification>}
-    {rowConflict(remove.error) && <Notification kind="error" eventKey={remove.error}>Нельзя удалить членство: к участнику привязаны назначения. Удалите их отдельно в доступе к персонажу; каскад не выполняется.</Notification>}
-     {Boolean(save.error) && <ApiError error={save.error} />}{Boolean(remove.error && !rowConflict(remove.error)) && <ApiError error={remove.error} />}{Boolean(readError) && <ApiError error={readError} />}
-      {frozen && <div><Notification kind="warning" eventKey={String(snapshot?.metadataRevision ?? baseline.revision)}>Изменение не подтверждено. Перечитайте запись и сравните версии до дальнейших действий.</Notification><button type="button" className={buttonStyles.button} onClick={() => void reread()}>Перечитать запись</button>{missing && <button type="button" className={buttonStyles.button} onClick={() => { setMissing(false); setFrozen(false); setAdmin(baseline.value); clearDirty(); onChanged(); }}>Подтвердить отсутствие записи</button>}</div>}
-    <div className={commonStyles.formActions}>
-       <button className={buttonStyles.button} disabled={!writeAllowed || !dirty || save.busy || remove.busy || frozen || missing} onClick={() => void saveRow()}>Сохранить</button>
-        <button className={buttonStyles.button} disabled={save.busy || remove.busy || pending.current || missing} onClick={cancel}>Отмена</button>
-        <button className={buttonStyles.button} disabled={!writeAllowed || save.busy || remove.busy || frozen || missing} onClick={() => void deleteRow()}>Удалить членство</button>
-      {(isStatus(save.error, 409) || isStatus(remove.error, 409)) && !frozen && <button type="button" className={buttonStyles.button} onClick={() => void reread()}>Перечитать запись</button>}
-    </div>
-  </article>;
+    if (previousRetry.current === profileRetryVersion) return;
+    previousRetry.current = profileRetryVersion;
+    if (profile.error) profile.reload();
+  }, [profile.error, profile.reload, profileRetryVersion]);
+  const name = profile.data ? userName(profile.data) : 'Участник';
+  const visibleProfileName = profile.data ? userLabel(profile.data) : profile.error ? 'Профиль недоступен' : null;
+  const assignments = access.characters.filter(entry => entry.assignments.some(item => item.userId === member.userId));
+  const op = access.operationForMember(member.userId);
+  const memberBlocked = Boolean(op?.blocked);
+  const rowDisabled = !access.writable || access.isBusy || participantsLoading || memberBlocked;
+  const remove = () => {
+    if (!window.confirm('Удалить членство в кампании? Доступы к персонажам автоматически не удаляются.')) return;
+    void access.removeMember(member.userId);
+  };
+  const errorConflict = isMemberAssignmentsConflict(op?.error);
+  return <tr aria-label={`Участник ${name}`}>
+    <td>{member.isAdmin ? <Crown /> : null}</td>
+    <th scope="row" className={styles.nameCell}>{visibleProfileName && <span>{visibleProfileName}</span>}
+      {errorConflict && <Notification kind="error" eventKey={`member-assignments:${member.userId}`}>Нельзя удалить участника: сначала снимите назначения персонажей в его строке.</Notification>}
+      {!errorConflict && <OperationRecovery op={op} onRead={() => void access.rereadMember(member.userId)} onRetry={() => void access.retryOperation(access.memberOperationKey(member.userId))} onDiscard={() => access.discardOperation(access.memberOperationKey(member.userId))} readLabel={`Перечитать участника ${name}`} disabled={!access.writable || access.isBusy} />}
+    </th>
+    <td><List className={styles.assignmentList} layout="vertical" gap="small" stretch>
+      {assignments.map(entry => <AssignmentLine key={entry.character.id} entry={entry} userName={name} userId={member.userId} access={access} participantsLoading={participantsLoading} />)}
+      {assignments.length === 0 && charactersComplete && <span>Персонажи не назначены.</span>}
+    </List></td>
+    <td><ActionRow className={styles.rowActions}>
+      <IconButton icon="add" title={`Назначить персонажа ${name}`} ariaLabel={`Назначить персонажа ${name}`} disabled={rowDisabled} onClick={() => onAssign(member, name)} />
+      <IconButton icon={member.isAdmin ? 'arrow-down' : 'arrow-up'} title={member.isAdmin ? `Понизить ${name} до игрока` : `Повысить ${name} до ГМ`} ariaLabel={member.isAdmin ? `Понизить ${name} до игрока` : `Повысить ${name} до ГМ`} disabled={rowDisabled || Boolean(op?.blocked || op?.busy)} onClick={() => void access.setMemberRole(member.userId, !member.isAdmin)} />
+      <IconButton icon="delete" variant="danger" title={`Удалить участника ${name}`} ariaLabel={`Удалить участника ${name}`} disabled={rowDisabled || Boolean(op?.blocked || op?.busy)} onClick={remove} />
+    </ActionRow></td>
+  </tr>;
 };
 
-const rowConflict = (error: unknown) => Boolean(error && typeof error === 'object' && 'problem' in error && (error as { problem?: { code?: string } }).problem?.code === 'member_has_assignments');
+const PendingAdd: React.FC<{ op: MemberOperation; access: ReturnType<typeof useMembersAccess>; memberName?: string; characterName?: string }> = ({ op, access, memberName, characterName }) => {
+  if (op.busy) return null;
+  const memberAdd = op.kind === 'member-add';
+  const title = memberAdd ? 'Добавление участника' : 'Добавление назначения';
+  const description = memberAdd ? 'Результат добавления участника не подтверждён.' : 'Результат добавления назначения не подтверждён.';
+  const key = memberAdd ? access.memberAddOperationKey(op.userId) : access.assignmentAddOperationKey(op.characterId ?? '', op.userId);
+  const retry = () => void access.retryOperation(key);
+  const reread = () => memberAdd ? void access.rereadMember(op.userId) : op.characterId ? void access.rereadAssignment(op.characterId, op.userId) : undefined;
+  return <Panel className={styles.pendingAdd} density="compact" title={title} headingLevel={3}>
+    <p>{memberName ?? 'Участник'}{!memberAdd && ` — ${characterName ?? 'персонаж'}`}</p>
+    {op.blocked ? <><Notification kind="warning" eventKey={key}>{description}</Notification>{Boolean(op.error) && <ApiError error={op.error} />}<Button type="button" variant="secondary" onClick={reread} disabled={!access.writable || access.isBusy}>{memberAdd ? 'Проверить добавление участника' : 'Проверить добавление назначения'}</Button></> : <>{Boolean(op.error) && <ApiError error={op.error} />}<ActionRow><Button type="button" variant="secondary" onClick={retry} disabled={!access.writable || access.isBusy}>Повторить</Button><Button type="button" variant="secondary" onClick={() => access.discardOperation(key)} disabled={access.isBusy}>Отказаться</Button></ActionRow></>}
+  </Panel>;
+};
+
+const AssignmentDialog: React.FC<{ member: Member; memberName: string; isOpen: boolean; access: ReturnType<typeof useMembersAccess>; onClose: () => void; participantsLoading: boolean }> = ({ member, memberName, isOpen, access, onClose, participantsLoading }) => {
+  const selectId = useId();
+  const [characterId, setCharacterId] = useState('');
+  const [canWrite, setCanWrite] = useState(false);
+  const mounted = useRef(false);
+  const activeRef = useRef({ isOpen, memberId: member.userId });
+  activeRef.current = { isOpen, memberId: member.userId };
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const assignedIds = new Set(access.characters.filter(entry => entry.assignments.some(row => row.userId === member.userId)).map(entry => entry.character.id));
+  const currentMemberPresent = access.members.some(item => item.userId === member.userId);
+  const available = access.characters.filter(entry => !access.charsError && !entry.loading && !entry.error && !entry.unavailable && entry.permissions?.canManageAccess && !assignedIds.has(entry.character.id));
+  const selected = access.characters.find(entry => entry.character.id === characterId);
+  const addOp = access.pendingAssignmentAdds.find(([, op]) => op.userId === member.userId && op.characterId === characterId)?.[1];
+  const pendingAssignmentBlocked = access.pendingAssignmentAdds.some(([, op]) => op.blocked);
+  const close = () => { if (!access.isBusy) onClose(); };
+  const submit = async () => {
+    if (!currentMemberPresent || assignedIds.has(characterId)) return;
+    const originalMemberId = member.userId;
+    const originalCharacterId = characterId;
+    const result = await access.addAssignment(originalCharacterId, originalMemberId, canWrite);
+    if (result && mounted.current && activeRef.current.isOpen && activeRef.current.memberId === originalMemberId) onClose();
+  };
+  return <ModalPortal isOpen={isOpen} onClose={close} dismissDisabled={access.isBusy} title={`Назначить персонажа ${memberName}`}>
+    {access.pendingAssignmentAdds.map(([key, op]) => <PendingAdd key={key} op={op} access={access} memberName={op.userId === member.userId ? memberName : 'Участник'} characterName={access.characters.find(entry => entry.character.id === op.characterId)?.character.name} />)}
+    <Field label="Персонаж" htmlFor={selectId}>
+      <Select id={selectId} value={characterId} disabled={access.isBusy || Boolean(addOp?.blocked)} onChange={event => setCharacterId(event.target.value)}>
+        <option value="">Выберите персонажа</option>{available.map(entry => <option key={entry.character.id} value={entry.character.id}>{entry.character.name}</option>)}
+      </Select>
+    </Field>
+    <Field label="Уровень доступа" htmlFor={`${selectId}-level`}>
+      <Select id={`${selectId}-level`} value={canWrite ? 'write' : 'read'} disabled={access.isBusy || Boolean(addOp?.blocked)} onChange={event => setCanWrite(event.target.value === 'write')}>
+        <option value="read">Просмотр</option><option value="write">Редактирование</option>
+      </Select>
+    </Field>
+    {!currentMemberPresent && <p role="alert">Участник больше не состоит в кампании.</p>}
+    {characterId && assignedIds.has(characterId) && <p role="alert">Участнику уже назначен этот персонаж.</p>}
+    <ActionRow className={styles.dialogActions}>
+      <Button type="button" variant="secondary" disabled={access.isBusy} onClick={close}>Отмена</Button>
+      <Button type="button" disabled={participantsLoading || !currentMemberPresent || !characterId || assignedIds.has(characterId) || !selected || selected.loading || Boolean(access.charsError || selected.error || selected.unavailable) || !selected.permissions?.canManageAccess || !access.writable || access.isBusy || pendingAssignmentBlocked || access.pendingAssignmentAdds.length > 0 || Boolean(addOp?.blocked)} onClick={() => void submit()}>Назначить</Button>
+    </ActionRow>
+  </ModalPortal>;
+};
+
+const MembersPage: React.FC<{ campaignId: number }> = ({ campaignId }) => {
+  const { api, sessionKey } = useWorkspace();
+  const access = useMembersAccess(campaignId);
+  const searchInputId = useId();
+  const [nickname, setNickname] = useState('');
+  const [searchResults, setSearchResults] = useState<User[] | undefined>();
+  const [searchError, setSearchError] = useState<unknown>();
+  const [searching, setSearching] = useState(false);
+  const [dialogMember, setDialogMember] = useState<{ member: Member; name: string }>();
+  const [profileStates, setProfileStates] = useState<Record<number, { loading: boolean; failed: boolean }>>({});
+  const [profileRetryVersion, setProfileRetryVersion] = useState(0);
+  const profileStatesRef = useRef(profileStates);
+  profileStatesRef.current = profileStates;
+  const searchSequence = useRef(0);
+  const mounted = useRef(false);
+  const writableRef = useRef(access.writable);
+  writableRef.current = access.writable;
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; searchSequence.current += 1; }; }, []);
+  const updateProfileState = useCallback((userId: number, next?: { loading: boolean; failed: boolean }) => {
+    const current = profileStatesRef.current;
+    if (!next) {
+      if (!(userId in current)) return;
+      const updated = Object.fromEntries(Object.entries(current).filter(([key]) => Number(key) !== userId));
+      profileStatesRef.current = updated;
+      setProfileStates(updated);
+      return;
+    }
+    const previous = current[userId];
+    if (previous?.loading === next.loading && previous.failed === next.failed) return;
+    const updated = { ...current, [userId]: next };
+    profileStatesRef.current = updated;
+    setProfileStates(updated);
+  }, []);
+  const search = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!access.writable || access.isBusy) return;
+    const sequence = ++searchSequence.current;
+    setSearching(true); setSearchResults(undefined); setSearchError(undefined);
+    try {
+      const result = await api.searchUsers(nickname);
+      if (mounted.current && writableRef.current && sequence === searchSequence.current) setSearchResults(result.filter(user => int32UserId(user.id)));
+    } catch (error) {
+      if (mounted.current && writableRef.current && sequence === searchSequence.current) setSearchError(error);
+    } finally { if (mounted.current && sequence === searchSequence.current) setSearching(false); }
+  };
+  const memberIds = new Set(access.members.map(item => item.userId));
+  const charactersComplete = !access.charsLoading && !access.charsError && access.characters.every(entry => !entry.loading && !entry.error && !entry.unavailable && entry.permissions?.canManageAccess);
+  const profilesLoading = access.listLoading || access.members.some(member => profileStates[member.userId]?.loading ?? true);
+  const assignmentsLoading = access.charsLoading || access.characters.some(entry => entry.loading);
+  const participantsLoading = profilesLoading || assignmentsLoading;
+  const profilesFailed = access.members.some(member => profileStates[member.userId]?.failed);
+  const openAssignment = (member: Member, name: string) => setDialogMember({ member, name });
+  const closeAssignment = () => setDialogMember(undefined);
+  const pendingMemberAdds = access.pendingMemberAdds;
+  const pendingAssignmentAdds = access.pendingAssignmentAdds;
+  const processing = access.displayAllowed && (participantsLoading || access.isBusy || searching || !access.writable);
+  const assignmentErrors = Boolean(access.charsError || access.characters.some(entry => Boolean(entry.error || entry.unavailable)));
+  const sectionReadErrorsSettled = access.displayAllowed && !participantsLoading && !processing;
+  return <section className={styles.page}>
+    <PageHeader title="Участники и доступ" />
+    {access.feedback ? <Notification kind={access.feedback.kind} eventKey={String(access.feedback.event)}>{access.feedback.message}</Notification> : null}
+    {processing && <Notification kind="info" eventKey={`members-processing:${sessionKey}:${campaignId}`}>{searching || access.isBusy ? 'Обработка…' : 'Загрузка…'}</Notification>}
+    {sectionReadErrorsSettled && (assignmentErrors || profilesFailed) && <Notification kind="warning" eventKey={`members-section-read:${sessionKey}:${campaignId}`}>{assignmentErrors && profilesFailed ? 'Не все данные списка участников доступны.' : assignmentErrors ? 'Не все назначения доступны.' : 'Не все профили доступны.'}</Notification>}
+    {!access.displayAllowed && <p>Список членства доступен только управляющим доступом.</p>}
+    {access.displayAllowed && <>
+      <Panel title="Добавить участника" headingLevel={2} className={styles.addPanel} aria-busy={searching || undefined}>
+        <form className={styles.searchForm} aria-busy={searching || undefined} onSubmit={event => void search(event)}>
+          <Field label="Никнейм" htmlFor={searchInputId} className={styles.searchField}>
+            <Input id={searchInputId} value={nickname} disabled={!access.writable || access.isBusy} onChange={event => { setNickname(event.target.value); searchSequence.current += 1; setSearching(false); setSearchResults(undefined); setSearchError(undefined); }} />
+          </Field>
+          <Button type="submit" variant="secondary" disabled={!access.writable || access.isBusy || searching} busy={searching}>Найти</Button>
+        </form>
+        {Boolean(searchError) && <ApiError error={searchError} />}
+        {searchResults && searchResults.length === 0 && <p>Ничего не найдено.</p>}
+        {searchResults && searchResults.length > 0 && <List className={styles.searchResults} layout="vertical" gap="small" stretch aria-label="Результаты поиска участников">
+          {searchResults.map(user => {
+            const alreadyMember = memberIds.has(user.id);
+            const name = userLabel(user);
+            return <Panel key={user.id} density="compact" className={styles.searchResult}>
+              <div className={styles.searchCardContent}>
+                <span>{name}</span>
+              <IconButton icon="add" title={`Добавить участника ${userName(user)}`} ariaLabel={`Добавить участника ${userName(user)}`} disabled={participantsLoading || alreadyMember || !access.writable || access.isBusy || pendingMemberAdds.length > 0} onClick={() => void access.addMember(user.id)} />
+                {alreadyMember && <span>Уже в кампании</span>}
+              </div>
+            </Panel>;
+          })}
+        </List>}
+      </Panel>
+      {pendingMemberAdds.map(([key, op]) => <PendingAdd key={key} op={op} access={access} memberName={searchResults?.find(user => user.id === op.userId) ? userName(searchResults.find(user => user.id === op.userId)) : undefined} />)}
+      {pendingAssignmentAdds.length > 0 && !dialogMember && pendingAssignmentAdds.map(([key, op]) => <PendingAdd key={key} op={op} access={access} memberName="Участник" characterName={access.characters.find(entry => entry.character.id === op.characterId)?.character.name} />)}
+      {Boolean(access.listError) && <ApiError error={access.listError} onRetry={access.reload} />}
+      {sectionReadErrorsSettled && assignmentErrors && <Button type="button" variant="secondary" size="small" disabled={!access.writable || access.isBusy} onClick={access.reload}>Повторить загрузку назначений</Button>}
+      {sectionReadErrorsSettled && profilesFailed && <Button type="button" variant="secondary" size="small" disabled={!access.writable || access.isBusy} onClick={() => setProfileRetryVersion(version => version + 1)}>Повторить загрузку профилей</Button>}
+      {!access.listLoading && !access.listError && access.members.length === 0 && <p>Участников нет.</p>}
+      <DataTable aria-label="Участники кампании" aria-busy={participantsLoading || undefined} minWidth="48rem" className={styles.membersTable}>
+        <thead><tr><th scope="col">#</th><th scope="col">Имя</th><th scope="col">Персонажи</th><th scope="col">Действия</th></tr></thead>
+        <tbody>{access.members.map(member => <MemberRow key={`${campaignId}:${member.userId}`} member={member} campaignId={campaignId} sessionKey={sessionKey} access={access} onAssign={openAssignment} charactersComplete={charactersComplete} participantsLoading={participantsLoading} onProfileState={updateProfileState} profileRetryVersion={profileRetryVersion} />)}</tbody>
+      </DataTable>
+      {dialogMember && <AssignmentDialog member={dialogMember.member} memberName={dialogMember.name} isOpen access={access} onClose={closeAssignment} participantsLoading={participantsLoading} />}
+    </>}
+  </section>;
+};
 
 const Members: React.FC = () => {
   const { groupId = '' } = useParams();
   const campaignId = Number(groupId);
-  const { api, sessionKey, invalidation, notifyInvalidation } = useWorkspace();
-  const { permissions, lastKnownPermissions, permissionsLoading = false, mode } = useCampaignWorkspace();
-  const dirtyAnywhere = useDirtyState();
-  const allowed = mode === 'gm' && permissions.canWrite;
-  const memberDisplayScope = mode === 'gm' && lastKnownPermissions.canWrite && lastKnownPermissions.canManageAccess;
-  const memberScope = allowed && permissions.canManageAccess && !permissionsLoading;
-  const members = useResource<Member[]>(`${sessionKey}:${campaignId}:members`, () => api.listMembers(campaignId), memberDisplayScope);
-  const characters = useResource<CharacterMetadata[]>(`${sessionKey}:${campaignId}:assignment-characters`, () => api.listCharacters(campaignId), mode === 'gm' && lastKnownPermissions.canWrite);
-  const [characterId, setCharacterId] = useState('');
-  const characterPermission = useResource<Permissions>(`${sessionKey}:${campaignId}:character-access:${characterId}`, () => api.characterPermissions(campaignId, characterId), Boolean(characterId && mode === 'gm' && lastKnownPermissions.canWrite));
-  const assignmentReady = Boolean(characterId && allowed && !permissionsLoading && !characterPermission.loading && !characterPermission.error && characterPermission.data?.canManageAccess);
-  const assignmentDisplayReady = Boolean(characterId && mode === 'gm' && lastKnownPermissions.canWrite && characterPermission.data?.canManageAccess);
-  const assignments = useResource<Assignment[]>(`${sessionKey}:${campaignId}:assignments:${characterId}`, () => api.listAssignments(campaignId, characterId), assignmentDisplayReady);
-  const [nickname, setNickname] = useState('');
-  const [searchResults, setSearchResults] = useState<User[] | null>(null);
-  const [selectedUserId, setSelectedUserId] = useState('');
-  const [selectedGrantUserId, setSelectedGrantUserId] = useState('');
-  const [searchError, setSearchError] = useState<unknown>();
-  const [addError, setAddError] = useState<unknown>();
-  const [memberAddBlock, setMemberAddBlock] = useState<{ userId: number; isAdmin: false; exists?: boolean; error?: unknown }>();
-  const [assignmentAddBlock, setAssignmentAddBlock] = useState<{ userId: number; characterId: string; canWrite: false; exists?: boolean; error?: unknown }>();
-  const searchSequence = useRef(0);
-  const addMember = useMutation((userId: number) => api.putMember(campaignId, userId, { isAdmin: false, expectedRevision: 0 }));
-  const addAssignment = useMutation((userId: number) => api.putAssignment(campaignId, characterId, userId, { canWrite: false, expectedRevision: 0 }));
-  const previousInvalidation = useRef(invalidation);
-  useEffect(() => { if (previousInvalidation.current === invalidation) return; previousInvalidation.current = invalidation; members.reload(); characters.reload(); characterPermission.reload(); assignments.reload(); }, [invalidation]);
-  useEffect(() => () => { searchSequence.current += 1; }, []);
-  const refresh = () => notifyInvalidation('access');
-  const search = async (event: React.FormEvent) => {
-    event.preventDefault(); if (!memberScope) return; const sequence = ++searchSequence.current; setSearchError(undefined); setSearchResults(null);
-    try { const found = await api.searchUsers(nickname); if (sequence === searchSequence.current) setSearchResults(found); }
-    catch (error) { if (sequence === searchSequence.current) setSearchError(error); }
-  };
-  const add = async (event: React.FormEvent) => { event.preventDefault(); if (!memberScope || !int32(selectedUserId) || addMember.busy || memberAddBlock) return; const userId = Number(selectedUserId); setAddError(undefined); try { await addMember.run(userId); setSelectedUserId(''); setSearchResults(null); refresh(); } catch (error) { setAddError(error); if (unknownOutcome(error) || isCode(error, 'member_already_exists')) setMemberAddBlock({ userId, isAdmin: false }); if (isStatus(error, 403)) refresh(); } };
-  const verifyMemberAdd = async () => { if (!memberScope || !memberAddBlock) return; try { const current = (await api.listMembers(campaignId)).find(item => item.userId === memberAddBlock.userId); if (current) { setMemberAddBlock({ userId: current.userId, isAdmin: memberAddBlock.isAdmin, exists: true }); refresh(); } else setMemberAddBlock(undefined); } catch (error) { setMemberAddBlock(current => current ? { ...current, error } : current); } };
-  const selectCharacter = (next: string) => { if (next === characterId) return; if ((dirtyAnywhere || assignmentAddBlock) && !window.confirm(assignmentAddBlock ? 'Результат добавления назначения не подтверждён. Сменить персонажа и оставить проверку для текущего персонажа?' : 'Есть несохранённые изменения. Сменить выбранного персонажа?')) return; setCharacterId(next); setSelectedGrantUserId(''); setAssignmentAddBlock(undefined); };
-  const addGrant = async (event: React.FormEvent) => { event.preventDefault(); if (!assignmentReady || !memberScope || !int32(selectedGrantUserId) || addAssignment.busy || assignmentAddBlock) return; const userId = Number(selectedGrantUserId); setAddError(undefined); try { await addAssignment.run(userId); setSelectedGrantUserId(''); refresh(); } catch (error) { setAddError(error); if (unknownOutcome(error) || isCode(error, 'assignment_already_exists')) setAssignmentAddBlock({ userId, characterId, canWrite: false }); if (isStatus(error, 403)) refresh(); } };
-  const verifyAssignmentAdd = async () => { if (!assignmentReady || !assignmentAddBlock || assignmentAddBlock.characterId !== characterId) return; try { const current = (await api.listAssignments(campaignId, characterId)).find(item => item.userId === assignmentAddBlock.userId); if (current) { setAssignmentAddBlock({ ...assignmentAddBlock, exists: true }); refresh(); } else setAssignmentAddBlock(undefined); } catch (error) { setAssignmentAddBlock(current => current ? { ...current, error } : current); } };
-  return <section className={styles.page}>
-      <h2>Участники кампании</h2>
-       {!allowed && <Notification kind="error" eventKey={`${mode}:${permissions.canWrite}`}>Нет доступа к управлению участниками.</Notification>}
-      {memberDisplayScope ? <>
-        {members.loading && !members.data && <p>Загрузка участников…</p>}{Boolean(members.error) && <ApiError error={members.error} onRetry={members.reload} />}
-        {members.data?.map(member => <MemberRow key={`${sessionKey}:${campaignId}:${member.userId}`} campaignId={campaignId} sessionKey={sessionKey} row={member} writeAllowed={memberScope} onChanged={refresh} />)}
-        {members.data?.length === 0 && <p>Участников нет.</p>}
-         <form className={commonStyles.form} onSubmit={search}><h3>Добавить участника</h3><label className={commonStyles.formGroup}>Никнейм<input className={inputStyles.input} disabled={!memberScope || Boolean(memberAddBlock && !memberAddBlock.exists)} value={nickname} onChange={event => { setNickname(event.target.value); searchSequence.current += 1; setSearchResults(null); }} /></label><button className={buttonStyles.button} type="submit" disabled={!memberScope || Boolean(memberAddBlock && !memberAddBlock.exists)}>Найти</button>{Boolean(searchError) && <ApiError error={searchError} />}{searchResults && <label className={commonStyles.formGroup}>Найденный пользователь<select className={inputStyles.input} disabled={!memberScope || Boolean(memberAddBlock && !memberAddBlock.exists)} value={selectedUserId} onChange={event => { const value = event.target.value; setSelectedUserId(value); if (memberAddBlock?.exists && Number(value) !== memberAddBlock.userId) setMemberAddBlock(undefined); }}><option value="">Выберите пользователя</option>{searchResults.map(user => <option key={user.id} value={user.id}>{user.visibleName} (@{user.nickname})</option>)}</select></label>}</form>
-         {Boolean(addError) && <ApiError error={addError} />}{searchResults && <form onSubmit={add}><button className={buttonStyles.button} disabled={!memberScope || !int32(selectedUserId) || addMember.busy || Boolean(memberAddBlock)}>Добавить участника</button></form>}{memberAddBlock && <div><Notification kind={memberAddBlock.exists ? 'info' : 'warning'} eventKey={String(memberAddBlock.userId)}>{memberAddBlock.exists ? 'Запись уже существует. Список обновляется; повторное добавление не отправлено.' : 'Результат добавления участника не подтверждён.'}</Notification>{Boolean(memberAddBlock.error) && <ApiError error={memberAddBlock.error} />}{!memberAddBlock.exists && <button type="button" className={buttonStyles.button} disabled={!memberScope} onClick={() => void verifyMemberAdd()}>Проверить добавление</button>}</div>}
-      </> : <p>{permissionsLoading ? 'Проверка прав на членство…' : 'Список членства доступен только управляющим доступом.'}</p>}
-      <h2>Доступ к выбранному персонажу</h2>
-      {characters.loading && !characters.data && <p>Загрузка персонажей…</p>}{Boolean(characters.error) && <ApiError error={characters.error} onRetry={characters.reload} />}
-      {characters.data && <label>Персонаж<select className={inputStyles.input} value={characterId} onChange={event => selectCharacter(event.target.value)}><option value="">Выберите персонажа</option>{characters.data.map(character => <option key={character.id} value={character.id}>{character.name}</option>)}</select></label>}
-      {characterId && characterPermission.loading && <p>Проверка доступа к персонажу…</p>}{characterId && Boolean(characterPermission.error) && <ApiError error={characterPermission.error} onRetry={characterPermission.reload} />}
-       {characterId && characterPermission.data && !characterPermission.data.canManageAccess && <Notification kind="error" eventKey={characterId}>Нет права управления назначениями для этого персонажа.</Notification>}
-      {assignmentDisplayReady && <>
-        {(characterPermission.loading || permissionsLoading) && <p>Обновление прав и назначений…</p>}
-        {assignments.loading && !assignments.data && <p>Загрузка назначений…</p>}{Boolean(assignments.error) && <ApiError error={assignments.error} onRetry={assignments.reload} />}
-         {assignments.data && <div className={styles.page}>{assignments.data.map(row => <AssignmentRow key={`${sessionKey}:${campaignId}:${characterId}:${row.userId}`} campaignId={campaignId} sessionKey={sessionKey} characterId={characterId} row={row} writeAllowed={assignmentReady} onChanged={refresh} />)}
-           {memberScope && <form onSubmit={addGrant}><label>Добавить участника<select className={inputStyles.input} disabled={!assignmentReady || Boolean(assignmentAddBlock && !assignmentAddBlock.exists)} value={selectedGrantUserId} onChange={event => { const value = event.target.value; setSelectedGrantUserId(value); if (assignmentAddBlock?.exists && Number(value) !== assignmentAddBlock.userId) setAssignmentAddBlock(undefined); }}><option value="">Выберите участника</option>{members.data?.map(member => <MemberOption key={member.userId} campaignId={campaignId} sessionKey={sessionKey} member={member} />)}</select></label><button className={buttonStyles.button} disabled={!assignmentReady || !int32(selectedGrantUserId) || addAssignment.busy || Boolean(assignmentAddBlock)}>Назначить</button>{Boolean(addAssignment.error) && <ApiError error={addAssignment.error} />}</form>}{assignmentAddBlock && assignmentAddBlock.characterId === characterId && <div><Notification kind={assignmentAddBlock.exists ? 'info' : 'warning'} eventKey={`${assignmentAddBlock.characterId}:${assignmentAddBlock.userId}`}>{assignmentAddBlock.exists ? 'Запись уже существует. Список обновляется; назначение повторно не отправлено.' : 'Результат добавления назначения не подтверждён.'}</Notification>{Boolean(assignmentAddBlock.error) && <ApiError error={assignmentAddBlock.error} />}{!assignmentAddBlock.exists && <button type="button" className={buttonStyles.button} disabled={!assignmentReady} onClick={() => void verifyAssignmentAdd()}>Проверить добавление</button>}</div>}</div>}
-      </>}
-    </section>;
-};
-
-const AssignmentRow: React.FC<{ campaignId: number; sessionKey: string; characterId: string; row: Assignment; writeAllowed: boolean; onChanged: () => void }> = ({ campaignId, sessionKey, characterId, row, writeAllowed, onChanged }) => {
-  const { api } = useWorkspace();
-  const profile = useResource<User>(`${sessionKey}:${campaignId}:user:${row.userId}`, () => api.getUser(row.userId));
-  const [baseline, setBaseline] = useState({ value: row.canWrite, revision: row.metadataRevision });
-  const [canWrite, setCanWrite] = useState(row.canWrite);
-  const [frozen, setFrozen] = useState(false);
-  const [missing, setMissing] = useState(false);
-  const [readError, setReadError] = useState<unknown>();
-  const [saved, setSaved] = useState(false);
-  const [snapshot, setSnapshot] = useState<Assignment>();
-  const dirty = canWrite !== baseline.value;
-  const clearDirty = useDirtyDraft(`assignment-${campaignId}-${characterId}-${row.userId}`, dirty);
-  const pending = useRef(false);
-  const seenRevision = useRef(String(row.metadataRevision));
-  const ownSuccessRevision = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    const nextRevision = String(row.metadataRevision);
-    if (seenRevision.current === nextRevision) return;
-    seenRevision.current = nextRevision;
-    if (ownSuccessRevision.current === nextRevision) { ownSuccessRevision.current = undefined; return; }
-    if (!dirty) { setBaseline({ value: row.canWrite, revision: row.metadataRevision }); setCanWrite(row.canWrite); setSnapshot(undefined); setFrozen(false); setSaved(false); }
-    else if (nextRevision !== String(baseline.revision)) { setSnapshot(row); setFrozen(true); }
-  }, [row, dirty, baseline.revision]);
-  const save = useMutation((value: boolean) => api.putAssignment(campaignId, characterId, row.userId, { canWrite: value, expectedRevision: baseline.revision }));
-  const remove = useMutation(() => api.deleteAssignment(campaignId, characterId, row.userId, baseline.revision));
-   const reread = async () => { setReadError(undefined); try { const list = await api.listAssignments(campaignId, characterId); const current = list.find(item => item.userId === row.userId); if (!current) { setMissing(true); setFrozen(true); setSnapshot(undefined); return; } setMissing(false); setBaseline({ value: current.canWrite, revision: current.metadataRevision }); setSnapshot(current); setFrozen(false); } catch (error) { setReadError(error); setFrozen(true); if (isStatus(error, 403)) onChanged(); } };
-  const saveRow = async () => { if (!writeAllowed || frozen || missing || pending.current || save.busy || remove.busy) return; pending.current = true; const submitted = canWrite; try { const result = await save.run(submitted); if (result) { setBaseline({ value: result.canWrite, revision: result.metadataRevision }); setCanWrite(result.canWrite); ownSuccessRevision.current = String(result.metadataRevision); setSnapshot(undefined); setFrozen(false); setMissing(false); setSaved(true); clearDirty(); onChanged(); } } catch (error) { if ((isStatus(error, 409) && !rowConflict(error)) || Boolean(error && typeof error === 'object' && 'unknownOutcome' in error && error.unknownOutcome)) setFrozen(true); if (isStatus(error, 403)) onChanged(); } finally { pending.current = false; } };
-   const deleteRow = async () => { if (!writeAllowed || frozen || missing || pending.current || save.busy || remove.busy || !window.confirm('Снять доступ к персонажу? Назначение будет удалено без каскада.')) return; pending.current = true; try { await remove.run(); onChanged(); } catch (error) { if ((isStatus(error, 409) && !rowConflict(error)) || Boolean(error && typeof error === 'object' && 'unknownOutcome' in error && error.unknownOutcome)) setFrozen(true); if (isStatus(error, 403)) onChanged(); } finally { pending.current = false; } };
-  return <article className={commonStyles.card}>
-    <p>{profile.data ? `${profile.data.visibleName} (@${profile.data.nickname})` : 'Профиль недоступен'} — доступ к персонажу</p>
-    {Boolean(profile.error) && <><p>Профиль недоступен.</p><ApiError error={profile.error} /></>}
-    <label><input type="checkbox" checked={canWrite} disabled={!writeAllowed || save.busy || remove.busy || pending.current || frozen || missing} onChange={event => { setCanWrite(event.target.checked); setSaved(false); }} /> Может редактировать персонажа</label>
-     {saved && <Notification kind="success" eventKey={String(baseline.revision)}>Изменения сохранены.</Notification>}
-    {snapshot && <p>Актуальная версия: {snapshot.canWrite ? 'редактирование разрешено' : 'только просмотр'}. Черновик сохранён отдельно.</p>}
-     {missing && <Notification kind="warning" eventKey={String(baseline.revision)}>Запись отсутствует на сервере. Черновик оставлен только для чтения.</Notification>}
-    {Boolean(save.error) && <ApiError error={save.error} />}
-    {Boolean(remove.error) && <ApiError error={remove.error} />}
-    {Boolean(readError) && <ApiError error={readError} />}
-     {frozen && <div><Notification kind="warning" eventKey={String(snapshot?.metadataRevision ?? baseline.revision)}>Изменение не подтверждено. Перечитайте запись перед повторной операцией.</Notification><button className={buttonStyles.button} type="button" onClick={() => void reread()}>Перечитать запись</button>{missing && <button type="button" className={buttonStyles.button} onClick={() => { setMissing(false); setFrozen(false); setCanWrite(baseline.value); clearDirty(); onChanged(); }}>Подтвердить отсутствие записи</button>}</div>}
-    <div className={commonStyles.formActions}>
-      <button className={buttonStyles.button} disabled={!writeAllowed || !dirty || save.busy || remove.busy || pending.current || frozen || missing} onClick={() => void saveRow()}>Сохранить</button>
-      <button className={buttonStyles.button} disabled={save.busy || remove.busy || pending.current || missing} onClick={() => { if (dirty && !window.confirm('Отказаться от черновика назначения?')) return; setCanWrite(baseline.value); clearDirty(); }}>Отмена</button>
-      <button className={buttonStyles.button} disabled={!writeAllowed || save.busy || remove.busy || pending.current || frozen || missing} onClick={() => void deleteRow()}>Снять доступ</button>
-      {(isStatus(save.error, 409) || isStatus(remove.error, 409)) && !frozen && <button type="button" className={buttonStyles.button} onClick={() => void reread()}>Перечитать запись</button>}
-    </div>
-  </article>;
+  const { sessionKey } = useWorkspace();
+  return <MembersPage key={`${sessionKey}:${campaignId}`} campaignId={campaignId} />;
 };
 
 export default Members;

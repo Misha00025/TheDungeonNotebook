@@ -114,7 +114,7 @@ describe('campaign first iteration', () => {
       return response([]);
     });
     renderApp('/12/users', request);
-    expect(await screen.findByRole('heading', { name: 'Участники кампании' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Участники и доступ' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Участники и доступ' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Настройки' })).toBeInTheDocument();
     expect(request.mock.calls.some(([url]) => url === '/api/campaigns/12/members')).toBe(true);

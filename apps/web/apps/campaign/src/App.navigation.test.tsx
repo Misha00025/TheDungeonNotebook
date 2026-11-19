@@ -32,7 +32,7 @@ describe('campaign navigation under the Hub route', () => {
     const suffixes = ['gm/overview', 'gm/characters', 'gm/templates', 'gm/formulas', 'gm/views', 'gm/members', 'gm/settings'];
     for (const [index, label] of labels.entries()) expect(within(navigation).getByRole('link', { name: label })).toHaveAttribute('href', `${prefix}/12/${suffixes[index]}`);
 
-    const headings = ['Обзор кампании', 'Персонажи кампании', 'Шаблон кампании', 'Формулы', 'Представления', 'Участники кампании', 'Настройки кампании'];
+    const headings = ['Обзор кампании', 'Персонажи кампании', 'Шаблон кампании', 'Формулы', 'Представления', 'Участники и доступ', 'Настройки кампании'];
     for (const [index, label] of labels.entries()) {
       fireEvent.click(within(navigation).getByRole('link', { name: label }));
       await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe(`/groups/12/${suffixes[index]}`));
