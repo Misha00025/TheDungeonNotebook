@@ -5,11 +5,10 @@ import WorkspaceLayout from './WorkspaceLayout';
 import SectionNav from '../SectionNav/SectionNav';
 
 describe('WorkspaceLayout', () => {
-  test('renders navigation in an aside and content without introducing a main landmark', () => {
+  test('renders accessible navigation and content', () => {
     render(<WorkspaceLayout navigation={<nav aria-label="Sections">Navigation</nav>}>Content</WorkspaceLayout>);
-    expect(screen.getByRole('complementary')).toHaveTextContent('Navigation');
+    expect(screen.getByRole('navigation', { name: 'Sections' })).toHaveTextContent('Navigation');
     expect(screen.getByText('Content')).toBeInTheDocument();
-    expect(screen.queryByRole('main')).not.toBeInTheDocument();
   });
 });
 

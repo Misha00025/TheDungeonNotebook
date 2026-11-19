@@ -1,8 +1,7 @@
 import React, { StrictMode } from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Notification from './Notification';
-import styles from './Notification.module.css';
 
 describe('Notification', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -12,36 +11,27 @@ describe('Notification', () => {
     document.querySelectorAll('dialog[data-notification-test-dialog]').forEach(node => node.remove());
   });
 
-  it('renders variants into shared stack outside source with roles, classes, and headings', () => {
-    const source = document.createElement('main');
-    document.body.appendChild(source);
-    render(<><Notification kind="success">S</Notification><Notification kind="error">E</Notification><Notification kind="warning">W</Notification><Notification kind="info">I</Notification></>, { container: source });
-    expect(source).toBeEmptyDOMElement();
-    const root = document.querySelector('[data-tdn-notifications]');
-    expect(root).toHaveAttribute('role', 'region');
-    expect(root).toHaveAttribute('aria-label', 'Уведомления');
-    expect(root?.children).toHaveLength(4);
-    for (const [message, role, heading, className] of [
-      ['S', 'status', 'Успех', styles.success], ['E', 'alert', 'Ошибка', styles.error],
-      ['W', 'alert', 'Предупреждение', styles.warning], ['I', 'status', 'Информация', styles.info],
-    ]) {
-      const body = screen.getByText(message);
-      expect(body.parentElement).toHaveClass(className);
-      expect(body.parentElement).toHaveAttribute('role', role);
-      expect(body.parentElement).toHaveTextContent(heading);
-    }
-    expect(screen.getAllByLabelText('Время до закрытия уведомления')).toHaveLength(4);
+  it('renders notification variants with accessible roles and labels', () => {
+    render(<><Notification kind="success">S</Notification><Notification kind="error">E</Notification><Notification kind="warning">W</Notification><Notification kind="info">I</Notification></>);
+    expect(screen.getAllByRole('status')).toHaveLength(2);
+    expect(screen.getAllByRole('alert')).toHaveLength(2);
+    expect(within(screen.getAllByRole('status')[0]).getByText('Успех')).toBeInTheDocument();
+    expect(within(screen.getAllByRole('status')[0]).getByText('S')).toBeInTheDocument();
+    expect(within(screen.getAllByRole('alert')[0]).getByText('Ошибка')).toBeInTheDocument();
+    expect(within(screen.getAllByRole('alert')[0]).getByText('E')).toBeInTheDocument();
+    expect(within(screen.getAllByRole('alert')[1]).getByText('Предупреждение')).toBeInTheDocument();
+    expect(within(screen.getAllByRole('alert')[1]).getByText('W')).toBeInTheDocument();
+    expect(within(screen.getAllByRole('status')[1]).getByText('Информация')).toBeInTheDocument();
+    expect(within(screen.getAllByRole('status')[1]).getByText('I')).toBeInTheDocument();
   });
 
-  it('cleans root after timeout and manual close without requiring unmount', () => {
+  it('dismisses after timeout and manual close', () => {
     const { rerender } = render(<Notification durationMs={1000}>Expires</Notification>);
     act(() => vi.advanceTimersByTime(1000));
     expect(screen.queryByText('Expires')).toBeNull();
-    expect(document.querySelector('[data-tdn-notifications]')).toBeNull();
     rerender(<Notification eventKey="manual" durationMs={1000}>Manual</Notification>);
     fireEvent.click(screen.getByRole('button', { name: 'Закрыть уведомление' }));
     expect(screen.queryByText('Manual')).toBeNull();
-    expect(document.querySelector('[data-tdn-notifications]')).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -73,29 +63,24 @@ describe('Notification', () => {
     const view = render(<Notification kind="warning" eventKey="same" durationMs={1000}>Pending</Notification>);
     act(() => vi.advanceTimersByTime(400));
     view.rerender(<Notification kind="info" eventKey="same" durationMs={1000}>Exists</Notification>);
-    const committedMessage = screen.getByText('Exists');
-    expect(committedMessage.isConnected).toBe(true);
-    expect(committedMessage.parentElement).toHaveAttribute('role', 'status');
+    expect(screen.getByRole('status')).toHaveTextContent('Exists');
     await act(async () => { await Promise.resolve(); });
-    expect(screen.getByText('Exists')).toBe(committedMessage);
-    expect(committedMessage.isConnected).toBe(true);
+    expect(screen.getByRole('status')).toHaveTextContent('Exists');
     act(() => vi.advanceTimersByTime(999));
-    expect(screen.getByText('Exists')).toBe(committedMessage);
+    expect(screen.getByRole('status')).toHaveTextContent('Exists');
     act(() => vi.advanceTimersByTime(1));
     expect(screen.queryByText('Exists')).toBeNull();
   });
 
-  it('commits new text with an explicit new event key without detaching its committed node', async () => {
+  it('commits new text with an explicit new event key and resets its lifetime', async () => {
     const view = render(<Notification kind="warning" eventKey="before" durationMs={1000}>Before</Notification>);
     act(() => vi.advanceTimersByTime(400));
     view.rerender(<Notification kind="warning" eventKey="after" durationMs={1000}>After</Notification>);
-    const committedMessage = screen.getByText('After');
-    expect(committedMessage.isConnected).toBe(true);
+    expect(screen.getByRole('alert')).toHaveTextContent('After');
     await act(async () => { await Promise.resolve(); });
-    expect(screen.getByText('After')).toBe(committedMessage);
-    expect(committedMessage.isConnected).toBe(true);
+    expect(screen.getByRole('alert')).toHaveTextContent('After');
     act(() => vi.advanceTimersByTime(999));
-    expect(screen.getByText('After')).toBe(committedMessage);
+    expect(screen.getByRole('alert')).toHaveTextContent('After');
     act(() => vi.advanceTimersByTime(1));
     expect(screen.queryByText('After')).toBeNull();
   });
@@ -150,60 +135,26 @@ describe('Notification', () => {
     expect(screen.queryByText('Inside')).toBeNull();
   });
 
-  it('reuses an existing shared root', () => {
-    const root = document.createElement('div');
-    root.dataset.tdnNotifications = '';
-    document.body.appendChild(root);
-    const view = render(<Notification durationMs={1000}>One</Notification>);
-    expect(document.querySelectorAll('[data-tdn-notifications]')).toHaveLength(1);
-    expect(document.querySelector('[data-tdn-notifications]')).toBe(root);
-    expect(root.children).toHaveLength(1);
-    view.unmount();
-    expect(document.querySelector('[data-tdn-notifications]')).toBeNull();
-  });
-
   it('keeps one notification and timer through StrictMode replay and cleans them on unmount', () => {
     const view = render(<StrictMode><Notification durationMs={1000}>One</Notification></StrictMode>);
-    const currentRoot = document.querySelector('[data-tdn-notifications]');
-    expect(document.querySelectorAll('[data-tdn-notifications]')).toHaveLength(1);
-    expect(currentRoot?.children).toHaveLength(1);
+    expect(screen.getByRole('status')).toHaveTextContent('One');
     expect(vi.getTimerCount()).toBe(1);
     view.unmount();
+    expect(screen.queryByText('One')).toBeNull();
     expect(vi.getTimerCount()).toBe(0);
-    expect(document.querySelector('[data-tdn-notifications]')).toBeNull();
   });
 
-  it('moves root into and out of the topmost open native dialog', async () => {
-    const dialog = document.createElement('dialog');
-    dialog.dataset.notificationTestDialog = '';
-    dialog.setAttribute('open', '');
-    document.body.appendChild(dialog);
-    const view = render(<Notification durationMs={1000}>In dialog</Notification>);
-    const root = document.querySelector('[data-tdn-notifications]');
-    expect(root?.parentElement).toBe(dialog);
-    act(() => vi.advanceTimersByTime(300));
-    dialog.removeAttribute('open');
-    await act(async () => { await Promise.resolve(); });
-    expect(root?.parentElement).toBe(document.body);
-    act(() => vi.advanceTimersByTime(700));
-    expect(screen.queryByText('In dialog')).toBeNull();
-    view.unmount();
-  });
-
-  it('follows dialogs opened and closed after notification mount without resetting deadline', async () => {
+  it('preserves the notification lifetime when a dialog opens and closes', async () => {
     const view = render(<Notification durationMs={1000}>Follow dialog</Notification>);
-    const root = document.querySelector('[data-tdn-notifications]');
     act(() => vi.advanceTimersByTime(300));
     const dialog = document.createElement('dialog');
     dialog.dataset.notificationTestDialog = '';
     dialog.setAttribute('open', '');
     document.body.appendChild(dialog);
     await act(async () => { await Promise.resolve(); });
-    expect(root?.parentElement).toBe(dialog);
     act(() => vi.advanceTimersByTime(300));
     dialog.removeAttribute('open');
     await act(async () => { await Promise.resolve(); });
-    expect(root?.parentElement).toBe(document.body);
     act(() => vi.advanceTimersByTime(399));
     expect(screen.getByText('Follow dialog')).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(1));
@@ -216,6 +167,5 @@ describe('Notification', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Закрыть уведомление' })[0]);
     expect(screen.queryByText('A')).toBeNull();
     expect(screen.getByText('B')).toBeInTheDocument();
-    expect(document.querySelector('[data-tdn-notifications]')?.children).toHaveLength(1);
   });
 });

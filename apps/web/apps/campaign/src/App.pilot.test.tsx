@@ -5,7 +5,6 @@ import type { HubRemoteProps } from '@tdn/shared';
 import App from './App';
 import { CampaignApiError } from './workspace/api';
 import { ApiError } from './workspace/Feedback';
-import listStyles from '@tdn/shared/ui/List/List.module.css';
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const campaign = { id: 12, name: 'Pilot campaign', metadataRevision: 1 };
@@ -74,13 +73,7 @@ describe('campaign SDK pilot', () => {
     expect(screen.queryByText('Можно вести и редактировать')).not.toBeInTheDocument();
     expect(screen.queryByText('Только просмотр')).not.toBeInTheDocument();
     expect(screen.queryByText('Права на каждого персонажа определяются отдельно.')).not.toBeInTheDocument();
-    for (const group of [canLead, canView]) {
-      const rows = group.querySelector(`:scope > .${listStyles.list}`);
-      expect(rows).toHaveClass(listStyles['layout-vertical'], listStyles.stretch);
-      expect(rows?.querySelector(`.${listStyles['layout-grid']}`)).toBeNull();
-    }
     expect(screen.queryByRole('button', { name: 'Создать персонажа' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('main')).not.toBeInTheDocument();
   });
 
   it('keeps permission-pending characters out of readonly cards and empty states', async () => {

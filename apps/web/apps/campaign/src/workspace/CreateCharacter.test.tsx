@@ -122,8 +122,9 @@ describe('CreateCharacter', () => {
 
   it('does not load templates or create controls in player mode', () => {
     shared.mode = 'player'; shared.canWrite = false;
-    const { container } = renderForm();
-    expect(container).toBeEmptyDOMElement();
+    renderForm();
+    expect(screen.queryByRole('dialog', { name: 'Создать персонажа' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Создать персонажа' })).not.toBeInTheDocument();
     expect(shared.api.createCharacter).not.toHaveBeenCalled();
   });
 

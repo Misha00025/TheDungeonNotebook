@@ -8,10 +8,6 @@ import type { HubRemoteProps } from '@tdn/shared';
 import { LosslessNumber } from 'lossless-json';
 import { stringifyJson } from './json';
 import { afterEach, vi } from 'vitest';
-import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
-import listStyles from '../../../../packages/shared/src/ui/List/List.module.css';
-import pageStyles from '../../../../packages/shared/src/ui/PageLayout/PageLayout.module.css';
-import characterStyles from './CharacterSheet.module.css';
 
 const response = (body: unknown, status = 200) => new Response(stringifyJson(body), { status, headers: { 'Content-Type': 'application/json' } });
 const id = 'abcdef01-2345-6789-abcd-ef0123456789';
@@ -67,7 +63,12 @@ describe('CharacterSheet', () => {
     expect(screen.getByRole('heading', { name: 'Базовые характеристики' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'string', level: 4 })).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('Тип: Integer');
-    expect(screen.getByLabelText('string').closest('fieldset')).toBeDisabled();
+    for (const field of fields) {
+      expect(screen.queryByRole('textbox', { name: field.title })).not.toBeInTheDocument();
+      expect(screen.queryByRole('checkbox', { name: field.title })).not.toBeInTheDocument();
+      expect(screen.queryByRole('combobox', { name: field.title })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: `Сохранить ${field.key}` })).not.toBeInTheDocument();
+    }
     expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(true);
     expect(request.mock.calls.map(([url]) => url).some(url => /virtual-fields|formulas|assignments/.test(url))).toBe(false);
     expect(screen.queryByRole('button', { name: /Сбросить/ })).not.toBeInTheDocument();
@@ -103,8 +104,7 @@ describe('CharacterSheet', () => {
     expect(within(tabs).getByRole('link', { name: 'Характеристики' })).toHaveAttribute('href', `/12/player/characters/${id}/stats`);
     expect(within(tabs).getByRole('link', { name: 'Характеристики' })).toHaveAttribute('aria-current', 'page');
     const back = screen.getByRole('link', { name: 'К персонажам' });
-    expect(back.tagName).toBe('A');
-    expect(back).toHaveClass(buttonStyles.button);
+    expect(back).toHaveAttribute('href', '/12/player/characters');
   });
 
   it('hides the sheet TabBar on mobile while keeping the overview and description in readonly mode', async () => {
@@ -132,28 +132,19 @@ describe('CharacterSheet', () => {
     expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
   });
 
-  it.each(['gm', 'player'])('renders the %s overview presentation full-width below the shared header', async mode => {
+  it.each(['gm', 'player'])('renders the %s overview presentation and character data', async mode => {
     const request = vi.fn(async (url: string) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: false, canManageAccess: false });
       if (url.endsWith('/computed-sheet')) return response(sheet);
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       return response([]);
     });
-    const { container } = render(sheetTree(request, false, `/12/${mode}/characters/${id}/overview`));
-    const heading = await screen.findByRole('heading', { name: 'Hero', level: 2 });
-    const row = heading.parentElement;
-    expect(row).toHaveClass(pageStyles.headerTitleRow);
-    expect(row).toContainElement(screen.getByText('Ключевой'));
-    expect(heading).not.toContainElement(screen.getByText('Ключевой'));
-    expect(row?.nextElementSibling).toHaveTextContent('Overview');
-    const overview = screen.getByRole('region', { name: 'Обзор персонажа' });
-    expect(overview).toContainElement(screen.getByRole('region', { name: 'Представление персонажа' }));
-    expect(overview.children).toHaveLength(1);
-    expect(overview.parentElement).toHaveClass(listStyles.stretch);
-    expect(overview).not.toHaveTextContent('Overview');
-    expect(overview).not.toHaveTextContent('Hero');
-    expect(overview.closest(`.${listStyles.columns2}`)).toBeNull();
-    expect(container.querySelector('h3')).toBeNull();
+    render(sheetTree(request, false, `/12/${mode}/characters/${id}/overview`));
+    expect(await screen.findByRole('heading', { name: 'Hero', level: 2 })).toBeInTheDocument();
+    expect(screen.getByText('Ключевой')).toBeInTheDocument();
+    expect(screen.getByText('Overview')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Обзор персонажа' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Представление персонажа' })).toBeInTheDocument();
   });
 
   it.each([['A description', 'new\nline'], ['Overview', '']])('edits a description explicitly from %s to %s', async (description, submitted) => {
@@ -187,8 +178,8 @@ describe('CharacterSheet', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     const editButton = screen.getByRole('button', { name: 'Изменить описание' });
     await waitFor(() => expect(editButton).toBeEnabled());
-    if (submitted) expect(document.querySelector(`.${characterStyles.descriptionText}`)?.textContent).toBe(submitted);
-    else expect(document.querySelector(`.${characterStyles.descriptionText}`)).toBeNull();
+    if (submitted) expect(screen.getByText(submitted, { normalizer: text => text })).toBeInTheDocument();
+    else expect(screen.queryByText(description)).not.toBeInTheDocument();
     fireEvent.click(editButton);
     expect(screen.getByRole('textbox', { name: 'Описание' })).toHaveValue(submitted);
     expect(screen.getByRole('button', { name: 'Сохранить описание' })).toBeDisabled();

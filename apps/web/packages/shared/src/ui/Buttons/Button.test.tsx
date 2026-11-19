@@ -5,16 +5,15 @@ import Button from './Button';
 import LinkButton from './LinkButton';
 
 describe('Button', () => {
-  test('defaults to a primary button type button', () => {
+  test('defaults to a native button type button', () => {
     render(<Button>Save</Button>);
     expect(screen.getByRole('button', { name: 'Save' })).toHaveAttribute('type', 'button');
   });
 
-  test('supports submit and secondary variant', () => {
-    render(<Button type="submit" variant="secondary">Save</Button>);
+  test('supports submit type', () => {
+    render(<Button type="submit">Save</Button>);
     const button = screen.getByRole('button', { name: 'Save' });
     expect(button).toHaveAttribute('type', 'submit');
-    expect(button.className).toContain('secondary');
   });
 
   test('busy disables the button and preserves children', () => {
@@ -35,30 +34,23 @@ describe('LinkButton', () => {
   test('renders a router anchor with native navigation attributes', () => {
     render(
       <MemoryRouter>
-        <LinkButton to="/destination" target="_blank" variant="secondary">Open</LinkButton>
+        <LinkButton to="/destination" target="_blank">Open</LinkButton>
       </MemoryRouter>
     );
     const link = screen.getByRole('link', { name: 'Open' });
-    expect(link.tagName).toBe('A');
     expect(link).toHaveAttribute('href', '/destination');
     expect(link).toHaveAttribute('target', '_blank');
-    expect(link.className).toContain('secondary');
-    expect(link.className).not.toContain('small');
-    expect(link).not.toHaveAttribute('size');
   });
 
-  test('supports a small secondary link button and retains its ref', () => {
+  test('retains its ref', () => {
     const ref = React.createRef<HTMLAnchorElement>();
     render(
       <MemoryRouter>
-        <LinkButton to="/destination" variant="secondary" size="small" ref={ref}>Open</LinkButton>
+        <LinkButton to="/destination" ref={ref}>Open</LinkButton>
       </MemoryRouter>
     );
     const link = screen.getByRole('link', { name: 'Open' });
     expect(link).toHaveAttribute('href', '/destination');
-    expect(link.className).toContain('secondary');
-    expect(link.className).toContain('small');
-    expect(link).not.toHaveAttribute('size');
     expect(ref.current).toBe(link);
   });
 });

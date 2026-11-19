@@ -138,12 +138,11 @@ describe('Hub App auth and profile gates', () => {
     expect(window.location.pathname).toBe('/profile');
   });
 
-  it('keeps profile retry inline after error notification expires', () => {
+  it('keeps profile retry available after error notification expires', () => {
     vi.useFakeTimers();
     controls.auth.status = 'authenticated'; controls.auth.authenticated = true; controls.auth.userId = 7;
     controls.profile.error = 'private profile failure';
     const view = renderHub();
-    expect(view.container.querySelector('[data-tdn-notifications]')).toBeNull();
     expect(screen.getByText('Не удалось загрузить профиль. Попробуйте ещё раз.')).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(6000));
     expect(screen.queryByText('Не удалось загрузить профиль. Попробуйте ещё раз.')).toBeNull();

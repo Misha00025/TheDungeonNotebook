@@ -17,14 +17,14 @@ describe('GlobalSidebar logout', () => {
   it('does not perform SPA navigation after successful logout', async () => {
     mocks.logout.mockRejectedValueOnce(new Error('offline'));
     render(<MemoryRouter initialEntries={['/profile']}><GlobalSidebar navItems={[]} /><Location /></MemoryRouter>);
-    fireEvent.click(screen.getByText('Выйти'));
+    fireEvent.click(screen.getByRole('button', { name: /Выйти$/ }));
     await waitFor(() => expect(mocks.logout).toHaveBeenCalledTimes(1));
     expect(screen.getByTestId('path').textContent).toBe('/profile');
-    const button = screen.getByText('Выйти').closest('button') as HTMLButtonElement;
-    await waitFor(() => expect(button.disabled).toBe(false));
+    const button = screen.getByRole('button', { name: /Выйти$/ });
+    await waitFor(() => expect(button).not.toBeDisabled());
     mocks.logout.mockResolvedValueOnce(undefined);
     fireEvent.click(button);
-    await waitFor(() => expect(button.disabled).toBe(false));
+    await waitFor(() => expect(button).not.toBeDisabled());
     expect(mocks.logout).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId('path').textContent).toBe('/profile');
   });
@@ -33,9 +33,9 @@ describe('GlobalSidebar logout', () => {
     let resolve!: () => void;
     mocks.logout.mockReturnValueOnce(new Promise<void>(r => { resolve = r; }));
     render(<MemoryRouter><GlobalSidebar navItems={[]} /></MemoryRouter>);
-    const button = screen.getByText('Выйти').closest('button') as HTMLButtonElement;
+    const button = screen.getByRole('button', { name: /Выйти$/ });
     fireEvent.click(button);
-    expect(button.disabled).toBe(true);
+    expect(button).toBeDisabled();
     await act(async () => resolve());
   });
 });

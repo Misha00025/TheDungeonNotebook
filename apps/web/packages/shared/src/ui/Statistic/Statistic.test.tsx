@@ -4,10 +4,8 @@ import Statistic from './Statistic';
 
 describe('Statistic', () => {
   test('renders its accessible label and value once and passes attributes', () => {
-    const { container } = render(<Statistic label="Characters" value={12} data-testid="statistic" />);
+    render(<Statistic label="Characters" value={12} data-testid="statistic" />);
     expect(screen.getByRole('article', { name: 'Characters' })).toHaveAttribute('data-testid', 'statistic');
-    expect(container.querySelectorAll('dt')).toHaveLength(1);
-    expect(container.querySelectorAll('dd')).toHaveLength(1);
     expect(screen.getByText('Characters')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
   });

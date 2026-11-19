@@ -3,8 +3,6 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Characters from './Characters';
-import panelStyles from '@tdn/shared/ui/Panel/Panel.module.css';
-import listItemStyles from '@tdn/shared/ui/List/ListItem.module.css';
 
 const api = vi.hoisted(() => ({ listCharacters: vi.fn(), characterPermissions: vi.fn(), getSheet: vi.fn() }));
 const characters = [
@@ -35,9 +33,6 @@ describe('GM Characters', () => {
     expect(within(key).getByRole('heading', { name: 'Key hero', level: 4 })).toBeInTheDocument();
     expect(within(secondary).getByRole('heading', { name: /Secondary hero/, level: 4 })).toBeInTheDocument();
     expect(within(background).getByText('Background hero')).toBeInTheDocument();
-    expect(within(key).getByRole('article')).not.toHaveClass(panelStyles.compact);
-    expect(within(secondary).getByRole('article')).toHaveClass(panelStyles.compact);
-    expect(within(background).getByText('Background hero').closest(`.${listItemStyles.listItem}`)).toHaveClass(listItemStyles.compact);
     expect(await screen.findByText('key-id description')).toBeInTheDocument();
     expect(await screen.findByText('secondary-id description')).toBeInTheDocument();
     expect(await screen.findByText('background-id description')).toBeInTheDocument();

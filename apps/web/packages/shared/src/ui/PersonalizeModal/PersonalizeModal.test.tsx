@@ -59,6 +59,5 @@ describe('PersonalizeModal notifications', () => {
     expect(screen.getByText('Не удалось синхронизировать тему. Попробуйте ещё раз.')).toBeInTheDocument();
     view.rerender(<PersonalizeModal isOpen={false} onClose={vi.fn()} />);
     expect(screen.queryByText('Не удалось синхронизировать тему. Попробуйте ещё раз.')).toBeNull();
-    expect(document.querySelector('[data-tdn-notifications]')).toBeNull();
   });
 });

@@ -4,7 +4,6 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import App from './App';
 import Home from './Home';
 import type { HubRemoteProps } from '@tdn/shared';
-import listStyles from '@tdn/shared/ui/List/List.module.css';
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const makeAuth = (request: (url: string, options?: RequestInit) => Promise<Response>, userId = 4) => ({ status: 'authenticated', authenticated: true, userId, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request: async (url: string, options?: RequestInit) => { const result = await request(url, options); if (url.endsWith('/presentation')) { const body = await result.clone().json().catch(() => undefined); if (Array.isArray(body) && body.length === 0) return response({ contentRevision: 0, defaults: {}, contextParams: {} }); } return result; }, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
@@ -173,9 +172,6 @@ describe('campaign first iteration', () => {
     expect(await screen.findByRole('heading', { name: 'Hero', level: 4 })).toBeInTheDocument();
     const canLead = await screen.findByRole('region', { name: 'Могу вести' });
     expect(within(canLead).getByText('Hero')).toBeInTheDocument();
-    const rows = canLead.querySelector(`:scope > .${listStyles.list}`);
-    expect(rows).toHaveClass(listStyles['layout-vertical'], listStyles.stretch);
-    expect(rows?.querySelector(`.${listStyles['layout-grid']}`)).toBeNull();
     expect(screen.queryByText('Можно вести и редактировать')).not.toBeInTheDocument();
     expect(screen.queryByText('Только просмотр')).not.toBeInTheDocument();
     expect(screen.queryByText('Права на каждого персонажа определяются отдельно.')).not.toBeInTheDocument();

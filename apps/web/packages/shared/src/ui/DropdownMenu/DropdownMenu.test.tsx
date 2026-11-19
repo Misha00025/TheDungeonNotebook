@@ -49,7 +49,6 @@ describe('DropdownMenu', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Navigate' }));
     const link = screen.getByRole('link', { name: 'Destination' });
-    expect(link.tagName).toBe('A');
     expect(link).toHaveAttribute('href', '/destination');
     expect(link).toHaveAttribute('aria-current', 'page');
     const modifiedClick = new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true });

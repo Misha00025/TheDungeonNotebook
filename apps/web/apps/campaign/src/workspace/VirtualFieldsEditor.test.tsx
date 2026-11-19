@@ -42,14 +42,13 @@ describe('VirtualFieldsEditor', () => {
     expect(onChange).toHaveBeenCalledWith([expect.objectContaining({ bindings: { manual: { kind: 'Base', fieldId: 'base-1' } } })]);
   });
 
-  it('keeps compact core controls visible and places stored and manual links in additional details', async () => {
+  it('keeps core controls visible and exposes stored and manual links', async () => {
     const onChange = vi.fn();
     const field = { ...makeField(), bindings: { unknown: { kind: 'Base' as const, fieldId: 'missing' } }, parentBaseFieldId: 'base-1' };
     render(<VirtualFieldsEditor compact campaignId={4} fields={[field]} onChange={onChange} formulas={formulas} baseFields={[{ id: 'base-1', key: 'base', title: 'Base field' }]} />);
 
     const row = screen.getByRole('group', { name: 'Calc' });
     expect(screen.queryByRole('heading', { name: 'Виртуальные поля' })).not.toBeInTheDocument();
-    expect(row.querySelector('[class*="formGrid"]')).toBeInTheDocument();
     expect(within(row).getByLabelText('Ключ')).toHaveValue('calc');
     expect(within(row).getByLabelText('Название')).toHaveValue('Calc');
     expect(within(row).getByLabelText('Результат')).toHaveValue('Number');
@@ -75,7 +74,7 @@ describe('VirtualFieldsEditor', () => {
     })]);
   });
 
-  it('keeps the formula read error and manual-link hint visible in compact mode', async () => {
+  it('keeps the formula read error and manual-link hint visible', async () => {
     api.getFormulaContent.mockRejectedValue(new Error('forbidden'));
     render(<VirtualFieldsEditor compact campaignId={4} fields={[makeField()]} onChange={vi.fn()} formulas={formulas} baseFields={[]} />);
     expect(await screen.findByText(/связи можно редактировать вручную/i)).toBeInTheDocument();

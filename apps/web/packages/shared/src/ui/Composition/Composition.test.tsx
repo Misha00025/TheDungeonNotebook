@@ -4,8 +4,8 @@ import ActionRow from './ActionRow';
 import Toolbar from './Toolbar';
 
 describe('composition components', () => {
-  test('ActionRow passes attributes and uses the supplied justification', () => {
-    render(<ActionRow justify="end" data-testid="actions"><button>Save</button></ActionRow>);
+  test('ActionRow passes attributes and renders children', () => {
+    render(<ActionRow data-testid="actions"><button>Save</button></ActionRow>);
     expect(screen.getByTestId('actions')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
   });

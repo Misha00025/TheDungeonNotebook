@@ -3,12 +3,12 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import BottomNavigation from './BottomNavigation';
-import styles from './BottomNavigation.module.css';
 
 let resize: () => void = () => {};
 let mobileMatches = true;
 let mediaListeners = new Set<(event: MediaQueryListEvent) => void>();
 const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+const originalRect = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'getBoundingClientRect');
 
 class MockResizeObserver {
   constructor(callback: ResizeObserverCallback) {
@@ -45,22 +45,25 @@ beforeEach(() => {
     }),
   });
   vi.stubGlobal('ResizeObserver', MockResizeObserver);
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    return rect(this.getAttribute('aria-label') ? 360 : 72);
+  });
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  if (originalRect) Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', originalRect);
+  else Reflect.deleteProperty(HTMLElement.prototype, 'getBoundingClientRect');
   if (originalMatchMedia) Object.defineProperty(window, 'matchMedia', originalMatchMedia);
   else Reflect.deleteProperty(window, 'matchMedia');
 });
 
 describe('BottomNavigation', () => {
-  it('measures capacity, keeps the first item pinned, and puts active overflow behind More', async () => {
+  it('measures capacity, keeps the first item pinned, and exposes active overflow from More', async () => {
     render(<MemoryRouter><BottomNavigation aria-label="Campaign" items={items} /></MemoryRouter>);
     const navigation = await screen.findByRole('navigation', { name: 'Campaign' });
-    const measurement = navigation.querySelector(`.${styles.measurementSlot}`) as HTMLElement;
     let navigationWidth = 360;
     vi.spyOn(navigation, 'getBoundingClientRect').mockImplementation(() => rect(navigationWidth));
-    vi.spyOn(measurement, 'getBoundingClientRect').mockReturnValue(rect(72));
     act(() => resize());
 
     let links = within(navigation).getAllByRole('link');
@@ -68,8 +71,6 @@ describe('BottomNavigation', () => {
     expect(links[0]).toHaveTextContent('Item 1');
     expect(links[0]).toHaveAttribute('href', '/item-1');
     let more = within(navigation).getByRole('button', { name: 'Ещё' });
-    expect(more.className).toContain(styles.moreActive);
-    expect(navigation.querySelector('button')).toBe(more);
     fireEvent.click(more);
     expect(within(navigation).getByRole('link', { name: 'Item 7' })).toHaveAttribute('aria-current', 'page');
     fireEvent.keyDown(more, { key: 'Escape' });
@@ -86,13 +87,10 @@ describe('BottomNavigation', () => {
   it('renders all router items as anchors when they fit measured capacity', async () => {
     render(<MemoryRouter initialEntries={['/start']}><BottomNavigation aria-label="Sections" items={items.slice(0, 4)} /><Path /></MemoryRouter>);
     const navigation = await screen.findByRole('navigation', { name: 'Sections' });
-    const measurement = navigation.querySelector(`.${styles.measurementSlot}`) as HTMLElement;
     vi.spyOn(navigation, 'getBoundingClientRect').mockReturnValue(rect(360));
-    vi.spyOn(measurement, 'getBoundingClientRect').mockReturnValue(rect(72));
     act(() => resize());
     const links = within(navigation).getAllByRole('link');
     expect(links).toHaveLength(4);
-    expect(links[0].tagName).toBe('A');
     const modifiedClick = new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true });
     fireEvent(links[0], modifiedClick);
     expect(modifiedClick.defaultPrevented).toBe(false);
@@ -103,9 +101,7 @@ describe('BottomNavigation', () => {
   it('measures capacity from the navigation inner width after horizontal padding', async () => {
     render(<MemoryRouter><BottomNavigation aria-label="Padded sections" items={items} /></MemoryRouter>);
     const navigation = await screen.findByRole('navigation', { name: 'Padded sections' });
-    const measurement = navigation.querySelector(`.${styles.measurementSlot}`) as HTMLElement;
     vi.spyOn(navigation, 'getBoundingClientRect').mockReturnValue(rect(360));
-    vi.spyOn(measurement, 'getBoundingClientRect').mockReturnValue(rect(72));
     const getComputedStyle = window.getComputedStyle.bind(window);
     vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudoElement) => {
       if (element === navigation) return { paddingLeft: '36px', paddingRight: '36px' } as CSSStyleDeclaration;
@@ -116,7 +112,7 @@ describe('BottomNavigation', () => {
     expect(within(navigation).getByRole('button', { name: 'Ещё' })).toBeInTheDocument();
   });
 
-  it('does not render the bottom bar on desktop', () => {
+  it('omits navigation on desktop', () => {
     mobileMatches = false;
     render(<MemoryRouter><BottomNavigation aria-label="Sections" items={items} /></MemoryRouter>);
     expect(screen.queryByRole('navigation', { name: 'Sections' })).not.toBeInTheDocument();

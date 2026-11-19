@@ -4,9 +4,6 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CampaignOverview from './CampaignOverview';
 import GMOverviewRoster from './GMOverviewRoster';
-import panelStyles from '@tdn/shared/ui/Panel/Panel.module.css';
-import rosterStyles from './GMOverviewRoster.module.css';
-import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
 import type { CharacterMetadata } from './types';
 
 const api = vi.hoisted(() => ({ listCharacters: vi.fn(), characterPermissions: vi.fn(), listAssignments: vi.fn(), getUser: vi.fn(), getSheet: vi.fn(), listFormulas: vi.fn(), listViews: vi.fn() }));
@@ -37,35 +34,21 @@ describe('CampaignOverview', () => {
     api.listViews.mockResolvedValue([{ id: 'view-1' }]);
   });
 
-  it('shows one supported Statistic, empty placeholders, a compact roster, and existing quick actions', async () => {
+  it('shows character count, empty placeholders, roster content, and existing quick actions', async () => {
     renderOverview();
     const statistic = await screen.findByRole('article', { name: 'Персонажи' });
     expect(within(statistic).getAllByText('Персонажи')).toHaveLength(1);
-    expect(statistic.querySelectorAll('dt')).toHaveLength(1);
-    expect(statistic.querySelector('dd')).toHaveTextContent('1');
+    expect(within(statistic).getByText('1')).toBeInTheDocument();
     expect(screen.queryByText('Персонажей: 1')).not.toBeInTheDocument();
-    const questsHeading = screen.getByRole('heading', { name: 'Квесты' });
-    const notesHeading = screen.getByRole('heading', { name: 'Заметки' });
-    const quests = questsHeading.closest(`.${panelStyles.panel}`);
-    const notes = notesHeading.closest(`.${panelStyles.panel}`);
-    expect(quests?.querySelector(`.${panelStyles.body}`)).toBeNull();
-    expect(notes?.querySelector(`.${panelStyles.body}`)).toBeNull();
+    const quests = screen.getByRole('heading', { name: 'Квесты' }).closest('section');
+    const notes = screen.getByRole('heading', { name: 'Заметки' }).closest('section');
     expect(within(quests as HTMLElement).queryByRole('link')).not.toBeInTheDocument();
     expect(within(notes as HTMLElement).queryByRole('link')).not.toBeInTheDocument();
     const rosterLink = await screen.findByRole('link', { name: 'Открыть лист Roster hero' });
     expect(rosterLink).toHaveAttribute('href', '/groups/12/gm/characters/hero%2Fone/overview');
     expect(rosterLink).toHaveTextContent('Открыть');
-    expect(rosterLink).toHaveClass(buttonStyles.small);
-    const row = rosterLink.parentElement;
-    const identity = row?.firstElementChild;
-    expect(row).toHaveClass(rosterStyles.row);
-    expect(identity).toHaveClass(rosterStyles.identity);
-    expect(identity?.querySelector('strong')).toHaveTextContent('Roster hero');
-    expect(identity?.querySelectorAll(`.${panelStyles.badge}`)).toHaveLength(1);
-    expect(identity).toHaveTextContent('Visible GM');
-    expect(identity?.querySelector('a')).toBeNull();
-    expect(row).not.toHaveTextContent('↗');
-    expect(row).not.toHaveTextContent('—');
+    expect(screen.getByText('Roster hero')).toBeInTheDocument();
+    expect(screen.getByText('Visible GM')).toBeInTheDocument();
     expect(screen.queryByText('Ключевой')).not.toBeInTheDocument();
     expect(screen.queryByText('Можно вести и редактировать')).not.toBeInTheDocument();
     expect(screen.queryByText('Только просмотр')).not.toBeInTheDocument();
@@ -97,7 +80,8 @@ describe('CampaignOverview', () => {
     renderOverview();
     const link = await screen.findByRole('link', { name: 'Открыть лист Roster hero' });
     expect(link).toHaveAttribute('href', '/groups/12/gm/characters/hero%2Fone/overview');
-    expect(link.parentElement?.firstElementChild).toHaveTextContent('Roster heroVisible writer');
+    expect(screen.getByText('Roster hero')).toBeInTheDocument();
+    expect(screen.getByText('Visible writer')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Открыть лист Read-only assignee' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Открыть лист Unassigned character' })).not.toBeInTheDocument();
     expect(screen.queryByText('Observer')).not.toBeInTheDocument();
@@ -110,7 +94,7 @@ describe('CampaignOverview', () => {
     expect(api.getUser).not.toHaveBeenCalledWith(22);
   });
 
-  it('renders multiple writer names as separate badges beside one open link', async () => {
+  it('renders multiple writer names beside one open link', async () => {
     api.listAssignments.mockResolvedValue([
       { campaignId: 12, characterId: character.id, userId: 21, canWrite: true, metadataRevision: 1 },
       { campaignId: 12, characterId: character.id, userId: 22, canWrite: true, metadataRevision: 1 },
@@ -118,12 +102,10 @@ describe('CampaignOverview', () => {
     api.getUser.mockImplementation(async (id: number) => ({ id, nickname: `user-${id}`, visibleName: `Writer ${id}` }));
     renderOverview();
     const link = await screen.findByRole('link', { name: 'Открыть лист Roster hero' });
-    const row = link.parentElement;
-    const identity = row?.firstElementChild;
-    expect(identity?.querySelectorAll(`.${panelStyles.badge}`)).toHaveLength(2);
-    expect(identity).toHaveTextContent('Writer 21');
-    expect(identity).toHaveTextContent('Writer 22');
-    expect(row?.querySelectorAll('a')).toHaveLength(1);
+    expect(screen.getByText('Roster hero')).toBeInTheDocument();
+    expect(screen.getByText('Writer 21')).toBeInTheDocument();
+    expect(screen.getByText('Writer 22')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Открыть лист Roster hero' })).toHaveLength(1);
     expect(link.textContent).toBe('Открыть');
   });
 
@@ -155,10 +137,11 @@ describe('CampaignOverview', () => {
       : [{ campaignId: 12, characterId: id, userId: 21, canWrite: true, metadataRevision: 1 }]);
     api.getUser.mockRejectedValue(new Error('profile unavailable'));
     renderOverview();
-    const first = await screen.findByRole('link', { name: 'Открыть лист Roster hero' });
-    const secondLink = await screen.findByRole('link', { name: 'Открыть лист Second hero' });
-    expect(first.parentElement?.firstElementChild).toHaveTextContent('Roster heroПрофиль недоступен');
-    expect(secondLink.parentElement?.firstElementChild).toHaveTextContent('Second heroПрофиль недоступен');
+    await screen.findByRole('link', { name: 'Открыть лист Roster hero' });
+    await screen.findByRole('link', { name: 'Открыть лист Second hero' });
+    expect(screen.getByText('Roster hero')).toBeInTheDocument();
+    expect(screen.getAllByText('Профиль недоступен')).toHaveLength(2);
+    expect(screen.getByText('Second hero')).toBeInTheDocument();
     expect(screen.queryByText('Observer hero')).not.toBeInTheDocument();
     expect(screen.queryByText('Unavailable hero')).not.toBeInTheDocument();
     expect(screen.getByText('Сведения о ведущих недоступны.')).toBeInTheDocument();
@@ -196,7 +179,8 @@ describe('CampaignOverview', () => {
 
     const newLink = await screen.findByRole('link', { name: 'Открыть лист New character' });
     expect(newLink).toHaveAttribute('href', '/groups/13/gm/characters/new-character/overview');
-    expect(newLink.parentElement?.firstElementChild).toHaveTextContent('New characterNew GM');
+    expect(screen.getByText('New character')).toBeInTheDocument();
+    expect(screen.getByText('New GM')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Открыть лист Old character' })).not.toBeInTheDocument();
     expect(api.characterPermissions).toHaveBeenCalledWith(12, oldCharacter.id);
     expect(api.characterPermissions).toHaveBeenCalledWith(13, newCharacter.id);

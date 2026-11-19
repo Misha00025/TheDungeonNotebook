@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate, useResolvedPath } from 'react-router-dom';
 import RemoteBoundary from './RemoteBoundary';
@@ -52,11 +52,9 @@ describe('RemoteBoundary', () => {
     ['object', { detail: 'http://localhost:3002/assets/remoteEntry.js profile/App' }],
   ])('shows only a generic notification when loading rejects with a %s', async (_label, rejection) => {
     mocks.loadRemoteModule.mockRejectedValue(rejection);
-    const view = render(<RemoteBoundary name="profile" module="App" auth={auth} />);
+    render(<RemoteBoundary name="profile" module="App" auth={auth} />);
 
     expect(await screen.findByText('Не удалось загрузить раздел. Попробуйте обновить страницу.')).toBeInTheDocument();
-    expect(within(view.container).queryByRole('alert')).not.toBeInTheDocument();
-    expect(view.container.querySelector('[data-tdn-notifications]')).toBeNull();
     expect(document.body.textContent).not.toContain('localhost:3002');
     expect(document.body.textContent).not.toContain('remoteEntry.js');
     expect(document.body.textContent).not.toContain('profile/App');

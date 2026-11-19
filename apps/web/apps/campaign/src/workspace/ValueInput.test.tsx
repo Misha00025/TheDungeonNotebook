@@ -41,14 +41,10 @@ describe('typed field values', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('uses a one-row compact string editor and roundtrips multiline values', () => {
+  it.each([false, true])('roundtrips multiline string values with compact=%s', isCompact => {
     const onChange = vi.fn();
     const text = 'first line\nsecond line';
-    const { rerender } = render(<ValueInput field={field('String')} value={text} onChange={onChange} />);
-    expect(screen.getByRole('textbox')).not.toHaveAttribute('rows');
-    rerender(<ValueInput compact field={field('String')} value={text} onChange={onChange} />);
-    expect(screen.getByRole('textbox')).toHaveAttribute('rows', '1');
-    expect(screen.getByRole('textbox')).toHaveStyle({ minHeight: '2.5rem' });
+    render(<ValueInput compact={isCompact} field={field('String')} value={text} onChange={onChange} />);
     expect(screen.getByRole('textbox')).toHaveValue(text);
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'next line\nkept' } });
     expect(onChange).toHaveBeenCalledWith('next line\nkept');

@@ -1,7 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import iconButtonStyles from '@tdn/shared/ui/Buttons/IconButton/IconButton.module.css';
 import type { VirtualFieldInput } from './types';
 import { TemplateChoiceValueDialog, TemplateDescriptionDialog, TemplateOptionsDialog, TemplateVirtualLinksDialog } from './TemplateFieldDialogs';
 
@@ -59,7 +58,6 @@ describe('Template field dialogs', () => {
     render(<TemplateOptionsDialog label="Choice" options={[{ optionKey: '', title: 'Empty key' }, { optionKey: 'opaque/key', title: 'Old' }]} disabled={false} onClose={vi.fn()} onApply={onApply} />);
     const dialog = screen.getByRole('dialog', { name: 'Варианты поля Choice' });
     const table = within(dialog).getByRole('table', { name: 'Варианты поля Choice' });
-    expect(within(table).getByRole('button', { name: 'Удалить вариант 1' })).toHaveClass(iconButtonStyles.danger);
     fireEvent.change(within(table).getByRole('textbox', { name: 'Название варианта 2' }), { target: { value: 'Renamed' } });
     fireEvent.click(within(table).getByRole('button', { name: 'Удалить вариант 1' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Добавить вариант' }));
@@ -101,7 +99,6 @@ describe('Template field dialogs', () => {
       const row = within(table).getByRole('row', { name: new RegExp(name) });
       expect(within(row).getByRole('rowheader', { name })).toBeInTheDocument();
       expect(within(row).getAllByRole('combobox')).toHaveLength(1);
-      expect(within(row).getByRole('combobox', { name: `Параметр ${name}` }).closest('label')).toBeNull();
     }
     expect(state.api.getFormulaContent).toHaveBeenCalledWith(7, 'formula-1');
     expect(within(dialog).queryByRole('textbox', { name: 'ID формулы' })).not.toBeInTheDocument();

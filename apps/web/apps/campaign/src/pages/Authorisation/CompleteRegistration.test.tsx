@@ -46,8 +46,9 @@ describe('CompleteRegistration', () => {
     authState.authenticated = false;
     authState.userId = null;
     const onCompleted = vi.fn();
-    const { container } = render(<CompleteRegistration onCompleted={onCompleted} />);
-    expect(container).toBeEmptyDOMElement();
+    render(<CompleteRegistration onCompleted={onCompleted} />);
+    expect(screen.queryAllByRole('textbox')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Создать профиль' })).not.toBeInTheDocument();
     expect(userAPI.createProfile).not.toHaveBeenCalled();
     expect(onCompleted).not.toHaveBeenCalled();
   });

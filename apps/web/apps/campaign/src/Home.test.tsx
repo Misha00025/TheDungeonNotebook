@@ -3,7 +3,6 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import Home from './Home';
 import App from './App';
-import styles from './pages/Dashboard.module.css';
 import { visitHistoryStorageKey } from './workspace/VisitHistory';
 import type { HubRemoteProps } from '@tdn/shared';
 
@@ -66,16 +65,10 @@ describe('Home dashboard', () => {
     const orderedCharacterLinks = screen.getAllByRole('link', { name: /^Открыть персонажа/ });
     expect(orderedCharacterLinks[0]).toHaveAttribute('href', `/groups/13/gm/characters/${guidA}/overview`);
     expect(orderedCharacterLinks[1]).toHaveAttribute('href', `/groups/12/player/characters/${guidB}/overview`);
-    const groupCard = screen.getByRole('link', { name: 'Продолжить кампанию' });
-    expect(groupCard.querySelector(`.${styles.avatarPlaceholder}`)).toHaveTextContent('G');
-    expect(groupCard.querySelector(`.${styles.info} h3`)).toHaveTextContent('Campaign 12');
-    expect(groupCard.querySelector(`.${styles.action}`)).toHaveTextContent('→');
-    const firstCard = orderedCharacterLinks[0];
-    expect(firstCard.querySelector(`.${styles.avatarPlaceholder}`)).toHaveTextContent('C');
-    expect(firstCard.querySelector(`.${styles.info} h3`)).toHaveTextContent('Recent A');
-    expect(firstCard.querySelector(`.${styles.info} p`)).toHaveTextContent('Campaign 13');
-    expect(firstCard.querySelector(`.${styles.action}`)).toHaveTextContent('→');
-    expect(orderedCharacterLinks[1].querySelector(`.${styles.info} h3`)).toHaveTextContent('Recent B');
+    expect(orderedCharacterLinks[0]).toHaveTextContent('Recent A');
+    expect(orderedCharacterLinks[0]).toHaveTextContent('Campaign 13');
+    expect(orderedCharacterLinks[1]).toHaveTextContent('Recent B');
+    expect(screen.getByRole('link', { name: 'Продолжить кампанию' })).toHaveTextContent('Campaign 12');
     expect(screen.getByText('Campaign 13')).toBeInTheDocument();
     expect(request.mock.calls.some(([url]) => /list|computed-sheet|template|formulas|content/.test(url))).toBe(false);
   });

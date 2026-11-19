@@ -1,9 +1,8 @@
 import React from 'react';
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Profile from './Profile';
-import notificationStyles from '@tdn/shared/ui/Notification/Notification.module.css';
 
 const state = vi.hoisted(() => ({
   profile: { id: 12, nickname: 'player', visibleName: 'Player', imageLink: '' },
@@ -77,7 +76,7 @@ describe('Profile', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     expect(await screen.findByText('Ошибка сохранения профиля')).toBeInTheDocument();
     expect(screen.getByLabelText('Видимое имя:')).toHaveValue('Draft name');
-    fireEvent.click(screen.getByRole('region', { name: 'Уведомления' }).querySelector('button') as HTMLButtonElement);
+    fireEvent.click(within(screen.getByRole('region', { name: 'Уведомления' })).getByRole('button', { name: 'Закрыть уведомление' }));
     expect(screen.queryByText('Ошибка сохранения профиля')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     expect(await screen.findByText('Ошибка сохранения профиля')).toBeInTheDocument();
@@ -102,7 +101,7 @@ describe('Profile', () => {
     expect(state.updateProfile).toHaveBeenCalledTimes(1);
   });
 
-  it('saves the exact profile payload and confirms success with semantic styling', async () => {
+  it('saves the exact profile payload and confirms success accessibly', async () => {
     state.updateProfile.mockResolvedValue(undefined);
     state.fetchProfile.mockResolvedValue(undefined);
     state.uploadImage.mockResolvedValue({ url: 'https://example.test/avatar.png', fileName: 'avatar.png', size: 5 });
@@ -116,11 +115,10 @@ describe('Profile', () => {
     fireEvent.click(save);
     await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith(12, { visibleName: 'Updated', imageLink: 'https://example.test/avatar.png' }));
     expect(state.fetchProfile).toHaveBeenCalledTimes(1);
-    const message = await screen.findByText('Профиль сохранён.');
-    expect(message.parentElement).toHaveClass(notificationStyles.success);
+    expect(await screen.findByRole('status')).toHaveTextContent('Профиль сохранён.');
   });
 
-  it('keeps profile retry inline after generic load error expires without automatic retry', () => {
+  it('keeps profile retry available after generic load error expires without automatic retry', () => {
     vi.useFakeTimers();
     state.error = new Error('private fetch details');
     const view = render(<Profile />);
