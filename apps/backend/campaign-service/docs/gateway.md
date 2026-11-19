@@ -4,6 +4,8 @@ Gateway exposes the campaign-service API one-to-one: the external path and upstr
 
 Template routes are singleton paths: `GET`/`PUT /api/campaigns/{campaignId}/template`, `GET`/`PUT .../template/content`, and `GET`/`PUT .../template/virtual-fields`. No plural catalog, create POST, or template-GUID route is proxied. This is a route-contract change only; Gateway/BFF authentication, verified identity forwarding, request/response passthrough, and body/query transport are unchanged.
 
+Virtual-field inputs use ordinary `bindings` only; the separate parent-field properties are not part of the service contract. Existing template/custom virtual-field and override proxy routes pass their request bodies through without rewrites.
+
 ## Authentication and identity
 
 Protected campaign routes require the Gateway's existing Bearer authentication through Account Service. The Gateway does not trust a client-supplied `X-Subject`: it removes supplied identity and credential headers and forwards the subject produced by successful authentication. User subjects identify users; Group subjects identify a campaign and are not Party identities. The Gateway does not inject `userId` into query parameters or request bodies. Campaign-service enforces campaign and character permissions.

@@ -47,13 +47,6 @@ public static class SheetCalculator
         {
             if (!states.TryGetValue(node.Id, out var state) || state.Diagnostic is not null)
                 continue;
-            if (node.ParentBaseFieldId is not null && node.ParentVirtualFieldId is not null ||
-                node.ParentBaseFieldId is not null && node.Bindings.ContainsKey("parent") ||
-                node.ParentVirtualFieldId is not null && node.Bindings.ContainsKey("parent"))
-            {
-                states[node.Id] = NodeState.Failed("invalid_reference");
-                continue;
-            }
             var deps = new HashSet<Guid>();
             string? diagnostic = null;
             foreach (var parameter in state.Prepared!.ParameterNames)
@@ -63,14 +56,7 @@ public static class SheetCalculator
                     diagnostic = "unknown_parameter";
                     break;
                 }
-                FieldReference? reference = null;
-                if (node.Bindings.TryGetValue(parameter, out var binding))
-                    reference = binding;
-                else if (parameter == "parent" && node.ParentBaseFieldId is not null)
-                    reference = new FieldReference(FieldSourceKind.Base, node.ParentBaseFieldId.Value);
-                else if (parameter == "parent" && node.ParentVirtualFieldId is not null)
-                    reference = new FieldReference(FieldSourceKind.Virtual, node.ParentVirtualFieldId.Value);
-                if (reference is null)
+                if (!node.Bindings.TryGetValue(parameter, out var reference))
                 {
                     diagnostic = "missing_input";
                     break;
@@ -111,11 +97,7 @@ public static class SheetCalculator
             {
                 var result = state.Prepared!.Evaluate(parameter =>
                 {
-                    FieldReference? reference = null;
-                    if (node.Bindings.TryGetValue(parameter, out var binding)) reference = binding;
-                    else if (parameter == "parent" && node.ParentBaseFieldId is not null) reference = new FieldReference(FieldSourceKind.Base, node.ParentBaseFieldId.Value);
-                    else if (parameter == "parent" && node.ParentVirtualFieldId is not null) reference = new FieldReference(FieldSourceKind.Virtual, node.ParentVirtualFieldId.Value);
-                    if (reference is null) throw new CalculationFailure("missing_input");
+                    if (!node.Bindings.TryGetValue(parameter, out var reference)) throw new CalculationFailure("missing_input");
                     if (reference.Kind == FieldSourceKind.Base) return bases.TryGetValue(reference.FieldId, out var value) ? value : throw new CalculationFailure("unknown_reference");
                     if (!byId.ContainsKey(reference.FieldId)) throw new CalculationFailure("unknown_reference");
                     try { return Resolve(reference.FieldId); }

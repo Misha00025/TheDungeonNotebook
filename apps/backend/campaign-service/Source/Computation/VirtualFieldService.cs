@@ -118,7 +118,6 @@ public sealed class VirtualFieldService(IResourceStore resources, IContentStore 
         }
         var finalTemplate = isTemplate ? allocated.Select(ToModel).ToArray() : templateFields;
         var finalCustom = isTemplate ? customFields : allocated.Select(ToModel).ToArray();
-        var all = finalTemplate.Concat(finalCustom).ToArray();
         foreach (var input in allocated)
         {
             var formula = formulaData[input.FormulaId!.Value];
@@ -128,11 +127,6 @@ public sealed class VirtualFieldService(IResourceStore resources, IContentStore 
                 if (string.IsNullOrWhiteSpace(binding.Key) || !declared.Contains(binding.Key) || binding.Value is null) throw BadRequest("invalid_binding", "Binding names must be declared formula parameters and references must be present.");
                 ValidateReference(binding.Value, bases, finalTemplate, finalCustom, isTemplate);
             }
-            if (input.ParentBaseFieldId is not null && input.ParentVirtualFieldId is not null ||
-                input.Bindings!.ContainsKey("parent") && (input.ParentBaseFieldId is not null || input.ParentVirtualFieldId is not null))
-                throw BadRequest("invalid_parent", "Parent may be specified only once.");
-            if (input.ParentBaseFieldId is { } parentBase && bases.All(x => x.Id != parentBase)) throw BadRequest("invalid_reference", "Parent base field must be active in this context.");
-            if (input.ParentVirtualFieldId is { } parentVirtual && all.All(x => x.Id != parentVirtual)) throw BadRequest("invalid_reference", "Parent virtual field must be active in this context.");
             var model = ToModel(input);
             ValidateUsedBindings(model, ExpressionAdapter.Prepare(formula.Expression).ParameterNames, bases, finalTemplate, finalCustom, isTemplate);
         }
@@ -141,16 +135,10 @@ public sealed class VirtualFieldService(IResourceStore resources, IContentStore 
 
     private static void ValidateUsedBindings(VirtualField field, IReadOnlyCollection<string> used, BaseField[] bases, VirtualField[] templates, VirtualField[] customs, bool isTemplate)
     {
-        if (field.ParentBaseFieldId is not null && field.ParentVirtualFieldId is not null ||
-            field.Bindings.ContainsKey("parent") && (field.ParentBaseFieldId is not null || field.ParentVirtualFieldId is not null))
-            throw BadRequest("invalid_parent", "Parent may be specified only once.");
         foreach (var name in used)
         {
-            if (field.Bindings.TryGetValue(name, out var reference)) ValidateReference(reference, bases, templates, customs, isTemplate);
-            else if (name == "parent" && field.ParentBaseFieldId is { } baseId && bases.All(x => x.Id != baseId)) throw BadRequest("invalid_reference", "Parent base field must be active in this context.");
-            else if (name == "parent" && field.ParentVirtualFieldId is { } virtualId && templates.Concat(customs).All(x => x.Id != virtualId)) throw BadRequest("invalid_reference", "Parent virtual field must be active in this context.");
-            else if (!field.Bindings.ContainsKey(name) && (name != "parent" || field.ParentBaseFieldId is null && field.ParentVirtualFieldId is null))
-                throw BadRequest("missing_input", "Each used formula parameter requires a binding or parent reference.");
+            if (!field.Bindings.TryGetValue(name, out var reference)) throw BadRequest("missing_input", "Each used formula parameter requires a binding.");
+            ValidateReference(reference, bases, templates, customs, isTemplate);
         }
     }
 
@@ -171,7 +159,7 @@ public sealed class VirtualFieldService(IResourceStore resources, IContentStore 
         return document ?? throw new DomainException(503, "content_unavailable", "The content store does not contain the published resource.", formulaId);
     }
 
-    private static VirtualField ToModel(VirtualFieldInput input) => new(input.Id!.Value, input.Key!, input.Title!, input.Description!, input.ResultType!.Value, input.FormulaId!.Value, input.Bindings!, input.ParentBaseFieldId, input.ParentVirtualFieldId);
+    private static VirtualField ToModel(VirtualFieldInput input) => new(input.Id!.Value, input.Key!, input.Title!, input.Description!, input.ResultType!.Value, input.FormulaId!.Value, input.Bindings!);
     private static long RequireRevision(long? revision) => revision is > 0 ? revision.Value : throw BadRequest("invalid_revision", "expectedRevision must be at least 1.");
     private static long RequireNonnegativeRevision(long? revision) => revision is >= 0 ? revision.Value : throw BadRequest("invalid_revision", "expectedRevision must be nonnegative.");
     private static DomainException RevisionConflict(int campaignId) => new(409, "content_revision_conflict", "The content revision no longer matches.", campaignId);

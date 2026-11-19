@@ -24,9 +24,7 @@ public sealed record VirtualField(
     string Description,
     NumericResultType ResultType,
     Guid FormulaId,
-    Dictionary<string, FieldReference> Bindings,
-    Guid? ParentBaseFieldId,
-    Guid? ParentVirtualFieldId);
+    Dictionary<string, FieldReference> Bindings);
 
 public sealed record FormulaContent(string Expression, string[] Parameters);
 public sealed record VirtualFormulaOverride(Guid VirtualFieldId, string Expression);
@@ -56,6 +54,7 @@ public sealed record FormulaContentUpdateRequest
 }
 public sealed record FormulaContentEnvelope(int CampaignId, Guid ResourceId, long ContentRevision, FormulaContent Data);
 public sealed record FormulaCreateDto(Guid Id, string Key, int CampaignId, string Name, long MetadataRevision, long ContentRevision);
+[System.Text.Json.Serialization.JsonUnmappedMemberHandling(System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow)]
 public sealed record VirtualFieldInput
 {
     public Guid? Id { get; init; }
@@ -65,8 +64,6 @@ public sealed record VirtualFieldInput
     [Required] public NumericResultType? ResultType { get; init; }
     [Required] public Guid? FormulaId { get; init; }
     [Required] public Dictionary<string, FieldReference>? Bindings { get; init; }
-    public Guid? ParentBaseFieldId { get; init; }
-    public Guid? ParentVirtualFieldId { get; init; }
 }
 public sealed record VirtualFieldsUpdateRequest
 {

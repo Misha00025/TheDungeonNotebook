@@ -20,7 +20,7 @@ public class SheetServiceTests
     {
         var fixture = CreateFixture();
         await ConfigureTemplate(fixture, Field(null, "value", FieldValueType.Integer, "1"));
-        var virtualField = new VirtualField(Guid.NewGuid(), "virtual", "Virtual", "", NumericResultType.Integer, Guid.NewGuid(), new(), null, null);
+        var virtualField = new VirtualField(Guid.NewGuid(), "virtual", "Virtual", "", NumericResultType.Integer, Guid.NewGuid(), new());
         var templateContent = fixture.Content.GetData<TemplateContent>("campaignTemplates", 7, Guid.Empty);
         await fixture.Content.ReplaceAsync("campaignTemplates", 7, Guid.Empty, 1, templateContent with { VirtualFields = [virtualField] }, default);
         await fixture.Sheets.UpdateTemplateContentAsync(Admin, 7, new TemplateContentUpdateRequest

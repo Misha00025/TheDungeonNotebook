@@ -54,6 +54,10 @@ Example Widget source:
 
 Character custom virtual fields and formula overrides remain in that character's own content document and keep their existing revision contract (`expectedRevision >= 1`). They do not select or replace the campaign template.
 
+## Formula inputs use bindings only
+
+Virtual-field input has the shape `{id?,key,title,description,resultType,formulaId,bindings}`. Each used formula parameter must be declared and have a same-name binding to a base or virtual field, for example `{"bindings":{"value":{"kind":"Base","fieldId":"<base-field-id>"},"strength":{"kind":"Base","fieldId":"<base-field-id>"}}}`. `parent` is an ordinary case-sensitive parameter name and is configured through this same bindings editor. Client editors should remove both parent-field properties and all parent shortcut controls/state; no separate parent selector exists. The service contract is documented in [formulas](formulas.md). This handoff describes the client contract and does not claim the Web implementation has been updated.
+
 ## Access and errors
 
 Existing permissions continue to apply: global Admin and matching Group can administer the campaign; campaign admins can write template definitions; member definition reads follow `Access:MembersCanReadDefinitions`. Campaign and character access checks remain scoped and are not widened. Gateway/BFF identity and transport contracts are unchanged. Mongo unknown-write outcomes remain safe `503 content_write_outcome_unknown`; revision conflicts remain `409`.

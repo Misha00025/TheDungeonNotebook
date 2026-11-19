@@ -64,14 +64,35 @@ public class ComputationTests
     }
 
     [Fact]
-    public void ResolvesBaseAndVirtualParentsAndMultipleInputs()
+    public void ResolvesBaseAndVirtualBindingsAndMultipleInputs()
     {
         var bases = new[] { Base(10, FieldValueType.Integer, "2"), Base(11, FieldValueType.Integer, "3") };
-        var parent = Node(1, "parent + y", NumericResultType.Integer, Bind("y", FieldSourceKind.Base, bases[1].Id), parentBase: bases[0].Id);
-        var child = Node(2, "parent * 2", NumericResultType.Integer, parentVirtual: parent.Id);
+        var parent = Node(1, "parent + y", NumericResultType.Integer,
+            new() { ["parent"] = new(FieldSourceKind.Base, bases[0].Id), ["y"] = new(FieldSourceKind.Base, bases[1].Id) });
+        var child = Node(2, "parent * 2", NumericResultType.Integer, Bind("parent", FieldSourceKind.Virtual, parent.Id));
         var result = Calculate([parent, child], bases);
         Assert.Equal(5L, result.VirtualFields[0].Value);
         Assert.Equal(10L, result.VirtualFields[1].Value);
+    }
+
+    [Theory]
+    [InlineData("parent", "parent", "missing_input")]
+    [InlineData("parent", "Parent", "missing_input")]
+    public void ParameterBindingsAreRequiredAndCaseSensitive(string expressionParameter, string bindingName, string diagnostic)
+    {
+        var node = Node(1, expressionParameter, NumericResultType.Integer,
+            bindingName == expressionParameter ? new() : Bind(bindingName, FieldSourceKind.Base, Id(10)),
+            formulaParameters: [expressionParameter]);
+        var result = Calculate([node], [Base(10, FieldValueType.Integer, "2")]);
+        Assert.Equal(diagnostic, result.VirtualFields.Single().Diagnostic?.Code);
+    }
+
+    [Fact]
+    public void ParentNamedVirtualBindingCanCreateCycle()
+    {
+        var node = Node(1, "parent", NumericResultType.Integer, Bind("parent", FieldSourceKind.Virtual, Id(1)));
+        var result = Calculate([node]);
+        Assert.Equal("cycle", result.VirtualFields.Single().Diagnostic?.Code);
     }
 
     [Fact]
@@ -179,12 +200,11 @@ public class ComputationTests
             }));
 
     private static string FormulaFor(VirtualField node) => node.Key.StartsWith("expr:", StringComparison.Ordinal) ? node.Key[5..] : "";
-    private static string[] ParametersFor(VirtualField node) => node.Bindings.Keys.Concat(node.ParentBaseFieldId is not null || node.ParentVirtualFieldId is not null ? ["parent"] : []).ToArray();
     private static Dictionary<string, FieldReference> Bind(string name, FieldSourceKind kind, Guid id) => new(StringComparer.Ordinal) { [name] = new(kind, id) };
     private static VirtualField Node(int id, string expression, NumericResultType resultType, Dictionary<string, FieldReference>? bindings = null,
-        Guid? parentBase = null, Guid? parentVirtual = null, Guid? formulaId = null, string[]? formulaParameters = null) =>
-        new(Id(id), "expr:" + expression, "field", string.Join(",", formulaParameters ?? (bindings ?? new()).Keys.Concat(parentBase is not null || parentVirtual is not null ? ["parent"] : [])),
-            resultType, formulaId ?? Id(id + 1000), bindings ?? new(), parentBase, parentVirtual);
+        Guid? formulaId = null, string[]? formulaParameters = null) =>
+        new(Id(id), "expr:" + expression, "field", string.Join(",", formulaParameters ?? (bindings ?? new()).Keys.ToArray()),
+            resultType, formulaId ?? Id(id + 1000), bindings ?? new());
     private static EffectiveBaseField Base(int id, FieldValueType type, string json) =>
         new(Id(id), "base" + id, "base", "", type, 1, [], JsonDocument.Parse(json).RootElement.Clone(), false);
     private static Guid Id(int value) => Guid.Parse($"00000000-0000-0000-0000-{value:D12}");

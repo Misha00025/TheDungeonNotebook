@@ -26,19 +26,19 @@ services:
       tags:
         - backend-campaign-service:latest
     image: backend-campaign-service:${IMAGE_TAG:-latest}
-  game-systems-service:
-    build:
-      context: ./apps/backend
-      dockerfile: game-systems-service/Dockerfile
-      tags:
-        - backend-game-systems-service:latest
-    image: backend-game-systems-service:${IMAGE_TAG:-latest}
-  sync-service:
-    build:
-      context: ./apps/backend/sync-service
-      tags:
-        - backend-sync-service:latest
-    image: backend-sync-service:${IMAGE_TAG:-latest}
+  # game-systems-service:
+  #   build:
+  #     context: ./apps/backend
+  #     dockerfile: game-systems-service/Dockerfile
+  #     tags:
+  #       - backend-game-systems-service:latest
+  #   image: backend-game-systems-service:${IMAGE_TAG:-latest}
+  # sync-service:
+  #   build:
+  #     context: ./apps/backend/sync-service
+  #     tags:
+  #       - backend-sync-service:latest
+  #   image: backend-sync-service:${IMAGE_TAG:-latest}
   web-hub:
     build:
       context: ./apps/web
@@ -67,15 +67,15 @@ services:
       tags:
         - tdn-login:latest
     image: tdn-login:${IMAGE_TAG:-latest}
-  web-game-systems:
-    build:
-      context: ./apps/web
-      dockerfile: apps/game-systems/Dockerfile
-      args:
-        VITE_BASE: ${VITE_BASE_GAME_SYSTEMS:-/}
-      tags:
-        - tdn-game-systems:latest
-    image: tdn-game-systems:${IMAGE_TAG:-latest}
+  # web-game-systems:
+  #   build:
+  #     context: ./apps/web
+  #     dockerfile: apps/game-systems/Dockerfile
+  #     args:
+  #       VITE_BASE: ${VITE_BASE_GAME_SYSTEMS:-/}
+  #     tags:
+  #       - tdn-game-systems:latest
+  #   image: tdn-game-systems:${IMAGE_TAG:-latest}
   web-proxy:
     build:
       context: ./apps/web/proxy

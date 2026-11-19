@@ -1,8 +1,8 @@
 .DEFAULT_GOAL := test
 .PHONY: test test-oidc build build-all build-backend build-web list-images help \
 	build-api-gateway build-users-service build-account-service build-campaign-service \
-	build-game-systems-service build-sync-service build-web-hub build-bff build-bff-web \
- build-web-campaign build-web-profile build-web-login build-web-game-systems build-web-proxy \
+	build-web-hub build-bff build-bff-web \
+ 	build-web-campaign build-web-profile build-web-login build-web-proxy \
 	run run-backend run-web web-install web-typecheck web-test web-build check-web test-web clean
 
 WEB_BUILD_ENV ?= template.env.build
@@ -49,10 +49,10 @@ build-account-service:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) account-service
 build-campaign-service:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) campaign-service
-build-game-systems-service:
-	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) game-systems-service
-build-sync-service:
-	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) sync-service
+#build-game-systems-service:
+#	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) game-systems-service
+#build-sync-service:
+#	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) sync-service
 build-web-hub:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) web-hub
 build-web-campaign:
@@ -61,8 +61,8 @@ build-web-profile:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) web-profile
 build-web-login:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) web-login
-build-web-game-systems:
-	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) web-game-systems
+#build-web-game-systems:
+#	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) web-game-systems
 build-web-proxy:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) web-proxy
 build-bff: build-bff-web
@@ -77,15 +77,6 @@ help:
 	@printf '%s\n' 'make build-backend | build-web | build-all | build-<service>'
 	@printf '%s\n' 'make build-bff | build-bff-web'
 	@printf '%s\n' 'make list-images; WEB_BUILD_ENV=<path> (default template.env.build); WEB_ENV=<path> (default .env)'
-
-# Запуск
-run: run-backend run-web
-
-run-backend:
-	cd apps/backend && docker compose up -d
-
-run-web:
-	cd apps/web && docker compose --env-file "$(WEB_ENV)" up -d
 
 web-install:
 	cd apps/web && npm ci

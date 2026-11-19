@@ -239,7 +239,7 @@ public class ViewServiceTests
         await CreateTemplate(fixture);
         var formula = await new FormulaService(fixture.Resources, fixture.Content, fixture.Sheets).CreateAsync(Admin, 7,
             new FormulaCreateRequest { RequestId = Guid.NewGuid(), Name = "Value", Expression = "7", Parameters = [] }, default);
-        var virtualField = new VirtualField(Guid.NewGuid(), "shared", "Shared", "", NumericResultType.Integer, formula.Id, new(), null, null);
+        var virtualField = new VirtualField(Guid.NewGuid(), "shared", "Shared", "", NumericResultType.Integer, formula.Id, new());
         var template = fixture.Content.GetData<TemplateContent>("campaignTemplates", 7, Guid.Empty);
         await fixture.Content.ReplaceAsync("campaignTemplates", 7, Guid.Empty, 1, template with { VirtualFields = [virtualField] }, default);
         var character = await fixture.Sheets.CreateCharacterAsync(Admin, 7, new CharacterCreateRequest { RequestId = Guid.NewGuid(), Name = "Character" }, default);
