@@ -5,7 +5,7 @@ import { CampaignApiError } from './api';
 import { validateFieldValue } from './ValueInput';
 import { parseJson, stringifyJson } from './json';
 import type { BaseFieldInput, Revision, TemplateContentEnvelope, VirtualFieldInput } from './types';
-import { acceptRows, newBaseField, newVirtualField, reconcileRows, rowsAreDirty, projectBaseField } from './templateFieldRows';
+import { acceptRows, moveRow, newBaseField, newVirtualField, reconcileRows, rowsAreDirty, rowsOrderChanged, projectBaseField } from './templateFieldRows';
 import type { FieldRow } from './templateFieldRows';
 
 type State = {
@@ -52,7 +52,9 @@ const projectVirtual = (field: VirtualFieldInput): VirtualFieldInput => ({
 const validateChangedRows = (state: State) => {
   const valid = <T,>(rows: FieldRow<T>[], check: (row: FieldRow<T>) => boolean) =>
     !rows.some(row => row.missing && !row.deleted) && rows.filter(row => !row.deleted).every(check);
-  return (!rowsAreDirty(state.baseRows) || valid(state.baseRows, row => {
+  const baseChanged = rowsAreDirty(state.baseRows) || rowsOrderChanged(state.baseRows, state.savedBase);
+  const virtualChanged = rowsAreDirty(state.virtualRows) || rowsOrderChanged(state.virtualRows, state.savedVirtual);
+  return (!baseChanged || valid(state.baseRows, row => {
     const field = row.field as BaseFieldInput;
     return Boolean(
       field.key.trim()
@@ -60,7 +62,7 @@ const validateChangedRows = (state: State) => {
       && !row.validationError
       && !validateFieldValue({ valueType: field.valueType, options: field.options }, field.value),
     );
-  })) && (!rowsAreDirty(state.virtualRows) || valid(state.virtualRows, row => {
+  })) && (!virtualChanged || valid(state.virtualRows, row => {
     const field = row.field as VirtualFieldInput;
     return Boolean(field.key.trim() && field.title.trim() && field.formulaId.trim());
   }));
@@ -83,7 +85,7 @@ export function useTemplateFields(campaignId: number) {
   const feedbackEvent = useRef(0);
   writableRef.current = writable;
   apiRef.current = api;
-  const dirty = state.loaded && (rowsAreDirty(state.baseRows) || rowsAreDirty(state.virtualRows));
+  const dirty = state.loaded && (rowsAreDirty(state.baseRows) || rowsOrderChanged(state.baseRows, state.savedBase) || rowsAreDirty(state.virtualRows) || rowsOrderChanged(state.virtualRows, state.savedVirtual));
   useDirtyDraft(`template-fields-${identity}`, dirty);
   const update = useCallback((change: (current: State) => State) => {
     if (!mounted.current) return;
@@ -99,8 +101,8 @@ export function useTemplateFields(campaignId: number) {
     const pendingVirtual = current.pending?.kind === 'virtual' ? current.pending.rowKeys : undefined;
     update(value => ({
       ...value,
-      baseRows: reconcileRows(value.baseRows, base, pendingBase),
-      virtualRows: reconcileRows(value.virtualRows, virtual, pendingVirtual),
+      baseRows: reconcileRows(value.baseRows, base, pendingBase, rowsOrderChanged(value.baseRows, value.savedBase)),
+      virtualRows: reconcileRows(value.virtualRows, virtual, pendingVirtual, rowsOrderChanged(value.virtualRows, value.savedVirtual)),
       savedBase: base,
       savedVirtual: virtual,
       description: envelope.data.description,
@@ -170,6 +172,14 @@ export function useTemplateFields(campaignId: number) {
   }, [invalidation, read]);
 
   const allowed = () => writableRef.current && stateRef.current.loaded && !busyRef.current && !stateRef.current.blocked;
+  const moveBase = useCallback((fromKey: string, toKey: string) => {
+    if (!allowed()) return;
+    update(value => ({ ...value, baseRows: moveRow(value.baseRows, fromKey, toKey) }));
+  }, [update]);
+  const moveVirtual = useCallback((fromKey: string, toKey: string) => {
+    if (!allowed()) return;
+    update(value => ({ ...value, virtualRows: moveRow(value.virtualRows, fromKey, toKey) }));
+  }, [update]);
   const addBase = useCallback(() => {
     if (!allowed()) return;
     update(value => ({
@@ -275,8 +285,8 @@ export function useTemplateFields(campaignId: number) {
   const saveAll = useCallback(async () => {
     const before = stateRef.current;
     if (busyRef.current || !writableRef.current || !before.loaded || before.blocked || before.revision === undefined) return;
-    const baseChanged = rowsAreDirty(before.baseRows);
-    const virtualChanged = rowsAreDirty(before.virtualRows);
+    const baseChanged = rowsAreDirty(before.baseRows) || rowsOrderChanged(before.baseRows, before.savedBase);
+    const virtualChanged = rowsAreDirty(before.virtualRows) || rowsOrderChanged(before.virtualRows, before.savedVirtual);
     if ((!baseChanged && !virtualChanged) || !validateChangedRows(before)) return;
     busyRef.current = true;
     const gen = ++generation.current;
@@ -300,7 +310,7 @@ export function useTemplateFields(campaignId: number) {
           savedBase,
           baseRows: acceptRows(value.baseRows, savedBase),
           savedVirtual,
-          virtualRows: reconcileRows(value.virtualRows, savedVirtual),
+          virtualRows: reconcileRows(value.virtualRows, savedVirtual, undefined, rowsOrderChanged(value.virtualRows, value.savedVirtual)),
           description: result.data.description,
           revision: result.contentRevision,
         }));
@@ -393,6 +403,8 @@ export function useTemplateFields(campaignId: number) {
     addVirtual,
     changeBase,
     changeVirtual,
+    moveBase,
+    moveVirtual,
     setBaseValidity,
     deleteBase: (key: string) => deleteRow('base', key),
     deleteVirtual: (key: string) => deleteRow('virtual', key),

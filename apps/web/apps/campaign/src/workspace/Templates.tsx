@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ActionRow, Button, DataTable, IconButton, Input, Notification, PageHeader, Select } from '@tdn/shared';
+import { ActionRow, Button, DataTable, DragHandle, IconButton, Input, Notification, PageHeader, Select } from '@tdn/shared';
 import type { ChoiceOption, JsonValue, ValueType, VirtualFieldInput } from './types';
 import { useWorkspace } from './Workspace';
 import { useResource } from './hooks';
@@ -38,6 +38,11 @@ export const TemplateEditor: React.FC<{ campaignId: number }> = ({ campaignId })
   const fields = useTemplateFields(campaignId);
   const formulas = useResource(`${sessionKey}:${campaignId}:${invalidation}:template-formulas`, () => api.listFormulas(campaignId), fields.loaded);
   const [openDialog, setOpenDialog] = useState<OpenDialog>();
+  const identity = `${sessionKey}:${campaignId}`;
+  const [drag, setDrag] = useState<{ kind: 'base' | 'virtual'; rowKey: string; identity: string }>();
+  const dragRef = useRef<typeof drag>(undefined);
+  const [hover, setHover] = useState<{ kind: 'base' | 'virtual'; rowKey: string; direction: 'up' | 'down' }>();
+  const setCurrentDrag = (value: typeof drag) => { dragRef.current = value; setDrag(value); };
   const dialogDisabled = !fields.writable || fields.busy || fields.blocked;
   const deletedBaseIds = new Set(fields.baseRows.filter(row => row.deleted && row.field.id).map(row => row.field.id));
   const deletedVirtualIds = new Set(fields.virtualRows.filter(row => row.deleted && row.field.id).map(row => row.field.id));
@@ -49,6 +54,60 @@ export const TemplateEditor: React.FC<{ campaignId: number }> = ({ campaignId })
   const activeBase = openDialog && openDialog.kind.startsWith('base-') ? fields.baseRows.find(row => row.rowKey === openDialog.rowKey && !row.missing && !row.deleted) : undefined;
   const activeVirtual = openDialog && (openDialog.kind === 'virtual-description' || openDialog.kind === 'virtual-links') ? fields.virtualRows.find(row => row.rowKey === openDialog.rowKey && !row.missing && !row.deleted) : undefined;
   const dialogOpen = Boolean(activeBase || activeVirtual);
+  const clearDrag = () => { setCurrentDrag(undefined); setHover(undefined); };
+  const reorderRows = (kind: 'base' | 'virtual'): { rowKey: string; deleted?: boolean; missing: boolean }[] => kind === 'base' ? fields.baseRows : fields.virtualRows;
+  const eligible = (kind: 'base' | 'virtual', key: string) => {
+    const rows = reorderRows(kind);
+    const row = rows.find(item => item.rowKey === key);
+    return Boolean(row && !row.deleted && !row.missing);
+  };
+  const canReorder = fields.loaded && fields.writable && !fields.busy && !fields.blocked && !dialogOpen;
+  useEffect(() => {
+    if (!drag) return;
+    if (drag.identity !== identity || !canReorder || !eligible(drag.kind, drag.rowKey)) clearDrag();
+  }, [drag, identity, canReorder, fields.baseRows, fields.virtualRows]);
+  const onHandleDragStart = (kind: 'base' | 'virtual', rowKey: string) => (event: React.DragEvent<HTMLButtonElement>) => {
+    if (!canReorder || !eligible(kind, rowKey)) { event.preventDefault(); return; }
+    event.dataTransfer.setData('text/plain', rowKey);
+    event.dataTransfer.effectAllowed = 'move';
+    setCurrentDrag({ kind, rowKey, identity });
+  };
+  const onRowDragOver = (kind: 'base' | 'virtual', rowKey: string) => (event: React.DragEvent<HTMLTableRowElement>) => {
+    const active = dragRef.current;
+    if (!active || active.kind !== kind || active.identity !== identity || active.rowKey === rowKey || !canReorder || !eligible(kind, active.rowKey) || !eligible(kind, rowKey)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    const rows = reorderRows(kind);
+    const direction = rows.findIndex(row => row.rowKey === active.rowKey) < rows.findIndex(row => row.rowKey === rowKey) ? 'down' : 'up';
+    setHover({ kind, rowKey, direction });
+  };
+  const onRowDrop = (kind: 'base' | 'virtual', rowKey: string) => (event: React.DragEvent<HTMLTableRowElement>) => {
+    const active = dragRef.current;
+    if (active && active.kind === kind && active.identity === identity && active.rowKey !== rowKey && canReorder && eligible(kind, active.rowKey) && eligible(kind, rowKey)) {
+      event.preventDefault();
+      if (kind === 'base') fields.moveBase(active.rowKey, rowKey);
+      else fields.moveVirtual(active.rowKey, rowKey);
+    }
+    clearDrag();
+  };
+  const onRowDragLeave = (event: React.DragEvent<HTMLTableRowElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setHover(undefined);
+  };
+  const onHandleKeyDown = (kind: 'base' | 'virtual', rowKey: string) => (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if ((event.key !== 'ArrowUp' && event.key !== 'ArrowDown') || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || !canReorder) return;
+    const rows = reorderRows(kind);
+    const index = rows.findIndex(row => row.rowKey === rowKey);
+    if (index < 0 || !eligible(kind, rowKey)) return;
+    const step = event.key === 'ArrowUp' ? -1 : 1;
+    event.preventDefault();
+    const candidates = step === -1 ? rows.slice(0, index).reverse() : rows.slice(index + 1);
+    const target = candidates.find(row => !row.deleted && !row.missing);
+    if (!target) return;
+    if (kind === 'base') fields.moveBase(rowKey, target.rowKey);
+    else fields.moveVirtual(rowKey, target.rowKey);
+    clearDrag();
+  };
   const header = <PageHeader
     title="Шаблон кампании"
     headingLevel={1}
@@ -80,14 +139,15 @@ export const TemplateEditor: React.FC<{ campaignId: number }> = ({ campaignId })
         <ActionRow style={{ gap: '0.5rem' }}><Button type="button" disabled={!fields.writable || fields.busy || fields.blocked} onClick={fields.addBase}>Добавить поле</Button></ActionRow>
       </header>
       <DataTable aria-label="Базовые поля" className={styles.baseTable} minWidth="48rem">
-        <thead><tr><th scope="col">Ключ</th><th scope="col">Название</th><th scope="col">Тип</th><th scope="col">По умолчанию</th><th scope="col">Действия</th></tr></thead>
+        <thead><tr><th scope="col" aria-label="Порядок">#</th><th scope="col">Ключ</th><th scope="col">Название</th><th scope="col">Тип</th><th scope="col">По умолчанию</th><th scope="col">Действия</th></tr></thead>
         <tbody>{fields.baseRows.map(row => {
           const label = labelOf(row.field);
           const change = rowChange(row);
           const actionDisabled = !fields.writable || fields.busy || fields.blocked || row.missing || Boolean(row.deleted);
           const validationError = row.validationError ?? validateFieldValue({ valueType: row.field.valueType, options: row.field.options }, row.field.value);
           const changeLabel = change ? { modified: 'Изменено', added: 'Добавлено', deleted: 'Удалено' }[change] : undefined;
-          return <tr key={row.rowKey} aria-label={`Базовое поле ${label}`} className={change ? styles[change] : undefined} data-change={change} title={changeLabel} aria-description={changeLabel}>
+          return <tr key={row.rowKey} aria-label={`Базовое поле ${label}`} className={[change ? styles[change] : '', drag?.kind === 'base' && drag.rowKey === row.rowKey ? styles.dragging : '', hover?.kind === 'base' && hover.rowKey === row.rowKey ? styles[`drop${hover.direction}`] : ''].filter(Boolean).join(' ')} data-change={change} title={changeLabel} aria-description={changeLabel} onDragOver={onRowDragOver('base', row.rowKey)} onDrop={onRowDrop('base', row.rowKey)} onDragLeave={onRowDragLeave}>
+            <td><DragHandle label={`Переместить базовое поле ${label}`} title="Перетащите или используйте стрелки вверх и вниз" disabled={!canReorder || row.missing || Boolean(row.deleted)} draggable onDragStart={onHandleDragStart('base', row.rowKey)} onDragEnd={clearDrag} onKeyDown={onHandleKeyDown('base', row.rowKey)} /></td>
             <td><Input aria-label={`Ключ базового поля ${label}`} value={row.field.key} disabled={Boolean(row.field.id) || actionDisabled} onChange={event => fields.changeBase(row.rowKey, field => ({ ...field, key: event.target.value }))} /></td>
             <td><Input aria-label={`Название базового поля ${label}`} value={row.field.title} disabled={actionDisabled} onChange={event => fields.changeBase(row.rowKey, field => ({ ...field, title: event.target.value }))} /></td>
             <td><div className={styles.typeCell}>
@@ -128,7 +188,7 @@ export const TemplateEditor: React.FC<{ campaignId: number }> = ({ campaignId })
       {formulas.loading && <p>Загрузка формул…</p>}
       {Boolean(formulas.error) && <ApiError error={formulas.error} onRetry={formulas.reload} />}
       <DataTable aria-label="Виртуальные поля" className={styles.virtualTable} minWidth="48rem">
-        <thead><tr><th scope="col">Ключ</th><th scope="col">Название</th><th scope="col">Тип</th><th scope="col">Формула</th><th scope="col">Связи</th><th scope="col">Действия</th></tr></thead>
+        <thead><tr><th scope="col" aria-label="Порядок">#</th><th scope="col">Ключ</th><th scope="col">Название</th><th scope="col">Тип</th><th scope="col">Формула</th><th scope="col">Связи</th><th scope="col">Действия</th></tr></thead>
         <tbody>{fields.virtualRows.map(row => {
           const label = labelOf(row.field);
           const change = rowChange(row);
@@ -136,7 +196,8 @@ export const TemplateEditor: React.FC<{ campaignId: number }> = ({ campaignId })
           const changeLabel = change ? { modified: 'Изменено', added: 'Добавлено', deleted: 'Удалено' }[change] : undefined;
           const formula = formulas.data?.find(item => item.id === row.field.formulaId);
           const knownFormula = Boolean(formula);
-          return <tr key={row.rowKey} aria-label={`Виртуальное поле ${label}`} className={change ? styles[change] : undefined} data-change={change} title={changeLabel} aria-description={changeLabel}>
+          return <tr key={row.rowKey} aria-label={`Виртуальное поле ${label}`} className={[change ? styles[change] : '', drag?.kind === 'virtual' && drag.rowKey === row.rowKey ? styles.dragging : '', hover?.kind === 'virtual' && hover.rowKey === row.rowKey ? styles[`drop${hover.direction}`] : ''].filter(Boolean).join(' ')} data-change={change} title={changeLabel} aria-description={changeLabel} onDragOver={onRowDragOver('virtual', row.rowKey)} onDrop={onRowDrop('virtual', row.rowKey)} onDragLeave={onRowDragLeave}>
+            <td><DragHandle label={`Переместить виртуальное поле ${label}`} title="Перетащите или используйте стрелки вверх и вниз" disabled={!canReorder || row.missing || Boolean(row.deleted)} draggable onDragStart={onHandleDragStart('virtual', row.rowKey)} onDragEnd={clearDrag} onKeyDown={onHandleKeyDown('virtual', row.rowKey)} /></td>
             <td><Input aria-label={`Ключ виртуального поля ${label}`} value={row.field.key} disabled={Boolean(row.field.id) || actionDisabled} onChange={event => fields.changeVirtual(row.rowKey, field => ({ ...field, key: event.target.value }))} /></td>
             <td><Input aria-label={`Название виртуального поля ${label}`} value={row.field.title} disabled={actionDisabled} onChange={event => fields.changeVirtual(row.rowKey, field => ({ ...field, title: event.target.value }))} /></td>
             <td><Select aria-label={`Тип виртуального поля ${label}`} value={row.field.resultType} disabled={actionDisabled} onChange={event => fields.changeVirtual(row.rowKey, field => ({ ...field, resultType: event.target.value as VirtualFieldInput['resultType'] }))}><option value="Integer">Целое число</option><option value="Number">Дробное число</option></Select></td>

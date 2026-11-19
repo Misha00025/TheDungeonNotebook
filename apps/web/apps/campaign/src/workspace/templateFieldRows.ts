@@ -25,6 +25,19 @@ export const newBaseField = (): BaseFieldInput => ({ key: '', title: '', descrip
 export const newVirtualField = (): VirtualFieldInput => ({ key: '', title: '', description: '', resultType: 'Integer', formulaId: '', bindings: {} });
 export const rowIsDirty = <T>(row: FieldRow<T>) => Boolean(row.deleted) || row.baseline === undefined || row.missing || stringifyJson(row.field) !== stringifyJson(row.baseline) || Boolean(row.validationError);
 export const rowsAreDirty = <T>(rows: FieldRow<T>[]) => rows.some(rowIsDirty);
+export const rowsOrderChanged = <T extends { id?: string }>(rows: FieldRow<T>[], saved: T[]) => {
+  const active = rows.filter(row => !row.deleted).map(row => row.field.id);
+  return active.length !== saved.length || active.some((id, index) => !id || id !== saved[index]?.id);
+};
+export const moveRow = <T>(rows: FieldRow<T>[], fromKey: string, toKey: string): FieldRow<T>[] => {
+  const from = rows.findIndex(row => row.rowKey === fromKey);
+  const to = rows.findIndex(row => row.rowKey === toKey);
+  if (from < 0 || to < 0 || from === to || rows[from].deleted || rows[from].missing || rows[to].deleted || rows[to].missing) return rows;
+  const next = [...rows];
+  const [row] = next.splice(from, 1);
+  next.splice(to, 0, row);
+  return next;
+};
 export const rowChange = <T>(row: FieldRow<T>): 'added' | 'modified' | 'deleted' | undefined => row.deleted ? 'deleted' : row.baseline === undefined ? 'added' : rowIsDirty(row) ? 'modified' : undefined;
 
 const clone = <T,>(value: T): T => parseJson(stringifyJson(value)) as T;
@@ -40,7 +53,7 @@ export const virtualRowsFrom = (fields: VirtualField[], rowKeys: string[]) => fi
   return { ...newRow(rowKeys[index]!, clone(projected)), baseline: clone(projected) };
 });
 
-export const reconcileRows = <T extends { id?: string; key: string }>(current: FieldRow<T>[], incoming: T[], pendingRowKey?: string | string[]) => {
+export const reconcileRows = <T extends { id?: string; key: string }>(current: FieldRow<T>[], incoming: T[], pendingRowKey?: string | string[], preserveOrder = true) => {
   const matchedServerIds = new Set<string>();
   const rows = current.flatMap(row => {
     if (!row.field.id) return [row];
@@ -68,7 +81,12 @@ export const reconcileRows = <T extends { id?: string; key: string }>(current: F
       matchedServerIds.add(field.id!);
     }
   }
-  return rows;
+  if (preserveOrder) return rows;
+  const incomingIds = new Map(incoming.map((field, index) => [field.id, index]));
+  const matched = rows.filter(row => row.field.id && incomingIds.has(row.field.id));
+  const remaining = rows.filter(row => !row.field.id || !incomingIds.has(row.field.id));
+  matched.sort((left, right) => incomingIds.get(left.field.id)! - incomingIds.get(right.field.id)!);
+  return [...matched, ...remaining];
 };
 
 export const acceptRows = <T extends { id?: string; key: string }>(current: FieldRow<T>[], incoming: T[]) => incoming.map(field => {

@@ -1,0 +1,44 @@
+.handle {
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.75rem;
+  min-width: 0;
+  flex-shrink: 0;
+  height: 1.125rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-secondary);
+  cursor: grab;
+  vertical-align: middle;
+}
+
+.handle:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.handle:active:not(:disabled) {
+  cursor: grabbing;
+}
+
+.handle:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.handle:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.dots {
+  display: block;
+  width: 0.75rem;
+  height: 1.125rem;
+  fill: currentColor;
+}

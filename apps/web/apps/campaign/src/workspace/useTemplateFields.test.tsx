@@ -4,6 +4,7 @@ import { CampaignApiError } from './api';
 import { LosslessNumber } from 'lossless-json';
 import type { BaseField, Revision, TemplateContentEnvelope, VirtualField } from './types';
 import { useTemplateFields } from './useTemplateFields';
+import { projectBaseField } from './templateFieldRows';
 
 const context = vi.hoisted(() => ({ sessionKey: 'session-a', invalidation: 0, canWrite: true, permissionsLoading: false, invalidated: vi.fn(), dirtyOwners: {} as Record<string, boolean> }));
 const api = vi.hoisted(() => ({ getTemplateContent: vi.fn(), putTemplateContent: vi.fn(), putTemplateVirtualFields: vi.fn() }));
@@ -39,11 +40,14 @@ describe('useTemplateFields', () => {
       result.current.addBase();
     });
     const added = result.current.baseRows[2];
-    act(() => result.current.changeBase(added.rowKey, value => ({ ...value, key: 'new', title: 'New' })));
+    act(() => {
+      result.current.changeBase(added.rowKey, value => ({ ...value, key: 'new', title: 'New' }));
+      result.current.moveBase(added.rowKey, baseA.rowKey);
+    });
     await act(async () => result.current.saveAll());
     expect(api.putTemplateContent).toHaveBeenCalledTimes(1);
     expect(api.putTemplateVirtualFields).toHaveBeenCalledTimes(1);
-    expect(api.putTemplateContent.mock.calls[0][1]).toMatchObject({ expectedRevision: 0, description: 'passive description\n', baseFields: [expect.objectContaining({ id: 'a', title: 'changed' }), expect.objectContaining({ key: 'new', title: 'New' })] });
+    expect(api.putTemplateContent.mock.calls[0][1]).toMatchObject({ expectedRevision: 0, description: 'passive description\n', baseFields: [expect.objectContaining({ key: 'new', title: 'New' }), expect.objectContaining({ id: 'a', title: 'changed' })] });
     for (const field of api.putTemplateContent.mock.calls[0][1].baseFields) {
       expect(field).not.toHaveProperty('typeRevision');
     }
@@ -51,7 +55,7 @@ describe('useTemplateFields', () => {
     expect(result.current.revision).toBeInstanceOf(LosslessNumber);
     expect(String(result.current.revision)).toBe('9223372036854775807');
     expect(api.putTemplateVirtualFields.mock.calls[0][1]).toMatchObject({ virtualFields: [expect.objectContaining({ id: 'v1', title: 'changed virtual' }), virtual('v2')] });
-    expect(result.current.baseRows.find(row => row.rowKey === added.rowKey)?.field.id).toBe('base-new-1');
+    expect(result.current.baseRows.find(row => row.rowKey === added.rowKey)?.field.id).toBe('base-new-0');
     expect(result.current.feedback?.kind).toBe('success');
   });
 
@@ -83,6 +87,108 @@ describe('useTemplateFields', () => {
     expect(api.putTemplateContent).not.toHaveBeenCalled(); expect(api.putTemplateVirtualFields).not.toHaveBeenCalled();
     act(() => result.current.cancelAll());
     expect(result.current.baseRows[0].field.title).toBe('a'); expect(result.current.virtualRows).toHaveLength(2); expect(result.current.baseRows).toHaveLength(2);
+  });
+
+  it('tracks group order as dirty, returns to clean baseline, and cancels to confirmed order', async () => {
+    const { result } = renderHook(() => useTemplateFields(4));
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    const [baseA, baseB] = result.current.baseRows;
+    const [virtualA, virtualB] = result.current.virtualRows;
+    act(() => {
+      result.current.moveBase(baseA.rowKey, baseB.rowKey);
+      result.current.moveVirtual(virtualA.rowKey, virtualB.rowKey);
+    });
+    expect(result.current.dirty).toBe(true);
+    act(() => {
+      result.current.moveBase(baseB.rowKey, baseA.rowKey);
+      result.current.moveVirtual(virtualB.rowKey, virtualA.rowKey);
+    });
+    expect(result.current.dirty).toBe(false);
+    act(() => {
+      result.current.moveBase(baseA.rowKey, baseB.rowKey);
+      result.current.moveVirtual(virtualA.rowKey, virtualB.rowKey);
+      result.current.cancelAll();
+    });
+    expect(result.current.baseRows.map(row => row.field.id)).toEqual(['a', 'b']);
+    expect(result.current.virtualRows.map(row => row.field.id)).toEqual(['v1', 'v2']);
+    expect(api.putTemplateContent).not.toHaveBeenCalled();
+    expect(api.putTemplateVirtualFields).not.toHaveBeenCalled();
+  });
+
+  it('preserves order-only virtual draft across partial failure and retries only virtual order', async () => {
+    const { result } = renderHook(() => useTemplateFields(4));
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    act(() => {
+      result.current.moveBase(result.current.baseRows[0].rowKey, result.current.baseRows[1].rowKey);
+      result.current.moveVirtual(result.current.virtualRows[0].rowKey, result.current.virtualRows[1].rowKey);
+    });
+    api.putTemplateVirtualFields.mockRejectedValueOnce(new CampaignApiError(400, { code: 'bad', title: 'Bad', detail: 'Bad' }));
+    await act(async () => result.current.saveAll());
+    expect(api.putTemplateContent.mock.calls[0][1].baseFields.map((field: BaseField) => field.id)).toEqual(['b', 'a']);
+    expect(api.putTemplateVirtualFields.mock.calls[0][1]).toMatchObject({ expectedRevision: 2, virtualFields: [virtual('v2'), virtual('v1')] });
+    expect(result.current.baseRows.map(row => row.field.id)).toEqual(['b', 'a']);
+    expect(result.current.virtualRows.map(row => row.field.id)).toEqual(['v2', 'v1']);
+    expect(result.current.dirty).toBe(true);
+    act(() => result.current.cancelAll());
+    expect(result.current.baseRows.map(row => row.field.id)).toEqual(['b', 'a']);
+    expect(result.current.virtualRows.map(row => row.field.id)).toEqual(['v1', 'v2']);
+    act(() => result.current.moveVirtual(result.current.virtualRows[0].rowKey, result.current.virtualRows[1].rowKey));
+    await act(async () => result.current.saveAll());
+    expect(api.putTemplateContent).toHaveBeenCalledTimes(1);
+    expect(api.putTemplateVirtualFields).toHaveBeenCalledTimes(2);
+    expect(api.putTemplateVirtualFields.mock.calls[1][1]).toMatchObject({ expectedRevision: 2, virtualFields: [virtual('v2'), virtual('v1')] });
+    expect(result.current.dirty).toBe(false);
+  });
+
+  it('adopts clean incoming order while retaining content drafts and cancel restores the newest baseline', async () => {
+    const { result } = renderHook(() => useTemplateFields(4));
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    act(() => result.current.changeBase(result.current.baseRows[0].rowKey, value => ({ ...value, title: 'local title' })));
+    api.getTemplateContent.mockResolvedValueOnce(envelope(2, [base('b'), base('a')], [virtual('v1'), virtual('v2')]));
+    await act(async () => result.current.reread());
+    expect(result.current.baseRows.map(row => row.field.id)).toEqual(['b', 'a']);
+    expect(result.current.baseRows.find(row => row.field.id === 'a')?.field.title).toBe('local title');
+    const [first, second] = result.current.baseRows;
+    act(() => result.current.moveBase(second.rowKey, first.rowKey));
+    api.getTemplateContent.mockResolvedValueOnce(envelope(3, [base('b'), base('a')], [virtual('v1'), virtual('v2')]));
+    await act(async () => result.current.reread());
+    expect(result.current.baseRows.map(row => row.field.id)).toEqual(['a', 'b']);
+    expect(result.current.dirty).toBe(true);
+    expect(result.current.baseRows.find(row => row.field.id === 'a')?.field.title).toBe('local title');
+    act(() => result.current.cancelAll());
+    expect(result.current.baseRows.map(row => row.field.id)).toEqual(['b', 'a']);
+    expect(result.current.virtualRows.map(row => row.field.id)).toEqual(['v1', 'v2']);
+    expect(api.putTemplateContent).not.toHaveBeenCalled();
+    expect(api.putTemplateVirtualFields).not.toHaveBeenCalled();
+  });
+
+  it.each([409, 503])('recovers order-only status %i writes only after explicit reread', async status => {
+    const { result } = renderHook(() => useTemplateFields(4));
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    act(() => result.current.moveBase(result.current.baseRows[0].rowKey, result.current.baseRows[1].rowKey));
+    api.putTemplateContent.mockRejectedValueOnce(new CampaignApiError(status, { code: 'failure', title: 'Failure', detail: 'Failure' }, status === 503));
+    await act(async () => result.current.saveAll());
+    expect(api.putTemplateContent.mock.calls[0][1].baseFields).toEqual([projectBaseField(base('b')), projectBaseField(base('a'))]);
+    expect(result.current.blocked).toBe(true);
+    const beforeBlockedMove = result.current.baseRows.map(row => row.field.id);
+    act(() => result.current.moveBase(result.current.baseRows[1].rowKey, result.current.baseRows[0].rowKey));
+    expect(result.current.baseRows.map(row => row.field.id)).toEqual(beforeBlockedMove);
+    await act(async () => result.current.saveAll());
+    expect(api.putTemplateContent).toHaveBeenCalledTimes(1);
+    const remote = status === 503 ? [base('b'), base('a')] : [base('a'), base('b')];
+    api.getTemplateContent.mockResolvedValueOnce(envelope(5, remote));
+    await act(async () => result.current.reread());
+    expect(result.current.baseRows.map(row => row.field.id)).toEqual(['b', 'a']);
+    if (status === 503) {
+      expect(result.current.dirty).toBe(false);
+      await act(async () => result.current.saveAll());
+      expect(api.putTemplateContent).toHaveBeenCalledTimes(1);
+    } else {
+      expect(result.current.dirty).toBe(true);
+      await act(async () => result.current.saveAll());
+      expect(api.putTemplateContent).toHaveBeenCalledTimes(2);
+      expect(api.putTemplateContent.mock.calls[1][1]).toMatchObject({ expectedRevision: 5, baseFields: [projectBaseField(base('b')), projectBaseField(base('a'))] });
+    }
   });
 
   it('retains a confirmed base phase when virtual publication fails and retries only virtual', async () => {
@@ -255,6 +361,8 @@ describe('useTemplateFields', () => {
       void result.current.saveAll();
       result.current.addBase();
       result.current.changeVirtual(virtualRowsBefore[0].rowKey, value => ({ ...value, title: 'busy edit' }));
+      result.current.moveBase(baseRowsBefore[0].rowKey, baseRowsBefore[1].rowKey);
+      result.current.moveVirtual(virtualRowsBefore[0].rowKey, virtualRowsBefore[1].rowKey);
       result.current.deleteBase(baseRowsBefore[1].rowKey);
       result.current.restoreBase(baseRowsBefore[1].rowKey);
       result.current.cancelAll();
@@ -265,6 +373,8 @@ describe('useTemplateFields', () => {
     expect(api.putTemplateVirtualFields).not.toHaveBeenCalled();
     expect(api.getTemplateContent).toHaveBeenCalledTimes(1);
     expect(result.current.baseRows).toHaveLength(2);
+    expect(result.current.baseRows.map(row => row.field.id)).toEqual(['a', 'b']);
+    expect(result.current.virtualRows.map(row => row.field.id)).toEqual(['v1', 'v2']);
     expect(result.current.baseRows[0].field.title).toBe('base draft');
     expect(result.current.virtualRows[0].field.title).toBe('virtual draft');
     await act(async () => resolveBase(envelope(2)));
@@ -335,6 +445,9 @@ describe('useTemplateFields', () => {
     act(() => result.current.changeBase(result.current.baseRows[0].rowKey, value => ({ ...value, title: 'draft' })));
     context.permissionsLoading = true; rerender();
     expect(result.current.canSaveAll).toBe(false);
+    const beforeMove = result.current.baseRows.map(row => row.field.id);
+    act(() => result.current.moveBase(result.current.baseRows[0].rowKey, result.current.baseRows[1].rowKey));
+    expect(result.current.baseRows.map(row => row.field.id)).toEqual(beforeMove);
     await act(async () => result.current.saveAll());
     expect(api.putTemplateContent).not.toHaveBeenCalled();
     act(() => result.current.cancelAll());

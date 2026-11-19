@@ -53,6 +53,8 @@ export { default as IconButton } from './ui/Buttons/IconButton/IconButton';
 export type { IconType, IconButtonProps } from './ui/Buttons/IconButton/IconButton';
 export { default as Button } from './ui/Buttons/Button';
 export type { ButtonProps, ButtonVariant } from './ui/Buttons/Button';
+export { default as DragHandle } from './ui/Buttons/DragHandle';
+export type { DragHandleProps } from './ui/Buttons/DragHandle';
 export { default as LinkButton } from './ui/Buttons/LinkButton';
 export type { LinkButtonProps } from './ui/Buttons/LinkButton';
 export { default as Panel, Badge } from './ui/Panel/Panel';

@@ -14,6 +14,7 @@
 - Страница шаблона — singleton: metadata шаблона не редактируется; базовые и виртуальные поля отображаются в отдельных native `DataTable`, а общие команды «Сохранить» и «Отменить» находятся в шапке страницы.
 - Удаление поля сначала локально помечает его к удалению; строку можно восстановить до общего сохранения. Общая отмена возвращает последний подтверждённый baseline и удаляет новые черновики.
 - Общая команда сохранения отправляет полные массивы всех изменённых групп: сначала базовые поля, затем виртуальные, используя общую content revision. Запросы не атомарны: после частичного успеха подтверждённый baseline сохраняется, а общая отмена сбрасывает только оставшиеся черновики. Базовый PUT roundtrips пассивное описание шаблона.
+- Левый drag handle позволяет менять локальный порядок базовых и виртуальных полей отдельно; общие «Сохранить» и «Отменить» сохраняют и отменяют порядок вместе с остальными черновиками. На handle доступны стрелки вверх и вниз.
 - Описание, варианты, значения MultiChoice и связи виртуального поля редактируются отдельными Template-модалками как локальный draft. «Применить» обновляет draft; серверная запись выполняется только общей командой «Сохранить».
 - Формула виртуального поля выбирается в таблице. Модалка связей загружает объявленные параметры выбранной формулы и показывает пары «параметр/поле» в табличных строках; связывать можно только с сохранёнными полями. Ручного ввода ID, отдельного родителя и произвольных параметров нет. Ошибку чтения можно повторить; модалка меняет только локальный draft bindings.
 - Изменённые, новые и помеченные к удалению строки имеют theme-based цветовое различие; действие восстановления и удаление доступны для соответствующих строк до общей команды сохранения.
@@ -33,7 +34,7 @@
 
 | Компонент | Исходный файл |
 | --- | --- |
-| `Button`, `LinkButton`, `IconButton` | `packages/shared/src/ui/Buttons/Button.tsx`, `packages/shared/src/ui/Buttons/LinkButton.tsx`, `packages/shared/src/ui/Buttons/IconButton/IconButton.tsx`, `packages/shared/src/styles/components/Button.module.css`, `packages/shared/src/ui/Buttons/IconButton/IconButton.module.css` |
+| `Button`, `LinkButton`, `IconButton`, `DragHandle` | `packages/shared/src/ui/Buttons/Button.tsx`, `packages/shared/src/ui/Buttons/LinkButton.tsx`, `packages/shared/src/ui/Buttons/IconButton/IconButton.tsx`, `packages/shared/src/ui/Buttons/DragHandle.tsx`, `packages/shared/src/styles/components/Button.module.css`, `packages/shared/src/ui/Buttons/IconButton/IconButton.module.css`, `packages/shared/src/ui/Buttons/DragHandle.module.css` |
 | `Panel`, `Badge`, `StatePanel`, `Statistic` | `packages/shared/src/ui/Panel/Panel.tsx`, `packages/shared/src/ui/Panel/Panel.module.css`, `packages/shared/src/ui/StatePanel/StatePanel.tsx`, `packages/shared/src/ui/Statistic/Statistic.tsx`, `packages/shared/src/ui/Statistic/Statistic.module.css` |
 | `DataTable` | `packages/shared/src/ui/DataTable/DataTable.tsx`, `packages/shared/src/ui/DataTable/DataTable.module.css` |
 | `Field`, `Input`, `Select`, `Textarea` | `packages/shared/src/ui/Form/Field.tsx`, `packages/shared/src/ui/Form/Input.tsx`, `packages/shared/src/ui/Form/Select.tsx`, `packages/shared/src/ui/Form/Textarea.tsx`, `packages/shared/src/ui/Form/Field.module.css`, `packages/shared/src/styles/components/Input.module.css` |

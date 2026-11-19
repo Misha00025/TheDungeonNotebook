@@ -201,6 +201,84 @@ describe('singleton campaign template editor', () => {
     expect(globalCancelButton()).toBeDisabled();
   });
 
+  it.each([
+    { kind: 'base' as const, first: 'Alpha', second: 'Beta' },
+    { kind: 'virtual' as const, first: 'Virtual', second: 'Second virtual' },
+  ])('reorders $kind rows locally and saves the complete ordered group', async ({ kind, first, second }) => {
+    serverContent = content(11, undefined, [virtual('virtual-a', 'v', 'Virtual'), virtual('virtual-b', 'w', 'Second virtual')]);
+    renderTemplates();
+    await screen.findByLabelText('Название базового поля Alpha');
+    const titleFor = (label: string) => kind === 'base' ? baseTitle(label) : virtualTitle(label);
+    fireEvent.change(titleFor(first), { target: { value: 'Edited' } });
+    const changedLabel = 'Edited';
+    if (kind === 'base') fireEvent.change(within(baseRow(changedLabel)).getByRole('textbox', { name: 'Значение по умолчанию Edited' }), { target: { value: '42' } });
+    const source = screen.getByRole('button', { name: `Переместить ${kind === 'base' ? 'базовое' : 'виртуальное'} поле ${changedLabel}` });
+    const target = kind === 'base' ? baseRow(second) : virtualRow(second);
+    const dataTransfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' };
+    fireEvent.dragStart(source, { dataTransfer });
+    expect(dataTransfer.setData).toHaveBeenCalledWith('text/plain', expect.any(String));
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+    expect(globalSaveButton()).toBeEnabled();
+    expect(api.putTemplateContent).not.toHaveBeenCalled();
+    expect(api.putTemplateVirtualFields).not.toHaveBeenCalled();
+    fireEvent.click(globalSaveButton());
+    if (kind === 'base') {
+      await waitFor(() => expect(api.putTemplateContent).toHaveBeenCalledTimes(1));
+      const fields = api.putTemplateContent.mock.calls[0][1].baseFields;
+      expect(fields.map((field: BaseFieldInput) => field.id)).toEqual(['base-b', 'base-a']);
+      expect(fields[1]).toMatchObject({ id: 'base-a', title: 'Edited' });
+      expect(isLosslessNumber(fields[1].value)).toBe(true);
+      expect(String(fields[1].value)).toBe('42');
+      expect(api.putTemplateVirtualFields).not.toHaveBeenCalled();
+    } else {
+      await waitFor(() => expect(api.putTemplateVirtualFields).toHaveBeenCalledTimes(1));
+      const fields = api.putTemplateVirtualFields.mock.calls[0][1].virtualFields;
+      expect(fields.map((field: VirtualFieldInput) => field.id)).toEqual(['virtual-b', 'virtual-a']);
+      expect(fields[1]).toMatchObject({ id: 'virtual-a', title: 'Edited' });
+      expect(api.putTemplateContent).not.toHaveBeenCalled();
+    }
+  });
+
+  it('does not reorder on aborted, cross-group, or external drags', async () => {
+    serverContent = content(11, undefined, [virtual('virtual-a', 'v', 'Virtual'), virtual('virtual-b', 'w', 'Second virtual')]);
+    renderTemplates();
+    await screen.findByLabelText('Название базового поля Alpha');
+    const alphaHandle = screen.getByRole('button', { name: 'Переместить базовое поле Alpha' });
+    const virtualTarget = virtualRow('Virtual');
+    const transfer = { setData: vi.fn(), effectAllowed: '', dropEffect: '' };
+    fireEvent.dragStart(alphaHandle, { dataTransfer: transfer });
+    fireEvent.dragOver(baseRow('Beta'), { dataTransfer: transfer });
+    fireEvent.dragEnd(alphaHandle, { dataTransfer: transfer });
+    expect(globalSaveButton()).toBeDisabled();
+    fireEvent.dragStart(alphaHandle, { dataTransfer: transfer });
+    fireEvent.drop(virtualTarget, { dataTransfer: transfer });
+    expect(globalSaveButton()).toBeDisabled();
+    fireEvent.dragOver(baseRow('Beta'), { dataTransfer: transfer });
+    fireEvent.drop(baseRow('Beta'), { dataTransfer: transfer });
+    expect(globalSaveButton()).toBeDisabled();
+    expect(api.putTemplateContent).not.toHaveBeenCalled();
+    expect(api.putTemplateVirtualFields).not.toHaveBeenCalled();
+  });
+
+  it('moves rows with arrow keys, honors boundaries, and skips deleted rows', async () => {
+    serverContent = content(11, [base('base-a', 'a', 'Alpha'), base('base-b', 'b', 'Beta'), base('base-c', 'c', 'Gamma')], []);
+    renderTemplates();
+    await screen.findByLabelText('Название базового поля Alpha');
+    const handle = (label: string) => screen.getByRole('button', { name: `Переместить базовое поле ${label}` });
+    fireEvent.keyDown(handle('Alpha'), { key: 'ArrowUp' });
+    expect(globalSaveButton()).toBeDisabled();
+    fireEvent.keyDown(handle('Alpha'), { key: 'ArrowDown' });
+    fireEvent.keyDown(handle('Alpha'), { key: 'ArrowUp' });
+    expect(globalSaveButton()).toBeDisabled();
+    fireEvent.click(baseDelete('Beta'));
+    fireEvent.keyDown(handle('Alpha'), { key: 'ArrowDown' });
+    fireEvent.click(within(baseRow('Beta')).getByRole('button', { name: 'Восстановить базовое поле Beta' }));
+    fireEvent.click(globalSaveButton());
+    await waitFor(() => expect(api.putTemplateContent).toHaveBeenCalledTimes(1));
+    expect(api.putTemplateContent.mock.calls[0][1].baseFields.map((field: BaseFieldInput) => field.id)).toEqual(['base-b', 'base-c', 'base-a']);
+  });
+
   it('serializes global actions and local edits while the first PUT is pending', async () => {
     let resolveBase!: (value: TemplateContentEnvelope) => void;
     api.putTemplateContent.mockReturnValueOnce(new Promise(resolve => { resolveBase = resolve; }));
