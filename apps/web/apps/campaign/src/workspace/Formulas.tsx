@@ -1,16 +1,14 @@
 import React, { useEffect, useId, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useWorkspace, useDirtyDraft, useDirtyState } from './Workspace';
+import { useWorkspace, useDirtyDraft } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 import { CampaignApiError } from './api';
-import { useResource, useMutation } from './hooks';
-import type { DefinitionCreate, FormulaContentEnvelope, FormulaMetadata } from './types';
+import { useMutation } from './hooks';
+import type { DefinitionCreate } from './types';
 import { ApiError } from './Feedback';
-import { ActionRow, Button, Field, Input, ModalPortal, Notification, Textarea } from '@tdn/shared';
-import commonStyles from '@tdn/shared/styles/common.module.css';
-import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
-import inputStyles from '@tdn/shared/styles/components/Input.module.css';
-import styles from './Workspace.module.css';
+import { ActionRow, Button, DataTable, Field, Input, ModalPortal, Notification, PageHeader, Textarea } from '@tdn/shared';
+import { rowDirty, useFormulaRows } from './useFormulaRows';
+import styles from './Formulas.module.css';
 
 const parametersFrom = (text: string) => text.split('\n').filter((item, index, values) => index < values.length - 1 || item.length > 0);
 const isUncertain = (failure: unknown) => failure instanceof CampaignApiError && (failure.unknownOutcome || ['already_published', 'content_already_prepared', 'creation_already_published'].includes(failure.problem.code));
@@ -76,116 +74,43 @@ export const CreateFormula: React.FC<{ campaignId: number; onCreated: (formula: 
   </ModalPortal>;
 };
 
-export const FormulaEditor: React.FC<{ campaignId: number; formula: FormulaMetadata }> = ({ campaignId, formula }) => {
-  const { api, notifyInvalidation } = useWorkspace();
-  const { permissions, permissionsLoading, campaign: activeCampaign } = useCampaignWorkspace();
-  const writable = permissions.canWrite && !permissionsLoading && activeCampaign.id === campaignId;
-  const [loaded, setLoaded] = useState(false);
-  const [loadError, setLoadError] = useState<unknown>();
-  const [name, setName] = useState('');
-  const [baselineName, setBaselineName] = useState('');
-  const [metadataRevision, setMetadataRevision] = useState(formula.metadataRevision);
-  const [expression, setExpression] = useState('');
-  const [baselineExpression, setBaselineExpression] = useState('');
-  const [parametersText, setParametersText] = useState('');
-  const [baselineParametersText, setBaselineParametersText] = useState('');
-  const [contentRevision, setContentRevision] = useState<FormulaContentEnvelope['contentRevision']>(1);
-  const [nameError, setNameError] = useState<unknown>();
-  const [contentError, setContentError] = useState<unknown>();
-  const [nameBlocked, setNameBlocked] = useState(false);
-  const [contentBlocked, setContentBlocked] = useState(false);
-  const [nameSnapshot, setNameSnapshot] = useState<FormulaMetadata>();
-  const [contentSnapshot, setContentSnapshot] = useState<FormulaContentEnvelope>();
-  const [loadAttempt, setLoadAttempt] = useState(0);
-  const [nameSaved, setNameSaved] = useState(false);
-  const [contentSaved, setContentSaved] = useState(false);
-  const nameDirty = loaded && name !== baselineName;
-  const contentDirty = loaded && (expression !== baselineExpression || parametersText !== baselineParametersText);
-  useDirtyDraft(`formula-editor-name-${formula.id}`, nameDirty);
-  useDirtyDraft(`formula-editor-content-${formula.id}`, contentDirty);
-  useEffect(() => {
-    let active = true;
-    setLoaded(false);
-    setLoadError(undefined);
-    Promise.all([api.getFormula(campaignId, formula.id), api.getFormulaContent(campaignId, formula.id)]).then(([metadata, content]) => {
-      if (!active) return;
-      setName(metadata.name); setBaselineName(metadata.name); setMetadataRevision(metadata.metadataRevision);
-      setExpression(content.data.expression); setBaselineExpression(content.data.expression);
-      const text = content.data.parameters.join('\n'); setParametersText(text); setBaselineParametersText(text);
-      setContentRevision(content.contentRevision); setLoaded(true);
-    }, failure => { if (active) setLoadError(failure); });
-    return () => { active = false; };
-  }, [api, campaignId, formula.id, loadAttempt]);
-  const rename = useMutation(async () => {
-    if (!writable || nameBlocked || !nameDirty || !name.trim()) return undefined;
-    const result = await api.renameFormula(campaignId, formula.id, { name: name.trim(), expectedRevision: metadataRevision });
-    setName(result.name); setBaselineName(result.name); setMetadataRevision(result.metadataRevision); setNameError(undefined); setNameBlocked(false); setNameSnapshot(undefined);
-    setNameSaved(true);
-    return result;
-  });
-  const saveContent = useMutation(async () => {
-    if (!writable || contentBlocked || !contentDirty) return undefined;
-    const result = await api.putFormulaContent(campaignId, formula.id, { expression, parameters: parametersFrom(parametersText), expectedRevision: contentRevision });
-    setExpression(result.data.expression); setBaselineExpression(result.data.expression);
-    const text = result.data.parameters.join('\n'); setParametersText(text); setBaselineParametersText(text);
-    setContentRevision(result.contentRevision); setContentError(undefined); setContentBlocked(false); setContentSnapshot(undefined);
-    setContentSaved(true);
-    return result;
-  });
-  const refreshName = async () => {
-    try { const latest = await api.getFormula(campaignId, formula.id); setMetadataRevision(latest.metadataRevision); setNameSnapshot(latest); setNameBlocked(false); }
-    catch (failure) { setNameError(failure); }
-  };
-  const refreshContent = async () => {
-    try { const latest = await api.getFormulaContent(campaignId, formula.id); setContentRevision(latest.contentRevision); setContentSnapshot(latest); setContentBlocked(false); }
-    catch (failure) { setContentError(failure); }
-  };
-  const handleNameError = (failure: unknown) => { setNameError(failure); if (failure instanceof CampaignApiError && failure.status === 403) notifyInvalidation(); if (failure instanceof CampaignApiError && (failure.status === 409 || failure.unknownOutcome)) setNameBlocked(true); };
-  const handleContentError = (failure: unknown) => { setContentError(failure); if (failure instanceof CampaignApiError && failure.status === 403) notifyInvalidation(); if (failure instanceof CampaignApiError && (failure.status === 409 || failure.unknownOutcome)) setContentBlocked(true); };
-  if (loadError) return <ApiError error={loadError} onRetry={() => { setLoadError(undefined); setLoaded(false); setLoadAttempt(value => value + 1); }} />;
-  if (!loaded) return <p>Загрузка формулы…</p>;
-  return <div className={styles.page}>
-      <form className={commonStyles.form} onSubmit={event => { event.preventDefault(); if (writable && !nameBlocked && !rename.busy && nameDirty) void rename.run().catch(handleNameError); }}><h2>Метаданные</h2>
-       <label className={commonStyles.formGroup}>Название<input className={inputStyles.input} disabled={!writable || rename.busy} value={name} onChange={event => { setName(event.target.value); setNameSaved(false); }} /></label>
-       {Boolean(nameError) && <ApiError error={nameError} />}{nameBlocked && <button type="button" className={buttonStyles.button} onClick={() => void refreshName()}>Перечитать метаданные</button>}
-      {nameSnapshot && <aside className={commonStyles.card}><h3>Актуальные метаданные (черновик не изменён)</h3><p>{nameSnapshot.name}</p></aside>}
-        <div className={commonStyles.formActions}><button className={buttonStyles.button} disabled={!writable || !nameDirty || rename.busy || nameBlocked || !name.trim()}>Сохранить название</button><button type="button" className={buttonStyles.button} onClick={() => { if (window.confirm('Отменить черновик названия?')) setName(baselineName); }} disabled={!nameDirty || rename.busy}>Отменить</button></div>
-       {nameSaved && !nameDirty && <Notification kind="success" eventKey={String(metadataRevision)}>Название сохранено.</Notification>}
-    </form>
-      <form className={commonStyles.form} onSubmit={event => { event.preventDefault(); if (writable && !contentBlocked && !saveContent.busy && contentDirty) void saveContent.run().catch(handleContentError); }}><h2>Содержимое</h2>
-        <label className={commonStyles.formGroup}>Выражение<textarea className={inputStyles.input} disabled={!writable || saveContent.busy} value={expression} onChange={event => { setExpression(event.target.value); setContentSaved(false); }} /></label>
-        <label className={commonStyles.formGroup}>Параметры, по одному в строке<textarea className={inputStyles.input} disabled={!writable || saveContent.busy} value={parametersText} onChange={event => { setParametersText(event.target.value); setContentSaved(false); }} /></label>
-       {Boolean(contentError) && <ApiError error={contentError} />}{contentBlocked && <button type="button" className={buttonStyles.button} onClick={() => void refreshContent()}>Перечитать содержимое</button>}
-      {contentSnapshot && <aside className={commonStyles.card}><h3>Актуальное содержимое (черновик не изменён)</h3><p>{contentSnapshot.data.expression}</p><ul>{contentSnapshot.data.parameters.map((item, index) => <li key={`${index}:${item}`}>{item}</li>)}</ul></aside>}
-        <div className={commonStyles.formActions}><button className={buttonStyles.button} disabled={!writable || !contentDirty || saveContent.busy || contentBlocked}>Сохранить содержимое</button><button type="button" className={buttonStyles.button} onClick={() => { if (window.confirm('Отменить черновик содержимого?')) { setExpression(baselineExpression); setParametersText(baselineParametersText); } }} disabled={!contentDirty || saveContent.busy}>Отменить</button></div>
-       {contentSaved && !contentDirty && <Notification kind="success" eventKey={String(contentRevision)}>Содержимое сохранено.</Notification>}
-    </form>
-  </div>;
+const FormulaTableEditor: React.FC<{ campaignId: number }> = ({ campaignId }) => {
+  const rows = useFormulaRows(campaignId);
+  const [creating, setCreating] = useState(false);
+  const header = <PageHeader title="Формулы" headingLevel={1} actions={<ActionRow>
+    <Button type="button" disabled={!rows.canSave || creating} busy={rows.busy} onClick={() => void rows.saveAll()}>Сохранить</Button>
+    <Button type="button" variant="secondary" disabled={!rows.dirty || rows.busy || creating} onClick={() => { if (window.confirm('Отменить все изменения формул?')) rows.cancelAll(); }}>Отменить</Button>
+    <Button type="button" disabled={!rows.writable || rows.busy || creating} onClick={() => setCreating(true)}>Создать формулу</Button>
+  </ActionRow>} />;
+  if (rows.loading && !rows.loaded) return <main className={styles.page}>{header}<p>Загрузка формул…</p></main>;
+  return <main className={styles.page}>{header}
+    {Boolean(rows.listError) && <ApiError error={rows.listError} onRetry={() => void rows.reload()} />}
+    {rows.feedback && <Notification kind={rows.feedback.kind} eventKey={String(rows.feedback.event)}>{rows.feedback.message}</Notification>}
+    {rows.loaded && rows.rows.length === 0 && !rows.listError && <p>Формул пока нет.</p>}
+    <DataTable aria-label="Формулы" className={styles.formulaTable} minWidth="48rem">
+      <thead><tr><th scope="col">Название</th><th scope="col">Выражение</th><th scope="col">Параметры</th></tr></thead>
+      <tbody>{rows.rows.map(row => {
+        const label = row.metadataBaseline.name || row.name || 'Без названия';
+        const modified = rowDirty(row);
+        return <tr key={row.id} aria-label={`Формула ${label}`} className={modified ? styles.modified : undefined}>
+          <td><Input aria-label={`Название формулы ${label}`} value={row.name} disabled={!rows.writable || rows.busy || creating || row.missing || !row.contentBaseline} onChange={event => rows.change(row.id, 'name', event.target.value)} /></td>
+          <td><Textarea rows={2} aria-label={`Выражение формулы ${label}`} value={row.expression} disabled={!rows.writable || rows.busy || creating || row.missing || !row.contentBaseline} onChange={event => rows.change(row.id, 'expression', event.target.value)} /></td>
+          <td><Textarea rows={2} aria-label={`Параметры формулы ${label}`} placeholder="По одному в строке" value={row.parametersText} disabled={!rows.writable || rows.busy || creating || row.missing || !row.contentBaseline} onChange={event => rows.change(row.id, 'parametersText', event.target.value)} />
+            {Boolean(row.loadError) && <ApiError error={row.loadError} />}
+            {Boolean(row.nameError) && <ApiError error={row.nameError} />}
+            {Boolean(row.contentError) && <ApiError error={row.contentError} />}
+            {row.missing && <p role="alert">{row.nameBlocked || row.contentBlocked ? 'Формула отсутствует в списке. Перечитайте формулу для проверки результата.' : 'Формула отсутствует на сервере. Отмените черновик.'}</p>}
+            {(Boolean(row.loadError) || row.nameBlocked || row.contentBlocked) && <Button type="button" variant="secondary" disabled={rows.busy || creating} onClick={() => void rows.rereadRow(row.id)}>Перечитать формулу {label}</Button>}
+          </td>
+        </tr>;
+      })}</tbody>
+    </DataTable>
+    {creating && <CreateFormula campaignId={campaignId} onCancel={() => setCreating(false)} onCreated={() => { setCreating(false); rows.created(); }} />}
+  </main>;
 };
 
 export const Formulas: React.FC = () => {
-  const { groupId = '' } = useParams(); const campaignId = Number(groupId); const { api, sessionKey, invalidation } = useWorkspace();
-  const { permissions, permissionsLoading, campaign } = useCampaignWorkspace();
-  const writable = permissions.canWrite && !permissionsLoading && campaign.id === campaignId;
-  const resource = useResource<FormulaMetadata[]>(`${sessionKey}:${campaignId}:formulas:${invalidation}`, () => api.listFormulas(campaignId));
-  const [selected, setSelected] = useState<FormulaMetadata>();
-  const [creating, setCreating] = useState(false);
-  const dirty = useDirtyState();
-  const changeSelection = (nextId: string) => {
-    const next = resource.data?.find(item => item.id === nextId);
-    if (next?.id === selected?.id) return;
-    if (dirty && !window.confirm('Есть несохранённые изменения. Переключить формулу?')) return;
-    setSelected(next);
-    if (creating) setCreating(false);
-  };
-  if (!resource.data && resource.loading) return <p>Загрузка формул…</p>;
-  return <main className={styles.page}><h1>Формулы</h1>
-    {Boolean(resource.error) && <ApiError error={resource.error} onRetry={resource.reload} />}
-    <label>Выбранная формула<select className={inputStyles.input} value={selected?.id ?? ''} onChange={event => changeSelection(event.target.value)}><option value="">Выберите формулу</option>{resource.data?.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-    {resource.data && <ul>{resource.data.map(item => <li key={item.id}><button type="button" className={buttonStyles.button} onClick={() => changeSelection(item.id)}>{item.name}</button></li>)}</ul>}
-    <button type="button" className={buttonStyles.button} disabled={!writable || creating} onClick={() => { if (writable && !creating && (!dirty || window.confirm('Есть несохранённые изменения. Открыть создание формулы?'))) setCreating(true); }}>Создать формулу</button>
-    {creating && <CreateFormula campaignId={campaignId} onCancel={() => setCreating(false)} onCreated={created => { const metadata = created as FormulaMetadata; setSelected(metadata); setCreating(false); resource.reload(); }} />}
-    {selected && !creating && <FormulaEditor key={`${campaignId}:${selected.id}`} campaignId={campaignId} formula={selected} />}
-  </main>;
+  const { groupId = '' } = useParams(); const campaignId = Number(groupId); const { sessionKey } = useWorkspace();
+  return <FormulaTableEditor key={`${sessionKey}:${campaignId}`} campaignId={campaignId} />;
 };
 export default Formulas;

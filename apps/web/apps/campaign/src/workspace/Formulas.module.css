@@ -1,0 +1,30 @@
+.page {
+  min-width: 0;
+}
+
+.formulaTable th:nth-child(1),
+.formulaTable td:nth-child(1) {
+  width: 20%;
+}
+
+.formulaTable th:nth-child(2),
+.formulaTable td:nth-child(2) {
+  width: 50%;
+}
+
+.formulaTable th:nth-child(3),
+.formulaTable td:nth-child(3) {
+  width: 30%;
+}
+
+.formulaTable td > textarea {
+  min-height: 4rem;
+}
+
+.modified > td {
+  background: color-mix(in srgb, var(--accent-color) 10%, var(--bg-primary));
+}
+
+.modified > td:first-child {
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent-color) 50%, var(--bg-primary));
+}
