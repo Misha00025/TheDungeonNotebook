@@ -8,3 +8,20 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.statsTable {
+  width: 100%;
+}
+
+.fieldDescription {
+  font-weight: normal;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.valueField {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 12rem;
+}

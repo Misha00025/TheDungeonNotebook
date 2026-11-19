@@ -1,28 +1,30 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ActionRow, Badge, Button, IconButton, Input, LinkButton, List, Notification, PageHeader, Panel, Select, StatePanel, TabBar, Textarea } from '@tdn/shared';
+import { ActionRow, Badge, Button, DataTable, IconButton, Input, LinkButton, List, Notification, PageHeader, Panel, Select, StatePanel, TabBar, Textarea } from '@tdn/shared';
 import type { NotificationKind } from '@tdn/shared';
 import { useWorkspace, useDirtyDraft, useDirtyState } from './Workspace';
 import { useVisitHistory } from './VisitHistory';
 import { useMutation, useResource } from './hooks';
 import { CampaignApiError } from './api';
 import type { CharacterMetadata, ComputedSheet, JsonValue, Permissions, Revision } from './types';
-import { ValueInput } from './ValueInput';
+import { ValueInput, validateFieldValue } from './ValueInput';
 import { displayValue, stringifyJson } from './json';
 import { diagnosticMessage } from './displayDiagnostics';
 import { ApiError } from './Feedback';
 import styles from './Workspace.module.css';
-import { CharacterVirtuals } from './CharacterVirtuals';
 import CharacterPresentation from './CharacterPresentation';
 import characterStyles from './CharacterSheet.module.css';
 
 const importanceLabel: Record<string, string> = { Background: 'Фоновый', Secondary: 'Второстепенный', Key: 'Ключевой' };
 type MetadataDraft = { name: string; importance: CharacterMetadata['importance'] };
+type ContentWriter = <T extends { contentRevision: Revision }>(operation: (revision: Revision) => Promise<T>, confirmed: (result: T) => void) => Promise<void>;
 
 const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats: boolean }> = ({ campaignId, characterId, stats }) => {
   const { api, path, sessionKey } = useWorkspace();
   const { visitCharacter } = useVisitHistory();
   const anyDraftDirty = useDirtyState();
+  const anyDraftDirtyRef = useRef(anyDraftDirty);
+  anyDraftDirtyRef.current = anyDraftDirty;
   const mode = useLocation().pathname.includes('/gm/') ? 'gm' : 'player';
   const scope = `${sessionKey}:${campaignId}:${characterId}`;
   const metadataResource = useResource<CharacterMetadata>(`${scope}:metadata`, () => api.getCharacter(campaignId, characterId));
@@ -31,6 +33,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
   const [metadata, setMetadata] = useState<CharacterMetadata>();
   const [metadataDraft, setMetadataDraft] = useState<MetadataDraft>();
   const [sheet, setSheet] = useState<ComputedSheet>();
+  const sheetRef = useRef(sheet);
   const [presentationRefreshKey, setPresentationRefreshKey] = useState(0);
   const [descriptionDraft, setDescriptionDraft] = useState<string>();
   const [fieldDrafts, setFieldDrafts] = useState<Record<string, JsonValue>>({});
@@ -46,6 +49,14 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
   const [writeStatusKind, setWriteStatusKind] = useState<NotificationKind>('success');
   const [writeStatusEvent, setWriteStatusEvent] = useState(0);
   const [contentBusy, setContentBusy] = useState(false);
+  const fieldDraftsRef = useRef(fieldDrafts);
+  const validityRef = useRef(validity);
+  const canWriteRef = useRef(false);
+  const blockedRef = useRef(sheetBlocked);
+  const processorBusyRef = useRef(false);
+  const pendingFieldWritesRef = useRef(new Map<string, JsonValue>());
+  const failedFieldWritesRef = useRef(new Set<string>());
+  const runContentRef = useRef<ContentWriter | undefined>(undefined);
   const contentBusyRef = useRef(false);
   const contentRevisionRef = useRef<Revision | undefined>(undefined);
   const metadataBusyRef = useRef(false);
@@ -56,6 +67,16 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
   const previousStatsRef = useRef(stats);
   const recordedCharacter = useRef<string | null>(null);
   const activeRef = useRef(true);
+  const updateSheet = (update: (current: ComputedSheet | undefined) => ComputedSheet | undefined) => {
+    const next = update(sheetRef.current);
+    sheetRef.current = next;
+    setSheet(next);
+  };
+  const stopPendingFields = () => {
+    for (const fieldId of pendingFieldWritesRef.current.keys()) failedFieldWritesRef.current.add(fieldId);
+    pendingFieldWritesRef.current.clear();
+  };
+  const hasUnconfirmedDrafts = () => anyDraftDirtyRef.current || Object.keys(fieldDraftsRef.current).length > 0 || Object.values(validityRef.current).some(Boolean);
   const showWriteStatus = (message: string, kind: NotificationKind = 'success') => { setWriteStatus(message); setWriteStatusKind(kind); setWriteStatusEvent(value => value + 1); };
   useEffect(() => {
     activeRef.current = true;
@@ -65,7 +86,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
     if (initializedRef.current || !metadataResource.data || !sheetResource.data) return;
     initializedRef.current = true;
     setMetadata(metadataResource.data);
-    setSheet(sheetResource.data);
+    updateSheet(() => sheetResource.data);
     contentRevisionRef.current = sheetResource.data.contentRevision;
   }, [metadataResource.data, sheetResource.data]);
   useEffect(() => {
@@ -87,11 +108,13 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
       if (!activeRef.current) return;
       setPresentationRefreshKey(value => value + 1);
       const revisionChanged = contentRevisionRef.current !== undefined && stringifyJson(fresh.contentRevision) !== stringifyJson(contentRevisionRef.current);
-      setSheet(current => current ? { ...current, ...fresh } : fresh);
-       if (revisionChanged && anyDraftDirty) {
+       updateSheet(current => current ? { ...current, ...fresh } : fresh);
+        if (revisionChanged && hasUnconfirmedDrafts()) {
          setSnapshotError(undefined);
-        setSheetBlocked(true);
-      } else if (!anyDraftDirty) {
+         blockedRef.current = true;
+         stopPendingFields();
+         setSheetBlocked(true);
+       } else if (!hasUnconfirmedDrafts()) {
         contentRevisionRef.current = fresh.contentRevision;
       }
     }).catch(error => { if (activeRef.current) setSnapshotError(error); }).finally(() => {
@@ -110,6 +133,18 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
     metadata.name !== metadataDraft.name || metadata.importance !== metadataDraft.importance
   ));
   const canWrite = Boolean(permissionResource.data?.canWrite && !permissionResource.loading && !permissionResource.error);
+  canWriteRef.current = canWrite;
+  blockedRef.current = sheetBlocked;
+  const updateDrafts = (update: (current: Record<string, JsonValue>) => Record<string, JsonValue>) => {
+    const next = update(fieldDraftsRef.current);
+    fieldDraftsRef.current = next;
+    setFieldDrafts(next);
+  };
+  const updateValidity = (update: (current: Record<string, string | undefined>) => Record<string, string | undefined>) => {
+    const next = update(validityRef.current);
+    validityRef.current = next;
+    setValidity(next);
+  };
   useDirtyDraft(`character-sheet-${scope}`, contentDirty || metadataDirty);
 
   const metadataMutation = useMutation(async (draft: MetadataDraft) => {
@@ -142,7 +177,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
     operation: (revision: Revision) => Promise<T>,
     confirmed: (result: T) => void
   ) => {
-    if (!canWrite || sheetBlocked || contentBusyRef.current || snapshotBusyRef.current || contentRevisionRef.current === undefined) return;
+    if (!canWriteRef.current || blockedRef.current || contentBusyRef.current || snapshotBusyRef.current || contentRevisionRef.current === undefined) return;
     contentBusyRef.current = true;
     setContentBusy(true);
     setWriteError(undefined);
@@ -156,9 +191,11 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
         const fresh = await api.getComputedSheet(campaignId, characterId);
         if (!activeRef.current) return;
         setPresentationRefreshKey(value => value + 1);
-        setSheet(current => current ? { ...current, ...fresh } : fresh);
-        if (stringifyJson(fresh.contentRevision) !== stringifyJson(result.contentRevision) && anyDraftDirty) {
+        updateSheet(current => current ? { ...current, ...fresh } : fresh);
+        if (stringifyJson(fresh.contentRevision) !== stringifyJson(result.contentRevision) && hasUnconfirmedDrafts()) {
           setSnapshotError(undefined);
+          blockedRef.current = true;
+          stopPendingFields();
           setSheetBlocked(true);
         } else {
           contentRevisionRef.current = fresh.contentRevision;
@@ -168,15 +205,69 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
       }
     } catch (error) {
       if (!activeRef.current) return;
+      stopPendingFields();
       setWriteError(error);
       setWriteStatus('');
       if (error instanceof CampaignApiError && error.status === 403) permissionResource.reload();
-      if (error instanceof CampaignApiError && (error.conflict || error.unknownOutcome)) { setSnapshotError(undefined); setSheetBlocked(true); }
+      if (error instanceof CampaignApiError && (error.conflict || error.unknownOutcome)) { setSnapshotError(undefined); blockedRef.current = true; setSheetBlocked(true); }
     } finally {
       contentBusyRef.current = false;
       if (activeRef.current) setContentBusy(false);
     }
   };
+  runContentRef.current = runContent;
+
+  const drainFieldWrites = async () => {
+    if (processorBusyRef.current) return;
+    processorBusyRef.current = true;
+    try {
+      while (pendingFieldWritesRef.current.size > 0) {
+        if (!activeRef.current) return;
+        if (!canWriteRef.current) { stopPendingFields(); return; }
+        if (blockedRef.current || snapshotBusyRef.current || contentBusyRef.current) return;
+        const [fieldId, submitted] = pendingFieldWritesRef.current.entries().next().value as [string, JsonValue];
+        pendingFieldWritesRef.current.delete(fieldId);
+        if (validityRef.current[fieldId]) { failedFieldWritesRef.current.add(fieldId); continue; }
+        const currentField = sheetRef.current?.baseFields.find(field => field.id === fieldId);
+        if (!currentField || validateFieldValue({ valueType: currentField.valueType, options: currentField.options }, submitted)) {
+          failedFieldWritesRef.current.add(fieldId);
+          continue;
+        }
+        if (stringifyJson(submitted) === stringifyJson(currentField.effectiveValue)) {
+          const currentDraft = fieldDraftsRef.current[fieldId];
+          if (currentDraft !== undefined && stringifyJson(currentDraft) === stringifyJson(submitted) && !validityRef.current[fieldId]) {
+            updateDrafts(drafts => { const next = { ...drafts }; delete next[fieldId]; return next; });
+            updateValidity(errors => { const next = { ...errors }; delete next[fieldId]; return next; });
+          }
+          continue;
+        }
+        let accepted = false;
+        await runContentRef.current?.(
+          revision => api.putBaseValue(campaignId, characterId, fieldId, { value: submitted, expectedRevision: revision }),
+          result => {
+            accepted = true;
+            updateSheet(current => current ? { ...current, ...result, virtualFields: current.virtualFields, formulaContentRevisions: current.formulaContentRevisions } : current);
+            const current = fieldDraftsRef.current[fieldId];
+            if (current !== undefined && stringifyJson(current) === stringifyJson(submitted) && !validityRef.current[fieldId]) {
+              updateDrafts(drafts => { const next = { ...drafts }; delete next[fieldId]; return next; });
+              updateValidity(errors => { const next = { ...errors }; delete next[fieldId]; return next; });
+              failedFieldWritesRef.current.delete(fieldId);
+            }
+            showWriteStatus('Поле сохранено.');
+          }
+        );
+        if (!activeRef.current) return;
+        if (!accepted) { failedFieldWritesRef.current.add(fieldId); stopPendingFields(); return; }
+      }
+    } finally { processorBusyRef.current = false; }
+  };
+  useEffect(() => {
+    if (!canWrite || sheetBlocked) {
+      for (const fieldId of pendingFieldWritesRef.current.keys()) failedFieldWritesRef.current.add(fieldId);
+      pendingFieldWritesRef.current.clear();
+    }
+    else if (!contentBusy && !snapshotBusy) void drainFieldWrites();
+  }, [canWrite, sheetBlocked, contentBusy, snapshotBusy]);
 
   const saveDescription = () => {
     const submitted = descriptionDraft;
@@ -184,35 +275,24 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
     void runContent(
       revision => api.putDescription(campaignId, characterId, { description: submitted, expectedRevision: revision }),
       result => {
-        setSheet(current => current ? { ...current, description: submitted, contentRevision: result.contentRevision } : current);
+        updateSheet(current => current ? { ...current, description: submitted, contentRevision: result.contentRevision } : current);
         setDescriptionDraft(undefined);
         showWriteStatus('Описание сохранено.');
       }
     );
   };
 
-  const saveField = (fieldId: string) => {
-    if (!Object.prototype.hasOwnProperty.call(fieldDrafts, fieldId) || validity[fieldId]) return;
-    const value = fieldDrafts[fieldId];
-    void runContent(
-      revision => api.putBaseValue(campaignId, characterId, fieldId, { value, expectedRevision: revision }),
-      result => {
-        setSheet(current => current ? { ...current, ...result, virtualFields: current.virtualFields, formulaContentRevisions: current.formulaContentRevisions } : current);
-        setFieldDrafts(current => { const next = { ...current }; delete next[fieldId]; return next; });
-        setValidity(current => { const next = { ...current }; delete next[fieldId]; return next; });
-        showWriteStatus('Поле сохранено.');
-      }
-    );
-  };
-
   const resetField = (fieldId: string) => {
-    if (!sheet?.baseFields.some(field => field.id === fieldId && field.isExplicit)) return;
+    if (contentBusyRef.current || sheetBlocked || snapshotBusyRef.current || !sheet?.baseFields.some(field => field.id === fieldId && field.isExplicit)) return;
+    pendingFieldWritesRef.current.delete(fieldId);
+    failedFieldWritesRef.current.delete(fieldId);
     void runContent(
       revision => api.resetBaseValue(campaignId, characterId, fieldId, revision),
       result => {
-        setSheet(current => current ? { ...current, ...result, virtualFields: current.virtualFields, formulaContentRevisions: current.formulaContentRevisions } : current);
-        setFieldDrafts(current => { const next = { ...current }; delete next[fieldId]; return next; });
-        setValidity(current => { const next = { ...current }; delete next[fieldId]; return next; });
+        updateSheet(current => current ? { ...current, ...result, virtualFields: current.virtualFields, formulaContentRevisions: current.formulaContentRevisions } : current);
+        updateDrafts(current => { const next = { ...current }; delete next[fieldId]; return next; });
+        updateValidity(current => { const next = { ...current }; delete next[fieldId]; return next; });
+        failedFieldWritesRef.current.delete(fieldId);
         setResetCounters(current => ({ ...current, [fieldId]: (current[fieldId] ?? 0) + 1 }));
         showWriteStatus('Значение сброшено.');
       }
@@ -229,8 +309,9 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
       const freshSheet = await api.getComputedSheet(campaignId, characterId);
       if (!activeRef.current || generation !== snapshotGenerationRef.current) return;
       setPresentationRefreshKey(value => value + 1);
-      setSheet(freshSheet);
+      updateSheet(() => freshSheet);
       contentRevisionRef.current = freshSheet.contentRevision;
+      blockedRef.current = false;
       setSheetBlocked(false);
       setWriteError(undefined);
        showWriteStatus('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.', 'info');
@@ -262,9 +343,12 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
     setDescriptionDraft(undefined);
   };
   const cancelField = (fieldId: string) => {
+    if (contentBusyRef.current) return;
     if ((Object.prototype.hasOwnProperty.call(fieldDrafts, fieldId) || Boolean(validity[fieldId])) && !window.confirm('Отменить черновик поля?')) return;
-    setFieldDrafts(current => { const next = { ...current }; delete next[fieldId]; return next; });
-    setValidity(current => { const next = { ...current }; delete next[fieldId]; return next; });
+    pendingFieldWritesRef.current.delete(fieldId);
+    failedFieldWritesRef.current.delete(fieldId);
+    updateDrafts(current => { const next = { ...current }; delete next[fieldId]; return next; });
+    updateValidity(current => { const next = { ...current }; delete next[fieldId]; return next; });
     setResetCounters(current => ({ ...current, [fieldId]: (current[fieldId] ?? 0) + 1 }));
   };
   const cancelMetadata = () => {
@@ -362,34 +446,52 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
     {!stats && <section aria-label="Обзор персонажа"><CharacterPresentation campaignId={campaignId} characterId={characterId} refreshKey={presentationRefreshKey} /></section>}
     {stats && <>
       <Panel title="Базовые характеристики" headingLevel={3}>
-        <List layout="grid" columns={3} minItemWidth="14rem">
+        <DataTable aria-label="Базовые характеристики" className={characterStyles.statsTable} minWidth="40rem">
+          <thead><tr><th scope="col">Название</th><th scope="col">Значение</th><th scope="col">Источник</th>{editorAllowed && <th scope="col">Действия</th>}</tr></thead>
+          <tbody>
           {sheet.baseFields.map(field => {
             const value = Object.prototype.hasOwnProperty.call(fieldDrafts, field.id) ? fieldDrafts[field.id] : field.effectiveValue;
-            return <Panel key={field.id} as="div" title={field.title} headingLevel={4} description={field.description}>
-              <fieldset disabled={permissionPending || !editorAllowed || contentBusy} className={styles.nodeFields}>
-                <label>{field.title}<ValueInput key={`${field.id}:${resetCounters[field.id] ?? 0}`} label={field.title} field={{ valueType: field.valueType, options: field.options }} value={value} disabled={!editorAllowed} onChange={next => { setWriteStatus(''); setFieldDrafts(current => ({ ...current, [field.id]: next })); }} onValidityChange={error => setValidity(current => current[field.id] === error ? current : { ...current, [field.id]: error })} /></label>
-                <p>{field.isExplicit ? 'Задано явно' : 'Унаследовано'}</p>
-                {editorAllowed && <ActionRow>
-                  <Button variant="secondary" type="button" disabled={!field.isExplicit || contentBusy || sheetBlocked || snapshotBusy || !canWrite} onClick={() => resetField(field.id)}>Сбросить {field.title}</Button>
-                  <Button type="button" aria-label={`Сохранить ${field.title}`} disabled={!Object.prototype.hasOwnProperty.call(fieldDrafts, field.id) || Boolean(validity[field.id]) || contentBusy || sheetBlocked || snapshotBusy || !canWrite} onClick={() => saveField(field.id)}>Сохранить</Button>
-                  <Button variant="secondary" type="button" aria-label={`Отмена ${field.title}`} disabled={contentBusy || (!Object.prototype.hasOwnProperty.call(fieldDrafts, field.id) && !validity[field.id])} onClick={() => cancelField(field.id)}>Отмена</Button>
-                </ActionRow>}
-              </fieldset>
-            </Panel>;
+            const hasDraft = Object.prototype.hasOwnProperty.call(fieldDrafts, field.id) || Boolean(validity[field.id]);
+            const hasRecovery = Boolean(validity[field.id]) || failedFieldWritesRef.current.has(field.id);
+            return <tr key={field.id}><th scope="row"><span>{field.title}</span>{field.description && <div className={characterStyles.fieldDescription}>{field.description}</div>}</th>
+              <td><fieldset disabled={permissionPending || !editorAllowed || !canWrite || sheetBlocked || snapshotBusy} className={characterStyles.valueField}>
+                <ValueInput key={`${field.id}:${resetCounters[field.id] ?? 0}`} label={field.title} compact disabled={!editorAllowed} field={{ valueType: field.valueType, options: field.options }} value={value} onChange={next => {
+                  if (!activeRef.current || !canWriteRef.current || blockedRef.current || snapshotBusyRef.current) return;
+                  setWriteStatus('');
+                  const baseline = field.effectiveValue;
+                  const hadQueued = pendingFieldWritesRef.current.has(field.id);
+                  updateDrafts(current => ({ ...current, [field.id]: next }));
+                  failedFieldWritesRef.current.delete(field.id);
+                  if (validityRef.current[field.id]) return;
+                  if (!hadQueued && !contentBusyRef.current && stringifyJson(next) === stringifyJson(baseline)) {
+                    updateDrafts(current => { const updated = { ...current }; delete updated[field.id]; return updated; });
+                    updateValidity(current => { const updated = { ...current }; delete updated[field.id]; return updated; });
+                    return;
+                  }
+                  pendingFieldWritesRef.current.set(field.id, next);
+                  void drainFieldWrites();
+                }} onValidityChange={error => {
+                  if (validityRef.current[field.id] === error) return;
+                  updateValidity(current => ({ ...current, [field.id]: error }));
+                  if (error) pendingFieldWritesRef.current.delete(field.id);
+                }} />
+              </fieldset></td><td>{field.isExplicit ? 'Задано явно' : 'Унаследовано'}</td>
+              {editorAllowed && <td><ActionRow>
+                {field.isExplicit && <Button variant="secondary" type="button" disabled={contentBusy || sheetBlocked || snapshotBusy || !canWrite} onClick={() => resetField(field.id)}>Сбросить {field.title}</Button>}
+                {hasDraft && failedFieldWritesRef.current.has(field.id) && Object.prototype.hasOwnProperty.call(fieldDrafts, field.id) && !validity[field.id] && <Button type="button" disabled={contentBusy || sheetBlocked || snapshotBusy || !canWrite} onClick={() => { failedFieldWritesRef.current.delete(field.id); pendingFieldWritesRef.current.set(field.id, fieldDraftsRef.current[field.id]); void drainFieldWrites(); }}>Повторить {field.title}</Button>}
+                {hasDraft && hasRecovery && <Button variant="secondary" type="button" disabled={contentBusy} onClick={() => cancelField(field.id)}>Отбросить изменения {field.title}</Button>}
+              </ActionRow></td>}
+            </tr>;
           })}
-        </List>
+          </tbody>
+        </DataTable>
       </Panel>
       <Panel title="Вычисляемые значения" headingLevel={3} aria-label="Виртуальные характеристики">
-        <List layout="grid" columns={2} minItemWidth="14rem">
-          {sheet.virtualFields.map(field => <Panel key={field.id} as="article" title={field.title} headingLevel={4} description={field.description}>
-             {field.diagnostic ? <p role="alert">{diagnosticMessage(field.diagnostic.code)}</p> : <p>{displayValue(field.value)}</p>}
-          </Panel>)}
-        </List>
+        <DataTable aria-label="Вычисляемые значения" minWidth="32rem"><thead><tr><th scope="col">Название</th><th scope="col">Значение</th></tr></thead><tbody>
+          {sheet.virtualFields.map(field => <tr key={field.id}><th scope="row"><span>{field.title}</span>{field.description && <div className={characterStyles.fieldDescription}>{field.description}</div>}</th><td>{field.diagnostic ? <p role="alert">{diagnosticMessage(field.diagnostic.code)}</p> : displayValue(field.value)}</td></tr>)}
+        </tbody></DataTable>
       </Panel>
     </>}
-    {editorAllowed && <div hidden={!stats}><Panel title="Настройка вычислений" headingLevel={3}>
-      <CharacterVirtuals key={`${scope}:virtual-editor`} campaignId={campaignId} characterId={characterId} baseFields={sheet.baseFields} virtualFields={sheet.virtualFields} canWrite={canWrite} busy={contentBusy} blocked={sheetBlocked} write={runContent} />
-    </Panel></div>}
   </List></section>;
 };
 

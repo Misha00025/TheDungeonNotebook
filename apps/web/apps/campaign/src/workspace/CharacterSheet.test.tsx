@@ -19,6 +19,11 @@ const auth = (request: (url: string, options?: RequestInit) => Promise<Response>
 const CurrentPath: React.FC = () => <output aria-label="Current path">{useLocation().pathname}</output>;
 const sheetTree = (request: (url: string, options?: RequestInit) => Promise<Response>, stats: boolean, initial = '/12/player/characters') => <MemoryRouter initialEntries={[initial]}><RemoteAuthProvider auth={auth(request)}><WorkspaceProvider mountPath="/"><DirtyProvider><CharacterSheet campaignId={12} characterId={id} stats={stats} /><CurrentPath /></DirtyProvider></WorkspaceProvider></RemoteAuthProvider></MemoryRouter>;
 const renderSheet = (request: (url: string, options?: RequestInit) => Promise<Response>) => render(sheetTree(request, true));
+const findWritableControl = async (role: 'textbox' | 'checkbox' | 'combobox', label: string) => {
+  const control = await screen.findByRole(role, { name: label });
+  await waitFor(() => expect(control).toBeEnabled());
+  return control;
+};
 const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
 
 afterEach(() => {
@@ -33,20 +38,18 @@ describe('CharacterSheet', () => {
       { id: 'value-field', key: 'value', title: 'Computed value', description: '', resultType: 'Number', value: 0, diagnostic: null },
       { id: 'error-field', key: 'broken', title: 'Broken value', description: '', resultType: 'Number', value: 0, diagnostic: { code: 'formula_error', message: 'Broken formula 00000000-0000-4000-8000-000000000001' } }
     ] };
-    const request = vi.fn(async (url: string) => {
+    const request = vi.fn(async (url: string, _options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: false, canManageAccess: false });
       if (url.endsWith('/computed-sheet')) return response(computed);
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       return response([]);
     });
     renderSheet(request);
-    const valueCard = await screen.findByRole('heading', { name: 'Computed value' });
-    expect(valueCard.closest('article')).toHaveTextContent('0');
-    const errorCard = screen.getByRole('heading', { name: 'Broken value' }).closest('article');
-    expect(errorCard).toHaveTextContent('Не удалось вычислить значение.');
-    expect(errorCard).not.toHaveTextContent('0');
-    expect(errorCard).not.toHaveTextContent('formula_error');
-    expect(errorCard).not.toHaveTextContent('00000000-0000-4000-8000-000000000001');
+    const values = await screen.findByRole('region', { name: 'Виртуальные характеристики' });
+    expect(within(values).getByText('0')).toBeInTheDocument();
+    expect(within(values).getByText('Не удалось вычислить значение.')).toBeInTheDocument();
+    expect(within(values).queryByText('formula_error')).not.toBeInTheDocument();
+    expect(within(values).queryByText('00000000-0000-4000-8000-000000000001')).not.toBeInTheDocument();
     expect(screen.queryByText(/^Шаблон:/)).not.toBeInTheDocument();
   });
 
@@ -61,16 +64,16 @@ describe('CharacterSheet', () => {
     expect(await screen.findByText('Только чтение')).toBeInTheDocument();
     expect(screen.getAllByText('Задано явно')).toHaveLength(6);
     expect(screen.getByRole('heading', { name: 'Базовые характеристики' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'string', level: 4 })).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /string/ })).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('Тип: Integer');
     for (const field of fields) {
       expect(screen.queryByRole('textbox', { name: field.title })).not.toBeInTheDocument();
       expect(screen.queryByRole('checkbox', { name: field.title })).not.toBeInTheDocument();
       expect(screen.queryByRole('combobox', { name: field.title })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: `Сохранить ${field.key}` })).not.toBeInTheDocument();
     }
     expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(true);
     expect(request.mock.calls.map(([url]) => url).some(url => /virtual-fields|formulas|assignments/.test(url))).toBe(false);
+    expect(screen.queryByRole('button', { name: /Индивидуальные формулы|Настройка вычислений/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Сбросить/ })).not.toBeInTheDocument();
   });
 
@@ -325,13 +328,12 @@ describe('CharacterSheet', () => {
       return response([]);
     });
     render(sheetTree(request, true, `/12/player/characters/${id}/stats`));
-    await screen.findByRole('button', { name: 'Сохранить string' });
+    await findWritableControl('textbox', 'string');
     fireEvent.click(screen.getByRole('button', { name: 'Изменить сведения персонажа' }));
     fireEvent.change(screen.getByLabelText('Имя'), { target: { value: 'Renamed' } });
     fireEvent.click(screen.getByRole('button', { name: 'Изменить описание' }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Описание' }), { target: { value: 'Description draft' } });
-    fireEvent.change(screen.getByLabelText('string'), { target: { value: 'Field draft' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
+    fireEvent.change(await findWritableControl('textbox', 'string'), { target: { value: 'Field draft' } });
     expect(await screen.findByRole('textbox', { name: 'Описание' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Сохранить описание' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить описание' }));
@@ -352,7 +354,7 @@ describe('CharacterSheet', () => {
     expect(request.mock.calls.filter(([url, options]) => url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT')).toHaveLength(1);
   });
 
-  it('saves exactly the changed explicit field with the sheet revision and supports typed falsy values', async () => {
+  it('autosaves exactly the changed explicit field with the sheet revision', async () => {
     let latest = sheet;
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
@@ -362,10 +364,8 @@ describe('CharacterSheet', () => {
       return response([]);
     });
     renderSheet(request);
-    await screen.findByRole('button', { name: 'Сохранить string' });
-    const stringInput = await screen.findByLabelText('string');
+    const stringInput = await findWritableControl('textbox', 'string');
     fireEvent.change(stringInput, { target: { value: 'new value' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
     await waitFor(() => expect(request.mock.calls.some(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT')).toBe(true));
     const write = request.mock.calls.find(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT');
     expect(JSON.parse(String(write?.[1]?.body))).toEqual({ value: 'new value', expectedRevision: 1 });
@@ -386,17 +386,31 @@ describe('CharacterSheet', () => {
       return response([]);
     });
     renderSheet(request);
-    await screen.findByRole('button', { name: 'Сохранить boolean' });
-    fireEvent.click(await screen.findByLabelText('boolean'));
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить boolean' }));
-    await waitFor(() => expect(screen.getAllByText('Задано явно')).toHaveLength(6));
+    fireEvent.click(await findWritableControl('checkbox', 'boolean'));
+    await waitFor(() => expect(request.mock.calls.some(([url, options]) => url.endsWith('/base-values/boolean') && options?.method === 'PUT')).toBe(true));
     const call = request.mock.calls.find(([url, options]) => url.endsWith('/base-values/boolean') && options?.method === 'PUT');
     expect(call).toBeDefined();
     expect(String(call?.[1]?.body)).toContain(`"expectedRevision":${revision}`);
     expect(screen.getByLabelText('boolean')).toBeChecked();
   });
 
-  it('automatically rereads a conflicting content write, preserves the draft, and waits for explicit Save', async () => {
+  it('does not materialize an inherited field when an unchanged value is emitted', async () => {
+    const inherited = { ...sheet, baseFields: fields.map(field => field.id === 'string' ? { ...field, isExplicit: false, effectiveValue: 'template' } : field) };
+    const request = vi.fn(async (url: string, _options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(inherited);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      return response([]);
+    });
+    renderSheet(request);
+    const input = await findWritableControl('textbox', 'string');
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
+    fireEvent.change(input, { target: { value: 'template' } });
+    await waitFor(() => expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0));
+    expect(input).toHaveValue('template');
+  });
+
+  it('automatically rereads a conflicting content write, preserves the draft, and waits for explicit retry', async () => {
     let writes = 0;
     let sheetReads = 0;
     const latest = { ...sheet, contentRevision: 7, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'server', isExplicit: true } : field) };
@@ -419,28 +433,25 @@ describe('CharacterSheet', () => {
       return response([]);
     });
     renderSheet(request);
-    await screen.findByRole('button', { name: 'Сохранить string' });
-    fireEvent.change(await screen.findByLabelText('string'), { target: { value: 'my draft' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
+    fireEvent.change(await findWritableControl('textbox', 'string'), { target: { value: 'my draft' } });
     expect(await screen.findByText('Обновляем данные после изменения на сервере. Черновик сохранён.')).toBeInTheDocument();
     await waitFor(() => expect(sheetReads).toBe(2));
     expect(screen.getByLabelText('string')).toHaveValue('my draft');
-    expect(screen.getByRole('button', { name: 'Сохранить string' })).toBeDisabled();
+    expect(screen.getByLabelText('string')).toBeDisabled();
     expect(writes).toBe(1);
-    const blockedNotification = screen.getByText('Обновляем данные после изменения на сервере. Черновик сохранён.').closest('[role="alert"]');
-    expect(blockedNotification).toBeInTheDocument();
+    const blockedNotification = screen.getAllByRole('alert').find(alert => alert.textContent?.includes('Обновляем данные после изменения на сервере. Черновик сохранён.'));
+    expect(blockedNotification).toBeDefined();
     fireEvent.click(within(blockedNotification as HTMLElement).getByRole('button', { name: 'Закрыть уведомление' }));
-    expect(blockedNotification).not.toBeInTheDocument();
+    expect(screen.queryByText('Обновляем данные после изменения на сервере. Черновик сохранён.')).not.toBeInTheDocument();
     expect(screen.getByLabelText('string')).toHaveValue('my draft');
-    expect(screen.getByRole('button', { name: 'Сохранить string' })).toBeDisabled();
+    expect(screen.getByLabelText('string')).toBeDisabled();
     expect(writes).toBe(1);
     await act(async () => { resolveRecovery(response(latest)); });
     expect(await screen.findByText('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('string')).toHaveValue('my draft'));
-    expect(screen.queryByLabelText('Снимок листа')).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить string' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Повторить string' })).toBeEnabled());
     expect(writes).toBe(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить string' }));
     await waitFor(() => expect(writes).toBe(2));
     const attempts = request.mock.calls.filter(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT');
     expect(attempts.map(([, options]) => JSON.parse(String(options?.body)).expectedRevision)).toEqual([1, 7]);
@@ -448,50 +459,60 @@ describe('CharacterSheet', () => {
 
   it('automatically recovers a changed revision when returning to stats without dropping drafts', async () => {
     let reads = 0;
+    let writes = 0;
     let latest = { ...sheet, contentRevision: 2, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'server value' } : field) };
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
       if (url.endsWith('/computed-sheet')) return response(reads++ === 0 ? sheet : latest);
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
-      if (url.endsWith('/base-values/string') && options?.method === 'PUT') { latest = { ...latest, contentRevision: 3, baseFields: latest.baseFields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'my retained draft' } : field) }; return response({ contentRevision: 3 }); }
+      if (url.endsWith('/base-values/string') && options?.method === 'PUT') {
+        writes += 1;
+        if (writes === 1) return response({ code: 'invalid_value', title: 'Invalid', detail: 'Rejected' }, 400);
+        latest = { ...latest, contentRevision: 3, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'my retained draft' } : field) };
+        return response(latest);
+      }
       return response([]);
     });
     const view = render(sheetTree(request, true));
-    await screen.findByRole('button', { name: 'Сохранить string' });
-    fireEvent.change(await screen.findByLabelText('string'), { target: { value: 'my retained draft' } });
+    fireEvent.change(await findWritableControl('textbox', 'string'), { target: { value: 'my retained draft' } });
+    await screen.findByRole('button', { name: 'Повторить string' });
     view.rerender(sheetTree(request, false));
     view.rerender(sheetTree(request, true));
     await waitFor(() => expect(reads).toBeGreaterThanOrEqual(3));
     expect(screen.getByLabelText('string')).toHaveValue('my retained draft');
     expect(await screen.findByText('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Снимок листа')).not.toBeInTheDocument();
-    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить string' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
-    await waitFor(() => expect(request.mock.calls.some(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT')).toBe(true));
-    const put = request.mock.calls.find(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT');
-    expect(JSON.parse(String(put?.[1]?.body)).expectedRevision).toBe(2);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Повторить string' })).toBeEnabled());
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить string' }));
+    await waitFor(() => expect(request.mock.calls.filter(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT')).toHaveLength(2));
+    const writesForField = request.mock.calls.filter(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT');
+    expect(writesForField.map(([, options]) => JSON.parse(String(options?.body)))).toEqual([
+      { value: 'my retained draft', expectedRevision: 1 },
+      { value: 'my retained draft', expectedRevision: 2 },
+    ]);
   });
 
   it('does not retry an unknown write after its automatic snapshot read', async () => {
     let writes = 0;
     let sheetReads = 0;
+    let latest = sheet;
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
-      if (url.endsWith('/computed-sheet')) { sheetReads += 1; return response(sheet); }
+      if (url.endsWith('/computed-sheet')) { sheetReads += 1; return response(latest); }
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
-      if (url.endsWith('/base-values/string') && options?.method === 'PUT') { writes += 1; return response({ code: 'write_outcome_unknown', title: 'Unknown', detail: 'Unknown' }, 502); }
+      if (url.endsWith('/base-values/string') && options?.method === 'PUT') { writes += 1; latest = { ...sheet, contentRevision: 2, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'draft' } : field) }; return response({ code: 'write_outcome_unknown', title: 'Unknown', detail: 'Unknown' }, 502); }
       return response([]);
     });
     renderSheet(request);
-    await screen.findByRole('button', { name: 'Сохранить string' });
-    fireEvent.change(await screen.findByLabelText('string'), { target: { value: 'draft' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
+    fireEvent.change(await findWritableControl('textbox', 'string'), { target: { value: 'draft' } });
     expect(await screen.findByText('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.')).toBeInTheDocument();
     await waitFor(() => expect(sheetReads).toBe(2));
     expect(writes).toBe(1);
     expect(screen.getByLabelText('string')).toHaveValue('draft');
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить string' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Повторить string' })).toBeEnabled());
+    expect(writes).toBe(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить string' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Отбросить изменения string' })).not.toBeInTheDocument());
     expect(writes).toBe(1);
   });
 
@@ -511,9 +532,7 @@ describe('CharacterSheet', () => {
       return response([]);
     });
     renderSheet(request);
-    await screen.findByRole('button', { name: 'Сохранить string' });
-    fireEvent.change(await screen.findByLabelText('string'), { target: { value: 'kept draft' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
+    fireEvent.change(await findWritableControl('textbox', 'string'), { target: { value: 'kept draft' } });
     expect(await screen.findByText('Зависимый сервис временно недоступен.')).toBeInTheDocument();
     expect(screen.getByLabelText('string')).toHaveValue('kept draft');
     expect(screen.getByRole('button', { name: 'Повторить загрузку' })).toBeInTheDocument();
@@ -522,7 +541,7 @@ describe('CharacterSheet', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Повторить загрузку' }));
     expect(await screen.findByText('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.')).toBeInTheDocument();
     await waitFor(() => expect(sheetReads).toBe(3));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить string' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Повторить string' })).toBeEnabled());
     expect(screen.getByLabelText('string')).toHaveValue('kept draft');
     expect(writes).toBe(1);
   });
@@ -540,9 +559,7 @@ describe('CharacterSheet', () => {
       return response([]);
     });
     renderSheet(request);
-    await screen.findByRole('button', { name: 'Сохранить string' });
-    fireEvent.change(await screen.findByLabelText('string'), { target: { value: 'kept draft' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
+    fireEvent.change(await findWritableControl('textbox', 'string'), { target: { value: 'kept draft' } });
     expect(await screen.findByText('Доступ запрещён.')).toBeInTheDocument();
     await waitFor(() => expect(permissionReads).toBeGreaterThan(1));
     expect(screen.getByLabelText('string')).toHaveTextContent('kept draft');
@@ -674,9 +691,7 @@ describe('CharacterSheet', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Изменить описание' }));
     fireEvent.change(await screen.findByLabelText('Описание'), { target: { value: 'description draft' } });
     view.rerender(sheetTree(request, true));
-    await screen.findByRole('button', { name: 'Сохранить string' });
-    fireEvent.change(await screen.findByLabelText('string'), { target: { value: 'saved field' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
+    fireEvent.change(await findWritableControl('textbox', 'string'), { target: { value: 'saved field' } });
     expect(await screen.findByText('Поле сохранено.')).toBeInTheDocument();
     view.rerender(sheetTree(request, false));
     expect(screen.getByLabelText('Описание')).toHaveValue('description draft');
@@ -699,28 +714,350 @@ describe('CharacterSheet', () => {
     ['empty', 'String', 'x', ''],
     ['choice', 'SingleChoice', 'one', 'two'],
     ['empty-list', 'MultiChoice', ['one'], []]
-  ])('does not treat a falsy %s draft as absent', async (fieldId, valueType, initial, expected) => {
+    ])('does not treat a falsy %s draft as absent', async (fieldId, valueType, initial, expected) => {
     const typedField = { id: fieldId, key: fieldId, title: fieldId, description: '', valueType, typeRevision: 1, options: valueType === 'MultiChoice' || valueType === 'SingleChoice' ? [{ optionKey: 'one', title: 'One' }, { optionKey: 'two', title: 'Two' }] : [], effectiveValue: initial, isExplicit: false };
     const base = { ...sheet, baseFields: [typedField] };
+    let latest = base;
     const request = vi.fn(async (url: string, options?: RequestInit) => {
       if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
-      if (url.endsWith('/computed-sheet')) return response({ ...base, virtualFields: [], formulaContentRevisions: [] });
+      if (url.endsWith('/computed-sheet')) return response(latest);
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
-      if (url.endsWith(`/base-values/${fieldId}`) && options?.method === 'PUT') return response({ ...base, contentRevision: 2, baseFields: [{ ...typedField, isExplicit: true }] });
+      if (url.endsWith(`/base-values/${fieldId}`) && options?.method === 'PUT') { latest = { ...base, contentRevision: 2, baseFields: [{ ...typedField, isExplicit: true, effectiveValue: expected }] }; return response(latest); }
       return response([]);
     });
     renderSheet(request);
-    await screen.findByRole('button', { name: `Сохранить ${fieldId}` });
-    const input = await screen.findByLabelText(fieldId);
+    const role = valueType === 'Boolean' ? 'checkbox' : valueType === 'SingleChoice' ? 'combobox' : 'textbox';
+    const input = valueType === 'MultiChoice' ? await findWritableControl('checkbox', 'One') : await findWritableControl(role, fieldId);
     if (valueType === 'Boolean') fireEvent.click(input);
     else if (valueType === 'String') fireEvent.change(input, { target: { value: '' } });
     else if (valueType === 'MultiChoice') fireEvent.click(screen.getByLabelText('One'));
     else if (valueType === 'SingleChoice') fireEvent.change(input, { target: { value: 'two' } });
     else if (valueType === 'Number') fireEvent.change(input, { target: { value: '0.25' } });
     else fireEvent.change(input, { target: { value: '0' } });
-    fireEvent.click(screen.getByRole('button', { name: `Сохранить ${fieldId}` }));
     await waitFor(() => expect(request.mock.calls.some(([url, options]) => url.endsWith(`/base-values/${fieldId}`) && options?.method === 'PUT')).toBe(true));
     const call = request.mock.calls.find(([url, options]) => url.endsWith(`/base-values/${fieldId}`) && options?.method === 'PUT');
     expect(JSON.parse(String(call?.[1]?.body)).value).toEqual(expected);
+  });
+
+  it('coalesces rapid edits while a write is pending and sends the latest value with the next revision', async () => {
+    let latest = sheet;
+    let resolveFirst!: (value: Response) => void;
+    const firstWrite = new Promise<Response>(resolve => { resolveFirst = resolve; });
+    let fieldWrites = 0;
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(latest);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith('/base-values/string') && options?.method === 'PUT') {
+        const value = JSON.parse(String(options.body)).value;
+        fieldWrites += 1;
+        if (fieldWrites === 1) return firstWrite;
+        latest = { ...latest, contentRevision: 3, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: value } : field) };
+        return response(latest);
+      }
+      return response([]);
+    });
+    renderSheet(request);
+    const input = await findWritableControl('textbox', 'string');
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
+    fireEvent.change(input, { target: { value: 'a' } });
+    await waitFor(() => expect(fieldWrites).toBe(1));
+    fireEvent.change(input, { target: { value: 'ab' } });
+    fireEvent.change(input, { target: { value: 'abc' } });
+    expect(input).toBeEnabled();
+    expect(input).toHaveValue('abc');
+    expect(fieldWrites).toBe(1);
+    await act(async () => {
+      latest = { ...sheet, contentRevision: 2, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'a' } : field) };
+      resolveFirst(response(latest));
+    });
+    await waitFor(() => expect(fieldWrites).toBe(2));
+    await waitFor(() => expect(input).toHaveValue('abc'));
+    const writes = request.mock.calls.filter(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT');
+    expect(writes.map(([, options]) => JSON.parse(String(options?.body)))).toEqual([
+      { value: 'a', expectedRevision: 1 },
+      { value: 'abc', expectedRevision: 2 },
+    ]);
+    expect(writes.some(([, options]) => JSON.parse(String(options?.body)).value === 'ab')).toBe(false);
+  });
+
+  it('keeps invalid numeric input while an earlier valid write is pending and does not send invalid text', async () => {
+    const numericFields = [{ ...fields[0], effectiveValue: 1 }];
+    let latest = { ...sheet, baseFields: numericFields };
+    let resolveFirst!: (value: Response) => void;
+    const firstWrite = new Promise<Response>(resolve => { resolveFirst = resolve; });
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(latest);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith('/base-values/integer') && options?.method === 'PUT') return firstWrite;
+      return response([]);
+    });
+    renderSheet(request);
+    const input = await findWritableControl('textbox', 'integer');
+    fireEvent.change(input, { target: { value: '2' } });
+    await waitFor(() => expect(request.mock.calls.filter(([url, options]) => url.endsWith('/base-values/integer') && options?.method === 'PUT')).toHaveLength(1));
+    fireEvent.change(input, { target: { value: '2.' } });
+    expect(input).toHaveValue('2.');
+    await act(async () => {
+      latest = { ...latest, contentRevision: 2, baseFields: [{ ...numericFields[0], effectiveValue: 2 }] };
+      resolveFirst(response(latest));
+    });
+    expect(input).toHaveValue('2.');
+    expect(request.mock.calls.filter(([url, options]) => url.endsWith('/base-values/integer') && options?.method === 'PUT')).toHaveLength(1);
+    fireEvent.change(input, { target: { value: '3' } });
+    await waitFor(() => expect(request.mock.calls.filter(([url, options]) => url.endsWith('/base-values/integer') && options?.method === 'PUT')).toHaveLength(2));
+    const writes = request.mock.calls.filter(([url, options]) => url.endsWith('/base-values/integer') && options?.method === 'PUT');
+    expect(writes.map(([, options]) => JSON.parse(String(options?.body)).value)).toEqual([2, 3]);
+  });
+
+  it('preserves an int64 field value as native lossless JSON', async () => {
+    const int64 = '9223372036854775807';
+    const largeSheet = { ...sheet, baseFields: [{ ...fields[0], effectiveValue: 0 }] };
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(largeSheet);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith('/base-values/integer') && options?.method === 'PUT') return response({ ...largeSheet, contentRevision: 2, baseFields: [{ ...largeSheet.baseFields[0], effectiveValue: new LosslessNumber(int64) }] });
+      return response([]);
+    });
+    renderSheet(request);
+    const input = await findWritableControl('textbox', 'integer');
+    fireEvent.change(input, { target: { value: int64 } });
+    await waitFor(() => expect(request.mock.calls.some(([url, options]) => url.endsWith('/base-values/integer') && options?.method === 'PUT')).toBe(true));
+    const write = request.mock.calls.find(([url, options]) => url.endsWith('/base-values/integer') && options?.method === 'PUT');
+    expect(String(write?.[1]?.body)).toContain(`"value":${int64}`);
+    expect(String(write?.[1]?.body)).toContain('"expectedRevision":1');
+  });
+
+  it('rejects an integer outside the int64 range without sending it', async () => {
+    const request = vi.fn(async (url: string, _options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(sheet);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      return response([]);
+    });
+    renderSheet(request);
+    fireEvent.change(await findWritableControl('textbox', 'integer'), { target: { value: '9223372036854775808' } });
+    expect(await screen.findByText('Значение вне диапазона int64.')).toBeInTheDocument();
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Отбросить изменения integer' })).toBeInTheDocument();
+  });
+
+  it('sends a return to the baseline after the earlier value is accepted', async () => {
+    let latest = sheet;
+    let resolveFirst!: (value: Response) => void;
+    const firstWrite = new Promise<Response>(resolve => { resolveFirst = resolve; });
+    let writes = 0;
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(latest);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith('/base-values/string') && options?.method === 'PUT') {
+        writes += 1;
+        const value = JSON.parse(String(options.body)).value;
+        if (writes === 1) return firstWrite;
+        latest = { ...latest, contentRevision: 3, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: value } : field) };
+        return response(latest);
+      }
+      return response([]);
+    });
+    renderSheet(request);
+    const input = await findWritableControl('textbox', 'string');
+    fireEvent.change(input, { target: { value: 'temporary' } });
+    await waitFor(() => expect(writes).toBe(1));
+    fireEvent.change(input, { target: { value: '' } });
+    await act(async () => {
+      latest = { ...sheet, contentRevision: 2, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'temporary' } : field) };
+      resolveFirst(response(latest));
+    });
+    await waitFor(() => expect(writes).toBe(2));
+    const writesForField = request.mock.calls.filter(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT');
+    expect(writesForField.map(([, options]) => JSON.parse(String(options?.body)))).toEqual([
+      { value: 'temporary', expectedRevision: 1 },
+      { value: '', expectedRevision: 2 },
+    ]);
+  });
+
+  it('resets an explicit field with the current content revision', async () => {
+    let latest = sheet;
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(latest);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.split('?')[0].endsWith('/base-values/string') && options?.method === 'DELETE') {
+        latest = { ...sheet, contentRevision: 2, baseFields: fields.map(field => field.id === 'string' ? { ...field, isExplicit: false, effectiveValue: 'template value' } : field) };
+        return response(latest);
+      }
+      return response([]);
+    });
+    renderSheet(request);
+    await findWritableControl('textbox', 'string');
+    fireEvent.click(await screen.findByRole('button', { name: 'Сбросить string' }));
+    await waitFor(() => expect(request.mock.calls.some(([url, options]) => url.split('?')[0].endsWith('/base-values/string') && options?.method === 'DELETE')).toBe(true));
+    const reset = request.mock.calls.find(([url, options]) => url.split('?')[0].endsWith('/base-values/string') && options?.method === 'DELETE');
+    expect(reset?.[0]).toContain('expectedRevision=1');
+    await waitFor(() => expect(screen.getByLabelText('string')).toHaveValue('template value'));
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
+  });
+
+  it('queues a field change made during an explicit description write', async () => {
+    let latest = sheet;
+    let resolveDescription!: (value: Response) => void;
+    const pendingDescription = new Promise<Response>(resolve => { resolveDescription = resolve; });
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(latest);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT') return pendingDescription;
+      if (url.endsWith('/base-values/string') && options?.method === 'PUT') {
+        expect(JSON.parse(String(options.body)).expectedRevision).toBe(2);
+        latest = { ...latest, contentRevision: 3, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'queued field' } : field) };
+        return response(latest);
+      }
+      return response([]);
+    });
+    render(sheetTree(request, true));
+    fireEvent.click(await screen.findByRole('button', { name: 'Изменить описание' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Описание' }), { target: { value: 'new description' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить описание' }));
+    const fieldEditor = await findWritableControl('textbox', 'string');
+    fireEvent.change(fieldEditor, { target: { value: 'queued field' } });
+    expect(fieldEditor).toHaveValue('queued field');
+    expect(request.mock.calls.filter(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT')).toHaveLength(0);
+    await act(async () => {
+      latest = { ...latest, contentRevision: 2, description: 'new description' };
+      resolveDescription(response({ contentRevision: 2 }));
+    });
+    await waitFor(() => expect(request.mock.calls.some(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT')).toBe(true));
+    const fieldWrite = request.mock.calls.find(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT');
+    expect(JSON.parse(String(fieldWrite?.[1]?.body))).toEqual({ value: 'queued field', expectedRevision: 2 });
+  });
+
+  it('does not dispatch a queued write after the character sheet unmounts', async () => {
+    let resolveFirst!: (value: Response) => void;
+    const firstWrite = new Promise<Response>(resolve => { resolveFirst = resolve; });
+    let latest = sheet;
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(latest);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (options?.method === 'PUT' && (url.endsWith('/base-values/string') || url.endsWith('/base-values/boolean'))) return firstWrite;
+      return response([]);
+    });
+    const view = renderSheet(request);
+    fireEvent.change(await findWritableControl('textbox', 'string'), { target: { value: 'first' } });
+    await waitFor(() => expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1));
+    fireEvent.click(await findWritableControl('checkbox', 'boolean'));
+    view.unmount();
+    await act(async () => {
+      latest = { ...sheet, contentRevision: 2, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'first' } : field) };
+      resolveFirst(response(latest));
+    });
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1);
+  });
+
+  it('does not write a queued value when refresh removes its field', async () => {
+    let reads = 0;
+    let resolveFirst!: (value: Response) => void;
+    const firstWrite = new Promise<Response>(resolve => { resolveFirst = resolve; });
+    let latest = { ...sheet, baseFields: fields.filter(field => field.id !== 'boolean') };
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(reads++ === 0 ? sheet : latest);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith('/base-values/string') && options?.method === 'PUT') return firstWrite;
+      if (url.endsWith('/base-values/boolean') && options?.method === 'PUT') return response({ contentRevision: 3 });
+      return response([]);
+    });
+    renderSheet(request);
+    fireEvent.change(await findWritableControl('textbox', 'string'), { target: { value: 'first' } });
+    await waitFor(() => expect(request.mock.calls.filter(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT')).toHaveLength(1));
+    fireEvent.click(await findWritableControl('checkbox', 'boolean'));
+    await act(async () => {
+      latest = { ...latest, contentRevision: 2, baseFields: latest.baseFields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'first' } : field) };
+      resolveFirst(response(latest));
+    });
+    await waitFor(() => expect(reads).toBeGreaterThanOrEqual(2));
+    expect(request.mock.calls.filter(([url, options]) => url.endsWith('/base-values/boolean') && options?.method === 'PUT')).toHaveLength(0);
+  });
+
+  it('serializes edits to different fields through consecutive content revisions', async () => {
+    let latest = sheet;
+    let resolveFirst!: (value: Response) => void;
+    const firstWrite = new Promise<Response>(resolve => { resolveFirst = resolve; });
+    let stringWrites = 0;
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(latest);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (options?.method === 'PUT' && url.endsWith('/base-values/string')) {
+        stringWrites += 1;
+        if (stringWrites === 1) return firstWrite;
+      }
+      if (options?.method === 'PUT' && url.endsWith('/base-values/boolean')) {
+        expect(JSON.parse(String(options.body)).expectedRevision).toBe(2);
+        latest = { ...latest, contentRevision: 3, baseFields: fields.map(field => field.id === 'boolean' ? { ...field, effectiveValue: true } : field) };
+        return response(latest);
+      }
+      return response([]);
+    });
+    renderSheet(request);
+    fireEvent.change(await findWritableControl('textbox', 'string'), { target: { value: 'first field' } });
+    await waitFor(() => expect(stringWrites).toBe(1));
+    fireEvent.click(await findWritableControl('checkbox', 'boolean'));
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1);
+    await act(async () => {
+      latest = { ...sheet, contentRevision: 2, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'first field' } : field) };
+      resolveFirst(response(latest));
+    });
+    await waitFor(() => expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(2));
+    const writes = request.mock.calls.filter(([, options]) => options?.method === 'PUT');
+    expect(JSON.parse(String(writes[0][1]?.body))).toEqual({ value: 'first field', expectedRevision: 1 });
+    expect(JSON.parse(String(writes[1][1]?.body))).toEqual({ value: true, expectedRevision: 2 });
+  });
+
+  it('keeps a newer field draft blocked when the post-write read finds an external revision', async () => {
+    const firstResult = { ...sheet, contentRevision: 2, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'a' } : field) };
+    const externalSheet = { ...sheet, contentRevision: 3, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'external' } : field) };
+    let latest = externalSheet;
+    let sheetReads = 0;
+    let writes = 0;
+    let resolveFirst!: (value: Response) => void;
+    const firstWrite = new Promise<Response>(resolve => { resolveFirst = resolve; });
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) {
+        sheetReads += 1;
+        return response(sheetReads === 1 ? sheet : latest);
+      }
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith('/base-values/string') && options?.method === 'PUT') {
+        writes += 1;
+        if (writes === 1) return firstWrite;
+        latest = { ...sheet, contentRevision: 4, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'abc' } : field) };
+        return response(latest);
+      }
+      return response([]);
+    });
+    renderSheet(request);
+    const input = await findWritableControl('textbox', 'string');
+    fireEvent.change(input, { target: { value: 'a' } });
+    await waitFor(() => expect(writes).toBe(1));
+    fireEvent.change(input, { target: { value: 'abc' } });
+    expect(input).toHaveValue('abc');
+    await act(async () => resolveFirst(response(firstResult)));
+    expect(await screen.findByText('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.')).toBeInTheDocument();
+    await waitFor(() => expect(sheetReads).toBe(3));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Повторить string' })).toBeEnabled());
+    expect(input).toHaveValue('abc');
+    expect(writes).toBe(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить string' }));
+    await waitFor(() => expect(writes).toBe(2));
+    const fieldWrites = request.mock.calls.filter(([url, options]) => url.endsWith('/base-values/string') && options?.method === 'PUT');
+    expect(fieldWrites.map(([, options]) => JSON.parse(String(options?.body)))).toEqual([
+      { value: 'a', expectedRevision: 1 },
+      { value: 'abc', expectedRevision: 3 },
+    ]);
   });
 });
