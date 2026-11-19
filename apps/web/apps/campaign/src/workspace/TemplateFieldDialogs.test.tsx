@@ -5,8 +5,8 @@ import iconButtonStyles from '@tdn/shared/ui/Buttons/IconButton/IconButton.modul
 import type { VirtualFieldInput } from './types';
 import { TemplateChoiceValueDialog, TemplateDescriptionDialog, TemplateOptionsDialog, TemplateVirtualLinksDialog } from './TemplateFieldDialogs';
 
-const state = vi.hoisted(() => ({ api: { getFormulaContent: vi.fn() }, dirty: {} as Record<string, boolean> }));
-vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api: state.api }), useDirtyDraft: (owner: string, dirty: boolean) => { state.dirty[owner] = dirty; } }));
+const state = vi.hoisted(() => ({ api: { getFormulaContent: vi.fn() }, sessionKey: 'session', dirty: {} as Record<string, boolean> }));
+vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api: state.api, sessionKey: state.sessionKey }), useDirtyDraft: (owner: string, dirty: boolean) => { state.dirty[owner] = dirty; } }));
 
 const virtualField = (changes: Partial<VirtualFieldInput> = {}): VirtualFieldInput => ({
   key: 'virtual',
@@ -85,88 +85,135 @@ describe('Template field dialogs', () => {
     expect(onApply).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps known parameter bindings and unknown stored references while applying parent exclusivity', async () => {
-    state.api.getFormulaContent.mockResolvedValue({ data: { parameters: ['amount'] } });
+  it('edits only declared case-sensitive bindings from saved sources', async () => {
+    state.api.getFormulaContent.mockResolvedValue({ data: { parameters: ['value', 'strength', 'parent', 'Parent'] } });
     const onApply = vi.fn();
-    const field = virtualField({
-      bindings: { amount: { kind: 'Base', fieldId: 'unavailable-base' }, legacy: { kind: 'Virtual', fieldId: 'unavailable-virtual' } },
-      parentBaseFieldId: 'base-source',
-      parentVirtualFieldId: null,
-    });
-    render(<TemplateVirtualLinksDialog
-      label="Total"
-      campaignId={7}
-      field={field}
-      sources={[{ id: 'base-source', title: 'Strength', kind: 'Base' }, { id: 'virtual-source', title: 'Modifier', kind: 'Virtual' }]}
-      disabled={false}
-      onClose={vi.fn()}
-      onApply={onApply}
-    />);
+    const onClose = vi.fn();
+    render(<TemplateVirtualLinksDialog label="Total" campaignId={7} field={virtualField({ bindings: { parent: { kind: 'Base', fieldId: 'same-id' } } })} sources={[{ id: 'same-id', title: 'Strength', kind: 'Base' }, { id: 'same-id', title: 'Modifier', kind: 'Virtual' }]} disabled={false} onClose={onClose} onApply={onApply} />);
     const dialog = screen.getByRole('dialog', { name: 'Связи поля Total' });
-    await waitFor(() => expect(state.api.getFormulaContent).toHaveBeenCalledWith(7, 'formula-1'));
-    await waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Параметр amount' })).toBeInTheDocument());
-    const parentSelect = within(dialog).getByRole('combobox', { name: 'Родитель' });
-    const amountSelect = within(dialog).getByRole('combobox', { name: 'Параметр amount' });
-    expect(within(amountSelect).getByRole('option', { name: 'Недоступный источник' })).toHaveValue('Base:unavailable-base');
-    expect(within(parentSelect).getByRole('option', { name: 'Базовое: Strength' })).toHaveValue('Base:base-source');
-    expect(within(parentSelect).getByRole('option', { name: 'Виртуальное: Modifier' })).toHaveValue('Virtual:virtual-source');
-    expect(parentSelect).toHaveValue('Base:base-source');
-    expect(amountSelect).toHaveValue('Base:unavailable-base');
-    expect(within(dialog).getByRole('textbox', { name: 'ID поля legacy' })).toHaveValue('unavailable-virtual');
-    fireEvent.change(parentSelect, { target: { value: 'Virtual:virtual-source' } });
+    for (const name of ['value', 'strength', 'parent', 'Parent']) await within(dialog).findByRole('combobox', { name: `Параметр ${name}` });
+    const table = within(dialog).getByRole('table', { name: 'Привязки параметров' });
+    expect(within(table).getByRole('columnheader', { name: 'Параметр' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Поле' })).toBeInTheDocument();
+    const parameterRows = within(table).getAllByRole('row').slice(1);
+    expect(parameterRows).toHaveLength(4);
+    for (const name of ['value', 'strength', 'parent', 'Parent']) {
+      const row = within(table).getByRole('row', { name: new RegExp(name) });
+      expect(within(row).getByRole('rowheader', { name })).toBeInTheDocument();
+      expect(within(row).getAllByRole('combobox')).toHaveLength(1);
+      expect(within(row).getByRole('combobox', { name: `Параметр ${name}` }).closest('label')).toBeNull();
+    }
+    expect(state.api.getFormulaContent).toHaveBeenCalledWith(7, 'formula-1');
+    expect(within(dialog).queryByRole('textbox', { name: 'ID формулы' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('combobox', { name: 'Родитель' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('textbox', { name: 'Новое имя параметра' })).not.toBeInTheDocument();
+    const parent = within(dialog).getByRole('combobox', { name: 'Параметр parent' });
+    expect(parent).toHaveValue('Base:same-id');
+    expect(within(parent).getByRole('group', { name: 'Базовые поля' })).toBeInTheDocument();
+    expect(within(parent).getByRole('group', { name: 'Виртуальные поля' })).toBeInTheDocument();
+    expect(within(parent).getAllByRole('option', { name: /Strength|Modifier/ })).toHaveLength(2);
+    fireEvent.change(within(dialog).getByRole('combobox', { name: 'Параметр value' }), { target: { value: 'Virtual:same-id' } });
+    fireEvent.change(parent, { target: { value: '' } });
+    expect(within(dialog).getByRole('combobox', { name: 'Параметр value' })).toHaveValue('Virtual:same-id');
+    expect(parent).toHaveValue('');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    expect(onApply).not.toHaveBeenCalled();
+    fireEvent.change(parent, { target: { value: 'Base:same-id' } });
+    expect(parent).toHaveValue('Base:same-id');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Применить' }));
-    expect(onApply).toHaveBeenCalledWith({
-      formulaId: 'formula-1',
-      bindings: { amount: { kind: 'Base', fieldId: 'unavailable-base' }, legacy: { kind: 'Virtual', fieldId: 'unavailable-virtual' } },
-      parentBaseFieldId: null,
-      parentVirtualFieldId: 'virtual-source',
-    });
+    expect(onApply).toHaveBeenCalledWith({ bindings: { value: { kind: 'Virtual', fieldId: 'same-id' }, parent: { kind: 'Base', fieldId: 'same-id' } } });
+    expect(onApply.mock.calls[0][0]).not.toHaveProperty('formulaId');
+    expect(onApply.mock.calls[0][0]).not.toHaveProperty('parentBaseFieldId');
   });
 
-  it('allows manual binding edits after formula read failure and retains opaque formula ids', async () => {
-    state.api.getFormulaContent.mockRejectedValue(new Error('unavailable'));
+  it('preserves unknown declared references until changed and removes undeclared bindings only on apply', async () => {
+    state.api.getFormulaContent.mockResolvedValue({ data: { parameters: ['value'] } });
+    const field = virtualField({ bindings: { value: { kind: 'Base', fieldId: 'gone' }, legacy: { kind: 'Virtual', fieldId: 'opaque' } } });
     const onApply = vi.fn();
-    render(
-      <TemplateVirtualLinksDialog
-        label="Calc"
-        campaignId={9}
-        field={virtualField({
-          formulaId: 'unknown-formula',
-          bindings: { kept: { kind: 'Virtual', fieldId: 'opaque-id' } },
-        })}
-        sources={[]}
-        disabled={false}
-        onClose={vi.fn()}
-        onApply={onApply}
-      />,
-    );
-    const dialog = screen.getByRole('dialog', { name: 'Связи поля Calc' });
-    expect(within(dialog).getByRole('textbox', { name: 'ID формулы' })).toHaveValue('unknown-formula');
-    expect(await within(dialog).findByText('Определения недоступны для чтения; сохранённые связи можно редактировать вручную.')).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Удалить связь kept' })).toHaveClass(iconButtonStyles.danger);
-    fireEvent.change(within(dialog).getByRole('textbox', { name: 'ID поля kept' }), { target: { value: 'edited-id' } });
-    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Новое имя параметра' }), { target: { value: 'manual' } });
-    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Новый ID поля' }), { target: { value: 'new-opaque' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Добавить связь' }));
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Применить' }));
-    expect(onApply).toHaveBeenCalledWith({
-      formulaId: 'unknown-formula',
-      bindings: { kept: { kind: 'Virtual', fieldId: 'edited-id' }, manual: { kind: 'Base', fieldId: 'new-opaque' } },
-      parentBaseFieldId: undefined,
-      parentVirtualFieldId: undefined,
-    });
+    const view = render(<TemplateVirtualLinksDialog label="Unknown" campaignId={8} field={field} sources={[]} disabled={false} onClose={vi.fn()} onApply={onApply} />);
+    const dialog = screen.getByRole('dialog', { name: 'Связи поля Unknown' });
+    const select = await within(dialog).findByRole('combobox', { name: 'Параметр value' });
+    expect(within(select).getByRole('option', { name: 'Недоступное поле' })).toHaveValue('Base:gone');
+    expect(within(dialog).queryByRole('combobox', { name: 'Параметр legacy' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('textbox', { name: 'Имя параметра legacy' })).not.toBeInTheDocument();
+    expect(within(dialog).getByText('Связи с параметрами, которых нет в формуле, будут убраны при применении.')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    expect(field.bindings).toEqual({ value: { kind: 'Base', fieldId: 'gone' }, legacy: { kind: 'Virtual', fieldId: 'opaque' } });
+    view.unmount();
+    render(<TemplateVirtualLinksDialog label="Unknown" campaignId={8} field={field} sources={[{ id: 'base', title: 'Base title', kind: 'Base' }]} disabled={false} onClose={vi.fn()} onApply={onApply} />);
+    const reopened = screen.getByRole('dialog', { name: 'Связи поля Unknown' });
+    const sourceSelect = await within(reopened).findByRole('combobox', { name: 'Параметр value' });
+    fireEvent.change(sourceSelect, { target: { value: 'Base:base' } });
+    fireEvent.click(within(reopened).getByRole('button', { name: 'Применить' }));
+    expect(onApply).toHaveBeenCalledWith({ bindings: { value: { kind: 'Base', fieldId: 'base' } } });
   });
 
-  it('ignores stale formula parameter responses after selection changes', async () => {
+  it('requires formula metadata, retries failures, allows zero-parameter formulas, and ignores stale resources', async () => {
+    const onApply = vi.fn();
+    const view = render(<TemplateVirtualLinksDialog label="Calc" campaignId={9} field={virtualField({ formulaId: '' })} sources={[]} disabled={false} onClose={vi.fn()} onApply={onApply} />);
+    let dialog = screen.getByRole('dialog', { name: 'Связи поля Calc' });
+    expect(within(dialog).getByText('Сначала выберите формулу в строке поля.')).toBeInTheDocument();
+    expect(state.api.getFormulaContent).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole('button', { name: 'Применить' })).toBeDisabled();
+    state.api.getFormulaContent.mockRejectedValueOnce(new Error('unavailable'));
+    view.rerender(<TemplateVirtualLinksDialog label="Calc" campaignId={9} field={virtualField({ bindings: { keep: { kind: 'Base', fieldId: 'id' } } })} sources={[]} disabled={false} onClose={vi.fn()} onApply={onApply} />);
+    await screen.findByRole('button', { name: 'Повторить загрузку' });
+    dialog = screen.getByRole('dialog', { name: 'Связи поля Calc' });
+    expect(within(dialog).getByRole('button', { name: 'Применить' })).toBeDisabled();
+    expect(within(dialog).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('table', { name: 'Привязки параметров' })).not.toBeInTheDocument();
+    state.api.getFormulaContent.mockResolvedValueOnce({ data: { parameters: [] } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Повторить загрузку' }));
+    expect(await within(dialog).findByText('Формула не требует входных полей.')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('table', { name: 'Привязки параметров' })).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Применить' }));
+    expect(onApply).toHaveBeenCalledWith({ bindings: {} });
+  });
+
+  it('does not show a previous formula response after the selected row formula changes', async () => {
     let resolveOld!: (result: { data: { parameters: string[] } }) => void;
     state.api.getFormulaContent.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }));
     state.api.getFormulaContent.mockResolvedValueOnce({ data: { parameters: ['current'] } });
-    render(<TemplateVirtualLinksDialog label="Race" campaignId={3} field={virtualField({ formulaId: 'old' })} sources={[]} disabled={false} onClose={vi.fn()} onApply={vi.fn()} />);
+    const props = { label: 'Race', campaignId: 3, sources: [], disabled: false, onClose: vi.fn(), onApply: vi.fn() };
+    const view = render(<TemplateVirtualLinksDialog {...props} field={virtualField({ formulaId: 'old' })} />);
+    view.rerender(<TemplateVirtualLinksDialog {...props} field={virtualField({ formulaId: 'current' })} />);
     const dialog = screen.getByRole('dialog', { name: 'Связи поля Race' });
-    fireEvent.change(within(dialog).getByRole('textbox', { name: 'ID формулы' }), { target: { value: 'current' } });
-    await waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Параметр current' })).toBeInTheDocument());
+    expect(within(dialog).queryByRole('table', { name: 'Привязки параметров' })).not.toBeInTheDocument();
+    await within(dialog).findByRole('combobox', { name: 'Параметр current' });
     await act(async () => resolveOld({ data: { parameters: ['stale'] } }));
-    expect(within(dialog).getByRole('combobox', { name: 'Параметр current' })).toBeInTheDocument();
     expect(within(dialog).queryByRole('combobox', { name: 'Параметр stale' })).not.toBeInTheDocument();
+  });
+
+  it('gates binding edits and apply when write access is unavailable but keeps cancel available', async () => {
+    state.api.getFormulaContent.mockResolvedValue({ data: { parameters: ['value'] } });
+    const onClose = vi.fn();
+    render(<TemplateVirtualLinksDialog label="Read only" campaignId={2} field={virtualField()} sources={[{ id: 'base', title: 'Base', kind: 'Base' }]} disabled onClose={onClose} onApply={vi.fn()} />);
+    const dialog = screen.getByRole('dialog', { name: 'Связи поля Read only' });
+    expect(await within(dialog).findByRole('combobox', { name: 'Параметр value' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Применить' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Отмена' })).toBeEnabled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('treats prototype-named parameters as ordinary declared names', async () => {
+    state.api.getFormulaContent.mockResolvedValue({ data: { parameters: ['constructor', '__proto__', 'toString'] } });
+    const onApply = vi.fn();
+    const props = { label: 'Names', campaignId: 2, sources: [{ id: 'opaque-id', title: 'Visible source', kind: 'Base' as const }], disabled: false, onClose: vi.fn(), onApply };
+    const view = render(<TemplateVirtualLinksDialog {...props} field={virtualField({ bindings: {} })} />);
+    const dialog = screen.getByRole('dialog', { name: 'Связи поля Names' });
+    const selects = await Promise.all(['constructor', '__proto__', 'toString'].map(name => within(dialog).findByRole('combobox', { name: `Параметр ${name}` })));
+    selects.forEach(select => expect(select).toHaveValue(''));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Применить' }));
+    expect(onApply).toHaveBeenCalledWith({ bindings: {} });
+    view.unmount();
+    render(<TemplateVirtualLinksDialog {...props} field={virtualField({ bindings: {} })} />);
+    const selectedDialog = screen.getByRole('dialog', { name: 'Связи поля Names' });
+    const constructor = await within(selectedDialog).findByRole('combobox', { name: 'Параметр constructor' });
+    expect(within(constructor).getByRole('option', { name: 'Visible source' })).toBeInTheDocument();
+    fireEvent.change(constructor, { target: { value: 'Base:opaque-id' } });
+    fireEvent.click(within(selectedDialog).getByRole('button', { name: 'Применить' }));
+    expect(onApply.mock.calls[1][0].bindings).toEqual({ constructor: { kind: 'Base', fieldId: 'opaque-id' } });
+    expect(Object.prototype.hasOwnProperty.call(onApply.mock.calls[1][0].bindings, 'constructor')).toBe(true);
   });
 });

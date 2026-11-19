@@ -90,7 +90,7 @@ describe('singleton campaign template editor', () => {
     expect(screen.queryByRole('button', { name: 'Сохранить виртуальные поля' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Открыть виртуальные поля' })).not.toBeInTheDocument();
     expect(api.getTemplateContent).toHaveBeenCalledWith(4);
-    expect(api.listFormulas).toHaveBeenCalledWith(4);
+    await waitFor(() => expect(api.listFormulas).toHaveBeenCalledWith(4));
     expect(api.getTemplate).not.toHaveBeenCalled();
     expect(api.renameTemplate).not.toHaveBeenCalled();
     expect(api).not.toHaveProperty('listTemplates');
@@ -394,9 +394,10 @@ describe('singleton campaign template editor', () => {
     expect(String(api.putTemplateContent.mock.calls[0][1].baseFields[0].value)).toBe('9223372036854775807');
   });
 
-  it('keeps formula loading independent and restricts virtual-link choices to saved sources', async () => {
-    serverContent = content(3, [base('base-a', 'a', 'Alpha')], [virtual('virtual-a', 'v', 'Virtual')]);
+  it('keeps formula loading independent and restricts virtual-link bindings to saved sources', async () => {
+    serverContent = content(3, [base('base-a', 'a', 'Alpha'), base('base-b', 'b', 'Beta')], [virtual('virtual-a', 'v', 'Virtual')]);
     api.listFormulas.mockReturnValueOnce(new Promise(() => {}));
+    api.getFormulaContent.mockResolvedValueOnce({ data: { expression: 'value + parent', parameters: ['value', 'parent'] } });
     renderTemplates();
     await screen.findByRole('row', { name: 'Виртуальное поле Virtual' });
     fireEvent.click(screen.getByRole('button', { name: 'Добавить поле' }));
@@ -407,16 +408,24 @@ describe('singleton campaign template editor', () => {
     fireEvent.change(draftSourceName, { target: { value: 'Unsaved source' } });
     fireEvent.click(within(virtualRow('Virtual')).getByRole('button', { name: 'Настроить' }));
     const dialog = screen.getByRole('dialog', { name: 'Связи поля Virtual' });
-    const parent = within(dialog).getByRole('combobox', { name: 'Родитель' });
-    expect(within(dialog).getByRole('option', { name: 'Базовое: Alpha' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('option', { name: 'Виртуальное: Virtual' })).toBeInTheDocument();
-    expect(within(dialog).queryByRole('option', { name: 'Базовое: Unsaved source' })).not.toBeInTheDocument();
-    fireEvent.change(parent, { target: { value: 'Base:base-a' } });
+    const value = await within(dialog).findByRole('combobox', { name: 'Параметр value' });
+    expect(within(value).getByRole('option', { name: 'Alpha' })).toBeInTheDocument();
+    expect(within(value).getByRole('option', { name: 'Virtual' })).toBeInTheDocument();
+    expect(within(value).queryByRole('option', { name: 'Unsaved source' })).not.toBeInTheDocument();
+    fireEvent.change(value, { target: { value: 'Base:base-a' } });
+    const parent = await within(dialog).findByRole('combobox', { name: 'Параметр parent' });
+    expect(within(parent).getByRole('option', { name: 'Beta' })).toHaveValue('Base:base-b');
+    fireEvent.change(parent, { target: { value: 'Base:base-b' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Применить' }));
     expect(api.putTemplateVirtualFields).not.toHaveBeenCalled();
     fireEvent.click(within(virtualRow('Virtual')).getByRole('button', { name: 'Сохранить виртуальное поле Virtual' }));
     await waitFor(() => expect(api.putTemplateVirtualFields).toHaveBeenCalledTimes(1));
-    expect(api.putTemplateVirtualFields.mock.calls[0][1].virtualFields[0]).toMatchObject({ parentBaseFieldId: 'base-a', parentVirtualFieldId: null });
+    expect(api.putTemplateVirtualFields.mock.calls[0][1].virtualFields).toHaveLength(1);
+    expect(api.putTemplateVirtualFields.mock.calls[0][1].virtualFields[0]).toMatchObject({ formulaId: 'formula', bindings: { value: { kind: 'Base', fieldId: 'base-a' }, parent: { kind: 'Base', fieldId: 'base-b' } } });
+    for (const field of api.putTemplateVirtualFields.mock.calls[0][1].virtualFields) {
+      expect(field).not.toHaveProperty('parentBaseFieldId');
+      expect(field).not.toHaveProperty('parentVirtualFieldId');
+    }
   });
 
   it('retries formula metadata failures without hiding virtual-field rows', async () => {
