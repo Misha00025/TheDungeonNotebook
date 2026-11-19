@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ActionRow, Badge, Button, IconButton, Input, LinkButton, List, PageHeader, Panel, Select, StatePanel, TabBar, Textarea } from '@tdn/shared';
+import { ActionRow, Badge, Button, IconButton, Input, LinkButton, List, Notification, PageHeader, Panel, Select, StatePanel, TabBar, Textarea } from '@tdn/shared';
+import type { NotificationKind } from '@tdn/shared';
 import { useWorkspace, useDirtyDraft, useDirtyState } from './Workspace';
 import { useVisitHistory } from './VisitHistory';
 import { useMutation, useResource } from './hooks';
@@ -42,6 +43,8 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
   const [snapshotError, setSnapshotError] = useState<unknown>();
   const [snapshotBusy, setSnapshotBusy] = useState(false);
   const [writeStatus, setWriteStatus] = useState('');
+  const [writeStatusKind, setWriteStatusKind] = useState<NotificationKind>('success');
+  const [writeStatusEvent, setWriteStatusEvent] = useState(0);
   const [contentBusy, setContentBusy] = useState(false);
   const contentBusyRef = useRef(false);
   const contentRevisionRef = useRef<Revision | undefined>(undefined);
@@ -53,6 +56,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
   const previousStatsRef = useRef(stats);
   const recordedCharacter = useRef<string | null>(null);
   const activeRef = useRef(true);
+  const showWriteStatus = (message: string, kind: NotificationKind = 'success') => { setWriteStatus(message); setWriteStatusKind(kind); setWriteStatusEvent(value => value + 1); };
   useEffect(() => {
     activeRef.current = true;
     return () => { activeRef.current = false; };
@@ -120,7 +124,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
       if (activeRef.current) {
         setMetadata(result);
         setMetadataDraft(undefined);
-        setWriteStatus('Метаданные сохранены.');
+        showWriteStatus('Метаданные сохранены.');
       }
       return result;
     } catch (error) {
@@ -160,7 +164,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
           contentRevisionRef.current = fresh.contentRevision;
         }
       } catch {
-        if (activeRef.current) setWriteStatus('Запись подтверждена, вычисления не обновлены');
+        if (activeRef.current) showWriteStatus('Запись подтверждена, вычисления не обновлены', 'warning');
       }
     } catch (error) {
       if (!activeRef.current) return;
@@ -182,7 +186,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
       result => {
         setSheet(current => current ? { ...current, description: submitted, contentRevision: result.contentRevision } : current);
         setDescriptionDraft(undefined);
-        setWriteStatus('Описание сохранено.');
+        showWriteStatus('Описание сохранено.');
       }
     );
   };
@@ -196,7 +200,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
         setSheet(current => current ? { ...current, ...result, virtualFields: current.virtualFields, formulaContentRevisions: current.formulaContentRevisions } : current);
         setFieldDrafts(current => { const next = { ...current }; delete next[fieldId]; return next; });
         setValidity(current => { const next = { ...current }; delete next[fieldId]; return next; });
-        setWriteStatus('Поле сохранено.');
+        showWriteStatus('Поле сохранено.');
       }
     );
   };
@@ -210,7 +214,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
         setFieldDrafts(current => { const next = { ...current }; delete next[fieldId]; return next; });
         setValidity(current => { const next = { ...current }; delete next[fieldId]; return next; });
         setResetCounters(current => ({ ...current, [fieldId]: (current[fieldId] ?? 0) + 1 }));
-        setWriteStatus('Значение сброшено.');
+        showWriteStatus('Значение сброшено.');
       }
     );
   };
@@ -229,7 +233,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
       contentRevisionRef.current = freshSheet.contentRevision;
       setSheetBlocked(false);
       setWriteError(undefined);
-      setWriteStatus('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.');
+       showWriteStatus('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.', 'info');
       permissionResource.reload();
     } catch (error) { if (activeRef.current && generation === snapshotGenerationRef.current) setSnapshotError(error); }
     finally { if (activeRef.current && generation === snapshotGenerationRef.current) { snapshotBusyRef.current = false; setSnapshotBusy(false); } }
@@ -247,7 +251,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
       setMetadata(freshMetadata);
       setMetadataBlocked(false);
       setMetadataError(undefined);
-      setWriteStatus('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.');
+       showWriteStatus('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.', 'info');
       permissionResource.reload();
     } catch (error) { if (activeRef.current && generation === snapshotGenerationRef.current) setSnapshotError(error); }
     finally { if (activeRef.current && generation === snapshotGenerationRef.current) { snapshotBusyRef.current = false; setSnapshotBusy(false); } }
@@ -349,13 +353,12 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
       hideOnMobile
       tabs={[{ id: 'overview', label: 'Обзор', path: 'overview' }, { id: 'stats', label: 'Характеристики', path: 'stats' }]}
     />
-    {sheetBlocked && <StatePanel kind="error">Обновляем данные после изменения на сервере. Черновик сохранён.</StatePanel>}
-    {metadataBlocked && <StatePanel kind="error">Обновляем данные после изменения на сервере. Черновик сохранён.</StatePanel>}
+    {(sheetBlocked || metadataBlocked) && <Notification kind="warning" eventKey={`${sheetBlocked}:${metadataBlocked}`}>Обновляем данные после изменения на сервере. Черновик сохранён.</Notification>}
     {snapshotBusy && <StatePanel kind="loading">Обновляем актуальные данные…</StatePanel>}
     {Boolean(snapshotError) && <ApiError error={snapshotError} onRetry={sheetBlocked || metadataBlocked ? retrySnapshot : undefined} />}
     {Boolean(writeError) && <ApiError error={writeError} />}
     {Boolean(metadataError) && <ApiError error={metadataError} />}
-    {writeStatus && <StatePanel kind="info" role="status">{writeStatus}</StatePanel>}
+    {writeStatus && <Notification kind={writeStatusKind} eventKey={writeStatusEvent}>{writeStatus}</Notification>}
     {!stats && <section aria-label="Обзор персонажа"><CharacterPresentation campaignId={campaignId} characterId={characterId} refreshKey={presentationRefreshKey} /></section>}
     {stats && <>
       <Panel title="Базовые характеристики" headingLevel={3}>

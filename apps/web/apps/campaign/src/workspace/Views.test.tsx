@@ -55,7 +55,7 @@ describe('Views workspace', () => {
     fireEvent.click(screen.getByText('Перечитать содержимое'));
     await waitFor(() => expect(api.getViewContent).toHaveBeenCalledTimes(2));
     expect(screen.getByDisplayValue('Draft title')).toBeTruthy();
-    expect(screen.getByText('Актуальная версия загружена. Черновик сохранён.')).toBeInTheDocument();
+    expect(await screen.findByText('Актуальная версия загружена. Черновик сохранён.')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain(privateId);
     expect(document.body.textContent).not.toContain('private');
     expect(api.putViewContent).toHaveBeenCalledTimes(1);

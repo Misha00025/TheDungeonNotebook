@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ActionRow, Badge, Button, LinkButton, List, ListItem, PageHeader, Panel, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
+import { ActionRow, Badge, Button, LinkButton, List, ListItem, Notification, PageHeader, Panel, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
 import { useWorkspace } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 import { useResource } from './hooks';
@@ -131,7 +131,7 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
         </section>;
       })}
     </List>}
-    {failed.length > 0 && <StatePanel kind="error">Не удалось загрузить права для {failed.length} персонажей.</StatePanel>}
+    {failed.length > 0 && <Notification kind="error" eventKey={failed.map(item => item.id).sort().join(',')}>Не удалось загрузить права для {failed.length} персонажей.</Notification>}
     {Boolean(resource.data?.length) && filtered.length > 0 && settled && allowed.length === 0 && failed.length === 0 && <StatePanel kind="empty">Нет доступных персонажей.</StatePanel>}
     {mode === 'gm' && !compact && createOpen && <CreateCharacter campaignId={campaignId} onClose={() => setCreateOpen(false)} />}
   </List></section>;

@@ -5,14 +5,15 @@ import '@tdn/shared/styles/globals.css';
 import { getConfig, loadConfig } from '@tdn/shared/config';
 import { configureRemotes } from './remote/loadRemote';
 import { bootstrap } from './bootstrap';
+import { Notification } from '@tdn/shared';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
 const ConfigFailure: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
-  <main role="alert" style={{ padding: '2rem' }}>
-    <p>Не удалось загрузить конфигурацию Web. Проверьте доступность config.json.</p>
+  <main style={{ padding: '2rem' }}>
+    <Notification kind="error">Не удалось загрузить конфигурацию Web. Проверьте доступность config.json.</Notification>
     <button type="button" onClick={onRetry}>Повторить</button>
   </main>
 );

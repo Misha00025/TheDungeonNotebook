@@ -13,6 +13,7 @@ export interface IconButtonProps {
   variant?: 'primary' | 'secondary' | 'danger';
   disabled?: boolean;
   busy?: boolean;
+  className?: string;
 }
 
 const IconButton: React.FC<IconButtonProps> = ({
@@ -23,13 +24,14 @@ const IconButton: React.FC<IconButtonProps> = ({
   size = 'small',
   variant = 'primary',
   disabled = false,
-  busy = false
+  busy = false,
+  className
 }) => {
   const inlineIcon = icon === 'check' || icon === 'close';
   return (
     <button
       type='button'
-      className={`${buttonStyles.button} ${styles.iconButton} ${styles[size]} ${styles[variant]}`}
+      className={`${buttonStyles.button} ${styles.iconButton} ${styles[size]} ${styles[variant]}${className ? ` ${className}` : ''}`}
       onClick={onClick}
       title={title}
       aria-label={ariaLabel ?? title}

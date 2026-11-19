@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import IconButton from './IconButton';
 import styles from './IconButton.module.css';
+import buttonStyles from '../../../styles/components/Button.module.css';
 
 describe('IconButton', () => {
   test('renders check and close SVG icons with an accessible button name', () => {
@@ -21,6 +22,17 @@ describe('IconButton', () => {
     const button = screen.getByRole('button', { name: 'Edit' });
     expect(button.querySelector('svg')).toBeNull();
     expect(button.querySelector(`.${styles.icon}.${styles.edit}`)).toBeInTheDocument();
+  });
+
+  test('adds className without replacing SDK classes or native button behavior', () => {
+    const onClick = vi.fn();
+    render(<IconButton icon="close" title="Close" size="large" variant="secondary" className="notification-close" disabled onClick={onClick} />);
+    const button = screen.getByRole('button', { name: 'Close' });
+    expect(button).toHaveClass(buttonStyles.button, styles.iconButton, styles.large, styles.secondary, 'notification-close');
+    expect(button).toHaveAttribute('type', 'button');
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(onClick).not.toHaveBeenCalled();
   });
 
   test('disabled and busy buttons do not invoke click handlers', () => {

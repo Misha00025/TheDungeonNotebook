@@ -436,6 +436,13 @@ describe('CharacterSheet', () => {
     expect(screen.getByLabelText('string')).toHaveValue('my draft');
     expect(screen.getByRole('button', { name: 'Сохранить string' })).toBeDisabled();
     expect(writes).toBe(1);
+    const blockedNotification = screen.getByText('Обновляем данные после изменения на сервере. Черновик сохранён.').closest('[role="alert"]');
+    expect(blockedNotification).toBeInTheDocument();
+    fireEvent.click(within(blockedNotification as HTMLElement).getByRole('button', { name: 'Закрыть уведомление' }));
+    expect(blockedNotification).not.toBeInTheDocument();
+    expect(screen.getByLabelText('string')).toHaveValue('my draft');
+    expect(screen.getByRole('button', { name: 'Сохранить string' })).toBeDisabled();
+    expect(writes).toBe(1);
     await act(async () => { resolveRecovery(response(latest)); });
     expect(await screen.findByText('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('string')).toHaveValue('my draft'));

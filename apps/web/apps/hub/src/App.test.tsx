@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import App from './App';
 
@@ -20,7 +20,8 @@ const controls = vi.hoisted(() => ({
   lastRemote: null as any,
 }));
 
-vi.mock('@tdn/shared', () => ({
+vi.mock('@tdn/shared', async importOriginal => ({
+  ...await importOriginal<typeof import('@tdn/shared')>(),
   AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SidebarProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -45,7 +46,10 @@ vi.mock('@tdn/shared/auth/useProfile', () => ({
   },
 }));
 
-vi.mock('@tdn/shared/config', () => ({ getConfig: () => controls.auth.config }));
+vi.mock('@tdn/shared/config', async importOriginal => {
+  const actual = await importOriginal<typeof import('@tdn/shared/config')>();
+  return { ...actual, getConfig: () => controls.auth.config };
+});
 
 vi.mock('./remote/RemoteBoundary', () => ({
   default: (props: any) => {
@@ -77,7 +81,8 @@ describe('Hub App auth and profile gates', () => {
     expect(screen.getByText('Загрузка…')).toBeInTheDocument();
     controls.auth.status = 'error'; controls.auth.error = 'offline';
     view.rerender(<App />);
-    expect(screen.getByText(/offline/)).toBeInTheDocument();
+    expect(screen.getByText('Не удалось проверить сессию. Попробуйте ещё раз.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('offline');
     fireEvent.click(screen.getByText('Повторить'));
     expect(controls.auth.refreshSession).toHaveBeenCalled();
     controls.auth.status = 'anonymous';
@@ -104,7 +109,8 @@ describe('Hub App auth and profile gates', () => {
     controls.auth.status = 'authenticated'; controls.auth.authenticated = true; controls.auth.userId = 7;
     controls.profile.error = 'service unavailable';
     renderHub('/');
-    expect(screen.getByRole('alert').textContent).toContain('service unavailable');
+    expect(screen.getByText('Не удалось загрузить профиль. Попробуйте ещё раз.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('service unavailable');
     fireEvent.click(screen.getByText('Повторить'));
     expect(controls.fetchProfile).toHaveBeenCalled();
   });
@@ -127,7 +133,26 @@ describe('Hub App auth and profile gates', () => {
     controls.auth.logout.mockRejectedValue(new Error('Logout failed: 503'));
     renderHub('/profile');
     fireEvent.click(screen.getByText('sidebar logout'));
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Logout failed: 503'));
+    await waitFor(() => expect(screen.getByText('Не удалось выполнить действие с сессией. Попробуйте ещё раз.')).toBeInTheDocument());
+    expect(document.body.textContent).not.toContain('Logout failed: 503');
     expect(window.location.pathname).toBe('/profile');
+  });
+
+  it('keeps profile retry inline after error notification expires', () => {
+    vi.useFakeTimers();
+    controls.auth.status = 'authenticated'; controls.auth.authenticated = true; controls.auth.userId = 7;
+    controls.profile.error = 'private profile failure';
+    const view = renderHub();
+    expect(view.container.querySelector('[data-tdn-notifications]')).toBeNull();
+    expect(screen.getByText('Не удалось загрузить профиль. Попробуйте ещё раз.')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(6000));
+    expect(screen.queryByText('Не удалось загрузить профиль. Попробуйте ещё раз.')).toBeNull();
+    const retry = screen.getByText('Повторить');
+    expect(controls.fetchProfile).not.toHaveBeenCalled();
+    fireEvent.click(retry);
+    expect(controls.fetchProfile).toHaveBeenCalledTimes(1);
+    view.unmount();
+    cleanup();
+    vi.useRealTimers();
   });
 });

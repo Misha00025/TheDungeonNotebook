@@ -6,6 +6,7 @@ import { PRESET_LABELS } from '../../theme/types';
 import buttonStyles from '../../styles/components/Button.module.css';
 import styles from './PersonalizeModal.module.css';
 import AdaptiveLayout from '../AdaptiveLayout/AdaptiveLayout';
+import Notification from '../Notification/Notification';
 
 interface PersonalizeModalProps {
   isOpen: boolean;
@@ -197,8 +198,8 @@ const PersonalizeModal: React.FC<PersonalizeModalProps> = ({ isOpen, onClose }) 
         <AdaptiveLayout className={styles.buttons}>
           <AdaptiveLayout.Full>
             {themeSyncing && <p style={{ margin: '4px 0', fontSize: '13px', color: 'var(--text-primary, #6b7280)' }}>Синхронизация...</p>}
-            {themeSyncError && <p style={{ margin: '4px 0', fontSize: '13px', color: 'var(--danger-color)' }}>{themeSyncError}</p>}
-            {syncMessage && !themeSyncError && <p style={{ margin: '4px 0', fontSize: '13px', color: 'var(--text-primary, #6b7280)' }}>{syncMessage}</p>}
+            {themeSyncError && <Notification kind="error" eventKey={themeSyncError}>Не удалось синхронизировать тему. Попробуйте ещё раз.</Notification>}
+            {syncMessage && !themeSyncError && <Notification kind="success" eventKey={syncMessage}>{syncMessage}</Notification>}
           </AdaptiveLayout.Full>
           <button className={buttonStyles.button} onClick={handleSync} disabled={themeSyncing}>
             Синхронизировать

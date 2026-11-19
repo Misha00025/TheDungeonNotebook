@@ -5,7 +5,7 @@ import { ApiError } from './Feedback';
 import commonStyles from '@tdn/shared/styles/common.module.css';
 import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
 import inputStyles from '@tdn/shared/styles/components/Input.module.css';
-import { ActionRow, Button, FieldSet, FormGrid, List } from '@tdn/shared';
+import { ActionRow, Button, FieldSet, FormGrid, List, Notification } from '@tdn/shared';
 
 type Source = { id: string; key: string; title: string; kind: 'Base' | 'Virtual' };
 type Props = { fields: VirtualFieldInput[]; onChange: (fields: VirtualFieldInput[]) => void; formulas: DefinitionMetadata[]; baseFields: { id: string; key: string; title: string }[]; templateVirtualFields?: VirtualField[]; disabled?: boolean; onValidityChange?: (valid: boolean) => void; campaignId: number; compact?: boolean };
@@ -52,11 +52,11 @@ const VirtualFieldRow: React.FC<RowProps> = ({ field, fieldIndex, change, remove
   const addBindingButton = compact ? <ActionRow><Button type="button" disabled={disabled || !manualParameter || !manualFieldId} onClick={() => { patchBinding(manualParameter, { kind: manualKind, fieldId: manualFieldId }); setManualParameter(''); setManualFieldId(''); }}>Добавить связь</Button></ActionRow> : <button type="button" className={buttonStyles.button} disabled={disabled || !manualParameter || !manualFieldId} onClick={() => { patchBinding(manualParameter, { kind: manualKind, fieldId: manualFieldId }); setManualParameter(''); setManualFieldId(''); }}>Добавить связь</button>;
   const manualBinding = compact ? <FieldSet legend="Добавить связь вручную"><FormGrid minColumnWidth="9rem">{manualControls}{addBindingButton}</FormGrid></FieldSet> : <fieldset><legend>Добавить связь вручную</legend>{manualControls}{addBindingButton}</fieldset>;
   const deleteButton = compact ? <Button type="button" disabled={disabled} onClick={() => remove(fieldIndex)}>Удалить поле</Button> : <button type="button" className={buttonStyles.button} disabled={disabled} onClick={() => remove(fieldIndex)}>Удалить поле</button>;
-  if (compact) return <FieldSet legend={field.title || 'Новое виртуальное поле'}><FormGrid minColumnWidth="9rem">{keyControl}{titleControl}{resultControl}{formulaControl}</FormGrid><FormGrid minColumnWidth="9rem">{descriptionControl}{parentControl}</FormGrid>{Boolean(readError) && <><ApiError error={readError} /><p>Определения недоступны для чтения; связи можно редактировать вручную.</p></>}{parameterControls.length > 0 && <FormGrid minColumnWidth="9rem">{parameterControls}</FormGrid>}<details><summary>Дополнительные связи</summary><List layout="vertical" gap="small">{formulaIdControl}{storedBindings}{manualBinding}</List></details><ActionRow>{deleteButton}</ActionRow></FieldSet>;
+  if (compact) return <FieldSet legend={field.title || 'Новое виртуальное поле'}><FormGrid minColumnWidth="9rem">{keyControl}{titleControl}{resultControl}{formulaControl}</FormGrid><FormGrid minColumnWidth="9rem">{descriptionControl}{parentControl}</FormGrid>{Boolean(readError) && <><ApiError error={readError} /><Notification kind="warning" eventKey={readError}>Определения недоступны для чтения; связи можно редактировать вручную.</Notification></>}{parameterControls.length > 0 && <FormGrid minColumnWidth="9rem">{parameterControls}</FormGrid>}<details><summary>Дополнительные связи</summary><List layout="vertical" gap="small">{formulaIdControl}{storedBindings}{manualBinding}</List></details><ActionRow>{deleteButton}</ActionRow></FieldSet>;
   return <fieldset className={commonStyles.card}>
     <legend>{field.title || 'Новое виртуальное поле'}</legend>
     {keyControl}{titleControl}{descriptionControl}{resultControl}{formulaControl}{formulaIdControl}
-    {Boolean(readError) && <><ApiError error={readError} /><p>Определения недоступны для чтения; связи можно редактировать вручную.</p></>}
+     {Boolean(readError) && <><ApiError error={readError} /><Notification kind="warning" eventKey={readError}>Определения недоступны для чтения; связи можно редактировать вручную.</Notification></>}
     <h4>Связи параметров</h4>
     {parameterControls}{storedBindings}{manualBinding}{parentControl}{deleteButton}
   </fieldset>;

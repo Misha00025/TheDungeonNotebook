@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Navigate, Outlet, useLocation, useParams } from 'react-router-dom';
-import { Badge, BottomNavigation, Breadcrumbs, Button, Field, NavigationIcon, SectionNav, Select, StatePanel, WorkspaceLayout } from '@tdn/shared';
+import { Badge, BottomNavigation, Breadcrumbs, Button, Field, NavigationIcon, Notification, SectionNav, Select, StatePanel, WorkspaceLayout } from '@tdn/shared';
 import type { BottomNavigationItem, NavigationIconName } from '@tdn/shared';
 import type { Campaign, Permissions } from './types';
 import { useWorkspace } from './Workspace';
@@ -42,13 +42,13 @@ const CampaignShell: React.FC = () => {
     recordedGroup.current = identity;
     visitGroup(id);
   }, [sessionKey, id, valid, campaign.data, campaign.loading, campaign.error, permission.data, permission.loading, permission.error, visitGroup]);
-  if (!valid) return <StatePanel kind="error">Некорректный идентификатор кампании.</StatePanel>;
+  if (!valid) return <Notification kind="error" eventKey={groupId}>Некорректный идентификатор кампании.</Notification>;
   if (campaign.loading && !campaign.data) return <StatePanel kind="loading">Загрузка кампании…</StatePanel>;
   if (campaign.error && !campaign.data) return <ApiError error={campaign.error} onRetry={campaign.reload} />;
-  if (!campaign.data) return <StatePanel kind="error">Данные кампании недоступны.</StatePanel>;
+  if (!campaign.data) return <Notification kind="error" eventKey={campaign.error}>Данные кампании недоступны.</Notification>;
   if (permission.loading && !permission.data) return <StatePanel kind="loading">Загрузка прав кампании…</StatePanel>;
   if (permission.error && !permission.data) return <ApiError error={permission.error} onRetry={permission.reload} />;
-  if (!permission.data) return <StatePanel kind="error">Права кампании недоступны.</StatePanel>;
+  if (!permission.data) return <Notification kind="error" eventKey={permission.error}>Права кампании недоступны.</Notification>;
   if (mode === 'gm' && !permission.loading && !permission.error && !permission.data.canWrite) return <Navigate to={path(`/${id}/player/characters`)} replace />;
   const effective = permission.loading || permission.error ? { ...permission.data, canWrite: false, canManageAccess: false } : permission.data;
   const canEnterGm = effective.canWrite;

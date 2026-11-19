@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { loadRemoteModule } from './loadRemote';
 import type { RemoteModule, RemoteProps } from './types';
+import { Button, Notification } from '@tdn/shared';
 
 interface RemoteBoundaryProps extends RemoteProps {
   /** Имя remote (совпадает с ключом в remotes vite.config). */
@@ -17,6 +18,7 @@ const RemoteLoader: React.FC<RemoteBoundaryProps> = ({
 }) => {
   const [mod, setMod] = useState<RemoteModule | null>(null);
   const [failed, setFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,12 +36,13 @@ const RemoteLoader: React.FC<RemoteBoundaryProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [name, module]);
+  }, [name, module, loadAttempt]);
 
   if (failed) {
     return (
-      <div role="alert" style={{ padding: '2rem', color: 'var(--danger-color, #d93025)' }}>
-        Не удалось загрузить раздел. Попробуйте обновить страницу.
+      <div style={{ padding: '2rem' }}>
+        <Notification kind="error" eventKey={`${name}:${module}:${loadAttempt}`}>Не удалось загрузить раздел. Попробуйте обновить страницу.</Notification>
+        <Button variant="secondary" type="button" onClick={() => setLoadAttempt(value => value + 1)}>Повторить загрузку раздела</Button>
       </div>
     );
   }

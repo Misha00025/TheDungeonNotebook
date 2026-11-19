@@ -1,5 +1,5 @@
 import React, { useId, useState } from 'react';
-import { Button, Field, List, Select, StatePanel } from '@tdn/shared';
+import { Button, Field, List, Notification, Select, StatePanel } from '@tdn/shared';
 import { useWorkspace } from './Workspace';
 import { CampaignApiError } from './api';
 import { useResource } from './hooks';
@@ -33,7 +33,7 @@ const CharacterPresentation: React.FC<Props> = ({ campaignId, characterId, refre
     {Boolean(view.error) && (view.error instanceof CampaignApiError && view.error.status === 404 && view.error.problem.code === 'view_not_configured' ? <StatePanel kind="empty">Представление не назначено.</StatePanel> : <ApiError error={view.error} onRetry={refresh} />)}
     {view.data && sources.loading && <StatePanel kind="loading">Загрузка данных представления…</StatePanel>}
     {Boolean(sources.error) && Boolean(view.data) && <ApiError error={sources.error} onRetry={refresh} />}
-    {changedSnapshot && <><StatePanel kind="error">Представление изменилось; обновите данные</StatePanel><Button type="button" onClick={refresh}>Обновить данные представления</Button></>}
+    {changedSnapshot && <><Notification kind="warning" eventKey={`${view.data?.viewContent.contentRevision}:${sources.data?.viewContentRevision}`}>Представление изменилось; обновите данные</Notification><Button type="button" onClick={refresh}>Обновить данные представления</Button></>}
     {view.data && sources.data && !changedSnapshot && <ViewRenderer roots={view.data.viewContent.data.roots} widgets={sources.data.widgets} />}
   </List></section>;
 };

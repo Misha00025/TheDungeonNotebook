@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, ThemeProvider, SidebarProvider, useAuth, GlobalSidebar, names } from '@tdn/shared';
+import { AuthProvider, ThemeProvider, SidebarProvider, useAuth, GlobalSidebar, names, Notification } from '@tdn/shared';
 import { useProfile } from '@tdn/shared/auth/useProfile';
 import type { AuthContextType } from '@tdn/shared';
 import { hubNavItems } from './navigation';
@@ -11,7 +11,7 @@ import Login from './pages/Login';
 const ProfileGate: React.FC<{ auth: AuthContextType }> = ({ auth }) => {
   const { loading, error, profileNotFound, fetchProfile } = useProfile(true);
   if (loading) return <div>Загрузка профиля…</div>;
-  if (error) return <div role="alert">Не удалось загрузить профиль: {error} <button onClick={() => void fetchProfile()}>Повторить</button></div>;
+  if (error) return <><Notification kind="error" eventKey={error}>Не удалось загрузить профиль. Попробуйте ещё раз.</Notification><button onClick={() => void fetchProfile()}>Повторить</button></>;
   if (profileNotFound) return <RemoteBoundary name="campaign" module="CompleteProfile" auth={auth} onCompleted={fetchProfile} />;
   return (
     <Routes>
@@ -29,13 +29,13 @@ const ProfileGate: React.FC<{ auth: AuthContextType }> = ({ auth }) => {
 const AppContent: React.FC = () => {
   const auth = useAuth();
   if (auth.status === 'loading') return <div>Загрузка…</div>;
-  if (auth.status === 'error') return <div role="alert">Не удалось проверить сессию: {auth.error} <button onClick={() => void auth.refreshSession()}>Повторить</button></div>;
+  if (auth.status === 'error') return <><Notification kind="error" eventKey={auth.error}>Не удалось проверить сессию. Попробуйте ещё раз.</Notification><button onClick={() => void auth.refreshSession()}>Повторить</button></>;
   if (auth.status === 'anonymous') return <Login />;
   return (
     <>
       <GlobalSidebar navItems={hubNavItems} brand={names.title} />
       <main className="app-content">
-        {auth.error && <div role="alert">{auth.error}</div>}
+        {auth.error && <Notification kind="error" eventKey={auth.error}>Не удалось выполнить действие с сессией. Попробуйте ещё раз.</Notification>}
         <ProfileGate auth={auth} />
       </main>
     </>

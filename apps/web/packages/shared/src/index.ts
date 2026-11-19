@@ -101,6 +101,8 @@ export { default as Toolbar } from './ui/Composition/Toolbar';
 export type { ToolbarProps } from './ui/Composition/Toolbar';
 export { default as StatePanel } from './ui/StatePanel/StatePanel';
 export type { StatePanelProps } from './ui/StatePanel/StatePanel';
+export { default as Notification } from './ui/Notification/Notification';
+export type { NotificationKind, NotificationProps } from './ui/Notification/Notification';
 
 // --- utils ---
 export { evaluateExpression } from './utils/evaluateExpression';

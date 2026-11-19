@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate, useResolvedPath } from 'react-router-dom';
 import RemoteBoundary from './RemoteBoundary';
@@ -50,12 +50,13 @@ describe('RemoteBoundary', () => {
     ['TypeError', new TypeError('Failed to fetch dynamically imported module: http://localhost:3002/assets/remoteEntry.js profile/App')],
     ['string', 'http://localhost:3002/assets/remoteEntry.js profile/App'],
     ['object', { detail: 'http://localhost:3002/assets/remoteEntry.js profile/App' }],
-  ])('shows only a generic alert when loading rejects with a %s', async (_label, rejection) => {
+  ])('shows only a generic notification when loading rejects with a %s', async (_label, rejection) => {
     mocks.loadRemoteModule.mockRejectedValue(rejection);
-    render(<RemoteBoundary name="profile" module="App" auth={auth} />);
+    const view = render(<RemoteBoundary name="profile" module="App" auth={auth} />);
 
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Не удалось загрузить раздел. Попробуйте обновить страницу.');
+    expect(await screen.findByText('Не удалось загрузить раздел. Попробуйте обновить страницу.')).toBeInTheDocument();
+    expect(within(view.container).queryByRole('alert')).not.toBeInTheDocument();
+    expect(view.container.querySelector('[data-tdn-notifications]')).toBeNull();
     expect(document.body.textContent).not.toContain('localhost:3002');
     expect(document.body.textContent).not.toContain('remoteEntry.js');
     expect(document.body.textContent).not.toContain('profile/App');
@@ -74,7 +75,7 @@ describe('RemoteBoundary', () => {
     mocks.loadRemoteModule.mockRejectedValue(rejection);
     render(<RemoteBoundary name="profile" module="App" auth={auth} />);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Не удалось загрузить раздел. Попробуйте обновить страницу.');
+    expect(await screen.findByText('Не удалось загрузить раздел. Попробуйте обновить страницу.')).toBeInTheDocument();
   });
 
   it('starts a new load after failure when the remote props change', async () => {
@@ -82,14 +83,14 @@ describe('RemoteBoundary', () => {
     mocks.loadRemoteModule.mockRejectedValueOnce(new Error('failed')).mockReturnValueOnce(pending.promise);
     const view = render(<RemoteBoundary name="profile" module="App" auth={auth} />);
 
-    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(await screen.findByText('Не удалось загрузить раздел. Попробуйте обновить страницу.')).toBeInTheDocument();
     view.rerender(<RemoteBoundary name="campaign" module="Home" auth={auth} />);
 
     expect(screen.getByText('Загрузка модуля…')).toBeInTheDocument();
     await waitFor(() => expect(mocks.loadRemoteModule).toHaveBeenCalledTimes(2));
     pending.resolve(remoteModule);
     expect(await screen.findByTestId('remote-view')).toBeInTheDocument();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText('Не удалось загрузить раздел. Попробуйте обновить страницу.')).not.toBeInTheDocument();
   });
 
   it('resets failure for changed props and ignores an obsolete rejection', async () => {
@@ -108,8 +109,29 @@ describe('RemoteBoundary', () => {
       first.reject(new Error('obsolete failure'));
     });
 
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText('Не удалось загрузить раздел. Попробуйте обновить страницу.')).not.toBeInTheDocument();
     expect(screen.getByTestId('remote-view')).toBeInTheDocument();
+  });
+
+  it('keeps explicit module retry after notification expiry and does not retry automatically', async () => {
+    vi.useFakeTimers();
+    let resolve!: (value: RemoteModule) => void;
+    const pending = new Promise<RemoteModule>(done => { resolve = done; });
+    mocks.loadRemoteModule.mockRejectedValueOnce(new Error('private module path')).mockReturnValueOnce(pending);
+    const view = render(<RemoteBoundary name="profile" module="App" auth={auth} />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.getByText('Не удалось загрузить раздел. Попробуйте обновить страницу.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Повторить загрузку раздела' })).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(6000));
+    expect(screen.queryByText('Не удалось загрузить раздел. Попробуйте обновить страницу.')).toBeNull();
+    expect(mocks.loadRemoteModule).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить загрузку раздела' }));
+    await act(async () => { await Promise.resolve(); });
+    expect(mocks.loadRemoteModule).toHaveBeenCalledTimes(2);
+    await act(async () => { resolve(remoteModule); await pending; });
+    expect(screen.getByTestId('remote-view')).toBeInTheDocument();
+    view.unmount();
+    vi.useRealTimers();
   });
 
   it('unmounts the old remote before rendering under a different parent route base', async () => {

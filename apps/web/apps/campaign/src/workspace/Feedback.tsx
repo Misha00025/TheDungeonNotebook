@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, StatePanel } from '@tdn/shared';
+import { Button, Notification } from '@tdn/shared';
 import { CampaignApiError } from './api';
 
 export const ApiError: React.FC<{ error: unknown; onRetry?: () => void }> = ({ error, onRetry }) => {
@@ -15,5 +15,6 @@ export const ApiError: React.FC<{ error: unknown; onRetry?: () => void }> = ({ e
               : status === 503 ? 'Зависимый сервис временно недоступен.'
                 : status === 500 || status === 502 || status === 504 ? 'Сервис временно недоступен. Попробуйте позже.'
                   : 'Не удалось выполнить операцию. Попробуйте ещё раз.';
-  return <StatePanel kind="error">{message}{onRetry && <Button variant="secondary" type="button" onClick={onRetry}>Повторить загрузку</Button>}</StatePanel>;
+  const kind = apiError?.unknownOutcome || status === 0 || status === 409 ? 'warning' : 'error';
+  return <><Notification kind={kind} eventKey={error}>{message}</Notification>{onRetry && <Button variant="secondary" type="button" onClick={onRetry}>Повторить загрузку</Button>}</>;
 };

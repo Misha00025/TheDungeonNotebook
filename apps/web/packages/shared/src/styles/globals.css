@@ -8,6 +8,10 @@
     --text-shadow: none;
     --progress-bar-from: #e53935;
     --progress-bar-to: #66bb6a;
+    --notification-success-color: #2e9d52;
+    --notification-error-color: #e5484d;
+    --notification-warning-color: #d99612;
+    --notification-info-color: #3b82f6;
 
     /* Каркас боковой панели (тикет #36) */
     --rail-width: 60px;

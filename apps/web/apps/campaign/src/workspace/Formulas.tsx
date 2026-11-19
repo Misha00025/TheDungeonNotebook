@@ -6,7 +6,7 @@ import { CampaignApiError } from './api';
 import { useResource, useMutation } from './hooks';
 import type { DefinitionCreate, FormulaContentEnvelope, FormulaMetadata } from './types';
 import { ApiError } from './Feedback';
-import { ActionRow, Button, Field, Input, ModalPortal, Textarea } from '@tdn/shared';
+import { ActionRow, Button, Field, Input, ModalPortal, Notification, Textarea } from '@tdn/shared';
 import commonStyles from '@tdn/shared/styles/common.module.css';
 import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
 import inputStyles from '@tdn/shared/styles/components/Input.module.css';
@@ -150,7 +150,7 @@ export const FormulaEditor: React.FC<{ campaignId: number; formula: FormulaMetad
        {Boolean(nameError) && <ApiError error={nameError} />}{nameBlocked && <button type="button" className={buttonStyles.button} onClick={() => void refreshName()}>Перечитать метаданные</button>}
       {nameSnapshot && <aside className={commonStyles.card}><h3>Актуальные метаданные (черновик не изменён)</h3><p>{nameSnapshot.name}</p></aside>}
         <div className={commonStyles.formActions}><button className={buttonStyles.button} disabled={!writable || !nameDirty || rename.busy || nameBlocked || !name.trim()}>Сохранить название</button><button type="button" className={buttonStyles.button} onClick={() => { if (window.confirm('Отменить черновик названия?')) setName(baselineName); }} disabled={!nameDirty || rename.busy}>Отменить</button></div>
-      {nameSaved && !nameDirty && <p role="status">Название сохранено.</p>}
+       {nameSaved && !nameDirty && <Notification kind="success" eventKey={String(metadataRevision)}>Название сохранено.</Notification>}
     </form>
       <form className={commonStyles.form} onSubmit={event => { event.preventDefault(); if (writable && !contentBlocked && !saveContent.busy && contentDirty) void saveContent.run().catch(handleContentError); }}><h2>Содержимое</h2>
         <label className={commonStyles.formGroup}>Выражение<textarea className={inputStyles.input} disabled={!writable || saveContent.busy} value={expression} onChange={event => { setExpression(event.target.value); setContentSaved(false); }} /></label>
@@ -158,7 +158,7 @@ export const FormulaEditor: React.FC<{ campaignId: number; formula: FormulaMetad
        {Boolean(contentError) && <ApiError error={contentError} />}{contentBlocked && <button type="button" className={buttonStyles.button} onClick={() => void refreshContent()}>Перечитать содержимое</button>}
       {contentSnapshot && <aside className={commonStyles.card}><h3>Актуальное содержимое (черновик не изменён)</h3><p>{contentSnapshot.data.expression}</p><ul>{contentSnapshot.data.parameters.map((item, index) => <li key={`${index}:${item}`}>{item}</li>)}</ul></aside>}
         <div className={commonStyles.formActions}><button className={buttonStyles.button} disabled={!writable || !contentDirty || saveContent.busy || contentBlocked}>Сохранить содержимое</button><button type="button" className={buttonStyles.button} onClick={() => { if (window.confirm('Отменить черновик содержимого?')) { setExpression(baselineExpression); setParametersText(baselineParametersText); } }} disabled={!contentDirty || saveContent.busy}>Отменить</button></div>
-      {contentSaved && !contentDirty && <p role="status">Содержимое сохранено.</p>}
+       {contentSaved && !contentDirty && <Notification kind="success" eventKey={String(contentRevision)}>Содержимое сохранено.</Notification>}
     </form>
   </div>;
 };

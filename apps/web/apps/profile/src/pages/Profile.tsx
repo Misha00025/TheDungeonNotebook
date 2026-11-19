@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useProfile } from '@tdn/shared/auth/useProfile';
-import { userAPI } from '@tdn/shared';
+import { Button, Notification, userAPI } from '@tdn/shared';
+import type { NotificationKind } from '@tdn/shared';
 import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
 import inputStyles from '@tdn/shared/styles/components/Input.module.css';
 import styles from '@tdn/shared/styles/common.module.css';
@@ -19,6 +20,8 @@ const Profile: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [notice, setNotice] = useState<{ message: string; kind: NotificationKind; event: number }>();
+  const showNotice = (message: string, kind: NotificationKind = 'error') => setNotice(current => ({ message, kind, event: (current?.event ?? 0) + 1 }));
 
   useEffect(() => {
     if (profile) {
@@ -40,12 +43,12 @@ const Profile: React.FC = () => {
 
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      alert('Недопустимый формат файла. Разрешены: JPEG, PNG, GIF, BMP, WebP.');
+      showNotice('Недопустимый формат файла. Разрешены: JPEG, PNG, GIF, BMP, WebP.', 'warning');
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('Файл слишком большой. Максимальный размер: 5MB.');
+      showNotice('Файл слишком большой. Максимальный размер: 5MB.', 'warning');
       return;
     }
 
@@ -53,8 +56,8 @@ const Profile: React.FC = () => {
     try {
       const uploadResult = await uploadAPI.uploadImage(file);
       setFormData(prev => ({ ...prev, imageLink: uploadResult.url }));
-    } catch (error) {
-      alert('Ошибка загрузки изображения');
+    } catch {
+      showNotice('Ошибка загрузки изображения');
     } finally {
       setUploadingImage(false);
     }
@@ -71,8 +74,9 @@ const Profile: React.FC = () => {
       });
       await fetchProfile();
       setEditMode(false);
-    } catch (error) {
-      alert('Ошибка сохранения профиля');
+      showNotice('Профиль сохранён.', 'success');
+    } catch {
+      showNotice('Ошибка сохранения профиля');
     } finally {
       setSaving(false);
     }
@@ -104,9 +108,11 @@ const Profile: React.FC = () => {
   };
 
   if (loading) return <div className={styles.container}>Загрузка...</div>;
-  if (error) return <div className={styles.container}>Ошибка: {error}</div>;
+  if (error) return <div className={styles.container}><Notification kind="error" eventKey={error}>Не удалось загрузить профиль. Попробуйте ещё раз.</Notification><Button type="button" onClick={() => void fetchProfile()}>Повторить загрузку</Button></div>;
 
   return (
+    <>
+    {notice && <Notification kind={notice.kind} eventKey={notice.event}>{notice.message}</Notification>}
     <div className={styles.container}>
       <h1>Профиль пользователя</h1>
       
@@ -215,6 +221,7 @@ const Profile: React.FC = () => {
         )}
       </div>
     </div>
+    </>
   );
 };
 

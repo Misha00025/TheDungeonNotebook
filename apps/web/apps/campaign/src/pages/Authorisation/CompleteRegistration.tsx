@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
+import { Notification } from '@tdn/shared';
 import { useAuth } from '@tdn/shared/auth/useAuth';
 import { userAPI } from '../../services/api';
 import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
 import inputStyles from '@tdn/shared/styles/components/Input.module.css';
 import commonStyles from '@tdn/shared/styles/common.module.css';
-import modalStyles from '@tdn/shared/styles/modal.module.css';
 
 type CompleteRegistrationProps = { onCompleted: () => Promise<void> };
 
@@ -33,8 +33,8 @@ const CompleteRegistration: React.FC<CompleteRegistrationProps> = ({ onCompleted
         setCreated(true);
       }
       await onCompleted();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create profile');
+    } catch {
+      setError('Не удалось создать или обновить профиль. Попробуйте ещё раз.');
     } finally {
       setLoading(false);
     }
@@ -47,7 +47,7 @@ const CompleteRegistration: React.FC<CompleteRegistrationProps> = ({ onCompleted
       <h1>Профиль The Dungeon Notebook</h1>
       <p>Создайте профиль, чтобы продолжить.</p>
 
-      {error && <div className={modalStyles.error}>{error}</div>}
+      {error && <Notification kind="error" eventKey={error}>{error}</Notification>}
 
       <form onSubmit={handleSubmit} className={commonStyles.form}>
         <div className={commonStyles.formGroup}>

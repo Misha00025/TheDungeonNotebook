@@ -1,0 +1,60 @@
+.viewport {
+  position: fixed;
+  z-index: 10000;
+  top: max(1rem, env(safe-area-inset-top));
+  right: max(1rem, env(safe-area-inset-right));
+  width: 24rem;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+  display: grid;
+  gap: 0.75rem;
+  pointer-events: none;
+}
+
+.card {
+  --semantic: var(--notification-info-color);
+  position: relative;
+  min-width: 0;
+  padding: 0.9rem 3.2rem 1.1rem 1rem;
+  overflow: hidden;
+  color: var(--text-primary, CanvasText);
+  background: color-mix(in srgb, var(--bg-primary, Canvas) 90%, var(--semantic));
+  border: 1px solid color-mix(in srgb, var(--semantic) 40%, var(--border-color, GrayText));
+  border-left: 0.3rem solid var(--semantic);
+  border-radius: var(--border-radius-md, 8px);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 18%);
+  pointer-events: auto;
+}
+
+.success { --semantic: var(--notification-success-color); }
+.error { --semantic: var(--notification-error-color); }
+.warning { --semantic: var(--notification-warning-color); }
+.info { --semantic: var(--notification-info-color); }
+
+.heading { font-weight: 700; margin-bottom: 0.3rem; }
+.body { overflow-wrap: anywhere; }
+.close { position: absolute; top: 0.4rem; right: 0.4rem; }
+
+.progress {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--semantic);
+  transform: scaleX(1);
+  transform-origin: left;
+  animation: countdown var(--notification-duration) linear forwards;
+  animation-play-state: running;
+}
+
+.paused { animation-play-state: paused; }
+
+@keyframes countdown {
+  to { transform: scaleX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+}

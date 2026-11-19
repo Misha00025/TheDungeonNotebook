@@ -24,7 +24,7 @@ describe('CompleteRegistration', () => {
     fireEvent.change(nickname, { target: { value: 'misha' } });
     fireEvent.change(visibleName, { target: { value: 'Misha' } });
     fireEvent.click(screen.getByRole('button', { name: 'Создать профиль' }));
-    await waitFor(() => expect(screen.getByText('Nickname unavailable')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Не удалось создать или обновить профиль. Попробуйте ещё раз.')).toBeInTheDocument());
     expect(nickname).toHaveValue('misha');
     expect(visibleName).toHaveValue('Misha');
     expect(onCompleted).not.toHaveBeenCalled();
