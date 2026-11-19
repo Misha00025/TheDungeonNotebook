@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ActionRow, Badge, Button, Field, IconButton, Input, LinkButton, List, PageHeader, Panel, Select, StatePanel, TabBar, Textarea } from '@tdn/shared';
+import { ActionRow, Badge, Button, IconButton, Input, LinkButton, List, PageHeader, Panel, Select, StatePanel, TabBar, Textarea } from '@tdn/shared';
 import { useWorkspace, useDirtyDraft, useDirtyState } from './Workspace';
 import { useVisitHistory } from './VisitHistory';
 import { useMutation, useResource } from './hooks';
@@ -13,6 +13,7 @@ import { ApiError } from './Feedback';
 import styles from './Workspace.module.css';
 import { CharacterVirtuals } from './CharacterVirtuals';
 import CharacterPresentation from './CharacterPresentation';
+import characterStyles from './CharacterSheet.module.css';
 
 const importanceLabel: Record<string, string> = { Background: 'Фоновый', Secondary: 'Второстепенный', Key: 'Ключевой' };
 type MetadataDraft = { name: string; importance: CharacterMetadata['importance'] };
@@ -52,7 +53,6 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
   const previousStatsRef = useRef(stats);
   const recordedCharacter = useRef<string | null>(null);
   const activeRef = useRef(true);
-  const descriptionId = React.useId();
   useEffect(() => {
     activeRef.current = true;
     return () => { activeRef.current = false; };
@@ -290,6 +290,13 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
   const editorAllowed = Boolean(lastPermissionRef.current?.canWrite);
   const saveMetadata = async () => { if (metadataDraft) await metadataMutation.run(metadataDraft); };
   const metadataControlsDisabled = permissionPending || !canWrite || metadataMutation.busy || metadataBlocked || snapshotBusy;
+  const descriptionControlsDisabled = permissionPending || !canWrite || contentBusy || sheetBlocked || snapshotBusy;
+  const handleDescriptionEscape = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Escape' && !contentBusy) {
+      event.preventDefault();
+      cancelDescription();
+    }
+  };
   const handleMetadataEscape = (event: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (event.key === 'Escape' && !metadataMutation.busy) {
       event.preventDefault();
@@ -303,22 +310,27 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
       if (!metadataControlsDisabled && metadataDirty) void saveMetadata();
     }
   };
-  const descriptionPanel = <Panel title="Описание" headingLevel={3}>
-    <Field label="Описание" htmlFor={descriptionId}><Textarea id={descriptionId} value={descriptionDraft ?? sheet.description} disabled={!canWrite} onChange={event => { setWriteStatus(''); setDescriptionDraft(event.target.value); }} /></Field>
-    {editorAllowed && <ActionRow>
-      <Button type="button" disabled={descriptionDraft === undefined || descriptionDraft === sheet.description || contentBusy || sheetBlocked || snapshotBusy || !canWrite} onClick={saveDescription}>Сохранить описание</Button>
-      <Button variant="secondary" type="button" disabled={descriptionDraft === undefined || contentBusy || !canWrite} onClick={cancelDescription}>Отмена</Button>
-    </ActionRow>}
-  </Panel>;
   return <section><List layout="vertical" stretch>
     <PageHeader
       title={metadataDraft
         ? <Input aria-label="Имя" autoFocus value={metadataDraft.name} disabled={metadataControlsDisabled} onChange={event => setMetadataDraft(current => ({ ...(current ?? { name: metadata.name, importance: metadata.importance }), name: event.target.value }))} onKeyDown={handleMetadataNameKeyDown} />
         : metadata.name}
       headingLevel={2}
-      subtitle={metadataDraft
+      titleAside={metadataDraft
         ? <Select aria-label="Важность" value={metadataDraft.importance} disabled={metadataControlsDisabled} onChange={event => setMetadataDraft(current => ({ ...(current ?? { name: metadata.name, importance: metadata.importance }), importance: event.target.value as CharacterMetadata['importance'] }))} onKeyDown={handleMetadataEscape}><option value="Background">Фоновый</option><option value="Secondary">Второстепенный</option><option value="Key">Ключевой</option></Select>
-        : importanceLabel[metadata.importance] ?? metadata.importance}
+        : <Badge>{importanceLabel[metadata.importance] ?? metadata.importance}</Badge>}
+      subtitle={descriptionDraft !== undefined ? <List layout="vertical" gap="small" stretch className={characterStyles.description}>
+        <Textarea aria-label="Описание" autoFocus value={descriptionDraft} disabled={descriptionControlsDisabled} onChange={event => { setWriteStatus(''); setDescriptionDraft(event.target.value); }} onKeyDown={handleDescriptionEscape} />
+        <ActionRow>
+          <IconButton icon="check" title="Сохранить описание" ariaLabel="Сохранить описание" size="small" variant="secondary" disabled={descriptionDraft === sheet.description || descriptionControlsDisabled} onClick={saveDescription} />
+          <IconButton icon="close" title="Отменить изменения описания" ariaLabel="Отменить изменения описания" size="small" variant="secondary" disabled={contentBusy} onClick={cancelDescription} />
+        </ActionRow>
+      </List> : sheet.description || canWrite ? <List layout="vertical" gap="small" stretch className={characterStyles.description}>
+        <List layout="horizontal" gap="small">
+          {sheet.description && <span className={characterStyles.descriptionText}>{sheet.description}</span>}
+          {canWrite && <IconButton icon="edit" title="Изменить описание" ariaLabel="Изменить описание" size="small" variant="secondary" disabled={descriptionControlsDisabled} onClick={() => { setDescriptionDraft(sheet.description); setWriteStatus(''); }} />}
+        </List>
+      </List> : undefined}
       actions={<ActionRow justify="end">
         {permissionResource.data && !permissionResource.loading && !permissionResource.error && !permissionResource.data.canWrite && <Badge>Только чтение</Badge>}
         {metadataDraft === undefined && canWrite && <IconButton icon="edit" title="Изменить сведения персонажа" ariaLabel="Изменить сведения персонажа" size="small" variant="secondary" disabled={metadataControlsDisabled} onClick={ensureMetadataDraft} />}
@@ -344,12 +356,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; stats:
     {Boolean(writeError) && <ApiError error={writeError} />}
     {Boolean(metadataError) && <ApiError error={metadataError} />}
     {writeStatus && <StatePanel kind="info" role="status">{writeStatus}</StatePanel>}
-    {!stats && <List layout="grid" columns={2} minItemWidth="18rem">
-      <Panel title="Лист персонажа" headingLevel={3}>
-        <CharacterPresentation campaignId={campaignId} characterId={characterId} refreshKey={presentationRefreshKey} />
-      </Panel>
-      {descriptionPanel}
-    </List>}
+    {!stats && <section aria-label="Обзор персонажа"><CharacterPresentation campaignId={campaignId} characterId={characterId} refreshKey={presentationRefreshKey} /></section>}
     {stats && <>
       <Panel title="Базовые характеристики" headingLevel={3}>
         <List layout="grid" columns={3} minItemWidth="14rem">

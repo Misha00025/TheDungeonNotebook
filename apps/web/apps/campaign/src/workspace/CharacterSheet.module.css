@@ -1,0 +1,10 @@
+.description {
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin-top: 0.5rem;
+}
+
+.descriptionText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

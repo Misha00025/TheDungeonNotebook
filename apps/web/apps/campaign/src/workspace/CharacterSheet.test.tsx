@@ -9,6 +9,9 @@ import { LosslessNumber } from 'lossless-json';
 import { stringifyJson } from './json';
 import { afterEach, vi } from 'vitest';
 import buttonStyles from '@tdn/shared/styles/components/Button.module.css';
+import listStyles from '../../../../packages/shared/src/ui/List/List.module.css';
+import pageStyles from '../../../../packages/shared/src/ui/PageLayout/PageLayout.module.css';
+import characterStyles from './CharacterSheet.module.css';
 
 const response = (body: unknown, status = 200) => new Response(stringifyJson(body), { status, headers: { 'Content-Type': 'application/json' } });
 const id = 'abcdef01-2345-6789-abcd-ef0123456789';
@@ -104,7 +107,7 @@ describe('CharacterSheet', () => {
     expect(back).toHaveClass(buttonStyles.button);
   });
 
-  it('hides the sheet TabBar on mobile while keeping the overview presentation and description in readonly mode', async () => {
+  it('hides the sheet TabBar on mobile while keeping the overview and description in readonly mode', async () => {
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       value: (query: string) => ({ media: query, matches: true, onchange: null, addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn() }),
@@ -116,14 +119,246 @@ describe('CharacterSheet', () => {
       return response([]);
     });
     render(sheetTree(request, false, `/12/player/characters/${id}/overview`));
-    expect(await screen.findByRole('heading', { name: 'Лист персонажа' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Описание' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Hero', level: 2 })).toBeInTheDocument();
+    expect(screen.getByText('Ключевой')).toBeInTheDocument();
+    expect(screen.getByText('Overview')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Описание' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Изменить описание' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Сохранить описание' })).not.toBeInTheDocument();
     expect(await screen.findByText('Представление не назначено.')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Представление персонажа' })).toBeInTheDocument();
     expect(screen.getByText('Только чтение')).toBeInTheDocument();
-    expect(screen.getByLabelText('Описание')).toHaveValue('Overview');
-    expect(screen.getByLabelText('Описание')).toBeDisabled();
     await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Лист персонажа' })).not.toBeInTheDocument());
     expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
+  });
+
+  it.each(['gm', 'player'])('renders the %s overview presentation full-width below the shared header', async mode => {
+    const request = vi.fn(async (url: string) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: false, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(sheet);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      return response([]);
+    });
+    const { container } = render(sheetTree(request, false, `/12/${mode}/characters/${id}/overview`));
+    const heading = await screen.findByRole('heading', { name: 'Hero', level: 2 });
+    const row = heading.parentElement;
+    expect(row).toHaveClass(pageStyles.headerTitleRow);
+    expect(row).toContainElement(screen.getByText('Ключевой'));
+    expect(heading).not.toContainElement(screen.getByText('Ключевой'));
+    expect(row?.nextElementSibling).toHaveTextContent('Overview');
+    const overview = screen.getByRole('region', { name: 'Обзор персонажа' });
+    expect(overview).toContainElement(screen.getByRole('region', { name: 'Представление персонажа' }));
+    expect(overview.children).toHaveLength(1);
+    expect(overview.parentElement).toHaveClass(listStyles.stretch);
+    expect(overview).not.toHaveTextContent('Overview');
+    expect(overview).not.toHaveTextContent('Hero');
+    expect(overview.closest(`.${listStyles.columns2}`)).toBeNull();
+    expect(container.querySelector('h3')).toBeNull();
+  });
+
+  it.each([['A description', 'new\nline'], ['Overview', '']])('edits a description explicitly from %s to %s', async (description, submitted) => {
+    let latestSheet = { ...sheet, description };
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(latestSheet);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT') {
+        latestSheet = { ...latestSheet, description: submitted, contentRevision: 2 };
+        return response({ contentRevision: 2 });
+      }
+      return response([]);
+    });
+    render(sheetTree(request, false));
+    const pencil = await screen.findByRole('button', { name: 'Изменить описание' });
+    expect(screen.queryByRole('textbox', { name: 'Описание' })).not.toBeInTheDocument();
+    fireEvent.click(pencil);
+    const textarea = screen.getByRole('textbox', { name: 'Описание' });
+    expect(textarea).toHaveValue(description);
+    fireEvent.change(textarea, { target: { value: submitted } });
+    fireEvent.blur(textarea);
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить описание' }));
+    await waitFor(() => expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1));
+    const put = request.mock.calls.find(([url, options]) => url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT');
+    expect(JSON.parse(String(put?.[1]?.body))).toEqual({ description: submitted, expectedRevision: 1 });
+    expect(put?.[0]).toBe(`/api/campaigns/12/characters/${id}/description`);
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Описание' })).not.toBeInTheDocument());
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const editButton = screen.getByRole('button', { name: 'Изменить описание' });
+    await waitFor(() => expect(editButton).toBeEnabled());
+    if (submitted) expect(document.querySelector(`.${characterStyles.descriptionText}`)?.textContent).toBe(submitted);
+    else expect(document.querySelector(`.${characterStyles.descriptionText}`)).toBeNull();
+    fireEvent.click(editButton);
+    expect(screen.getByRole('textbox', { name: 'Описание' })).toHaveValue(submitted);
+    expect(screen.getByRole('button', { name: 'Сохранить описание' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Отменить изменения описания' }));
+    expect(screen.queryByRole('textbox', { name: 'Описание' })).not.toBeInTheDocument();
+    expect(confirm).not.toHaveBeenCalled();
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1);
+    confirm.mockRestore();
+  });
+
+  it('keeps a rejected description cancellation draft and closes only after confirmation', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const request = vi.fn(async (url: string, _options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(sheet);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      return response([]);
+    });
+    render(sheetTree(request, false));
+    fireEvent.click(await screen.findByRole('button', { name: 'Изменить описание' }));
+    const textarea = screen.getByRole('textbox', { name: 'Описание' });
+    fireEvent.change(textarea, { target: { value: 'Draft' } });
+    fireEvent.keyDown(textarea, { key: 'Escape' });
+    expect(textarea).toHaveValue('Draft');
+    expect(confirm).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Отменить изменения описания' }));
+    expect(textarea).toHaveValue('Draft');
+    expect(confirm).toHaveBeenCalledTimes(2);
+    confirm.mockReturnValue(true);
+    fireEvent.keyDown(textarea, { key: 'Escape' });
+    expect(screen.queryByRole('textbox', { name: 'Описание' })).not.toBeInTheDocument();
+    expect(screen.getByText('Overview')).toBeInTheDocument();
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
+    confirm.mockRestore();
+  });
+
+  it.each([409, 502])('recovers description write status %s without retrying before explicit save', async status => {
+    let latestSheet = { ...sheet };
+    let sheetReads = 0;
+    let writes = 0;
+    let resolveRecovery!: (value: Response) => void;
+    const recovery = new Promise<Response>(resolve => { resolveRecovery = resolve; });
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) {
+        sheetReads += 1;
+        if (sheetReads === 1) return response(latestSheet);
+        if (sheetReads === 2) return recovery;
+        return response(latestSheet);
+      }
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 11 });
+      if (url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT') {
+        writes += 1;
+        if (writes === 1) return response({ code: status === 502 ? 'write_outcome_unknown' : 'conflict', title: 'Conflict', detail: 'Changed' }, status);
+        latestSheet = { ...latestSheet, description: 'My description', contentRevision: 8 };
+        return response({ contentRevision: 8 });
+      }
+      return response([]);
+    });
+    render(sheetTree(request, false));
+    fireEvent.click(await screen.findByRole('button', { name: 'Изменить описание' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Описание' }), { target: { value: 'My description' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить описание' }));
+    expect(await screen.findByText('Обновляем данные после изменения на сервере. Черновик сохранён.')).toBeInTheDocument();
+    await waitFor(() => expect(sheetReads).toBe(2));
+    expect(screen.getByRole('textbox', { name: 'Описание' })).toHaveValue('My description');
+    expect(screen.getByRole('textbox', { name: 'Описание' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Сохранить описание' })).toBeDisabled();
+    expect(writes).toBe(1);
+    await act(async () => {
+      latestSheet = { ...latestSheet, contentRevision: 7, description: 'Server description' };
+      resolveRecovery(response(latestSheet));
+    });
+    expect(await screen.findByText('Актуальные данные загружены. Черновик сохранён; сохранение не повторялось.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить описание' })).toBeEnabled());
+    expect(screen.getByRole('textbox', { name: 'Описание' })).toHaveValue('My description');
+    expect(writes).toBe(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить описание' }));
+    await waitFor(() => expect(writes).toBe(2));
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Описание' })).not.toBeInTheDocument());
+    const attempts = request.mock.calls.filter(([url, options]) => url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT');
+    expect(attempts.map(([, options]) => JSON.parse(String(options?.body)))).toEqual([
+      { description: 'My description', expectedRevision: 1 },
+      { description: 'My description', expectedRevision: 7 },
+    ]);
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(2);
+  });
+
+  it('keeps a disabled description draft after forbidden write and allows confirmed cancellation', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    let permissionReads = 0;
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) {
+        permissionReads += 1;
+        return response({ canRead: true, canWrite: permissionReads === 1, canManageAccess: false });
+      }
+      if (url.endsWith('/computed-sheet')) return response(sheet);
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT') return response({ code: 'forbidden', title: 'Forbidden', detail: 'No longer allowed' }, 403);
+      return response([]);
+    });
+    try {
+      render(sheetTree(request, false));
+      fireEvent.click(await screen.findByRole('button', { name: 'Изменить описание' }));
+      const textarea = screen.getByRole('textbox', { name: 'Описание' });
+      fireEvent.change(textarea, { target: { value: 'My description' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Сохранить описание' }));
+      expect(await screen.findByText('Доступ запрещён.')).toBeInTheDocument();
+      await waitFor(() => expect(permissionReads).toBeGreaterThan(1));
+      expect(request.mock.calls.filter(([url]) => url.endsWith('/permissions'))).toHaveLength(2);
+      expect(textarea).toHaveValue('My description');
+      expect(textarea).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Сохранить описание' })).toBeDisabled();
+      expect(screen.getByText('Только чтение')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Изменить описание' })).not.toBeInTheDocument();
+      const cancel = screen.getByRole('button', { name: 'Отменить изменения описания' });
+      expect(cancel).toBeEnabled();
+      fireEvent.click(cancel);
+      expect(confirm).toHaveBeenCalledWith('Отменить черновик описания?');
+      expect(screen.queryByRole('textbox', { name: 'Описание' })).not.toBeInTheDocument();
+      expect(request.mock.calls.filter(([url, options]) => url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT')).toHaveLength(1);
+    } finally {
+      confirm.mockRestore();
+    }
+  });
+
+  it('serializes description behind a field write without losing the metadata draft', async () => {
+    let latestSheet = { ...sheet };
+    let resolveField!: (value: Response) => void;
+    const fieldResponse = new Promise<Response>(resolve => { resolveField = resolve; });
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith('/permissions')) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith('/computed-sheet')) return response(latestSheet);
+      if (url.endsWith(`/characters/${id}`) && options?.method === 'PUT') return response({ id, campaignId: 12, name: 'Renamed', importance: 'Key', metadataRevision: 12 });
+      if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 11 });
+      if (url.endsWith('/base-values/string') && options?.method === 'PUT') return fieldResponse;
+      if (url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT') {
+        const body = JSON.parse(String(options.body));
+        expect(body.expectedRevision).toBe(2);
+        latestSheet = { ...latestSheet, contentRevision: 3, description: body.description };
+        return response({ contentRevision: 3 });
+      }
+      return response([]);
+    });
+    render(sheetTree(request, true, `/12/player/characters/${id}/stats`));
+    await screen.findByRole('button', { name: 'Сохранить string' });
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить сведения персонажа' }));
+    fireEvent.change(screen.getByLabelText('Имя'), { target: { value: 'Renamed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить описание' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Описание' }), { target: { value: 'Description draft' } });
+    fireEvent.change(screen.getByLabelText('string'), { target: { value: 'Field draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить string' }));
+    expect(await screen.findByRole('textbox', { name: 'Описание' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Сохранить описание' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить описание' }));
+    expect(request.mock.calls.filter(([url, options]) => url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT')).toHaveLength(0);
+    expect(screen.getByLabelText('Имя')).toHaveValue('Renamed');
+    await act(async () => {
+      latestSheet = { ...latestSheet, contentRevision: 2, baseFields: fields.map(field => field.id === 'string' ? { ...field, effectiveValue: 'Field draft' } : field) };
+      resolveField(response({ contentRevision: 2 }));
+    });
+    expect(await screen.findByText('Поле сохранено.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить описание' })).toBeEnabled());
+    expect(screen.getByLabelText('Имя')).toHaveValue('Renamed');
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить описание' }));
+    await waitFor(() => expect(request.mock.calls.some(([url, options]) => url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT')).toBe(true));
+    const descriptionWrite = request.mock.calls.find(([url, options]) => url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT');
+    expect(JSON.parse(String(descriptionWrite?.[1]?.body))).toEqual({ description: 'Description draft', expectedRevision: 2 });
+    expect(screen.getByLabelText('Имя')).toHaveValue('Renamed');
+    expect(request.mock.calls.filter(([url, options]) => url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT')).toHaveLength(1);
   });
 
   it('saves exactly the changed explicit field with the sheet revision and supports typed falsy values', async () => {
@@ -438,7 +673,7 @@ describe('CharacterSheet', () => {
     });
     const view = render(sheetTree(request, false));
     await screen.findByRole('button', { name: 'Изменить сведения персонажа' });
-    await waitFor(() => expect(screen.getByLabelText('Описание')).toHaveValue('Overview'));
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить описание' }));
     fireEvent.change(await screen.findByLabelText('Описание'), { target: { value: 'description draft' } });
     view.rerender(sheetTree(request, true));
     await screen.findByRole('button', { name: 'Сохранить string' });
@@ -449,6 +684,7 @@ describe('CharacterSheet', () => {
     expect(screen.getByLabelText('Описание')).toHaveValue('description draft');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить описание' }));
     await waitFor(() => expect(request.mock.calls.some(([url, options]) => url.endsWith(`/characters/${id}/description`) && options?.method === 'PUT')).toBe(true));
+    await waitFor(() => expect(screen.queryByLabelText('Описание')).not.toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: 'Изменить сведения персонажа' }));
     fireEvent.change(screen.getByLabelText('Имя'), { target: { value: 'Renamed' } });
     expect(request.mock.calls.filter(([url, options]) => url === `/api/campaigns/12/characters/${id}` && options?.method === 'PUT')).toHaveLength(0);

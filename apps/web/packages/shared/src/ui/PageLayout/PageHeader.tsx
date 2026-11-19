@@ -3,6 +3,7 @@ import styles from './PageLayout.module.css';
 
 export interface PageHeaderProps {
   title: React.ReactNode;
+  titleAside?: React.ReactNode;
   subtitle?: React.ReactNode;
   imageUrl?: string;
   imageAlt?: string;
@@ -13,6 +14,7 @@ export interface PageHeaderProps {
 
 const PageHeader: React.FC<PageHeaderProps> = ({
   title,
+  titleAside,
   subtitle,
   imageUrl,
   imageAlt,
@@ -31,7 +33,14 @@ const PageHeader: React.FC<PageHeaderProps> = ({
         />
       )}
       <div className={styles.headerText}>
-        <Heading id={id} className={styles.headerTitle}>{title}</Heading>
+        {titleAside != null ? (
+          <div className={styles.headerTitleRow}>
+            <Heading id={id} className={styles.headerTitle}>{title}</Heading>
+            <div className={styles.headerTitleAside}>{titleAside}</div>
+          </div>
+        ) : (
+          <Heading id={id} className={styles.headerTitle}>{title}</Heading>
+        )}
         {subtitle && <div className={styles.headerSubtitle}>{subtitle}</div>}
       </div>
       {actions && <div className={styles.headerActions}>{actions}</div>}
