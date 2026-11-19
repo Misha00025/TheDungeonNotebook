@@ -2,7 +2,7 @@ import React from 'react';
 import buttonStyles from '../../../styles/components/Button.module.css';
 import styles from './IconButton.module.css';
 
-export type IconType = 'edit' | 'delete' | 'add' | 'view' | 'close' | 'check' | 'sort' | 'sort-up' | 'sort-down' | 'arrow-up' | 'arrow-down' | 'people';
+export type IconType = 'edit' | 'delete' | 'add' | 'view' | 'close' | 'check' | 'undo' | 'sort' | 'sort-up' | 'sort-down' | 'arrow-up' | 'arrow-down' | 'people';
 
 export interface IconButtonProps {
   icon: IconType;
@@ -27,7 +27,7 @@ const IconButton: React.FC<IconButtonProps> = ({
   busy = false,
   className
 }) => {
-  const inlineIcon = icon === 'check' || icon === 'close';
+  const inlineIcon = icon === 'check' || icon === 'close' || icon === 'undo';
   return (
     <button
       type='button'
@@ -39,7 +39,7 @@ const IconButton: React.FC<IconButtonProps> = ({
       disabled={disabled || busy}
     >
       {inlineIcon
-        ? <svg className={styles.svgIcon} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">{icon === 'check' ? <path d="m5 12 4 4L19 6" /> : <path d="m6 6 12 12M18 6 6 18" />}</svg>
+        ? <svg className={styles.svgIcon} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">{icon === 'check' ? <path d="m5 12 4 4L19 6" /> : icon === 'close' ? <path d="m6 6 12 12M18 6 6 18" /> : <path d="m9 4-5 5 5 5M4 9h10a6 6 0 0 1 0 12h-2" />}</svg>
         : <span aria-hidden="true" className={`${styles.icon} ${styles[icon]}`}></span>}
     </button>
   );

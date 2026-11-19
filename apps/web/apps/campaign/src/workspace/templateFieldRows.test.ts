@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BaseField } from './types';
-import { baseRowsFrom, newBaseField, newVirtualField, projectBaseField, reconcileRows, rowIsDirty, rowsAreDirty, virtualRowsFrom } from './templateFieldRows';
+import { acceptRows, baseRowsFrom, newBaseField, newVirtualField, projectBaseField, reconcileRows, rowIsDirty, rowsAreDirty, virtualRowsFrom } from './templateFieldRows';
 
 const savedBase: BaseField = { id: 'base-1', key: 'base', title: 'Base', description: '', valueType: 'Number', typeRevision: 4, value: 2, options: [] };
 
@@ -18,6 +18,7 @@ describe('template field rows', () => {
     expect(rowIsDirty({ ...clean, field: { ...clean.field, title: 'Changed' } })).toBe(true);
     expect(rowIsDirty({ ...clean, validationError: 'Invalid number' })).toBe(true);
     expect(rowIsDirty({ ...clean, missing: true })).toBe(true);
+    expect(rowIsDirty({ ...clean, deleted: true })).toBe(true);
     expect(rowsAreDirty([...virtualRowsFrom([], []), { rowKey: 'new', field: newVirtualField(), missing: false, resetKey: 0 }])).toBe(true);
   });
 
@@ -54,5 +55,27 @@ describe('template field rows', () => {
     const result = reconcileRows(rows, [{ ...newBaseField(), id: 'published', key: 'same' }], 'pending');
     expect(result.find(row => row.rowKey === 'pending')?.field.id).toBe('published');
     expect(result.find(row => row.rowKey === 'other')?.field.id).toBeUndefined();
+  });
+
+  it('accepts confirmed server rows while retaining row keys for server-assigned ids', () => {
+    const draft = { rowKey: 'local', field: { ...newBaseField(), key: 'new', title: 'New' }, missing: false, resetKey: 3 };
+    const accepted = acceptRows([draft], [{ ...newBaseField(), id: 'server-id', key: 'new', title: 'New' }]);
+    expect(accepted).toEqual([expect.objectContaining({ rowKey: 'local', field: { ...newBaseField(), id: 'server-id', key: 'new', title: 'New' }, baseline: { ...newBaseField(), id: 'server-id', key: 'new', title: 'New' }, resetKey: 4, missing: false, deleted: false })]);
+  });
+
+  it('matches multiple pending publications without adopting unrelated same-key drafts', () => {
+    const current = [
+      { rowKey: 'one', field: { ...newBaseField(), key: 'one', title: 'One' }, missing: false, resetKey: 0 },
+      { rowKey: 'two', field: { ...newBaseField(), key: 'two', title: 'Two' }, missing: false, resetKey: 0 },
+      { rowKey: 'other', field: { ...newBaseField(), key: 'one', title: 'Unsubmitted duplicate key' }, missing: false, resetKey: 0 },
+    ];
+    const rows = reconcileRows(current, [
+      { ...newBaseField(), id: 'server-1', key: 'one', title: 'One' },
+      { ...newBaseField(), id: 'server-2', key: 'two', title: 'Two' },
+    ], ['one', 'two']);
+    expect(rows.find(row => row.rowKey === 'one')?.field.id).toBe('server-1');
+    expect(rows.find(row => row.rowKey === 'two')?.field.id).toBe('server-2');
+    expect(rows.find(row => row.rowKey === 'other')?.field).toMatchObject({ key: 'one', title: 'Unsubmitted duplicate key' });
+    expect(rows.find(row => row.rowKey === 'other')?.field.id).toBeUndefined();
   });
 });

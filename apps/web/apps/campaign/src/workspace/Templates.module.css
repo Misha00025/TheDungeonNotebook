@@ -63,6 +63,30 @@
   min-width: 9rem;
 }
 
+.modified > td {
+  background: color-mix(in srgb, var(--accent-color) 10%, var(--bg-primary));
+}
+
+.modified > td:first-child {
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent-color) 50%, var(--bg-primary));
+}
+
+.added > td {
+  background: color-mix(in srgb, var(--accent-color) 22%, var(--bg-primary));
+}
+
+.added > td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent-color);
+}
+
+.deleted > td {
+  background: color-mix(in srgb, var(--danger-color) 10%, var(--bg-primary));
+}
+
+.deleted > td:first-child {
+  box-shadow: inset 3px 0 0 var(--danger-color);
+}
+
 .typeCell {
   display: flex;
   flex-wrap: nowrap;
