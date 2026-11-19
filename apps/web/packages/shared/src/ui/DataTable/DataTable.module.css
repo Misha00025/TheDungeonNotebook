@@ -1,0 +1,31 @@
+.wrapper {
+  min-width: 0;
+  max-width: 100%;
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 0.25rem 0.375rem;
+  vertical-align: middle;
+  text-align: start;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.table th {
+  font-weight: 600;
+}
+
+.table thead {
+  background: var(--bg-secondary);
+}
+
+.table tbody tr:last-child th,
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}

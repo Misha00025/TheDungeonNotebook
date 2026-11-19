@@ -1,0 +1,105 @@
+.page {
+  min-width: 0;
+}
+
+.template {
+  display: grid;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.section {
+  min-width: 0;
+}
+
+.sectionHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.sectionHeader h2 {
+  margin: 0;
+}
+
+.baseTable th:nth-child(1),
+.baseTable td:nth-child(1),
+.baseTable th:nth-child(2),
+.baseTable td:nth-child(2) {
+  min-width: 8rem;
+}
+
+.baseTable th:nth-child(3),
+.baseTable td:nth-child(3),
+.baseTable th:nth-child(4),
+.baseTable td:nth-child(4) {
+  min-width: 9rem;
+}
+
+.baseTable th:nth-child(5),
+.baseTable td:nth-child(5),
+.virtualTable th:nth-child(6),
+.virtualTable td:nth-child(6) {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.virtualTable th:nth-child(1),
+.virtualTable td:nth-child(1),
+.virtualTable th:nth-child(2),
+.virtualTable td:nth-child(2) {
+  min-width: 8rem;
+}
+
+.virtualTable th:nth-child(3),
+.virtualTable td:nth-child(3),
+.virtualTable th:nth-child(4),
+.virtualTable td:nth-child(4),
+.virtualTable th:nth-child(5),
+.virtualTable td:nth-child(5) {
+  min-width: 9rem;
+}
+
+.typeCell {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.typeCell > select {
+  min-width: 8rem;
+}
+
+.typeCell > button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.valueFieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.rowActions {
+  align-items: center;
+  white-space: nowrap;
+}
+
+.validationError,
+.missingNotice {
+  display: block;
+  max-width: 14rem;
+  color: var(--danger-color, var(--text-primary));
+  white-space: normal;
+}
+
+.rowActions + .missingNotice {
+  margin-top: 0.25rem;
+}

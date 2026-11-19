@@ -92,14 +92,17 @@ describe('campaign first iteration', () => {
     fireEvent.click(await screen.findByRole('link', { name: 'Шаблон' }));
     expect(await screen.findByRole('heading', { name: 'Шаблон кампании' })).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: 'Базовые поля' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Виртуальные поля' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Метаданные' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Название')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Описание')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Выбранный шаблон')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Создать шаблон' })).not.toBeInTheDocument();
+    await waitFor(() => expect(request.mock.calls.some(([url]) => url === '/api/campaigns/12/formulas')).toBe(true));
     expect(request.mock.calls.map(([url]) => url).filter(url => url.startsWith('/api/')).some(url => url.includes('/templates'))).toBe(false);
     expect(request.mock.calls.some(([url]) => url === '/api/campaigns/12/template')).toBe(false);
     expect(request.mock.calls.some(([url]) => url === '/api/campaigns/12/template/content')).toBe(true);
+    expect(request.mock.calls.some(([url]) => url === '/api/campaigns/12/formulas')).toBe(true);
   });
 
   it('routes GM access panels and the legacy members route to scoped membership data', async () => {

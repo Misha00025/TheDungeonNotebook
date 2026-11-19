@@ -57,6 +57,8 @@ export { default as LinkButton } from './ui/Buttons/LinkButton';
 export type { LinkButtonProps } from './ui/Buttons/LinkButton';
 export { default as Panel, Badge } from './ui/Panel/Panel';
 export type { PanelProps } from './ui/Panel/Panel';
+export { default as DataTable } from './ui/DataTable/DataTable';
+export type { DataTableProps } from './ui/DataTable/DataTable';
 export { default as Statistic } from './ui/Statistic/Statistic';
 export type { StatisticProps } from './ui/Statistic/Statistic';
 export { default as Field } from './ui/Form/Field';

@@ -11,7 +11,10 @@
 
 - Обзор кампании показывает слева имя персонажа и отдельные теги назначенных ведущих с правом записи, а справа — компактную ссылку-кнопку `LinkButton size="small"` к GM-обзору; наблюдатели в этом списке не отображаются.
 - Полный список персонажей GM сгруппирован по важности. Описания карточек и фоновых строк загружаются из листа персонажа.
-- Страница шаблона — singleton: UI не редактирует metadata шаблона, а описание шаблона передаётся обратно как пассивное content-значение при сохранении полей.
+- Страница шаблона — singleton: metadata шаблона не редактируется; базовые и виртуальные поля отображаются в отдельных native `DataTable` с одним field на строку и собственными действиями сохранения, отмены и удаления.
+- Сохранение строки шаблона формирует полный список соответствующего вида из последнего сохранённого baseline, заменяя только целевое поле; несохранённые соседние строки и черновики не включаются. Базовое сохранение roundtrips пассивное описание шаблона.
+- Описание, варианты, значения MultiChoice и связи виртуального поля редактируются отдельными Template-модалками как локальный draft. «Применить» обновляет черновик строки, а серверная запись выполняется её row-action Save.
+- В таблицах шаблона действия ✓/× показываются только для изменённых строк; удаление помечено danger-вариантом `IconButton`.
 - `VirtualFieldsEditor` поддерживает opt-in `compact` для шаблона. Потребитель `CharacterVirtuals` использует default-режим без этого флага.
 
 ## Нативная семантика и компоновка
@@ -30,6 +33,7 @@
 | --- | --- |
 | `Button`, `LinkButton`, `IconButton` | `packages/shared/src/ui/Buttons/Button.tsx`, `packages/shared/src/ui/Buttons/LinkButton.tsx`, `packages/shared/src/ui/Buttons/IconButton/IconButton.tsx`, `packages/shared/src/styles/components/Button.module.css`, `packages/shared/src/ui/Buttons/IconButton/IconButton.module.css` |
 | `Panel`, `Badge`, `StatePanel`, `Statistic` | `packages/shared/src/ui/Panel/Panel.tsx`, `packages/shared/src/ui/Panel/Panel.module.css`, `packages/shared/src/ui/StatePanel/StatePanel.tsx`, `packages/shared/src/ui/Statistic/Statistic.tsx`, `packages/shared/src/ui/Statistic/Statistic.module.css` |
+| `DataTable` | `packages/shared/src/ui/DataTable/DataTable.tsx`, `packages/shared/src/ui/DataTable/DataTable.module.css` |
 | `Field`, `Input`, `Select`, `Textarea` | `packages/shared/src/ui/Form/Field.tsx`, `packages/shared/src/ui/Form/Input.tsx`, `packages/shared/src/ui/Form/Select.tsx`, `packages/shared/src/ui/Form/Textarea.tsx`, `packages/shared/src/ui/Form/Field.module.css`, `packages/shared/src/styles/components/Input.module.css` |
 | `FieldSet` | `packages/shared/src/ui/Form/FieldSet.tsx`, `packages/shared/src/ui/Form/FieldSet.module.css` |
 | `FormGrid` | `packages/shared/src/ui/Form/FormGrid.tsx`, `packages/shared/src/ui/Form/FormGrid.module.css` |
@@ -59,6 +63,8 @@
 `Textarea` — нативный textarea с теми же theme-based контрол-стилями, что `Input`, и вертикальным resize. `Field` остаётся ответственным за label/hint/error association.
 
 `FieldSet` рендерит нативный `<fieldset>` с необязательным `legend`; стандартное поведение `disabled` наследуется браузером.
+
+`DataTable` — нативная таблица с ручной композицией `thead`/`tbody` и прокручиваемой обёрткой. Передавайте стандартные атрибуты таблицы, `className`/`style` для самой таблицы, `wrapperClassName` для обёртки и `minWidth` (по умолчанию `40rem`) для её CSS-переменной `--table-min-width`. Колонки и строки задаёт потребитель; компонент не добавляет сортировку, пагинацию или адаптацию таблицы в карточки.
 
 `Statistic` принимает отдельные `label` и `value`, выводя их как `dt` и `dd` внутри article; не передавайте этот label повторно как заголовок `Panel`. `Panel` допускает title-only и body-only варианты без пустого body или header. `PageHeader.title` и `subtitle` принимают ReactNode; при нетекстовом title задайте явный `imageAlt`, если в заголовке есть изображение. `IconButton` поддерживает `check` и `close`, `disabled`, `busy` и `ariaLabel`; доступное имя по умолчанию берётся из `title`.
 
