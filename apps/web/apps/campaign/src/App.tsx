@@ -81,6 +81,8 @@ const CharacterSheetRoute: React.FC = () => {
   const { sessionKey, path } = useWorkspace();
   const mode = useLocation().pathname.includes('/gm/') ? 'gm' : 'player';
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(characterId)) return <NotFound />;
+  if (pageKey === 'all-stats' && mode !== 'gm') return <NotFound />;
+  if (pageKey === 'all-stats') return <CharacterSheet key={`${sessionKey}:${groupId}:${characterId}`} campaignId={Number(groupId)} characterId={characterId} pageKey={pageKey} />;
   if (pageKey && ['overview', 'stats'].includes(pageKey)) return <Navigate to={path(`/${groupId}/${mode}/characters/${encodeURIComponent(characterId)}`)} replace />;
   if (pageKey && !/^page_[1-9]\d*$/.test(pageKey)) return <NotFound />;
   return <CharacterSheet key={`${sessionKey}:${groupId}:${characterId}`} campaignId={Number(groupId)} characterId={characterId} pageKey={pageKey} />;

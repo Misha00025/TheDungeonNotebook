@@ -68,7 +68,7 @@ describe('campaign first iteration', () => {
     expect(supported.mock.calls.some(([url]) => url === '/api/campaigns/12/views')).toBe(true);
     expect(supported.mock.calls.some(([url, options]) => url.includes('/views') && options?.method === 'DELETE')).toBe(false);
     supportedView.unmount();
-    const unsupported = ['/12/quests', '/12/items', ...['items', 'skills', 'quests', 'notes'].map(tab => `/12/character/abcdef01-2345-6789-abcd-ef0123456789/${tab}`)];
+    const unsupported = ['/12/quests', '/12/items', '/12/player/characters/abcdef01-2345-6789-abcd-ef0123456789/all-stats', ...['items', 'skills', 'quests', 'notes'].map(tab => `/12/character/abcdef01-2345-6789-abcd-ef0123456789/${tab}`)];
     for (const path of unsupported) {
       const request = vi.fn(async (url: string) => url.endsWith('/permissions') ? response(permissions()) : url === '/api/campaigns/12' ? response(campaign()) : response([]));
       const view = renderApp(path, request);
@@ -87,6 +87,85 @@ describe('campaign first iteration', () => {
     expect(campaignNavigation.getByRole('link', { name: 'Представления' })).toBeInTheDocument();
     expect(campaignNavigation.queryByRole('link', { name: /Предметы|Навыки|Задания|Заметки|Отряды/ })).toBeNull();
     for (const label of ['Создать персонажа']) expect(screen.queryByText(label)).not.toBeInTheDocument();
+  });
+
+  const fullStatsFixture = (characterCanWrite = true, presentationFails = false) => {
+    const id = 'abcdef01-2345-6789-abcd-ef0123456789';
+    const fieldId = '11111111-1111-4111-8111-111111111111';
+    let currentSheet = { contentRevision: 7, templateContentRevision: 1, description: '', baseFields: [{ id: fieldId, key: 'strength', title: 'Сила', description: '', valueType: 'Integer', typeRevision: 1, options: [], effectiveValue: 3, isExplicit: true }], virtualFields: [{ id: '22222222-2222-4222-8222-222222222222', key: 'defense', title: 'Защита', description: '', resultType: 'Integer', value: 6, diagnostic: null }, { id: '33333333-3333-4333-8333-333333333333', key: 'broken', title: 'Ошибка расчёта', description: '', resultType: 'Integer', value: null, diagnostic: { code: 'formula_error', message: 'secret details' } }], formulaContentRevisions: [] };
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      if (url === '/api/campaigns/12') return response(campaign());
+      if (url === '/api/campaigns/12/permissions') return response(permissions());
+      if (url === `/api/campaigns/12/characters/${id}`) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+      if (url === `/api/campaigns/12/characters/${id}/permissions`) return response({ ...permissions(characterCanWrite), canManageAccess: false });
+      if (url === `/api/campaigns/12/characters/${id}/computed-sheet`) return response(currentSheet);
+      if (url === '/api/campaigns/12/presentation') return presentationFails ? response({}, 503) : response({ contentRevision: 1, defaults: {}, contextParams: {} });
+      if (url === `/api/campaigns/12/characters/${id}/base-values/${fieldId}` && options?.method === 'PUT') {
+        const body = JSON.parse(String(options.body)) as { value: number };
+        currentSheet = { ...currentSheet, contentRevision: 8, baseFields: currentSheet.baseFields.map(field => ({ ...field, effectiveValue: body.value })) };
+        return response(currentSheet);
+      }
+      return response([]);
+    });
+    return { id, fieldId, request };
+  };
+
+  it('opens GM full stats without assigned pages and writes only the selected base value', async () => {
+    const { id, fieldId, request } = fullStatsFixture();
+    renderApp(`/12/gm/characters/${id}`, request);
+    const table = await screen.findByRole('table', { name: 'Все характеристики' });
+    expect(await screen.findByRole('link', { name: 'Все характеристики' })).toHaveAttribute('aria-current', 'page');
+    expect(within(table).getByText('Сила')).toBeInTheDocument();
+    expect(within(table).getByText('Защита')).toBeInTheDocument();
+    expect(within(table).queryByRole('button', { name: 'Изменить показатель Защита' })).not.toBeInTheDocument();
+    expect(within(table).getByText('Не удалось вычислить значение.')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('secret details');
+
+    const search = screen.getByRole('textbox', { name: 'Поиск характеристик' });
+    fireEvent.change(search, { target: { value: '  сИлА  ' } });
+    expect(within(table).getByText('Сила')).toBeInTheDocument();
+    expect(within(table).queryByText('Защита')).not.toBeInTheDocument();
+    fireEvent.change(search, { target: { value: '' } });
+    const filter = screen.getByRole('combobox', { name: 'Фильтр характеристик' });
+    fireEvent.change(filter, { target: { value: 'errors' } });
+    expect(within(table).getByText('Не удалось вычислить значение.')).toBeInTheDocument();
+    expect(within(table).queryByText('Сила')).not.toBeInTheDocument();
+    expect(within(table).queryByText('Защита')).not.toBeInTheDocument();
+    fireEvent.change(filter, { target: { value: 'all' } });
+
+    fireEvent.click(within(table).getByRole('button', { name: 'Изменить показатель Сила' }));
+    let input = await screen.findByRole('textbox', { name: 'Сила' });
+    fireEvent.change(input, { target: { value: '-' } });
+    fireEvent.blur(input, { relatedTarget: document.body });
+    fireEvent.change(search, { target: { value: 'не найдено' } });
+    const recovery = await screen.findByRole('region', { name: 'Неподтверждённые значения' });
+    expect(within(recovery).getByRole('textbox', { name: 'Сила' })).toHaveValue('-');
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
+    fireEvent.change(search, { target: { value: '' } });
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Неподтверждённые значения' })).not.toBeInTheDocument());
+    fireEvent.click(within(await screen.findByRole('table', { name: 'Все характеристики' })).getByRole('button', { name: 'Изменить показатель Сила' }));
+    input = await screen.findByRole('textbox', { name: 'Сила' });
+    expect(input).toHaveValue('-');
+    fireEvent.change(input, { target: { value: '9' } });
+    fireEvent.blur(input, { relatedTarget: document.body });
+    await waitFor(() => expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1));
+    const [url, options] = request.mock.calls.find(([, requestOptions]) => requestOptions?.method === 'PUT')!;
+    expect(url).toBe(`/api/campaigns/12/characters/${id}/base-values/${fieldId}`);
+    expect(String(options?.body)).toBe('{"value":9,"expectedRevision":7}');
+  });
+
+  it('keeps GM full stats read-only without presentation and returns the same character to player space', async () => {
+    const { id, request } = fullStatsFixture(false, true);
+    renderApp(`/12/gm/characters/${id}/all-stats`, request);
+    const table = await screen.findByRole('table', { name: 'Все характеристики' });
+    expect(within(table).getByText('Защита')).toBeInTheDocument();
+    expect(within(table).queryByRole('button', { name: /Изменить показатель/ })).not.toBeInTheDocument();
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
+    expect(await screen.findByRole('button', { name: 'Пространство мастера' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Hero' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Инструменты мастера' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: 'Все характеристики' })).not.toBeInTheDocument();
   });
 
   it('opens the singleton campaign template from GM navigation without plural API routes', async () => {

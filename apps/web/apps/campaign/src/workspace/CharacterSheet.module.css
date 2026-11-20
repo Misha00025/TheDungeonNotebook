@@ -125,6 +125,20 @@
   gap: .5rem;
 }
 
+.tabNavigation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .75rem;
+  min-width: 0;
+}
+
+.toolTabs {
+  min-width: 0;
+  padding-inline-start: .75rem;
+  border-inline-start: 1px solid var(--border-color);
+}
+
 @media (max-width: 600px) {
   .valueField {
     min-width: 0;

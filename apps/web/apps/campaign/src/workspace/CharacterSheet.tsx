@@ -16,6 +16,7 @@ import CharacterPresentation from './CharacterPresentation';
 import characterStyles from './CharacterSheet.module.css';
 import { readPages } from './presentationModel';
 import InlineValueEditor from './InlineValueEditor';
+import CharacterStatsTable from './CharacterStatsTable';
 
 const importanceLabel: Record<string, string> = { Background: 'Фоновый', Secondary: 'Второстепенный', Key: 'Ключевой' };
 type MetadataDraft = { name: string; importance: CharacterMetadata['importance'] };
@@ -31,6 +32,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
   const campaignWorkspace = useOptionalCampaignWorkspace();
   const { visitCharacter } = useVisitHistory();
   const mode = useLocation().pathname.includes('/gm/') ? 'gm' : 'player';
+  const gmStatsPage = mode === 'gm' && pageKey === 'all-stats';
   const scope = `${sessionKey}:${campaignId}:${characterId}`;
   const metadataResource = useResource<CharacterMetadata>(`${scope}:metadata`, () => api.getCharacter(campaignId, characterId));
   const permissionResource = useResource<Permissions>(`${scope}:character-permissions`, () => api.characterPermissions(campaignId, characterId));
@@ -513,19 +515,21 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
   const presentationUnavailable = Boolean(presentationError ?? (!presentation && presentationResource.error));
   const pageNavigable = Boolean(presentation && !presentationPending && !presentationUnavailable && readAllowed);
   useEffect(() => {
+    if (gmStatsPage) { setPageRefreshConflict(false); return; }
     if (!pageNavigable) return;
     const first = pages[0];
     if (!pageKey) {
       if (first && (routeDirty || hasUnconfirmedDrafts())) { setPageRefreshConflict(false); return; }
       if (first) navigate(`${pageBase}/${first.key}`, { replace: true });
+      else if (mode === 'gm') navigate(`${pageBase}/all-stats`, { replace: true });
       return;
     }
     if (pages.some(page => page.key === pageKey)) { setPageRefreshConflict(false); return; }
     if (routeDirty || hasUnconfirmedDrafts()) { setPageRefreshConflict(true); setVisibleFieldIds([]); return; }
     setPageRefreshConflict(false);
-    navigate(first ? `${pageBase}/${first.key}` : pageBase, { replace: true });
-  }, [pageNavigable, pages, pageKey, routeDirty, navigate, pageBase]);
-  useEffect(() => { setVisibleFieldIds([]); }, [pageKey]);
+    navigate(first ? `${pageBase}/${first.key}` : mode === 'gm' ? `${pageBase}/all-stats` : pageBase, { replace: true });
+  }, [gmStatsPage, mode, pageNavigable, pages, pageKey, routeDirty, navigate, pageBase]);
+  useEffect(() => { if (!gmStatsPage) setVisibleFieldIds([]); }, [pageKey, gmStatsPage]);
   const goToPage = (key: string) => navigate(`${pageBase}/${key}`);
   const loadedRecovery = recoveryFields.map(fieldId => {
     const field = sheetRef.current?.baseFields.find(item => item.id === fieldId);
@@ -557,10 +561,10 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
     if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); if (!metadataControlsDisabled && metadataDirty) void saveMetadata(); }
   };
   const openCurrentPage = () => { if (pages[0]) goToPage(pages[0].key); };
-  const baseEntryWithDraft = Boolean(!pageKey && pages[0] && (routeDirty || hasUnconfirmedDrafts()));
+  const baseEntryWithDraft = Boolean(!gmStatsPage && !pageKey && pages[0] && (routeDirty || hasUnconfirmedDrafts()));
   const displayedPageKey = pageKey ?? (baseEntryWithDraft ? pages[0]?.key : undefined);
   const visiblePage = Boolean(displayedPageKey && pages.some(page => page.key === displayedPageKey));
-   const shellBusy = presentationPending || snapshotBusy || computedReadBusy || (permissionResource.loading && !permissionSnapshot);
+   const shellBusy = (!gmStatsPage && presentationPending) || snapshotBusy || computedReadBusy || (permissionResource.loading && !permissionSnapshot);
   return <section className={characterStyles.sheetSection} aria-busy={shellBusy}>
     {!readAllowed ? <div className={characterStyles.accessState}>
       {Boolean(permissionError || snapshotError) ? <><ApiError error={permissionError ?? snapshotError} onRetry={() => void refreshAll()} /><Button variant="secondary" type="button" onClick={() => void refreshAll()}>Проверить доступ и данные</Button></> : <Notification kind="warning" eventKey={`${scope}:permission`}>Доступ к актуальным данным персонажа не подтверждён.</Notification>}
@@ -585,16 +589,20 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
           <LinkButton className={styles.desktopOnly} to={path(`/${campaignId}/${mode}/characters`)} variant="secondary">К персонажам</LinkButton>
         </ActionRow>}
       />
-      <TabBar basePath={pageBase} aria-label="Страницы персонажа" tabs={pages.map(page => ({ id: page.key, label: page.title, path: page.key }))} />
+      <div className={characterStyles.tabNavigation}>
+        <TabBar basePath={pageBase} aria-label="Страницы персонажа" tabs={pages.map(page => ({ id: page.key, label: page.title, path: page.key }))} />
+        {mode === 'gm' && <div className={characterStyles.toolTabs}><TabBar basePath={pageBase} aria-label="Инструменты мастера" tabs={[{ id: 'all-stats', label: 'Все характеристики', path: 'all-stats' }]} /></div>}
+      </div>
       {baseEntryWithDraft && pages.length > 0 && <div className={characterStyles.pageConflict}><Notification kind="info" eventKey={`${scope}:base-entry`}>Черновые значения сохранены. Сейчас показана первая доступная страница без смены адреса.</Notification><Button variant="secondary" type="button" onClick={() => goToPage(pages[0].key)}>Открыть страницу «{pages[0].title}»</Button></div>}
-      {presentationUnavailable && <ApiError error={presentationError ?? presentationResource.error} onRetry={() => void refreshAll()} />}
-      {!presentationUnavailable && pages.length === 0 && <StatePanel kind="empty" title="Страницы кампании">Для кампании ещё не настроены страницы.{canManageViews && <LinkButton to={path(`/${campaignId}/gm/views`)}>Настроить страницы</LinkButton>}</StatePanel>}
-      {!presentationUnavailable && pageRefreshConflict && <div className={characterStyles.pageConflict}><Notification kind="warning" eventKey={`${scope}:${pageKey ?? ''}`}>Текущая страница больше не назначена. Неподтверждённые значения сохранены ниже.</Notification>{pages.length > 0 && <Button type="button" onClick={openCurrentPage}>Перейти к доступной странице «{pages[0].title}»</Button>}</div>}
+      {!gmStatsPage && presentationUnavailable && <ApiError error={presentationError ?? presentationResource.error} onRetry={() => void refreshAll()} />}
+      {!gmStatsPage && !presentationUnavailable && pages.length === 0 && <StatePanel kind="empty" title="Страницы кампании">Для кампании ещё не настроены страницы.{canManageViews && <LinkButton to={path(`/${campaignId}/gm/views`)}>Настроить страницы</LinkButton>}</StatePanel>}
+      {!gmStatsPage && !presentationUnavailable && pageRefreshConflict && <div className={characterStyles.pageConflict}><Notification kind="warning" eventKey={`${scope}:${pageKey ?? ''}`}>Текущая страница больше не назначена. Неподтверждённые значения сохранены ниже.</Notification>{pages.length > 0 && <Button type="button" onClick={openCurrentPage}>Перейти к доступной странице «{pages[0].title}»</Button>}</div>}
       {serverSheetSnapshot ? <div className={characterStyles.pageConflict}><Notification kind="warning" eventKey={String(serverSheetSnapshot.contentRevision)}>Лист изменился на сервере. Черновые значения сохранены и не отправлены.</Notification><ActionRow><Button type="button" onClick={useServerSheetAsBase}>Использовать актуальную ревизию</Button><Button variant="secondary" type="button" onClick={loadServerSheet}>Загрузить серверную версию</Button></ActionRow></div> : null}
       {serverMetadataSnapshot ? <div className={characterStyles.pageConflict}><Notification kind="warning" eventKey={String(serverMetadataSnapshot.metadataRevision)}>Метаданные персонажа изменились на сервере.</Notification><ActionRow><Button type="button" onClick={useServerMetadataAsBase}>Использовать актуальную ревизию</Button><Button variant="secondary" type="button" onClick={loadServerMetadata}>Загрузить серверную версию</Button></ActionRow></div> : null}
       {(sheetBlocked || metadataBlocked) && !serverSheetSnapshot && !serverMetadataSnapshot && <div className={characterStyles.pageConflict}><Notification kind="warning" eventKey={`${sheetBlocked}:${metadataBlocked}`}>Проверяем результат сохранения. Повторная запись автоматически не выполняется.</Notification><Button variant="secondary" type="button" disabled={snapshotBusy} onClick={retrySnapshot}>Проверить данные и права</Button></div>}
       {Boolean(snapshotError) && <ApiError error={snapshotError} onRetry={retrySnapshot} />}
       {Boolean(computedReadError) && <><ApiError error={computedReadError} /><Button variant="secondary" type="button" disabled={computedReadBusy || contentBusy || snapshotBusy} onClick={() => void refreshComputedSheet()}>Повторить обновление расчётов</Button></>}
+      {gmStatsPage && readAllowed && presentationSheet && <CharacterStatsTable sheet={presentationSheet} renderValue={editorAllowed ? renderValue : undefined} onVisibleFieldsChange={onVisibleFieldsChange} />}
       {pageNavigable && visiblePage && !pageRefreshConflict && presentationSheet && <CharacterPresentation campaignId={campaignId} characterId={characterId} pageKey={displayedPageKey!} sheet={presentationSheet} conditionSheet={sheet} refreshKey={presentationRefreshKey} renderValue={editorAllowed ? renderValue : undefined} onVisibleFieldsChange={onVisibleFieldsChange} />}
       {Boolean(writeError) && <ApiError error={writeError} onRetry={() => void refreshAll()} />}{Boolean(metadataError) && <ApiError error={metadataError} onRetry={() => void refreshAll()} />}
       {writeStatus && <Notification kind={writeStatusKind} eventKey={writeStatusEvent}>{writeStatus}</Notification>}
