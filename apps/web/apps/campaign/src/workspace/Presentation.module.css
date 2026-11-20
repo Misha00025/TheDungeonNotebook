@@ -179,10 +179,8 @@
 }
 
 .editorHeader,
-.nodeActions,
 .inlineActions,
-.partActions,
-.mobilePanelToggle {
+.partActions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -201,7 +199,7 @@
 
 .editorLayout {
   display: grid;
-  grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr) minmax(14rem, 19rem);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: .85rem;
   min-width: 0;
@@ -223,11 +221,15 @@
   color: var(--text-primary);
 }
 
+.palette {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .palette button,
 .properties button,
 .editorHeader button,
-.nodeActions button,
-.mobilePanelToggle button,
 .emptyState button {
   max-width: 100%;
   min-height: 2.4rem;
@@ -261,6 +263,22 @@
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-md);
   background: var(--bg-secondary);
+}
+
+.nodeControls {
+  position: absolute;
+  z-index: 3;
+  top: .35rem;
+  right: .35rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: .25rem;
+  max-width: calc(100% - .7rem);
+  padding: .25rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-primary);
 }
 
 .emptyCanvas {
@@ -339,29 +357,6 @@
 
 .rowChildren > * {
   flex: 1 1 12rem;
-}
-
-.mobilePanelToggle {
-  display: none;
-}
-
-@media (max-width: 900px) {
-  .editorLayout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .mobilePanelToggle {
-    display: flex;
-  }
-
-  .palette,
-  .properties {
-    display: none;
-  }
-
-  .mobileActive {
-    display: grid;
-  }
 }
 
 @media (max-width: 520px) {

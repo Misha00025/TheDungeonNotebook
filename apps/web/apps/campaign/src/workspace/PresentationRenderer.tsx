@@ -18,6 +18,7 @@ export type PresentationRendererProps = {
   selectedKey?: string;
   onSelect?: (nodeKey: string) => void;
   onDropNode?: (targetKey: string, placement: PresentationDropPlacement, event: React.DragEvent) => void;
+  renderNodeActions?: (node: PresentationNode) => React.ReactNode;
 };
 
 const isNumeric = (value: JsonValue): boolean => typeof value === 'number' ? Number.isFinite(value) : isLosslessNumber(value) && /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/.test(String(value));
@@ -66,7 +67,7 @@ function valueForPart(part: FieldPart, sheet: ComputedSheet | undefined, sample:
   return { label: result.label, text: result.value === '' ? "''" : displayValue(result.value) };
 }
 
-const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; sample: boolean; renderValue?: PresentationRendererProps['renderValue']; selectedKey?: string; onSelect?: PresentationRendererProps['onSelect']; onDropNode?: PresentationRendererProps['onDropNode'] }> = ({ node, sheet, sample, renderValue, selectedKey, onSelect, onDropNode }) => {
+const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; sample: boolean; renderValue?: PresentationRendererProps['renderValue']; selectedKey?: string; onSelect?: PresentationRendererProps['onSelect']; onDropNode?: PresentationRendererProps['onDropNode']; renderNodeActions?: PresentationRendererProps['renderNodeActions'] }> = ({ node, sheet, sample, renderValue, selectedKey, onSelect, onDropNode, renderNodeActions }) => {
   const [dropActive, setDropActive] = useState(false);
   const read = readParams(node.params);
   const params = read.status === 'supported' ? read.params : undefined;
@@ -76,7 +77,7 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; sam
   let body: React.ReactNode = null;
   if (params?.type === 'group') {
     body = <div className={`${styles.children} ${params.direction === 'row' ? styles.rowChildren : styles.groupChildren}`} style={{ '--presentation-columns': String(params.columns), display: params.direction === 'row' ? 'flex' : 'grid', flexDirection: params.direction === 'row' ? 'row' : undefined, flexWrap: params.direction === 'row' ? 'wrap' : undefined, gap: params.gap === 'small' ? '.5rem' : params.gap === 'large' ? '1.5rem' : '1rem' } as React.CSSProperties}>
-      {node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} sample={sample} renderValue={renderValue} selectedKey={selectedKey} onSelect={onSelect} onDropNode={onDropNode} />)}
+      {node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} sample={sample} renderValue={renderValue} selectedKey={selectedKey} onSelect={onSelect} onDropNode={onDropNode} renderNodeActions={renderNodeActions} />)}
     </div>;
   } else if (params?.type === 'composite') {
     const primary = params.primary && params.primary.kind === 'Base' && params.parts.some(part => 'source' in part && part.source.kind === 'Base' && part.source.fieldId === params.primary?.fieldId) ? params.primary : null;
@@ -116,18 +117,19 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; sam
     })}{sample && params.entries.length === 0 && <span className={styles.placeholder}>Выберите характеристику</span>}</div>;
   }
   const groupAppearance = params?.type === 'group' && params.appearance === 'panel';
-  const nestedChildren = params?.type !== 'group' && node.children.length > 0 ? <div className={styles.children}>{node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} sample={sample} renderValue={renderValue} selectedKey={selectedKey} onSelect={onSelect} onDropNode={onDropNode} />)}</div> : null;
+  const nestedChildren = params?.type !== 'group' && node.children.length > 0 ? <div className={styles.children}>{node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} sample={sample} renderValue={renderValue} selectedKey={selectedKey} onSelect={onSelect} onDropNode={onDropNode} renderNodeActions={renderNodeActions} />)}</div> : null;
   return <article className={`${styles.node} ${groupAppearance ? styles.panel : ''} ${selectedKey === node.nodeKey ? styles.selected : ''}`} data-drag-active={dropActive || undefined} tabIndex={onSelect ? 0 : undefined} draggable={Boolean(onDropNode)} aria-label={node.title || 'Компонент отображения'} onDragStart={event => { event.stopPropagation(); if (onDropNode) event.dataTransfer.setData('application/x-tdn-presentation', JSON.stringify({ kind: 'node', nodeKey: node.nodeKey })); }} onDragOver={onDropNode ? event => { event.preventDefault(); event.stopPropagation(); setDropActive(true); } : undefined} onDragLeave={onDropNode ? event => { event.stopPropagation(); if (!event.relatedTarget || !event.currentTarget.contains(event.relatedTarget as Node)) setDropActive(false); } : undefined} onClick={onSelect ? select : undefined} onKeyDown={onSelect ? onKeyDown : undefined}>
     {Boolean(onDropNode) && <>{drop('before')}</>}
+      {selectedKey === node.nodeKey && renderNodeActions && <div className={styles.nodeControls} role="group" aria-label="Действия компонента" onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onPointerUp={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onDragStart={event => { event.preventDefault(); event.stopPropagation(); }} onDrag={event => event.stopPropagation()} onDragEnd={event => event.stopPropagation()} onDragEnter={event => event.stopPropagation()} onDragOver={event => event.stopPropagation()} onDragLeave={event => event.stopPropagation()} onDrop={event => event.stopPropagation()}>{renderNodeActions(node)}</div>}
       {node.title && <h3 className={styles.nodeTitle}>{node.title}</h3>}
       {read.status !== 'supported' ? <p className={styles.diagnostic} role="status">{read.message}</p> : <>{body}{nestedChildren}</>}
-    {read.status !== 'supported' && node.children.length > 0 && <div className={styles.children}>{node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} sample={sample} renderValue={renderValue} selectedKey={selectedKey} onSelect={onSelect} onDropNode={onDropNode} />)}</div>}
+    {read.status !== 'supported' && node.children.length > 0 && <div className={styles.children}>{node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} sample={sample} renderValue={renderValue} selectedKey={selectedKey} onSelect={onSelect} onDropNode={onDropNode} renderNodeActions={renderNodeActions} />)}</div>}
     {Boolean(onDropNode) && <>{drop('after')}{params?.type === 'group' && drop('inside')}</>}
   </article>;
 };
 
-const PresentationRenderer: React.FC<PresentationRendererProps> = ({ roots, sheet, sample = false, renderValue, selectedKey, onSelect, onDropNode }) => <div className={styles.roots}>
-  {roots.map(node => <NodeContent key={node.nodeKey} node={node} sheet={sheet} sample={sample} renderValue={renderValue} selectedKey={selectedKey} onSelect={onSelect} onDropNode={onDropNode} />)}
+const PresentationRenderer: React.FC<PresentationRendererProps> = ({ roots, sheet, sample = false, renderValue, selectedKey, onSelect, onDropNode, renderNodeActions }) => <div className={styles.roots}>
+  {roots.map(node => <NodeContent key={node.nodeKey} node={node} sheet={sheet} sample={sample} renderValue={renderValue} selectedKey={selectedKey} onSelect={onSelect} onDropNode={onDropNode} renderNodeActions={renderNodeActions} />)}
 </div>;
 
 export default PresentationRenderer;
