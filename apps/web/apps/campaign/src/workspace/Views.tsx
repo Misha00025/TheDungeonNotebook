@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ActionRow, Button, Field, Input, ModalPortal, Select, StatePanel } from '@tdn/shared';
 import type { DefinitionCreate, ViewMetadata } from './types';
@@ -16,7 +16,7 @@ import styles from './Workspace.module.css';
 const uncertain = (error: unknown) => error instanceof CampaignApiError && (error.conflict || error.unknownOutcome);
 
 const CreateView: React.FC<{ campaignId: number; canWrite: boolean; onCancel: () => void; onCreated: (view: DefinitionCreate) => void }> = ({ campaignId, canWrite, onCancel, onCreated }) => {
-  const { api, notifyInvalidation } = useWorkspace();
+  const { api } = useWorkspace();
   const [name, setName] = useState('');
   const nameId = useId();
   const [requestId] = useState(() => crypto.randomUUID());
@@ -33,14 +33,14 @@ const CreateView: React.FC<{ campaignId: number; canWrite: boolean; onCancel: ()
     return { ...metadata, contentRevision: content.contentRevision } as DefinitionCreate;
   };
   const mutation = useMutation(() => runCreation(() => api.createView(campaignId, { requestId, name: name.trim(), roots: [] }), lookup));
-  const check = async () => { if (!canWrite || forbidden || mutation.busy || !blocked) return; setCheckError(undefined); try { const created = await lookup(); if (mounted.current) { clearDirty(); onCreated(created); } } catch (failure) { if (mounted.current) { setCheckError(failure); if (failure instanceof CampaignApiError && failure.status === 403) { setForbidden(true); notifyInvalidation(); } } } };
+  const check = async () => { if (!canWrite || forbidden || mutation.busy || !blocked) return; setCheckError(undefined); try { const created = await lookup(); if (mounted.current) { clearDirty(); onCreated(created); } } catch (failure) { if (mounted.current) { setCheckError(failure); if (failure instanceof CampaignApiError && failure.status === 403) setForbidden(true); } } };
   const cancel = () => {
     if (mutation.busy) return;
     if (!name || window.confirm(blocked ? 'Результат создания неизвестен. Отказаться от проверки и оставить созданное отображение в списке?' : 'Отказаться от черновика отображения?')) { clearDirty(); onCancel(); }
   };
   return <ModalPortal isOpen title="Создать отображение" onClose={cancel} dismissDisabled={mutation.busy}><form className={commonStyles.form} onSubmit={event => {
     event.preventDefault(); if (!canWrite || forbidden || !name.trim() || blocked || mutation.busy) return;
-    void mutation.run().then(result => { if (result && mounted.current) { clearDirty(); onCreated(result); } }).catch(failure => { if (mounted.current) { setError(failure); setBlocked(uncertain(failure)); if (failure instanceof CampaignApiError && failure.status === 403) { setForbidden(true); notifyInvalidation(); } } });
+    void mutation.run().then(result => { if (result && mounted.current) { clearDirty(); onCreated(result); } }).catch(failure => { if (mounted.current) { setError(failure); setBlocked(uncertain(failure)); if (failure instanceof CampaignApiError && failure.status === 403) setForbidden(true); } });
   }}>
     <Field label="Название" htmlFor={nameId}><Input id={nameId} autoFocus value={name} disabled={!canWrite || forbidden || blocked || mutation.busy} onChange={event => setName(event.target.value)} /></Field>
     {Boolean(error) && <ApiError error={error} />}{Boolean(checkError) && <ApiError error={checkError} />}
@@ -53,10 +53,28 @@ const Views: React.FC = () => {
   const { groupId = '' } = useParams();
   const viewSelectId = useId();
   const campaignId = Number(groupId);
-  const { api, sessionKey, invalidation } = useWorkspace();
+  const { api, sessionKey } = useWorkspace();
   const { permissions, permissionsLoading } = useCampaignWorkspace();
   const canWrite = Boolean(permissions.canWrite && !permissionsLoading);
-  const viewsResource = useResource<ViewMetadata[]>(`${sessionKey}:${campaignId}:views:${invalidation}`, () => api.listViews(campaignId));
+  const scope = `${sessionKey}:${campaignId}`;
+  const viewsResource = useResource<ViewMetadata[]>(`${scope}:views`, () => api.listViews(campaignId));
+  const [confirmedViews, setConfirmedViews] = useState<{ scope: string; items: ViewMetadata[] }>({ scope, items: [] });
+  const onMetadataChange = useCallback((metadata: ViewMetadata) => {
+    if (metadata.campaignId !== campaignId) return;
+    setConfirmedViews(current => {
+      const items = current.scope === scope ? current.items : [];
+      const index = items.findIndex(item => item.id === metadata.id);
+      if (index < 0) return { scope, items: [...items, metadata] };
+      const next = [...items];
+      next[index] = metadata;
+      return { scope, items: next };
+    });
+  }, [campaignId, scope]);
+  const views = useMemo(() => {
+    const merged = new Map((viewsResource.data ?? []).map(view => [view.id, view]));
+    if (confirmedViews.scope === scope) for (const view of confirmedViews.items) merged.set(view.id, view);
+    return [...merged.values()];
+  }, [viewsResource.data, confirmedViews, scope]);
   const [selectedId, setSelectedId] = useState('');
   const [creating, setCreating] = useState(false);
   const [showPages, setShowPages] = useState(false);
@@ -91,12 +109,12 @@ const Views: React.FC = () => {
       <Button type="button" disabled={!canWrite || creating || initialLoading} onClick={openCreate}>Создать отображение</Button>
       <Button variant="secondary" type="button" disabled={!canWrite || permissionsLoading || initialLoading} onClick={openPages}>Страницы кампании</Button>
     </div>
-    <Field label="Сохранённое отображение" htmlFor={viewSelectId}><Select id={viewSelectId} value={selectedId} disabled={!viewsResource.data} onChange={event => changeSelection(event.target.value)}><option value="">Выберите отображение</option>{viewsResource.data?.map(view => <option key={view.id} value={view.id}>{view.name}</option>)}</Select></Field>
-    {viewsResource.data && viewsResource.data.length === 0 && <StatePanel kind="empty">Сохранённых отображений пока нет.</StatePanel>}
-    {creating && <CreateView key={`${sessionKey}:${campaignId}:create`} campaignId={campaignId} canWrite={canWrite} onCancel={() => setCreating(false)} onCreated={created => { setSelectedId(created.id); setCreating(false); viewsResource.reload(); }} />}
-    {selectedId && !creating && <ViewEditor key={`${sessionKey}:${campaignId}:${selectedId}`} sessionKey={sessionKey} campaignId={campaignId} viewId={selectedId} canWrite={canWrite} permissionsLoading={Boolean(permissionsLoading)} />}
+    <Field label="Сохранённое отображение" htmlFor={viewSelectId}><Select id={viewSelectId} value={selectedId} disabled={!viewsResource.data} onChange={event => changeSelection(event.target.value)}><option value="">Выберите отображение</option>{views.map(view => <option key={view.id} value={view.id}>{view.name}</option>)}</Select></Field>
+    {viewsResource.data && views.length === 0 && <StatePanel kind="empty">Сохранённых отображений пока нет.</StatePanel>}
+    {creating && <CreateView key={`${sessionKey}:${campaignId}:create`} campaignId={campaignId} canWrite={canWrite} onCancel={() => setCreating(false)} onCreated={created => { onMetadataChange(created); setSelectedId(created.id); setCreating(false); }} />}
+    {selectedId && !creating && <ViewEditor key={`${sessionKey}:${campaignId}:${selectedId}`} sessionKey={sessionKey} campaignId={campaignId} viewId={selectedId} canWrite={canWrite} permissionsLoading={Boolean(permissionsLoading)} onMetadataChange={onMetadataChange} />}
     <ModalPortal isOpen={showPages} title="Страницы кампании" size="wide" onClose={closePages} dismissDisabled={pageState.busy}>
-      <CampaignPagesEditor key={`${sessionKey}:${campaignId}:pages`} campaignId={campaignId} sessionKey={sessionKey} canWrite={canWrite} permissionsLoading={Boolean(permissionsLoading)} views={viewsResource.data ?? []} onStateChange={onPagesStateChange} embedded />
+      <CampaignPagesEditor key={`${sessionKey}:${campaignId}:pages`} campaignId={campaignId} sessionKey={sessionKey} canWrite={canWrite} permissionsLoading={Boolean(permissionsLoading)} views={views} onStateChange={onPagesStateChange} embedded />
     </ModalPortal>
     </div>
   </main>;

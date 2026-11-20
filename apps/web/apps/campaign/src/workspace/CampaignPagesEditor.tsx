@@ -39,8 +39,8 @@ const CampaignPageRow: React.FC<{
   </article>;
 };
 
-const CampaignPagesEditor: React.FC<{ campaignId: number; sessionKey: string; canWrite: boolean; permissionsLoading: boolean; views: ViewMetadata[]; onStateChange?: (state: { dirty: boolean; busy: boolean }) => void; embedded?: boolean }> = ({ campaignId, sessionKey, canWrite, permissionsLoading, views, onStateChange, embedded = false }) => {
-  const { api, notifyInvalidation } = useWorkspace();
+const CampaignPagesEditor: React.FC<{ campaignId: number; sessionKey: string; canWrite: boolean; permissionsLoading: boolean; views: ViewMetadata[]; onStateChange?: (state: { dirty: boolean; busy: boolean }) => void; embedded?: boolean }> = ({ campaignId, sessionKey, canWrite, views, onStateChange, embedded = false }) => {
+  const { api } = useWorkspace();
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>();
@@ -58,7 +58,6 @@ const CampaignPagesEditor: React.FC<{ campaignId: number; sessionKey: string; ca
   const [previewKey, setPreviewKey] = useState('');
   const [reservedKeys, setReservedKeys] = useState<Set<string>>(new Set());
   const attempted = useRef<Pick<PresentationEnvelope, 'defaults' | 'contextParams'> | undefined>(undefined);
-  const permissionRefresh = useRef({ waiting: false, sawLoading: false });
   const saveLock = useRef(false);
   const verifyLock = useRef(false);
   const mounted = useRef(true);
@@ -79,13 +78,6 @@ const CampaignPagesEditor: React.FC<{ campaignId: number; sessionKey: string; ca
   const isCurrent = (requestScope: string, generation: number) => mounted.current && scopeRef.current === requestScope && loadGeneration.current === generation;
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; loadGeneration.current += 1; }; }, []);
 
-  useEffect(() => {
-    if (permissionRefresh.current.waiting && permissionsLoading) permissionRefresh.current.sawLoading = true;
-    if (permissionRefresh.current.waiting && permissionRefresh.current.sawLoading && !permissionsLoading) {
-      permissionRefresh.current.waiting = false; permissionRefresh.current.sawLoading = false;
-      if (canWrite) setForbidden(false);
-    }
-  }, [canWrite, permissionsLoading]);
   useEffect(() => {
     let active = true;
     const generation = ++loadGeneration.current;
@@ -111,11 +103,11 @@ const CampaignPagesEditor: React.FC<{ campaignId: number; sessionKey: string; ca
       const result = await api.putPresentation(campaignId, { expectedRevision: presentation.contentRevision, defaults: body.defaults, contextParams: body.contextParams });
       if (!isCurrent(requestScope, generation)) return;
       const nextPages = readPages(result);
-      setPresentation(result); setPages(nextPages); setBaselinePages(nextPages); setReservedKeys(current => new Set([...current, ...pageKeys(result)])); setBlocked(false); setServerPresentation(undefined); attempted.current = undefined; setSaved(true); notifyInvalidation();
+       setPresentation(result); setPages(nextPages); setBaselinePages(nextPages); setReservedKeys(current => new Set([...current, ...pageKeys(result)])); setBlocked(false); setServerPresentation(undefined); attempted.current = undefined; setSaved(true);
     } catch (failure) {
       if (!isCurrent(requestScope, generation)) return;
       setWriteError(failure);
-      if (failure instanceof CampaignApiError && failure.status === 403) { setForbidden(true); permissionRefresh.current = { waiting: true, sawLoading: false }; notifyInvalidation(); }
+       if (failure instanceof CampaignApiError && failure.status === 403) setForbidden(true);
       if (uncertain(failure)) { setBlocked(true); attempted.current = body; }
     } finally { saveLock.current = false; if (isCurrent(requestScope, generation)) setSaving(false); }
   };
@@ -133,9 +125,9 @@ const CampaignPagesEditor: React.FC<{ campaignId: number; sessionKey: string; ca
       setPresentation(latest);
       if (attempted.current && samePresentation(latest, attempted.current)) {
         const nextPages = readPages(latest);
-        setPages(current => stringifyJson(current) === stringifyJson(attemptedPages) ? nextPages : current); setBaselinePages(nextPages); setBlocked(false); setServerPresentation(undefined); attempted.current = undefined; setSaved(true); notifyInvalidation();
+         setPages(current => stringifyJson(current) === stringifyJson(attemptedPages) ? nextPages : current); setBaselinePages(nextPages); setBlocked(false); setServerPresentation(undefined); attempted.current = undefined; setSaved(true);
       } else setServerPresentation(latest);
-    } catch (failure) { if (isCurrent(requestScope, generation)) { setReadError(failure); if (failure instanceof CampaignApiError && failure.status === 403) { setForbidden(true); permissionRefresh.current = { waiting: true, sawLoading: false }; notifyInvalidation(); } } }
+     } catch (failure) { if (isCurrent(requestScope, generation)) { setReadError(failure); if (failure instanceof CampaignApiError && failure.status === 403) setForbidden(true); } }
     finally { verifyLock.current = false; if (isCurrent(requestScope, generation)) setChecking(false); }
   };
   const loadServer = () => {

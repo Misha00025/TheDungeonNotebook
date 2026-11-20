@@ -40,8 +40,8 @@ function SectionLoading({ loading, children }: React.PropsWithChildren<{ loading
   </div>;
 }
 
-const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boolean; permissionsLoading: boolean; sessionKey: string }> = ({ campaignId, viewId, canWrite, permissionsLoading, sessionKey }) => {
-  const { api, notifyInvalidation } = useWorkspace();
+const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boolean; permissionsLoading: boolean; sessionKey: string; onMetadataChange?: (metadata: ViewMetadata) => void }> = ({ campaignId, viewId, canWrite, sessionKey, onMetadataChange }) => {
+  const { api } = useWorkspace();
   const nameInputId = useId();
   const previewSelectId = useId();
   const [attempt, setAttempt] = useState(0);
@@ -89,7 +89,6 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
   const activeScope = `${sessionKey}:${campaignId}:${viewId}`;
   const scopeRef = useRef(activeScope);
   scopeRef.current = activeScope;
-  const permissionRefresh = useRef({ waiting: false, sawLoading: false });
   const scope = useMemo<LocalDraftScope>(() => ({ account: sessionKey, campaign: String(campaignId), view: viewId, schemaVersion: 1 }), [sessionKey, campaignId, viewId]);
   const writable = canWrite && !forbidden;
   const metadataDirty = name !== baselineName;
@@ -104,13 +103,6 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
   const isCurrent = (scopeAtRequest: string, generation: number) => mounted.current && scopeRef.current === scopeAtRequest && loadGeneration.current === generation;
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; loadGeneration.current += 1; previewGeneration.current += 1; characterListGeneration.current += 1; }; }, []);
 
-  useEffect(() => {
-    if (permissionRefresh.current.waiting && permissionsLoading) permissionRefresh.current.sawLoading = true;
-    if (permissionRefresh.current.waiting && permissionRefresh.current.sawLoading && !permissionsLoading) {
-      permissionRefresh.current.waiting = false; permissionRefresh.current.sawLoading = false;
-      if (canWrite) setForbidden(false);
-    }
-  }, [canWrite, permissionsLoading]);
   useEffect(() => {
     let active = true;
     const generation = ++loadGeneration.current;
@@ -145,7 +137,7 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
   }, [api, campaignId, viewId, attempt, sessionKey, scope, activeScope]);
 
   const recordForbidden = (failure: unknown) => {
-    if (failure instanceof CampaignApiError && failure.status === 403) { setForbidden(true); permissionRefresh.current = { waiting: true, sawLoading: false }; notifyInvalidation(); return true; }
+    if (failure instanceof CampaignApiError && failure.status === 403) { setForbidden(true); return true; }
     return false;
   };
   const save = async () => {
@@ -162,7 +154,7 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
         try {
           const result = await api.renameView(campaignId, viewId, { name: submittedName, expectedRevision: metadataRevision });
           if (!isCurrent(requestScope, generation)) return;
-          setBaselineName(result.name); setName(current => current === submittedName ? result.name : current); setMetadataRevision(result.metadataRevision); setSnapshot(current => current ? { ...current, metadata: result } : current); setMetadataBlocked(false); setMetadataAttempt(undefined); setMetadataServer(undefined); setMetadataSaved(true); notifyInvalidation();
+          setBaselineName(result.name); setName(current => current === submittedName ? result.name : current); setMetadataRevision(result.metadataRevision); setSnapshot(current => current ? { ...current, metadata: result } : current); setMetadataBlocked(false); setMetadataAttempt(undefined); setMetadataServer(undefined); setMetadataSaved(true); onMetadataChange?.(result);
         } catch (failure) {
           if (!isCurrent(requestScope, generation)) return;
           setMetadataError(failure); writeRevoked = recordForbidden(failure);
@@ -176,7 +168,7 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
           if (!isCurrent(requestScope, generation)) return;
           const normalized = normalizeRoots(result.data.roots);
           const legacy = hasWidget(result.data.roots);
-          setBaselineRoots(normalized); setRoots(current => sameRoots(current, submittedRoots) ? normalized : current); setContentRevision(result.contentRevision); setLegacyConversion(legacy); setSnapshot(current => current ? { ...current, content: result, roots: normalized, legacy } : current); setContentBlocked(false); setContentAttempt(undefined); setContentServer(undefined); setContentSaved(true); notifyInvalidation();
+          setBaselineRoots(normalized); setRoots(current => sameRoots(current, submittedRoots) ? normalized : current); setContentRevision(result.contentRevision); setLegacyConversion(legacy); setSnapshot(current => current ? { ...current, content: result, roots: normalized, legacy } : current); setContentBlocked(false); setContentAttempt(undefined); setContentServer(undefined); setContentSaved(true);
         } catch (failure) {
           if (!isCurrent(requestScope, generation)) return;
           setContentError(failure); writeRevoked = recordForbidden(failure);
@@ -190,10 +182,11 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
     try {
       const latest = await api.getView(campaignId, viewId);
       if (!isCurrent(requestScope, generation)) return;
+      onMetadataChange?.(latest);
       const submitted = metadataAttempt;
       setSnapshot(current => current ? { ...current, metadata: latest } : current);
       if (submitted && latest.name === submitted.name) {
-        setBaselineName(latest.name); setName(current => current === submitted.name ? latest.name : current); setMetadataRevision(latest.metadataRevision); setSnapshot(current => current ? { ...current, metadata: latest } : current); setMetadataBlocked(false); setMetadataAttempt(undefined); setMetadataServer(undefined); setMetadataError(undefined); setMetadataSaved(true); notifyInvalidation();
+         setBaselineName(latest.name); setName(current => current === submitted.name ? latest.name : current); setMetadataRevision(latest.metadataRevision); setSnapshot(current => current ? { ...current, metadata: latest } : current); setMetadataBlocked(false); setMetadataAttempt(undefined); setMetadataServer(undefined); setMetadataError(undefined); setMetadataSaved(true);
       } else setMetadataServer(latest);
     } catch (failure) { if (isCurrent(requestScope, generation)) { setVerifyError(failure); recordForbidden(failure); } }
   };
@@ -205,7 +198,7 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
       const latestSnapshot: ViewSnapshot = { metadata: snapshot!.metadata, content: latest, roots: normalized, legacy: hasWidget(latest.data.roots) };
       setSnapshot(current => current ? { ...current, content: latest, roots: normalized, legacy: latestSnapshot.legacy } : current);
       if (contentAttempt && !hasWidget(latest.data.roots) && sameRoots(normalized, contentAttempt.roots)) {
-        setBaselineRoots(normalized); setRoots(current => sameRoots(current, contentAttempt.roots) ? normalized : current); setContentRevision(latest.contentRevision); setLegacyConversion(false); setContentBlocked(false); setContentAttempt(undefined); setContentServer(undefined); setContentError(undefined); setContentSaved(true); notifyInvalidation();
+        setBaselineRoots(normalized); setRoots(current => sameRoots(current, contentAttempt.roots) ? normalized : current); setContentRevision(latest.contentRevision); setLegacyConversion(false); setContentBlocked(false); setContentAttempt(undefined); setContentServer(undefined); setContentError(undefined); setContentSaved(true);
       } else setContentServer(latestSnapshot);
     } catch (failure) { if (isCurrent(requestScope, generation)) { setVerifyError(failure); recordForbidden(failure); } }
   };

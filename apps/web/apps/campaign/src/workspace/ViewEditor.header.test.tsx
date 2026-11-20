@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ViewMetadata } from './types';
 import ViewEditor from './ViewEditor';
 
 const api = vi.hoisted(() => ({
@@ -41,7 +42,7 @@ const computedSheet = {
   virtualFields: [],
 };
 
-const renderEditor = () => render(<ViewEditor campaignId={campaignId} viewId={viewId} canWrite permissionsLoading={false} sessionKey="session" />);
+const renderEditor = (onMetadataChange?: (metadata: ViewMetadata) => void) => render(<ViewEditor campaignId={campaignId} viewId={viewId} canWrite permissionsLoading={false} sessionKey="session" onMetadataChange={onMetadataChange} />);
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -57,7 +58,8 @@ beforeEach(() => {
 
 describe('ViewEditor controls and preview diagnostics', () => {
   it('shows the saved name and sample choice, then saves only metadata with its revision', async () => {
-    renderEditor();
+    const onMetadataChange = vi.fn();
+    renderEditor(onMetadataChange);
 
     const name = await screen.findByLabelText('Название') as HTMLInputElement;
     const preview = screen.getByLabelText('Предпросмотр') as HTMLSelectElement;
@@ -74,6 +76,8 @@ describe('ViewEditor controls and preview diagnostics', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
 
     await waitFor(() => expect(api.renameView).toHaveBeenCalledWith(campaignId, viewId, { name: 'Renamed', expectedRevision: 7 }));
+    await waitFor(() => expect(onMetadataChange).toHaveBeenCalledWith({ ...view, name: 'Renamed', metadataRevision: 8 }));
+    expect(onMetadataChange).toHaveBeenCalledTimes(1);
     expect(api.putViewContent).not.toHaveBeenCalled();
     expect(api.putPresentation).not.toHaveBeenCalled();
     expect(api.putCharacterValues).not.toHaveBeenCalled();
