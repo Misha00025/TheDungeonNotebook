@@ -8,9 +8,9 @@ import GMOverviewRoster from './GMOverviewRoster';
 import { ApiError } from './Feedback';
 
 const CampaignOverview: React.FC = () => {
-  const { path, api, sessionKey, invalidation } = useWorkspace();
+  const { path, api, sessionKey } = useWorkspace();
   const { campaign, mode } = useCampaignWorkspace();
-  const characters = useResource(`${sessionKey}:${campaign.id}:overview-characters:${invalidation}`, () => api.listCharacters(campaign.id));
+  const characters = useResource(`${sessionKey}:${campaign.id}:overview-characters`, () => api.listCharacters(campaign.id));
 
   return <section><List layout="vertical" stretch>
     <PageHeader title="Обзор кампании" headingLevel={2} subtitle="Состав и инструменты кампании под рукой." />
@@ -29,7 +29,7 @@ const CampaignOverview: React.FC = () => {
     <List layout="grid" columns={2} minItemWidth="18rem">
       <Panel title="Персонажи кампании" headingLevel={3}>
         {mode === 'gm'
-          ? characters.data !== undefined && <GMOverviewRoster campaignId={campaign.id} characters={characters.data} resourceKey={`${sessionKey}:${campaign.id}:overview-roster:${invalidation}`} />
+          ? characters.data !== undefined && <GMOverviewRoster campaignId={campaign.id} characters={characters.data} resourceKey={`${sessionKey}:${campaign.id}:overview-roster`} />
           : <Characters compact />}
       </Panel>
       <Panel title="Быстрые действия" headingLevel={3}>

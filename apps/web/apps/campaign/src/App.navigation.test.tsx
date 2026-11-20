@@ -6,6 +6,8 @@ import type { HubRemoteProps } from '@tdn/shared';
 
 const response = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
 const campaign = (id: number) => ({ id, name: `Campaign ${id}`, metadataRevision: 1 });
+const presentation = { contentRevision: 1, defaults: { page_1: 'view-one', page_2: 'view-two' }, contextParams: { page_1: { title: 'Основное' }, page_2: { title: 'Дополнительно' } } };
+const resolved = (key: string) => ({ contextKey: key, viewMetadata: { id: key, key, campaignId: 12, name: key, metadataRevision: 1 }, viewContent: { campaignId: 12, resourceId: key, contentRevision: 1, data: { roots: [] } }, contextParams: null, contentRevision: 1 });
 const makeAuth = (request: (url: string) => Promise<Response>) => ({ status: 'authenticated', authenticated: true, userId: 4, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
 const Pathname: React.FC = () => { const location = useLocation(); return <output aria-label="Current pathname">{location.pathname}</output>; };
 
@@ -19,7 +21,8 @@ describe('campaign navigation under the Hub route', () => {
       if (url === '/api/campaigns/12') return response(campaign(12));
       if (url === '/api/campaigns/13') return response(campaign(13));
       if (/^\/api\/campaigns\/(12|13)\/permissions$/.test(url)) return response({ canRead: true, canWrite: true, canManageAccess: true });
-      if (/^\/api\/campaigns\/\d+\/presentation$/.test(url)) return response({ contentRevision: 0, defaults: {}, contextParams: {} });
+      if (/^\/api\/campaigns\/\d+\/presentation$/.test(url)) return response(presentation);
+      if (url.includes('/presentation/resolve?')) return response(resolved(new URL(url, 'http://localhost').searchParams.get('contextKey') ?? ''));
       if (url.endsWith('/template')) return response({ campaignId: 12, name: 'Template', metadataRevision: 1 });
       if (url.endsWith('/template/content')) return response({ campaignId: 12, contentRevision: 0, data: { description: '', baseFields: [], virtualFields: [] } });
       if (/^\/api\/campaigns\/\d+\/(characters|formulas|views|members)$/.test(url)) return response([]);
@@ -32,7 +35,7 @@ describe('campaign navigation under the Hub route', () => {
     const suffixes = ['gm/overview', 'gm/characters', 'gm/templates', 'gm/formulas', 'gm/views', 'gm/members', 'gm/settings'];
     for (const [index, label] of labels.entries()) expect(within(navigation).getByRole('link', { name: label })).toHaveAttribute('href', `${prefix}/12/${suffixes[index]}`);
 
-    const headings = ['Обзор кампании', 'Персонажи кампании', 'Шаблон кампании', 'Формулы', 'Представления', 'Участники и доступ', 'Настройки кампании'];
+    const headings = ['Обзор кампании', 'Персонажи кампании', 'Шаблон кампании', 'Формулы', 'Отображения', 'Участники и доступ', 'Настройки кампании'];
     for (const [index, label] of labels.entries()) {
       fireEvent.click(within(navigation).getByRole('link', { name: label }));
       await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe(`/groups/12/${suffixes[index]}`));
@@ -64,18 +67,19 @@ describe('campaign navigation under the Hub route', () => {
       if (url === `/api/campaigns/12/characters/${characterId}/permissions`) return response({ canRead: true, canWrite: true, canManageAccess: false });
       if (url === `/api/campaigns/12/characters/${characterId}/computed-sheet`) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [], virtualFields: [], formulaContentRevisions: [] });
       if (url === '/api/campaigns/12/characters') return response([]);
-      if (url === '/api/campaigns/12/presentation') return response({ contentRevision: 0, defaults: {}, contextParams: {} });
+      if (url === '/api/campaigns/12/presentation') return response(presentation);
+      if (url.includes('/presentation/resolve?')) return response(resolved(new URL(url, 'http://localhost').searchParams.get('contextKey') ?? ''));
       throw new Error(`Unexpected request: ${url}`);
     });
-    render(<MemoryRouter basename={basename || undefined} initialEntries={[`${basename}/groups/12/gm/characters/${characterId}/stats`]}><Routes><Route path="/groups/*" element={<App auth={makeAuth(request)} />} /></Routes><Pathname /></MemoryRouter>);
-    await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe(`/groups/12/gm/characters/${characterId}/stats`));
-    const sheetNavigation = await screen.findByRole('navigation', { name: 'Лист персонажа' });
-    expect(within(sheetNavigation).getByRole('link', { name: 'Характеристики' })).toHaveAttribute('href', `${prefix}/12/gm/characters/${characterId}/stats`);
-    fireEvent.click(within(sheetNavigation).getByRole('link', { name: 'Обзор' }));
-    await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe(`/groups/12/gm/characters/${characterId}/overview`));
+    render(<MemoryRouter basename={basename || undefined} initialEntries={[`${basename}/groups/12/gm/characters/${characterId}/page_2`]}><Routes><Route path="/groups/*" element={<App auth={makeAuth(request)} />} /></Routes><Pathname /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe(`/groups/12/gm/characters/${characterId}/page_2`));
+    const sheetNavigation = await screen.findByRole('navigation', { name: 'Страницы персонажа' });
+    expect(within(sheetNavigation).getByRole('link', { name: 'Дополнительно' })).toHaveAttribute('href', `${prefix}/12/gm/characters/${characterId}/page_2`);
+    fireEvent.click(within(sheetNavigation).getByRole('link', { name: 'Основное' }));
+    await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe(`/groups/12/gm/characters/${characterId}/page_1`));
     expect(await screen.findByRole('link', { name: 'К персонажам' })).toHaveAttribute('href', `${prefix}/12/gm/characters`);
-    fireEvent.click(screen.getByRole('link', { name: 'Характеристики' }));
-    await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe(`/groups/12/gm/characters/${characterId}/stats`));
+    fireEvent.click(screen.getByRole('link', { name: 'Дополнительно' }));
+    await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe(`/groups/12/gm/characters/${characterId}/page_2`));
     fireEvent.click(screen.getByRole('link', { name: 'К персонажам' }));
     await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/12/gm/characters'));
     expect(await screen.findByRole('heading', { name: 'Персонажи кампании' })).toBeInTheDocument();

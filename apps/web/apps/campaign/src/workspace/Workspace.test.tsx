@@ -56,6 +56,15 @@ describe('workspace foundations', () => {
     expect(result.current.data).toBe('cached');
     expect(result.current.error).toBeInstanceOf(Error);
   });
+  it('keeps accepted resource data when an older pending read completes', async () => {
+    const pending = deferred<string>();
+    const { result } = renderHook(() => useResource('same', () => pending.promise));
+    act(() => result.current.setData('accepted mutation'));
+    expect(result.current).toMatchObject({ data: 'accepted mutation', loading: false });
+    expect(result.current.error).toBeUndefined();
+    await act(async () => pending.resolve('stale read'));
+    expect(result.current.data).toBe('accepted mutation');
+  });
   it('cancels dirty push navigation once and preserves the draft', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<MemoryRouter initialEntries={['/edit']}><DirtyProvider><NavigationHarness /></DirtyProvider></MemoryRouter>);

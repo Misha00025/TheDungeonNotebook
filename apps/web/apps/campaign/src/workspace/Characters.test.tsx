@@ -12,7 +12,7 @@ const characters = [
   { id: 'background-id', campaignId: 12, name: 'Background hero', importance: 'Background', metadataRevision: 1 },
 ];
 
-vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, path: (relative = '') => `/groups${relative}`, navigate, sessionKey: 'session', invalidation: 0 }) }));
+vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, path: (relative = '') => `/groups${relative}`, navigate, sessionKey: 'session' }) }));
 vi.mock('./Shell', () => ({ useCampaignWorkspace: () => ({ campaign: { id: 12 }, mode: 'gm', permissions: { canRead: true, canWrite: true, canManageAccess: true }, permissionsLoading: false }) }));
 
 const renderCharacters = () => render(<MemoryRouter initialEntries={['/groups/12/gm/characters']}><Routes><Route path="/groups/:groupId/gm/characters" element={<Characters />} /></Routes></MemoryRouter>);
@@ -40,7 +40,7 @@ describe('GM Characters', () => {
     expect(await within(backgroundEntry).findByText('background-id description')).toBeInTheDocument();
     for (const [name, id] of [['Key hero', 'key-id'], ['Secondary hero', 'secondary-id'], ['Background hero', 'background-id']]) {
       fireEvent.click(screen.getByRole('button', { name: `Открыть лист ${name}` }));
-      expect(navigate).toHaveBeenLastCalledWith(`/groups/12/gm/characters/${id}/overview`);
+      expect(navigate).toHaveBeenLastCalledWith(`/groups/12/gm/characters/${id}`);
     }
     expect(screen.queryByText('Ключевой')).not.toBeInTheDocument();
     expect(screen.queryByText('Второстепенный')).not.toBeInTheDocument();
@@ -56,18 +56,18 @@ describe('GM Characters', () => {
     renderCharacters();
     const entry = await screen.findByRole('button', { name: 'Открыть лист Key hero' });
     await waitFor(() => expect(api.getSheet).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(within(entry).queryByText('Загрузка описания…')).not.toBeInTheDocument());
     expect(entry).toHaveTextContent('Key hero');
     expect(screen.queryByText('Описание не задано.')).not.toBeInTheDocument();
     expect(api.getSheet).toHaveBeenCalledWith(12, characters[0].id);
     expect(screen.queryByText('Secondary hero')).not.toBeInTheDocument();
   });
 
-  it('does not request a sheet while permissions are pending', async () => {
+  it('keeps character entries unavailable and does not request sheets while permissions are pending', async () => {
     let resolvePermissions!: (value: { canRead: boolean; canWrite: boolean; canManageAccess: boolean }) => void;
     api.characterPermissions.mockReturnValue(new Promise(resolve => { resolvePermissions = resolve; }));
     renderCharacters();
-    expect(await screen.findByText('Загрузка прав персонажа «Key hero»…')).toBeInTheDocument();
+    await waitFor(() => expect(api.characterPermissions).toHaveBeenCalledWith(12, characters[0].id));
+    expect(screen.queryByRole('button', { name: 'Открыть лист Key hero' })).not.toBeInTheDocument();
     expect(api.getSheet).not.toHaveBeenCalled();
     await act(async () => { resolvePermissions({ canRead: true, canWrite: true, canManageAccess: false }); });
     expect(await screen.findByText('key-id description')).toBeInTheDocument();
@@ -85,7 +85,7 @@ describe('GM Characters', () => {
     expect(await screen.findByText('Recovered description')).toBeInTheDocument();
     for (const [name, id] of [['Key hero', 'key-id'], ['Secondary hero', 'secondary-id'], ['Background hero', 'background-id']]) {
       fireEvent.click(screen.getByRole('button', { name: `Открыть лист ${name}` }));
-      expect(navigate).toHaveBeenLastCalledWith(`/groups/12/gm/characters/${id}/overview`);
+      expect(navigate).toHaveBeenLastCalledWith(`/groups/12/gm/characters/${id}`);
     }
   });
 });

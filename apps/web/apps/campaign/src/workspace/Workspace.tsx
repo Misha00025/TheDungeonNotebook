@@ -6,13 +6,12 @@ import type { AuthenticatedRequest } from '@tdn/shared';
 import { createCampaignApi } from './api';
 import { VisitHistoryProvider } from './VisitHistory';
 
-type WorkspaceValue = { api: ReturnType<typeof createCampaignApi>; mountPath: string; path: (relative?: string) => string; navigate: ReturnType<typeof useNavigate>; notifyInvalidation: (key?: string) => void; invalidation: number; sessionKey: string };
+type WorkspaceValue = { api: ReturnType<typeof createCampaignApi>; mountPath: string; path: (relative?: string) => string; navigate: ReturnType<typeof useNavigate>; sessionKey: string };
 const Context = createContext<WorkspaceValue | null>(null);
 export const WorkspaceProvider: React.FC<React.PropsWithChildren<{ mountPath?: string }>> = ({ children, mountPath }) => {
   const auth = useAuth();
   const routeContext = useContext(UNSAFE_RouteContext);
   const navigate = useNavigate();
-  const [invalidation, setInvalidation] = useState(0);
   const sessionKey = String(auth.userId);
   const matchedRoute = routeContext.matches[routeContext.matches.length - 1];
   const matchedBase = matchedRoute?.pathnameBase ?? '/';
@@ -22,8 +21,7 @@ export const WorkspaceProvider: React.FC<React.PropsWithChildren<{ mountPath?: s
     const result = `${base === '/' ? '' : base}${relative.startsWith('/') ? relative : relative ? `/${relative}` : ''}`;
     return result.replace(/\/$/, '') || '/';
   }, [base]);
-  const notifyInvalidation = useCallback((_key?: string) => setInvalidation(value => value + 1), []);
-  const value = useMemo(() => ({ api, mountPath: base, path, navigate, notifyInvalidation, invalidation, sessionKey }), [api, base, path, navigate, notifyInvalidation, invalidation, sessionKey]);
+  const value = useMemo(() => ({ api, mountPath: base, path, navigate, sessionKey }), [api, base, path, navigate, sessionKey]);
   return <Context.Provider value={value}><VisitHistoryProvider key={sessionKey} sessionKey={sessionKey}>{children}</VisitHistoryProvider></Context.Provider>;
 };
 export const useWorkspace = () => {

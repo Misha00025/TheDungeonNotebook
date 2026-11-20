@@ -34,9 +34,9 @@ type OpenDialog =
   | { kind: 'base-description' | 'virtual-description' | 'base-options' | 'base-choice' | 'virtual-links'; rowKey: string };
 
 export const TemplateEditor: React.FC<{ campaignId: number }> = ({ campaignId }) => {
-  const { api, sessionKey, invalidation } = useWorkspace();
+  const { api, sessionKey } = useWorkspace();
   const fields = useTemplateFields(campaignId);
-  const formulas = useResource(`${sessionKey}:${campaignId}:${invalidation}:template-formulas`, () => api.listFormulas(campaignId), fields.loaded);
+  const formulas = useResource(`${sessionKey}:${campaignId}:template-formulas`, () => api.listFormulas(campaignId), fields.loaded);
   const [openDialog, setOpenDialog] = useState<OpenDialog>();
   const identity = `${sessionKey}:${campaignId}`;
   const [drag, setDrag] = useState<{ kind: 'base' | 'virtual'; rowKey: string; identity: string }>();
@@ -180,12 +180,11 @@ export const TemplateEditor: React.FC<{ campaignId: number }> = ({ campaignId })
       </DataTable>
     </section>
 
-    <section className={styles.section} aria-labelledby="template-virtual-fields-heading">
+    <section className={styles.section} aria-labelledby="template-virtual-fields-heading" aria-busy={formulas.loading || undefined}>
       <header className={styles.sectionHeader}>
         <h2 id="template-virtual-fields-heading">Виртуальные поля</h2>
         <ActionRow style={{ gap: '0.5rem' }}><Button type="button" disabled={!fields.writable || fields.busy || fields.blocked} onClick={fields.addVirtual}>Добавить виртуальное поле</Button></ActionRow>
       </header>
-      {formulas.loading && <p>Загрузка формул…</p>}
       {Boolean(formulas.error) && <ApiError error={formulas.error} onRetry={formulas.reload} />}
       <DataTable aria-label="Виртуальные поля" className={styles.virtualTable} minWidth="48rem">
         <thead><tr><th scope="col" aria-label="Порядок">#</th><th scope="col">Ключ</th><th scope="col">Название</th><th scope="col">Тип</th><th scope="col">Формула</th><th scope="col">Связи</th><th scope="col">Действия</th></tr></thead>

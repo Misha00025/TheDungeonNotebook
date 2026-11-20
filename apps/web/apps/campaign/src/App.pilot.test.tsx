@@ -8,6 +8,8 @@ import { ApiError } from './workspace/Feedback';
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const campaign = { id: 12, name: 'Pilot campaign', metadataRevision: 1 };
+const presentation = { contentRevision: 1, defaults: { page_1: 'view-one', page_2: 'view-two' }, contextParams: { page_1: { title: 'Основное' }, page_2: { title: 'Дополнительно' } } };
+const resolved = (key: string) => ({ contextKey: key, viewMetadata: { id: key, key, campaignId: 12, name: key, metadataRevision: 1 }, viewContent: { campaignId: 12, resourceId: key, contentRevision: 1, data: { roots: [] } }, contextParams: null, contentRevision: 1 });
 const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
 const playerCharacters = [
   { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', campaignId: 12, name: 'Writable hero', importance: 'Key', metadataRevision: 1 },
@@ -88,7 +90,7 @@ describe('campaign SDK pilot', () => {
       throw new Error(`Unexpected request: ${url}`);
     });
     renderPilot(request, '/groups/12/player/characters');
-    expect(await screen.findByText(`Загрузка прав персонажа «${playerCharacters[0].name}»…`)).toBeInTheDocument();
+    await waitFor(() => expect(request.mock.calls.some(([url]) => url.endsWith(`${playerCharacters[0].id}/permissions`))).toBe(true));
     expect(screen.queryByRole('heading', { name: playerCharacters[0].name, level: 4 })).not.toBeInTheDocument();
     expect(screen.queryByText('Нет персонажей для ведения.')).not.toBeInTheDocument();
     expect(screen.queryByText('Нет персонажей только для просмотра.')).not.toBeInTheDocument();
@@ -137,7 +139,8 @@ describe('campaign SDK pilot', () => {
       if (url === `/api/campaigns/12/characters/${playerCharacters[0].id}`) return response(playerCharacters[0]);
       if (url.endsWith(`${playerCharacters[0].id}/permissions`)) return response({ canRead: true, canWrite: true, canManageAccess: false });
       if (url === `/api/campaigns/12/characters/${playerCharacters[0].id}/computed-sheet`) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [], formulaContentRevisions: [], virtualFields: [] });
-      if (url === '/api/campaigns/12/presentation') return response({ contentRevision: 0, defaults: {}, contextParams: {} });
+      if (url === '/api/campaigns/12/presentation') return response(presentation);
+      if (url.includes('/presentation/resolve?')) return response(resolved(new URL(url, 'http://localhost').searchParams.get('contextKey') ?? ''));
       throw new Error(`Unexpected request: ${url}`);
     });
     renderPilot(request, `/groups/12/gm/characters/${playerCharacters[0].id}/overview`);
@@ -176,18 +179,15 @@ describe('campaign SDK pilot', () => {
       if (url === `/api/campaigns/12/characters/${characterId}/permissions`) return response({ canRead: true, canWrite: true, canManageAccess: false });
       if (url === `/api/campaigns/12/characters/${characterId}/computed-sheet`) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [], formulaContentRevisions: [], virtualFields: [] });
       if (url === '/api/campaigns/12/characters') return response([]);
-      if (url === '/api/campaigns/12/presentation') return response({ contentRevision: 0, defaults: {}, contextParams: {} });
+      if (url === '/api/campaigns/12/presentation') return response(presentation);
+      if (url.includes('/presentation/resolve?')) return response(resolved(new URL(url, 'http://localhost').searchParams.get('contextKey') ?? ''));
       throw new Error(`Unexpected request: ${url}`);
     });
-    renderPilot(request, `/groups/12/gm/characters/${characterId}/stats`, basename);
+    renderPilot(request, `/groups/12/gm/characters/${characterId}/page_2`, basename);
     const navigation = await screen.findByRole('navigation', { name: 'Лист персонажа на телефоне' });
-    expect(screen.getAllByRole('navigation', { name: /на телефоне$/ })).toHaveLength(1);
-    expect(screen.queryByRole('navigation', { name: 'Разделы кампании' })).not.toBeInTheDocument();
-    const links = within(navigation).getAllByRole('link');
-    expect(links).toHaveLength(3);
-    expect(within(navigation).getByRole('link', { name: 'Назад' })).toHaveAttribute('href', `${prefix}/12/gm/characters`);
-    expect(within(navigation).getByRole('link', { name: 'Характеристики' })).toHaveAttribute('aria-current', 'page');
-    expect(within(navigation).queryByRole('link', { name: 'Персонажи' })).not.toBeInTheDocument();
-    expect(within(navigation).queryByRole('link', { name: 'Шаблон' })).not.toBeInTheDocument();
+    const back = within(navigation).getByRole('link', { name: 'Назад' });
+    expect(back).toHaveAttribute('href', `${prefix}/12/gm/characters`);
+    fireEvent.click(back);
+    await waitFor(() => expect(screen.getByLabelText('Current pathname')).toHaveTextContent('/groups/12/gm/characters'));
   });
 });

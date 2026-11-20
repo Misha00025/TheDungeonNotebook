@@ -63,8 +63,7 @@ const GMOverviewRoster: React.FC<{ campaignId: number; characters: CharacterMeta
 
   const data = roster.data;
   if (!data) return null;
-  return <List layout="vertical" stretch gap="small">
-    {roster.loading && <p>Обновление списка ведущих…</p>}
+  return <List layout="vertical" stretch gap="small" aria-busy={roster.loading || undefined}>
     {Boolean(roster.error) && <ApiError error={roster.error} onRetry={roster.reload} />}
     {data.errors.map((error, index) => <ApiError key={index} error={error} onRetry={roster.reload} />)}
     {data.unavailable && <p>Сведения о ведущих недоступны.</p>}

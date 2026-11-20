@@ -9,7 +9,7 @@ import type { CharacterMetadata } from './types';
 const api = vi.hoisted(() => ({ listCharacters: vi.fn(), characterPermissions: vi.fn(), listAssignments: vi.fn(), getUser: vi.fn(), getSheet: vi.fn(), listFormulas: vi.fn(), listViews: vi.fn() }));
 
 vi.mock('./Workspace', () => ({
-  useWorkspace: () => ({ api, path: (relative = '') => `/groups${relative}`, sessionKey: 'user', invalidation: 0 }),
+  useWorkspace: () => ({ api, path: (relative = '') => `/groups${relative}`, sessionKey: 'user' }),
 }));
 
 vi.mock('./Shell', () => ({
@@ -45,7 +45,7 @@ describe('CampaignOverview', () => {
     expect(within(quests as HTMLElement).queryByRole('link')).not.toBeInTheDocument();
     expect(within(notes as HTMLElement).queryByRole('link')).not.toBeInTheDocument();
     const rosterLink = await screen.findByRole('link', { name: 'Открыть лист Roster hero' });
-    expect(rosterLink).toHaveAttribute('href', '/groups/12/gm/characters/hero%2Fone/overview');
+    expect(rosterLink).toHaveAttribute('href', '/groups/12/gm/characters/hero%2Fone');
     expect(rosterLink).toHaveTextContent('Открыть');
     expect(screen.getByText('Roster hero')).toBeInTheDocument();
     expect(screen.getByText('Visible GM')).toBeInTheDocument();
@@ -79,7 +79,7 @@ describe('CampaignOverview', () => {
     api.getUser.mockImplementation(async (id: number) => ({ id, nickname: `user-${id}`, visibleName: id === 21 ? 'Visible writer' : 'Observer' }));
     renderOverview();
     const link = await screen.findByRole('link', { name: 'Открыть лист Roster hero' });
-    expect(link).toHaveAttribute('href', '/groups/12/gm/characters/hero%2Fone/overview');
+    expect(link).toHaveAttribute('href', '/groups/12/gm/characters/hero%2Fone');
     expect(screen.getByText('Roster hero')).toBeInTheDocument();
     expect(screen.getByText('Visible writer')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Открыть лист Read-only assignee' })).not.toBeInTheDocument();
@@ -178,7 +178,7 @@ describe('CampaignOverview', () => {
     view.rerender(<MemoryRouter><GMOverviewRoster campaignId={13} characters={[newCharacter]} resourceKey="session-new:13:roster:0" /></MemoryRouter>);
 
     const newLink = await screen.findByRole('link', { name: 'Открыть лист New character' });
-    expect(newLink).toHaveAttribute('href', '/groups/13/gm/characters/new-character/overview');
+    expect(newLink).toHaveAttribute('href', '/groups/13/gm/characters/new-character');
     expect(screen.getByText('New character')).toBeInTheDocument();
     expect(screen.getByText('New GM')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Открыть лист Old character' })).not.toBeInTheDocument();
@@ -192,6 +192,6 @@ describe('CampaignOverview', () => {
     await waitFor(() => expect(api.getUser).toHaveBeenCalledWith(31));
     expect(screen.queryByRole('link', { name: 'Открыть лист Old character' })).not.toBeInTheDocument();
     expect(screen.queryByText('Old GM')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Открыть лист New character' })).toHaveAttribute('href', '/groups/13/gm/characters/new-character/overview');
+    expect(screen.getByRole('link', { name: 'Открыть лист New character' })).toHaveAttribute('href', '/groups/13/gm/characters/new-character');
   });
 });

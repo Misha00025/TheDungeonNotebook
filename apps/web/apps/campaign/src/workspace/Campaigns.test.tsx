@@ -8,7 +8,7 @@ const api = vi.hoisted(() => ({ listCampaigns: vi.fn(), campaignPermissions: vi.
 const navigate = vi.hoisted(() => vi.fn());
 const campaign = { id: 12, name: 'Test campaign', metadataRevision: 1 };
 
-vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, path: (relative = '') => (`/tdn/groups${relative}`).replace(/\/$/, '') || '/', navigate, sessionKey: 'session', invalidation: 0 }), useDirtyDraft: () => vi.fn() }));
+vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, path: (relative = '') => (`/tdn/groups${relative}`).replace(/\/$/, '') || '/', navigate, sessionKey: 'session' }), useDirtyDraft: () => vi.fn() }));
 
 const renderCampaigns = (allowCreate = true, initial = '/tdn/groups') => render(<MemoryRouter initialEntries={[initial]}><Campaigns allowCreate={allowCreate} /></MemoryRouter>);
 
@@ -33,11 +33,12 @@ describe('Campaigns', () => {
     expect(navigate).toHaveBeenCalledWith(destination);
   });
 
-  it('keeps entry and role hidden while permissions load and when access is denied', async () => {
+  it('keeps entry and role unavailable while permissions load and when access is denied', async () => {
     let resolvePermissions!: (value: { canRead: boolean; canWrite: boolean }) => void;
     api.campaignPermissions.mockReturnValue(new Promise(resolve => { resolvePermissions = resolve; }));
     renderCampaigns();
-    expect(await screen.findByText('Загрузка прав…')).toBeInTheDocument();
+    expect(await screen.findByText('Test campaign')).toBeInTheDocument();
+    expect(api.campaignPermissions).toHaveBeenCalledWith(campaign.id);
     expect(screen.queryByRole('button', { name: 'Вести' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Играть' })).not.toBeInTheDocument();
     expect(screen.queryByText('ГМ')).not.toBeInTheDocument();

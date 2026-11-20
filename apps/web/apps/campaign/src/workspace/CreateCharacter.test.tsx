@@ -5,7 +5,7 @@ import CreateCharacter from './CreateCharacter';
 import { CampaignApiError } from './api';
 
 const shared = vi.hoisted(() => ({ mode: 'gm' as 'gm' | 'player', canWrite: true, permissionsLoading: false, api: { createCharacter: vi.fn(), getCharacter: vi.fn() }, navigate: vi.fn(), close: vi.fn() }));
-vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api: shared.api, path: (value: string) => `/app${value}`, navigate: shared.navigate, sessionKey: 'user', invalidation: 0, notifyInvalidation: vi.fn() }), useDirtyDraft: () => vi.fn() }));
+vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api: shared.api, path: (value: string) => `/app${value}`, navigate: shared.navigate, sessionKey: 'user' }), useDirtyDraft: () => vi.fn() }));
 vi.mock('./Shell', () => ({ useCampaignWorkspace: () => ({ campaign: { id: 4 }, mode: shared.mode, permissions: { canWrite: shared.canWrite && !shared.permissionsLoading }, lastKnownPermissions: { canWrite: shared.canWrite }, permissionsLoading: shared.permissionsLoading }) }));
 
 const character = { id: 'returned-character-guid', campaignId: 4, name: 'Hero', importance: 'Key', metadataRevision: 1 };
@@ -36,7 +36,7 @@ describe('CreateCharacter', () => {
     const payload = shared.api.createCharacter.mock.calls[0][1];
     expect(payload).toEqual({ requestId: expect.any(String), name: 'Hero' });
     expect(payload.requestId).toMatch(/^[0-9a-f-]{36}$/i);
-    expect(shared.navigate).toHaveBeenCalledWith('/app/4/gm/characters/returned-character-guid/overview');
+    expect(shared.navigate).toHaveBeenCalledWith('/app/4/gm/characters/returned-character-guid');
     expect(shared.close).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('dialog', { name: 'Создать персонажа' })).not.toBeInTheDocument();
   });
@@ -84,7 +84,7 @@ describe('CreateCharacter', () => {
     expect(shared.api.createCharacter).toHaveBeenCalledTimes(1);
     expect(shared.navigate).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Проверить создание' }));
-    await waitFor(() => expect(shared.navigate).toHaveBeenCalledWith('/app/4/gm/characters/returned-character-guid/overview'));
+    await waitFor(() => expect(shared.navigate).toHaveBeenCalledWith('/app/4/gm/characters/returned-character-guid'));
     expect(shared.api.getCharacter).toHaveBeenNthCalledWith(3, 4, requestId);
     expect(shared.api.createCharacter).toHaveBeenCalledTimes(1);
     confirm.mockRestore();
@@ -105,7 +105,7 @@ describe('CreateCharacter', () => {
     expect(screen.getByRole('dialog', { name: 'Создать персонажа' })).toBeInTheDocument();
     resolveCreate(character);
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Создать персонажа' })).not.toBeInTheDocument());
-    expect(shared.navigate).toHaveBeenCalledWith('/app/4/gm/characters/returned-character-guid/overview');
+    expect(shared.navigate).toHaveBeenCalledWith('/app/4/gm/characters/returned-character-guid');
   });
 
   it('closes after a confirmed cancellation', async () => {

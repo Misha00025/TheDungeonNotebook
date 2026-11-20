@@ -20,10 +20,10 @@ import '@tdn/shared/styles/globals.css';
 const NotFound: React.FC = () => { const { path } = useWorkspace(); return <section><h2>Страница не найдена</h2><Link to={path('/')}>К кампаниям</Link></section>; };
 const ModeEntry: React.FC = () => {
   const { groupId = '' } = useParams();
-  const { api, path, sessionKey, invalidation } = useWorkspace();
+  const { api, path, sessionKey } = useWorkspace();
   const id = Number(groupId);
   const valid = Boolean(groupId.trim()) && Number.isInteger(id) && id >= -2147483648 && id <= 2147483647;
-  const resource = useResource(`${sessionKey}:${id}:mode-entry:${invalidation}`, () => valid ? api.campaignPermissions(id) : Promise.reject(new Error('Invalid campaign id')));
+  const resource = useResource(`${sessionKey}:${id}:mode-entry`, () => valid ? api.campaignPermissions(id) : Promise.reject(new Error('Invalid campaign id')));
   if (!valid) return <NotFound />;
   if (resource.loading) return <p>Загрузка прав кампании…</p>;
   if (resource.error) return <ApiError error={resource.error} onRetry={resource.reload} />;
@@ -31,18 +31,18 @@ const ModeEntry: React.FC = () => {
 };
 const LegacyCharactersEntry: React.FC = () => {
   const { groupId = '' } = useParams();
-  const { api, path, sessionKey, invalidation } = useWorkspace();
+  const { api, path, sessionKey } = useWorkspace();
   const id = Number(groupId);
-  const resource = useResource(`${sessionKey}:${id}:legacy-character-mode:${invalidation}`, () => api.campaignPermissions(id));
+  const resource = useResource(`${sessionKey}:${id}:legacy-character-mode`, () => api.campaignPermissions(id));
   if (resource.loading) return <p>Загрузка прав кампании…</p>;
   if (resource.error) return <ApiError error={resource.error} onRetry={resource.reload} />;
   return <Navigate to={path(`/${id}/${resource.data?.canWrite ? 'gm' : 'player'}/characters`)} replace />;
 };
 const LegacySectionEntry: React.FC<{ target: 'members' | 'settings' | 'templates' }> = ({ target }) => {
   const { groupId = '' } = useParams();
-  const { api, path, sessionKey, invalidation } = useWorkspace();
+  const { api, path, sessionKey } = useWorkspace();
   const id = Number(groupId);
-  const resource = useResource(`${sessionKey}:${id}:legacy-section:${invalidation}`, () => api.campaignPermissions(id));
+  const resource = useResource(`${sessionKey}:${id}:legacy-section`, () => api.campaignPermissions(id));
   if (resource.loading) return <p>Загрузка прав кампании…</p>;
   if (resource.error) return <ApiError error={resource.error} onRetry={resource.reload} />;
   return <Navigate to={path(`/${id}/${resource.data?.canWrite ? target === 'templates' ? 'gm/templates' : `gm/${target}` : 'player/characters'}`)} replace />;

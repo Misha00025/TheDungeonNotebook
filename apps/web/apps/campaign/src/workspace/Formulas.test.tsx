@@ -6,10 +6,10 @@ import { LosslessNumber } from 'lossless-json';
 import Formulas from './Formulas';
 import { CampaignApiError } from './api';
 
-const state = vi.hoisted(() => ({ owners: {} as Record<string, boolean>, sessionKey: 'user', invalidation: 0, canWrite: true, permissionsLoading: false, campaignId: 4, notifyInvalidation: vi.fn() }));
+const state = vi.hoisted(() => ({ owners: {} as Record<string, boolean>, sessionKey: 'user', canWrite: true, permissionsLoading: false, campaignId: 4, reloadPermissions: vi.fn() }));
 const api = vi.hoisted(() => ({ listFormulas: vi.fn(), createFormula: vi.fn(), getFormula: vi.fn(), getFormulaContent: vi.fn(), renameFormula: vi.fn(), putFormulaContent: vi.fn() }));
-vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, sessionKey: state.sessionKey, invalidation: state.invalidation, notifyInvalidation: state.notifyInvalidation }), useDirtyDraft: (owner: string, dirty: boolean) => { state.owners[owner] = dirty; return () => { state.owners[owner] = false; }; }, useDirtyState: () => Object.values(state.owners).some(Boolean) }));
-vi.mock('./Shell', () => ({ useCampaignWorkspace: () => ({ campaign: { id: state.campaignId }, permissions: { canWrite: state.canWrite }, permissionsLoading: state.permissionsLoading }) }));
+vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, sessionKey: state.sessionKey }), useDirtyDraft: (owner: string, dirty: boolean) => { state.owners[owner] = dirty; return () => { state.owners[owner] = false; }; }, useDirtyState: () => Object.values(state.owners).some(Boolean) }));
+vi.mock('./Shell', () => ({ useCampaignWorkspace: () => ({ campaign: { id: state.campaignId }, permissions: { canWrite: state.canWrite }, permissionsLoading: state.permissionsLoading, reloadPermissions: state.reloadPermissions }) }));
 
 const first = { id: 'formula-a', key: 'key-a', campaignId: 4, name: 'Original', metadataRevision: 3 };
 const second = { id: 'formula-b', key: 'key-b', campaignId: 4, name: 'Second', metadataRevision: 8 };
@@ -25,7 +25,7 @@ const openCreate = async () => {
 
 describe('formula workspace', () => {
   beforeEach(() => {
-    state.owners = {}; state.sessionKey = 'user'; state.invalidation = 0; state.canWrite = true; state.permissionsLoading = false; state.campaignId = 4; state.notifyInvalidation.mockReset();
+    state.owners = {}; state.sessionKey = 'user'; state.canWrite = true; state.permissionsLoading = false; state.campaignId = 4; state.reloadPermissions.mockReset();
     Object.values(api).forEach(method => method.mockReset());
     api.listFormulas.mockResolvedValue([first]);
     api.getFormula.mockResolvedValue(first);
@@ -320,25 +320,23 @@ describe('formula workspace', () => {
     expect(screen.getByRole('textbox', { name: 'Выражение формулы Renamed' })).toHaveValue('pending content');
   });
 
-  it('notifies permissions invalidation after a forbidden write', async () => {
+  it('rechecks campaign permissions after a forbidden write', async () => {
     api.putFormulaContent.mockRejectedValueOnce(new CampaignApiError(403, { code: 'forbidden', title: 'Forbidden', detail: 'write forbidden' }));
     renderFormulas();
     fireEvent.change(await screen.findByRole('textbox', { name: 'Выражение формулы Original' }), { target: { value: 'draft' } });
     save();
-    await waitFor(() => expect(state.notifyInvalidation).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(state.reloadPermissions).toHaveBeenCalledTimes(1));
   });
 
-  it('keeps conflict drafts blocked across workspace invalidation until explicit row reread', async () => {
+  it('keeps conflict drafts blocked until explicit row reread', async () => {
     api.putFormulaContent.mockRejectedValueOnce(new CampaignApiError(409, { code: 'content_revision_conflict', title: 'Conflict', detail: 'revision conflict' }));
     api.getFormula.mockResolvedValueOnce({ ...first, name: 'Server name', metadataRevision: 11 });
     api.getFormulaContent.mockResolvedValueOnce(content(first.id)).mockResolvedValueOnce(content(first.id, 9, 'server', ['server']));
-    const view = renderFormulas();
+    renderFormulas();
     const expression = await screen.findByRole('textbox', { name: 'Выражение формулы Original' });
     fireEvent.change(expression, { target: { value: 'local draft' } }); save();
     await screen.findByRole('button', { name: 'Перечитать формулу Original' });
-    state.invalidation++;
-    view.rerender(formulasTree());
-    await waitFor(() => expect(api.listFormulas).toHaveBeenCalledTimes(2));
+    expect(api.listFormulas).toHaveBeenCalledTimes(1);
     expect(api.getFormulaContent).toHaveBeenCalledTimes(1);
     expect(expression).toHaveValue('local draft');
     save();
@@ -351,21 +349,6 @@ describe('formula workspace', () => {
     expect(expression).toHaveValue('local draft');
     expect(api.putFormulaContent).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: 'Перечитать формулу Server name' })).not.toBeInTheDocument();
-  });
-
-  it('reconciles clean metadata and content baselines on invalidation while preserving the dirty content draft', async () => {
-    api.listFormulas.mockResolvedValueOnce([first]).mockResolvedValueOnce([{ ...first, name: 'Server rename', metadataRevision: 9 }]);
-    api.getFormulaContent.mockResolvedValueOnce(content(first.id, 1)).mockResolvedValueOnce(content(first.id, 5, 'server expression', ['serverParam']));
-    const view = renderFormulas();
-    const expression = await screen.findByRole('textbox', { name: 'Выражение формулы Original' });
-    fireEvent.change(expression, { target: { value: 'local expression' } });
-    state.invalidation++;
-    view.rerender(formulasTree());
-    await screen.findByRole('textbox', { name: 'Название формулы Server rename' });
-    expect(screen.getByRole('textbox', { name: 'Выражение формулы Server rename' })).toHaveValue('local expression');
-    expect(api.putFormulaContent).not.toHaveBeenCalled(); expect(api.renameFormula).not.toHaveBeenCalled();
-    save();
-    await waitFor(() => expect(api.putFormulaContent).toHaveBeenCalledWith(4, first.id, { expression: 'local expression', parameters: ['x'], expectedRevision: 5 }));
   });
 
   it('prevents duplicate saves and edits while a write is pending', async () => {

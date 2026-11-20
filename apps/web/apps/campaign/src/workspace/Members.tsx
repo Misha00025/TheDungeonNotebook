@@ -205,10 +205,9 @@ const MembersPage: React.FC<{ campaignId: number }> = ({ campaignId }) => {
   const processing = access.displayAllowed && (participantsLoading || access.isBusy || searching || !access.writable);
   const assignmentErrors = Boolean(access.charsError || access.characters.some(entry => Boolean(entry.error || entry.unavailable)));
   const sectionReadErrorsSettled = access.displayAllowed && !participantsLoading && !processing;
-  return <section className={styles.page}>
+  return <section className={styles.page} aria-busy={participantsLoading || access.isBusy || searching || undefined}>
     <PageHeader title="Участники и доступ" />
     {access.feedback ? <Notification kind={access.feedback.kind} eventKey={String(access.feedback.event)}>{access.feedback.message}</Notification> : null}
-    {processing && <Notification kind="info" eventKey={`members-processing:${sessionKey}:${campaignId}`}>{searching || access.isBusy ? 'Обработка…' : 'Загрузка…'}</Notification>}
     {sectionReadErrorsSettled && (assignmentErrors || profilesFailed) && <Notification kind="warning" eventKey={`members-section-read:${sessionKey}:${campaignId}`}>{assignmentErrors && profilesFailed ? 'Не все данные списка участников доступны.' : assignmentErrors ? 'Не все назначения доступны.' : 'Не все профили доступны.'}</Notification>}
     {!access.displayAllowed && <p>Список членства доступен только управляющим доступом.</p>}
     {access.displayAllowed && <>
@@ -241,7 +240,7 @@ const MembersPage: React.FC<{ campaignId: number }> = ({ campaignId }) => {
       {sectionReadErrorsSettled && assignmentErrors && <Button type="button" variant="secondary" size="small" disabled={!access.writable || access.isBusy} onClick={access.reload}>Повторить загрузку назначений</Button>}
       {sectionReadErrorsSettled && profilesFailed && <Button type="button" variant="secondary" size="small" disabled={!access.writable || access.isBusy} onClick={() => setProfileRetryVersion(version => version + 1)}>Повторить загрузку профилей</Button>}
       {!access.listLoading && !access.listError && access.members.length === 0 && <p>Участников нет.</p>}
-      <DataTable aria-label="Участники кампании" aria-busy={participantsLoading || undefined} minWidth="48rem" className={styles.membersTable}>
+      <DataTable aria-label="Участники кампании" aria-busy={participantsLoading || access.isBusy || undefined} minWidth="48rem" className={styles.membersTable}>
         <thead><tr><th scope="col">#</th><th scope="col">Имя</th><th scope="col">Персонажи</th><th scope="col">Действия</th></tr></thead>
         <tbody>{access.members.map(member => <MemberRow key={`${campaignId}:${member.userId}`} member={member} campaignId={campaignId} sessionKey={sessionKey} access={access} onAssign={openAssignment} charactersComplete={charactersComplete} participantsLoading={participantsLoading} onProfileState={updateProfileState} profileRetryVersion={profileRetryVersion} />)}</tbody>
       </DataTable>

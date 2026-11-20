@@ -99,12 +99,12 @@ const Views: React.FC = () => {
     if (dirty && !window.confirm('Есть несохранённые изменения. Открыть создание отображения?')) return;
     setCreating(true); setSelectedId(''); setShowPages(false);
   };
-  const initialLoading = permissionsLoading || (!viewsResource.data && viewsResource.loading);
+  const initialLoading = !viewsResource.data && viewsResource.loading;
   return <main className={styles.page}>
     <h1>Отображения</h1>
-    <div className={sectionStyles.sectionBody} aria-busy={initialLoading}>
+    <div className={sectionStyles.sectionBody} aria-busy={initialLoading || permissionsLoading || undefined}>
     {Boolean(viewsResource.error) && <ApiError error={viewsResource.error} onRetry={viewsResource.reload} />}
-    {initialLoading && <StatePanel kind="loading">{permissionsLoading ? 'Проверка прав и загрузка раздела…' : 'Загрузка отображений кампании…'}</StatePanel>}
+    {initialLoading && <StatePanel kind="loading">Загрузка отображений кампании…</StatePanel>}
     <div className={styles.actions}>
       <Button type="button" disabled={!canWrite || creating || initialLoading} onClick={openCreate}>Создать отображение</Button>
       <Button variant="secondary" type="button" disabled={!canWrite || permissionsLoading || initialLoading} onClick={openPages}>Страницы кампании</Button>

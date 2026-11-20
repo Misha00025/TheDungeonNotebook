@@ -40,17 +40,14 @@ const GMCharacterEntry: React.FC<{ character: CharacterMetadata; href: string; c
   const resource = useResource(`${resourceKey}:${character.id}:description`, async () => (await api.getSheet(campaignId, character.id)).description);
   const description = resource.data?.trim() ? resource.data : undefined;
   const entryClass = character.importance === 'Secondary' ? styles.secondaryEntry : character.importance === 'Background' ? styles.backgroundEntry : styles.keyEntry;
-  const hasDescriptionArea = Boolean(description || (resource.loading && resource.data === undefined));
-  return <div className={`${styles.entryWrapper} ${character.importance === 'Key' ? styles.keyWrapper : ''}`}>
+  return <div className={`${styles.entryWrapper} ${character.importance === 'Key' ? styles.keyWrapper : ''}`} aria-busy={resource.loading || undefined}>
     <Button className={`${styles.characterEntry} ${entryClass}`} variant="ghost" type="button" aria-label={`Открыть лист ${character.name}`} onClick={() => navigate(href)}>
       <span className={styles.entryContent}>
         <span className={styles.characterName}>{character.name}</span>
-        {hasDescriptionArea && <span className={styles.descriptionArea}>
-          {resource.loading && resource.data === undefined
-            ? <span>Загрузка описания…</span>
-            : description && (character.importance === 'Key'
+        {description && <span className={styles.descriptionArea}>
+          {character.importance === 'Key'
               ? <ClampedText className={styles.characterDescription} maxHeight="calc(var(--key-card-width) * 4 / 3 * 0.4)">{description}</ClampedText>
-              : <span className={styles.characterDescription}>{description}</span>)}
+              : <span className={styles.characterDescription}>{description}</span>}
         </span>}
       </span>
     </Button>
@@ -61,9 +58,9 @@ const GMCharacterEntry: React.FC<{ character: CharacterMetadata; href: string; c
 const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const { groupId = '' } = useParams();
   const campaignId = Number(groupId);
-  const { api, path, sessionKey, invalidation } = useWorkspace();
+  const { api, path, sessionKey } = useWorkspace();
   const { campaign, mode, permissions, permissionsLoading } = useCampaignWorkspace();
-  const key = `${sessionKey}:${campaign.id}:characters:${invalidation}`;
+  const key = `${sessionKey}:${campaign.id}:characters`;
   const resource = useResource<CharacterMetadata[]>(key, () => api.listCharacters(campaignId));
   const [accesses, setAccesses] = useState<{ key: string; values: Record<string, Access> }>({ key, values: {} });
   const [search, setSearch] = useState('');
@@ -83,7 +80,7 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const headingId = React.useId();
   if (resource.loading && !resource.data) return <StatePanel kind="loading">Загрузка персонажей…</StatePanel>;
   if (resource.error && !resource.data) return <ApiError error={resource.error} onRetry={resource.reload} />;
-  return <section><List layout="vertical" stretch>
+  return <section aria-busy={resource.loading || !settled || undefined}><List layout="vertical" stretch>
     {!compact && <>
       <PageHeader
         title={mode === 'gm' ? 'Персонажи кампании' : 'Мои персонажи'}
@@ -96,7 +93,6 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
         <SearchBar searchTerm={search} onSearchChange={setSearch} aria-label="Поиск персонажей" compact />
       </Toolbar>
     </>}
-    {resource.loading && <StatePanel kind="loading">Обновление персонажей…</StatePanel>}
     {Boolean(resource.error) && <ApiError error={resource.error} onRetry={resource.reload} />}
     {!resource.data?.length && !resource.loading && !resource.error && <StatePanel kind="empty">{emptyText}</StatePanel>}
     {Boolean(resource.data?.length) && filtered.length === 0 && <StatePanel kind="empty">Совпадений нет.</StatePanel>}
@@ -152,7 +148,7 @@ const PermissionProbe: React.FC<{ character: CharacterMetadata; campaignId: numb
   const { api } = useWorkspace();
   const resource = useResource<Permissions>(`${resourceKey}:${character.id}:permissions`, () => api.characterPermissions(campaignId, character.id));
   useEffect(() => { if (resource.error) onResult(character.id, { error: resource.error }); else if (resource.data) onResult(character.id, resource.data); }, [character.id, resource.error, resource.data, onResult]);
-  return resource.loading ? <StatePanel kind="loading">Загрузка прав персонажа «{character.name}»…</StatePanel> : resource.error ? <ApiError error={resource.error} onRetry={resource.reload} /> : null;
+  return resource.error ? <ApiError error={resource.error} onRetry={resource.reload} /> : null;
 };
 
 export default Characters;

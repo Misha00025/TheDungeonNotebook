@@ -6,7 +6,17 @@ import Home from './Home';
 import type { HubRemoteProps } from '@tdn/shared';
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
-const makeAuth = (request: (url: string, options?: RequestInit) => Promise<Response>, userId = 4) => ({ status: 'authenticated', authenticated: true, userId, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request: async (url: string, options?: RequestInit) => { const result = await request(url, options); if (url.endsWith('/presentation')) { const body = await result.clone().json().catch(() => undefined); if (Array.isArray(body) && body.length === 0) return response({ contentRevision: 0, defaults: {}, contextParams: {} }); } return result; }, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
+const makeAuth = (request: (url: string, options?: RequestInit) => Promise<Response>, userId = 4) => ({ status: 'authenticated', authenticated: true, userId, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request: async (url: string, options?: RequestInit) => {
+  const result = await request(url, options);
+  if (!result.ok) return result;
+  const body = await result.clone().json().catch(() => undefined);
+  if (url.endsWith('/presentation') && Array.isArray(body) && body.length === 0) return response({ contentRevision: 1, defaults: { page_1: 'view-one', page_2: 'view-two' }, contextParams: { page_1: { title: 'Основное' }, page_2: { title: 'Дополнительно' } } });
+  if (url.includes('/presentation/resolve?') && Array.isArray(body) && body.length === 0) {
+    const contextKey = new URL(url, 'http://localhost').searchParams.get('contextKey') ?? '';
+    return response({ contextKey, viewMetadata: { id: contextKey, key: contextKey, campaignId: 12, name: contextKey, metadataRevision: 1 }, viewContent: { campaignId: 12, resourceId: contextKey, contentRevision: 1, data: { roots: [] } }, contextParams: null, contentRevision: 1 });
+  }
+  return result;
+}, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
 const campaign = (id = 12) => ({ id, name: `Campaign ${id}`, metadataRevision: 1 });
 const permissions = (canWrite = true) => ({ canRead: true, canWrite, canManageAccess: false });
 const renderApp = (initial: string, request: (url: string, options?: RequestInit) => Promise<Response>) => render(<MemoryRouter initialEntries={[initial]}><App auth={makeAuth(request)} /></MemoryRouter>);
@@ -54,7 +64,7 @@ describe('campaign first iteration', () => {
   it('routes views and safely rejects unsupported destinations', async () => {
     const supported = vi.fn(async (url: string, _options?: RequestInit) => url.endsWith('/permissions') ? response(permissions()) : url === '/api/campaigns/12' ? response(campaign()) : url.endsWith('/views') ? response([]) : response([]));
     const supportedView = renderApp('/12/gm/views', supported);
-    expect(await screen.findByRole('heading', { name: 'Представления' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Отображения' })).toBeInTheDocument();
     expect(supported.mock.calls.some(([url]) => url === '/api/campaigns/12/views')).toBe(true);
     expect(supported.mock.calls.some(([url, options]) => url.includes('/views') && options?.method === 'DELETE')).toBe(false);
     supportedView.unmount();
@@ -185,7 +195,7 @@ describe('campaign first iteration', () => {
     const id = 'abcdef02-2345-6789-abcd-ef0123456789';
     const request = vi.fn(async (url: string) => url === '/api/campaigns/12' ? response(campaign()) : url === '/api/campaigns/12/permissions' ? response(permissions(false)) : url === '/api/campaigns/12/characters' ? response([{ id, campaignId: 12, name: 'Pending hero', importance: 'Secondary', metadataRevision: 1 }]) : url.endsWith(`/characters/${id}/permissions`) ? pending : response([]));
     renderApp('/12/player/characters', request);
-    expect(await screen.findByText('Загрузка прав персонажа «Pending hero»…')).toBeInTheDocument();
+    await waitFor(() => expect(request.mock.calls.some(([url]) => url === `/api/campaigns/12/characters/${id}/permissions`)).toBe(true));
     expect(screen.queryByRole('heading', { name: 'Pending hero', level: 4 })).not.toBeInTheDocument();
     resolve(response({ code: 'forbidden', title: 'Forbidden', detail: 'No access' }, 403));
     expect(await screen.findByText(/Не удалось загрузить права для 1 персонажей/)).toBeInTheDocument();
@@ -202,9 +212,9 @@ describe('campaign first iteration', () => {
     expect(request.mock.calls.map(([url]) => url).some(url => /templates|members|assignments|sheet|computed-sheet/.test(url))).toBe(false);
   });
 
-  it('redirects supported legacy character routes to the matching basic tab', async () => {
+  it('redirects supported legacy character routes to the first configured page', async () => {
     const id = 'abcdef01-2345-6789-abcd-ef0123456789';
-    for (const [legacy, tab] of [['', 'overview'], ['/stats', 'stats'], ['/base', 'overview'], ['/resources', 'overview']]) {
+    for (const legacy of ['', '/stats', '/base', '/resources']) {
       const request = vi.fn(async (url: string) => {
         if (url === '/api/campaigns/12') return response(campaign());
         if (url === '/api/campaigns/12/permissions') return response(permissions());
@@ -215,9 +225,9 @@ describe('campaign first iteration', () => {
         if (url.endsWith('/characters')) return response([{ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
         return response([]);
       });
-      const view = renderApp(`/12/character/${id}${legacy}`, request);
-      const sheetNavigation = await screen.findByRole('navigation', { name: 'Лист персонажа' });
-      await waitFor(() => expect(within(sheetNavigation).getByRole('link', { name: tab === 'stats' ? 'Характеристики' : 'Обзор' })).toHaveAttribute('aria-current', 'page'));
+       const view = renderApp(`/12/character/${id}${legacy}`, request);
+       const sheetNavigation = await screen.findByRole('navigation', { name: 'Страницы персонажа' });
+       await waitFor(() => expect(within(sheetNavigation).getByRole('link', { name: 'Основное' })).toHaveAttribute('aria-current', 'page'));
       expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(true);
       expect(request.mock.calls.map(([url]) => url).some(url => /formulas|virtual-fields|custom-virtual-fields|virtual-overrides|assignments/.test(url))).toBe(false);
       view.unmount();
@@ -235,15 +245,17 @@ describe('campaign first iteration', () => {
       if (url.endsWith('/characters')) return response([{ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
       return response([]);
     });
-    renderApp(`/12/gm/characters/${id}/stats`, request);
-    expect(await screen.findByRole('link', { name: 'Характеристики' })).toHaveAttribute('aria-current', 'page');
+    renderApp(`/12/gm/characters/${id}/page_2`, request);
+    expect(await screen.findByRole('link', { name: 'Дополнительно' })).toHaveAttribute('aria-current', 'page');
     fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
-    await waitFor(() => expect(screen.getByRole('link', { name: 'Характеристики' })).toHaveAttribute('href', `/12/player/characters/${id}/stats`));
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Дополнительно' })).toHaveAttribute('href', `/12/player/characters/${id}/page_2`));
+    expect(screen.getByRole('link', { name: 'Дополнительно' })).toHaveAttribute('aria-current', 'page');
     expect(request.mock.calls.some(([url]) => url === `/api/campaigns/12/characters/${id}/permissions`)).toBe(true);
     expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(true);
     expect(request.mock.calls.map(([url]) => url).some(url => /formulas|virtual-fields|custom-virtual-fields|virtual-overrides|assignments/.test(url))).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'Пространство мастера' }));
-    await waitFor(() => expect(screen.getByRole('link', { name: 'Характеристики' })).toHaveAttribute('href', `/12/gm/characters/${id}/stats`));
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Дополнительно' })).toHaveAttribute('href', `/12/gm/characters/${id}/page_2`));
+    expect(screen.getByRole('link', { name: 'Дополнительно' })).toHaveAttribute('aria-current', 'page');
   });
 
   it.each([403, 404])('falls back to the target character list when mode access returns %s', async status => {
@@ -261,8 +273,8 @@ describe('campaign first iteration', () => {
       if (url.endsWith('/characters')) return response([{ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 }]);
       return response([]);
     });
-    renderApp(`/12/gm/characters/${id}/stats`, request);
-    await screen.findByRole('link', { name: 'Характеристики' });
+    renderApp(`/12/gm/characters/${id}/page_2`, request);
+    await screen.findByRole('link', { name: 'Дополнительно' });
     fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
     expect(await screen.findByRole('heading', { name: 'Мои персонажи' })).toBeInTheDocument();
     expect(request.mock.calls.some(([url]) => url.endsWith('/assignments'))).toBe(false);
@@ -282,13 +294,14 @@ describe('campaign first iteration', () => {
       if (url.endsWith(`/characters/${id}`)) return response({ id, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
       return response([]);
     });
-    renderApp(`/12/gm/characters/${id}/stats`, request);
-    await screen.findByRole('link', { name: 'Характеристики' });
+    renderApp(`/12/gm/characters/${id}/page_2`, request);
+    await screen.findByRole('link', { name: 'Дополнительно' });
     fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
     expect(await screen.findByText('Зависимый сервис временно недоступен.')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('Try later');
     expect(document.body.textContent).not.toContain('dependency_unavailable');
-    expect(screen.getByRole('link', { name: 'Характеристики' })).toHaveAttribute('href', `/12/gm/characters/${id}/stats`);
+    expect(screen.getByRole('link', { name: 'Дополнительно' })).toHaveAttribute('href', `/12/gm/characters/${id}/page_2`);
+    expect(screen.getByRole('link', { name: 'Дополнительно' })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('heading', { name: 'Мои персонажи' })).not.toBeInTheDocument();
     expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(true);
   });

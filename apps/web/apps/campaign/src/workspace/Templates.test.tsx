@@ -7,9 +7,9 @@ import Templates from './Templates';
 import { CampaignApiError } from './api';
 import type { BaseField, BaseFieldInput, TemplateContentEnvelope, VirtualField, VirtualFieldInput } from './types';
 
-const shared = vi.hoisted(() => ({ dirty: false, canWrite: true, permissionsLoading: false, invalidation: 0, sessionKey: 'user' }));
+const shared = vi.hoisted(() => ({ dirty: false, canWrite: true, permissionsLoading: false, sessionKey: 'user' }));
 const api = vi.hoisted(() => ({ listFormulas: vi.fn(), getFormulaContent: vi.fn(), getTemplate: vi.fn(), getTemplateContent: vi.fn(), renameTemplate: vi.fn(), putTemplateContent: vi.fn(), putTemplateVirtualFields: vi.fn() }));
-vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, sessionKey: shared.sessionKey, invalidation: shared.invalidation, notifyInvalidation: vi.fn() }), useDirtyDraft: (_owner: string, dirty: boolean) => { shared.dirty = dirty; return () => { shared.dirty = false; }; } }));
+vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, sessionKey: shared.sessionKey }), useDirtyDraft: (_owner: string, dirty: boolean) => { shared.dirty = dirty; return () => { shared.dirty = false; }; } }));
 vi.mock('./Shell', () => ({ useCampaignWorkspace: () => ({ campaign: { id: 4 }, permissions: { canWrite: shared.canWrite }, lastKnownPermissions: { canWrite: shared.canWrite }, permissionsLoading: shared.permissionsLoading }) }));
 
 const base = (id: string, key: string, title = key, value: BaseField['value'] = 0): BaseField => ({ id, key, title, description: `description ${key}`, valueType: 'Number', typeRevision: 5, value, options: [] });
@@ -34,7 +34,6 @@ describe('singleton campaign template editor', () => {
     shared.dirty = false;
     shared.canWrite = true;
     shared.permissionsLoading = false;
-    shared.invalidation = 0;
     shared.sessionKey = 'user';
     Object.values(api).forEach(method => method.mockReset());
     serverContent = content();
@@ -510,22 +509,6 @@ describe('singleton campaign template editor', () => {
     expect(api.putTemplateContent).not.toHaveBeenCalled();
   });
 
-  it('unlocks header actions when invalidation removes the active modal row', async () => {
-    const view = renderTemplates();
-    await screen.findByLabelText('Название базового поля Alpha');
-    fireEvent.change(baseTitle('Beta'), { target: { value: 'Beta draft' } });
-    fireEvent.click(within(baseRow('Alpha')).getByRole('button', { name: 'Описание базового поля Alpha' }));
-    expect(screen.getByRole('dialog', { name: 'Описание поля Alpha' })).toBeInTheDocument();
-    api.getTemplateContent.mockResolvedValueOnce(content(12, [base('base-b', 'b', 'Beta')], [virtual('virtual-a', 'v', 'Virtual')]));
-    shared.invalidation++;
-    view.rerender(tree());
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Описание поля Alpha' })).not.toBeInTheDocument());
-    expect(baseTitle('Beta draft')).toHaveValue('Beta draft');
-    expect(globalSaveButton()).toBeEnabled();
-    expect(globalCancelButton()).toBeEnabled();
-    expect(api.putTemplateContent).not.toHaveBeenCalled();
-  });
-
   it('retains drafts while permissions are unavailable and allows local cancel', async () => {
     const view = renderTemplates();
     await screen.findByLabelText('Название базового поля Alpha');
@@ -543,25 +526,6 @@ describe('singleton campaign template editor', () => {
     fireEvent.click(globalCancelButton());
     expect(baseTitle('Alpha')).toHaveValue('Alpha');
     confirm.mockRestore();
-  });
-
-  it('offers persistent explicit recovery after a failed read without background loops', async () => {
-    const view = renderTemplates();
-    await screen.findByLabelText('Название базового поля Alpha');
-    fireEvent.change(baseTitle('Alpha'), { target: { value: 'Local draft' } });
-    api.getTemplateContent.mockRejectedValueOnce(new Error('read failed'));
-    shared.invalidation = 1;
-    view.rerender(tree());
-    expect(await screen.findByRole('button', { name: 'Повторить загрузку' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Перечитать содержимое' })).not.toBeInTheDocument();
-    api.getTemplateContent.mockResolvedValueOnce(content(12));
-    fireEvent.click(screen.getByRole('button', { name: 'Повторить загрузку' }));
-    await waitFor(() => {
-      expect(api.getTemplateContent).toHaveBeenCalledTimes(3);
-      expect(globalSaveButton()).toBeEnabled();
-      expect(screen.queryByRole('button', { name: 'Повторить загрузку' })).not.toBeInTheDocument();
-    });
-    expect(baseTitle('Local draft')).toHaveValue('Local draft');
   });
 
   it('ignores late content from a prior campaign and does not call template metadata endpoints', async () => {

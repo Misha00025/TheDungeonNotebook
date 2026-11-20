@@ -21,13 +21,13 @@ const importanceLabel: Record<string, string> = { Background: 'Фоновый', 
 type MetadataDraft = { name: string; importance: CharacterMetadata['importance'] };
 type FieldFingerprint = { valueType: ValueType; typeRevision: Revision; options: ChoiceOption[]; baselineValue: JsonValue };
 type PendingFieldWrite = { value: JsonValue; raw?: string; fingerprint: FieldFingerprint };
-type ContentWriter = <T extends { contentRevision: Revision }>(operation: (revision: Revision) => Promise<T>, confirmed: (result: T) => void) => Promise<void>;
+type ContentWriter = <T extends { contentRevision: Revision }>(operation: (revision: Revision) => Promise<T>, confirmed: (result: T) => void, refreshComputed?: boolean) => Promise<void>;
 const sheetSchemaFingerprint = (value: ComputedSheet) => stringifyJson({ templateContentRevision: value.templateContentRevision, baseFields: value.baseFields.map(field => ({ id: field.id, key: field.key, title: field.title, description: field.description, valueType: field.valueType, typeRevision: field.typeRevision, options: field.options })) });
 const fieldFingerprint = (field: ComputedSheet['baseFields'][number]): FieldFingerprint => ({ valueType: field.valueType, typeRevision: field.typeRevision, options: field.options.map(option => ({ optionKey: option.optionKey, title: option.title })), baselineValue: field.effectiveValue });
 const sameFingerprint = (left: FieldFingerprint, right: FieldFingerprint) => left.valueType === right.valueType && stringifyJson(left.typeRevision) === stringifyJson(right.typeRevision) && stringifyJson(left.options) === stringifyJson(right.options);
 
 const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKey?: string; stats?: boolean }> = ({ campaignId, characterId, pageKey }) => {
-  const { api, path, sessionKey, invalidation, notifyInvalidation, navigate } = useWorkspace();
+  const { api, path, sessionKey, navigate } = useWorkspace();
   const campaignWorkspace = useOptionalCampaignWorkspace();
   const { visitCharacter } = useVisitHistory();
   const mode = useLocation().pathname.includes('/gm/') ? 'gm' : 'player';
@@ -68,6 +68,8 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
   const [metadataBlocked, setMetadataBlocked] = useState(false);
   const [snapshotError, setSnapshotError] = useState<unknown>();
   const [snapshotBusy, setSnapshotBusy] = useState(false);
+  const [computedReadError, setComputedReadError] = useState<unknown>();
+  const [computedReadBusy, setComputedReadBusy] = useState(false);
   const [writeStatus, setWriteStatus] = useState('');
   const [writeStatusKind, setWriteStatusKind] = useState<NotificationKind>('success');
   const [writeStatusEvent, setWriteStatusEvent] = useState(0);
@@ -87,6 +89,8 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
   const metadataBusyRef = useRef(false);
   const snapshotGenerationRef = useRef(0);
   const snapshotBusyRef = useRef(false);
+  const computedReadBusyRef = useRef(false);
+  const computedReadGenerationRef = useRef(0);
   const lastPermissionRef = useRef<Permissions | undefined>(undefined);
   const initializedRef = useRef(false);
   const recordedCharacter = useRef<string | null>(null);
@@ -202,10 +206,39 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
     if (!hasUnconfirmedDrafts()) { blockedRef.current = false; setSheetBlocked(false); }
     else if (!changed) { blockedRef.current = false; setSheetBlocked(false); }
   };
+  const refreshComputedSheet = useCallback(async (duringContentWrite = false) => {
+    if (!activeRef.current || computedReadBusyRef.current || (!duringContentWrite && contentBusyRef.current) || snapshotBusyRef.current) return;
+    computedReadBusyRef.current = true;
+    setComputedReadBusy(true);
+    setComputedReadError(undefined);
+    const generation = ++computedReadGenerationRef.current;
+    const snapshotGeneration = snapshotGenerationRef.current;
+    try {
+      const fresh = await api.getComputedSheet(campaignId, characterId);
+      if (!activeRef.current || generation !== computedReadGenerationRef.current || snapshotGeneration !== snapshotGenerationRef.current) return;
+      acceptFreshSheet(fresh);
+    } catch (error) {
+      if (!activeRef.current || generation !== computedReadGenerationRef.current || snapshotGeneration !== snapshotGenerationRef.current) return;
+      setComputedReadError(error);
+      if (error instanceof CampaignApiError && error.status === 403) {
+        setPermissionCheckError(undefined);
+        campaignWorkspace?.reloadPermissions();
+        permissionResource.reload();
+      }
+    } finally {
+      if (generation === computedReadGenerationRef.current) {
+        computedReadBusyRef.current = false;
+        if (activeRef.current) setComputedReadBusy(false);
+      }
+    }
+  }, [api, campaignId, characterId, campaignWorkspace, permissionResource.reload]);
   const refreshAll = useCallback(async () => {
     if (!initializedRef.current || !activeRef.current) return;
     if (refreshBusyRef.current || contentBusyRef.current || processorBusyRef.current || metadataBusyRef.current) { refreshQueuedRef.current = true; return; }
     refreshBusyRef.current = true; snapshotBusyRef.current = true; setSnapshotBusy(true); setSnapshotError(undefined); setPermissionCheckError(undefined);
+    computedReadGenerationRef.current += 1;
+    computedReadBusyRef.current = false;
+    setComputedReadBusy(false);
     const generation = ++snapshotGenerationRef.current;
     const results = await Promise.allSettled([
       api.getPresentation(campaignId),
@@ -217,7 +250,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
       const [presentationResult, sheetResult, permissionResult, metadataResult] = results;
       if (presentationResult.status === 'fulfilled') { setPresentation(presentationResult.value); setPresentationError(undefined); setPresentationRefreshKey(value => value + 1); }
       else setPresentationError(presentationResult.reason);
-      if (sheetResult.status === 'fulfilled') { setSnapshotError(undefined); acceptFreshSheet(sheetResult.value); }
+      if (sheetResult.status === 'fulfilled') { setSnapshotError(undefined); setComputedReadError(undefined); acceptFreshSheet(sheetResult.value); }
       else setSnapshotError(sheetResult.reason);
       if (permissionResult.status === 'fulfilled') {
         setPermissionSnapshot(permissionResult.value); setPermissionCheckError(undefined); setPermissionDirectVerified(true); lastPermissionRef.current = permissionResult.value;
@@ -238,12 +271,6 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
   }, [api, campaignId, characterId]);
   refreshAllRef.current = () => { void refreshAll(); };
 
-  const observedInvalidationRef = useRef(invalidation);
-  useEffect(() => {
-    if (observedInvalidationRef.current === invalidation) return;
-    observedInvalidationRef.current = invalidation;
-    void refreshAll();
-  }, [invalidation, refreshAll]);
   const metadataMutation = useMutation(async (draft: MetadataDraft) => {
     if (metadataBusyRef.current || snapshotBusyRef.current || metadataBlocked || !canWrite) return undefined;
     metadataBusyRef.current = true;
@@ -257,7 +284,6 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
         setMetadata(result);
         setMetadataDraft(undefined);
         showWriteStatus('Метаданные сохранены.');
-        notifyInvalidation();
       }
       return result;
     } catch (error) {
@@ -265,7 +291,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
         setMetadataError(error);
         setWriteStatus('');
         setSnapshotError(undefined); setMetadataBlocked(true);
-        if (error instanceof CampaignApiError && error.status === 403) { setPermissionCheckError(undefined); notifyInvalidation(); }
+        if (error instanceof CampaignApiError && error.status === 403) { setPermissionCheckError(undefined); campaignWorkspace?.reloadPermissions(); permissionResource.reload(); }
       }
       return undefined;
     } finally { metadataBusyRef.current = false; if (refreshQueuedRef.current && activeRef.current) { refreshQueuedRef.current = false; void refreshAll(); } }
@@ -273,9 +299,10 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
 
   const runContent = async <T extends { contentRevision: Revision }>(
     operation: (revision: Revision) => Promise<T>,
-    confirmed: (result: T) => void
+    confirmed: (result: T) => void,
+    refreshComputed = false
   ) => {
-    if (!canWriteRef.current || blockedRef.current || contentBusyRef.current || snapshotBusyRef.current || contentRevisionRef.current === undefined) return;
+    if (!canWriteRef.current || blockedRef.current || contentBusyRef.current || computedReadBusyRef.current || snapshotBusyRef.current || contentRevisionRef.current === undefined) return;
     contentBusyRef.current = true;
     setContentBusy(true);
     setWriteError(undefined);
@@ -285,13 +312,13 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
       if (!activeRef.current) return;
       contentRevisionRef.current = result.contentRevision;
       confirmed(result);
-      notifyInvalidation();
+      if (refreshComputed) await refreshComputedSheet(true);
     } catch (error) {
       if (!activeRef.current) return;
       stopPendingFields();
       setWriteError(error);
       setWriteStatus('');
-      if (error instanceof CampaignApiError && error.status === 403) { setPermissionCheckError(undefined); notifyInvalidation(); }
+      if (error instanceof CampaignApiError && error.status === 403) { setPermissionCheckError(undefined); campaignWorkspace?.reloadPermissions(); permissionResource.reload(); }
       setSnapshotError(undefined); blockedRef.current = true; setSheetBlocked(true);
     } finally {
       contentBusyRef.current = false;
@@ -308,7 +335,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
       while (pendingFieldWritesRef.current.size > 0) {
         if (!activeRef.current) return;
         if (!canWriteRef.current) { stopPendingFields(); return; }
-        if (blockedRef.current || snapshotBusyRef.current || contentBusyRef.current) return;
+         if (blockedRef.current || snapshotBusyRef.current || contentBusyRef.current || computedReadBusyRef.current) return;
         const [fieldId, item] = pendingFieldWritesRef.current.entries().next().value as [string, PendingFieldWrite];
         pendingFieldWritesRef.current.delete(fieldId);
         if (validityRef.current[fieldId]) { failedFieldWritesRef.current.add(fieldId); continue; }
@@ -354,8 +381,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
               setResetCounters(counters => ({ ...counters, [fieldId]: (counters[fieldId] ?? 0) + 1 }));
               failedFieldWritesRef.current.delete(fieldId);
             }
-            showWriteStatus('Поле сохранено.');
-          }
+          }, true
         );
         if (!activeRef.current) return;
         if (!accepted) { failedFieldWritesRef.current.add(fieldId); stopPendingFields(); return; }
@@ -370,7 +396,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
   }, [canWrite, sheetBlocked]);
 
   const saveField = (fieldId: string) => {
-    if (!canWriteRef.current || blockedRef.current || contentBusyRef.current || snapshotBusyRef.current) return;
+    if (!canWriteRef.current || blockedRef.current || contentBusyRef.current || computedReadBusyRef.current || snapshotBusyRef.current) return;
     const currentField = sheetRef.current?.baseFields.find(field => field.id === fieldId);
     if (!currentField) { failedFieldWritesRef.current.add(fieldId); updateValidity(errors => ({ ...errors, [fieldId]: 'Характеристика больше недоступна.' })); return; }
     const fingerprint = fieldFingerprintsRef.current[fieldId];
@@ -406,7 +432,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
     setDescriptionDraft(undefined);
   };
   const cancelField = (fieldId: string) => {
-    if (contentBusyRef.current) return;
+    if (contentBusyRef.current || computedReadBusyRef.current) return;
     if ((Object.prototype.hasOwnProperty.call(fieldDraftsRef.current, fieldId) || Object.prototype.hasOwnProperty.call(rawDraftsRef.current, fieldId) || Boolean(validityRef.current[fieldId])) && !window.confirm('Отменить черновик поля?')) return;
     pendingFieldWritesRef.current.delete(fieldId);
     failedFieldWritesRef.current.delete(fieldId);
@@ -427,7 +453,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
     if (reference.kind !== 'Base' || !editorAllowed || permissionError) return undefined;
     const field = sheetRef.current?.baseFields.find(item => item.id === reference.fieldId);
     if (!field) return <span role="status">Характеристика недоступна.</span>;
-    const inlineDisabled = permissionPending || !canWrite || sheetBlocked || snapshotBusy || contentBusy;
+    const inlineDisabled = permissionPending || !canWrite || sheetBlocked || snapshotBusy || contentBusy || computedReadBusy;
     const fingerprint = fieldFingerprints[field.id];
     const fingerprintMismatch = Boolean(fingerprint && !sameFingerprint(fingerprint, fieldFingerprint(field)));
     const hasDraft = Object.prototype.hasOwnProperty.call(fieldDrafts, field.id) || Object.prototype.hasOwnProperty.call(rawDrafts, field.id) || Boolean(validity[field.id]);
@@ -440,7 +466,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
       if (display !== undefined || event.key !== 'Enter' || event.nativeEvent.isComposing || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLButtonElement) return;
       event.preventDefault(); saveField(field.id);
     }}>
-      <fieldset className={`${characterStyles.valueField} ${inline ? characterStyles.inlineValueField : ''}`} disabled={permissionPending || !canWrite || sheetBlocked || snapshotBusy || contentBusy}>
+      <fieldset className={`${characterStyles.valueField} ${inline ? characterStyles.inlineValueField : ''}`} disabled={permissionPending || !canWrite || sheetBlocked || snapshotBusy || contentBusy || computedReadBusy}>
         <ValueInput key={`${field.id}:${resetCounters[field.id] ?? 0}`} label={label} compact inline={inline} field={{ valueType: inputFingerprint.valueType, options: inputFingerprint.options }} value={value} controlledNumericDraft={raw} onRawChange={inputFingerprint.valueType === 'Integer' || inputFingerprint.valueType === 'Number' ? next => {
           captureFingerprint(field); updateRawDrafts(current => ({ ...current, [field.id]: next })); setWriteStatus('');
         } : undefined} onChange={next => { captureFingerprint(field); updateDrafts(current => ({ ...current, [field.id]: next })); setWriteStatus(''); }} onValidityChange={error => {
@@ -455,8 +481,8 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
       </fieldset>
       {fieldIssue && <span role="alert">{fieldIssue}</span>}
       {display === undefined && hasDraft && <ActionRow>
-        <Button type="button" disabled={!canWrite || permissionPending || contentBusy || sheetBlocked || snapshotBusy || Boolean(fieldIssue)} onClick={() => saveField(field.id)}>Сохранить значение {label}</Button>
-        <Button variant="secondary" type="button" disabled={contentBusy} onClick={() => cancelField(field.id)}>Отменить</Button>
+        <Button type="button" disabled={!canWrite || permissionPending || contentBusy || computedReadBusy || sheetBlocked || snapshotBusy || Boolean(fieldIssue)} onClick={() => saveField(field.id)}>Сохранить значение {label}</Button>
+        <Button variant="secondary" type="button" disabled={contentBusy || computedReadBusy} onClick={() => cancelField(field.id)}>Отменить</Button>
       </ActionRow>}
     </div>;
     if (display !== undefined) return <InlineValueEditor display={display} label={label} disabled={inlineDisabled} issue={fieldIssue} onCommit={() => { if (Object.prototype.hasOwnProperty.call(fieldDraftsRef.current, field.id) || Object.prototype.hasOwnProperty.call(rawDraftsRef.current, field.id)) saveField(field.id); }}>{editor}</InlineValueEditor>;
@@ -519,9 +545,9 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
   const ensureMetadataDraft = () => setMetadataDraft(current => current ?? { name: metadata.name, importance: metadata.importance });
   const saveMetadata = async () => { if (metadataDraft) await metadataMutation.run(metadataDraft); };
   const metadataControlsDisabled = permissionPending || !canWrite || metadataMutation.busy || metadataBlocked || snapshotBusy;
-  const descriptionControlsDisabled = permissionPending || !canWrite || contentBusy || sheetBlocked || snapshotBusy;
+  const descriptionControlsDisabled = permissionPending || !canWrite || contentBusy || computedReadBusy || sheetBlocked || snapshotBusy;
   const handleDescriptionEscape = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Escape' && !contentBusy) { event.preventDefault(); cancelDescription(); }
+    if (event.key === 'Escape' && !contentBusy && !computedReadBusy) { event.preventDefault(); cancelDescription(); }
   };
   const handleMetadataEscape = (event: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
     if (event.key === 'Escape' && !metadataMutation.busy) { event.preventDefault(); cancelMetadata(); }
@@ -534,7 +560,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
   const baseEntryWithDraft = Boolean(!pageKey && pages[0] && (routeDirty || hasUnconfirmedDrafts()));
   const displayedPageKey = pageKey ?? (baseEntryWithDraft ? pages[0]?.key : undefined);
   const visiblePage = Boolean(displayedPageKey && pages.some(page => page.key === displayedPageKey));
-  const shellBusy = presentationPending || snapshotBusy || (permissionResource.loading && !permissionSnapshot);
+   const shellBusy = presentationPending || snapshotBusy || computedReadBusy || (permissionResource.loading && !permissionSnapshot);
   return <section className={characterStyles.sheetSection} aria-busy={shellBusy}>
     {!readAllowed ? <div className={characterStyles.accessState}>
       {Boolean(permissionError || snapshotError) ? <><ApiError error={permissionError ?? snapshotError} onRetry={() => void refreshAll()} /><Button variant="secondary" type="button" onClick={() => void refreshAll()}>Проверить доступ и данные</Button></> : <Notification kind="warning" eventKey={`${scope}:permission`}>Доступ к актуальным данным персонажа не подтверждён.</Notification>}
@@ -550,12 +576,12 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
           : <Badge>{importanceLabel[metadata.importance] ?? metadata.importance}</Badge>}
         subtitle={descriptionDraft !== undefined ? <List layout="vertical" gap="small" stretch className={characterStyles.description}>
           <Textarea aria-label="Описание" autoFocus value={descriptionDraft} disabled={descriptionControlsDisabled} onChange={event => { setWriteStatus(''); setDescriptionDraft(event.target.value); }} onKeyDown={handleDescriptionEscape} />
-          <ActionRow><IconButton icon="check" title="Сохранить описание" ariaLabel="Сохранить описание" size="small" variant="secondary" disabled={descriptionDraft === sheet.description || descriptionControlsDisabled} onClick={saveDescription} /><IconButton icon="close" title="Отменить изменения описания" ariaLabel="Отменить изменения описания" size="small" variant="secondary" disabled={contentBusy} onClick={cancelDescription} /></ActionRow>
+          <ActionRow><IconButton icon="check" title="Сохранить описание" ariaLabel="Сохранить описание" size="small" variant="secondary" disabled={descriptionDraft === sheet.description || descriptionControlsDisabled} busy={contentBusy} onClick={saveDescription} /><IconButton icon="close" title="Отменить изменения описания" ariaLabel="Отменить изменения описания" size="small" variant="secondary" disabled={contentBusy || computedReadBusy} onClick={cancelDescription} /></ActionRow>
         </List> : sheet.description || canWrite ? <List layout="vertical" gap="small" stretch className={characterStyles.description}><List layout="horizontal" gap="small">{sheet.description && <span className={characterStyles.descriptionText}>{sheet.description}</span>}{canWrite && <IconButton icon="edit" title="Изменить описание" ariaLabel="Изменить описание" size="small" variant="secondary" disabled={descriptionControlsDisabled} onClick={() => { setDescriptionDraft(sheet.description); setWriteStatus(''); }} />}</List></List> : undefined}
         actions={<ActionRow justify="end">
           {currentPermissions && !currentPermissions.canWrite && <Badge>Только чтение</Badge>}
           {metadataDraft === undefined && canWrite && <IconButton icon="edit" title="Изменить сведения персонажа" ariaLabel="Изменить сведения персонажа" size="small" variant="secondary" disabled={metadataControlsDisabled} onClick={ensureMetadataDraft} />}
-          {metadataDraft !== undefined && <><IconButton icon="check" title="Сохранить сведения персонажа" ariaLabel="Сохранить сведения персонажа" size="small" variant="secondary" disabled={!metadataDirty || metadataControlsDisabled} onClick={() => void saveMetadata()} /><IconButton icon="close" title="Отменить изменения сведений персонажа" ariaLabel="Отменить изменения сведений персонажа" size="small" variant="secondary" disabled={metadataMutation.busy} onClick={cancelMetadata} /></>}
+          {metadataDraft !== undefined && <><IconButton icon="check" title="Сохранить сведения персонажа" ariaLabel="Сохранить сведения персонажа" size="small" variant="secondary" disabled={!metadataDirty || metadataControlsDisabled} busy={metadataMutation.busy} onClick={() => void saveMetadata()} /><IconButton icon="close" title="Отменить изменения сведений персонажа" ariaLabel="Отменить изменения сведений персонажа" size="small" variant="secondary" disabled={metadataMutation.busy} onClick={cancelMetadata} /></>}
           <LinkButton className={styles.desktopOnly} to={path(`/${campaignId}/${mode}/characters`)} variant="secondary">К персонажам</LinkButton>
         </ActionRow>}
       />
@@ -568,6 +594,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
       {serverMetadataSnapshot ? <div className={characterStyles.pageConflict}><Notification kind="warning" eventKey={String(serverMetadataSnapshot.metadataRevision)}>Метаданные персонажа изменились на сервере.</Notification><ActionRow><Button type="button" onClick={useServerMetadataAsBase}>Использовать актуальную ревизию</Button><Button variant="secondary" type="button" onClick={loadServerMetadata}>Загрузить серверную версию</Button></ActionRow></div> : null}
       {(sheetBlocked || metadataBlocked) && !serverSheetSnapshot && !serverMetadataSnapshot && <div className={characterStyles.pageConflict}><Notification kind="warning" eventKey={`${sheetBlocked}:${metadataBlocked}`}>Проверяем результат сохранения. Повторная запись автоматически не выполняется.</Notification><Button variant="secondary" type="button" disabled={snapshotBusy} onClick={retrySnapshot}>Проверить данные и права</Button></div>}
       {Boolean(snapshotError) && <ApiError error={snapshotError} onRetry={retrySnapshot} />}
+      {Boolean(computedReadError) && <><ApiError error={computedReadError} /><Button variant="secondary" type="button" disabled={computedReadBusy || contentBusy || snapshotBusy} onClick={() => void refreshComputedSheet()}>Повторить обновление расчётов</Button></>}
       {pageNavigable && visiblePage && !pageRefreshConflict && presentationSheet && <CharacterPresentation campaignId={campaignId} characterId={characterId} pageKey={displayedPageKey!} sheet={presentationSheet} conditionSheet={sheet} refreshKey={presentationRefreshKey} renderValue={editorAllowed ? renderValue : undefined} onVisibleFieldsChange={onVisibleFieldsChange} />}
       {Boolean(writeError) && <ApiError error={writeError} onRetry={() => void refreshAll()} />}{Boolean(metadataError) && <ApiError error={metadataError} onRetry={() => void refreshAll()} />}
       {writeStatus && <Notification kind={writeStatusKind} eventKey={writeStatusEvent}>{writeStatus}</Notification>}

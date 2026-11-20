@@ -6,10 +6,10 @@ import type { BaseField, Revision, TemplateContentEnvelope, VirtualField } from 
 import { useTemplateFields } from './useTemplateFields';
 import { projectBaseField } from './templateFieldRows';
 
-const context = vi.hoisted(() => ({ sessionKey: 'session-a', invalidation: 0, canWrite: true, permissionsLoading: false, invalidated: vi.fn(), dirtyOwners: {} as Record<string, boolean> }));
+const context = vi.hoisted(() => ({ sessionKey: 'session-a', canWrite: true, permissionsLoading: false, reloadPermissions: vi.fn(), dirtyOwners: {} as Record<string, boolean> }));
 const api = vi.hoisted(() => ({ getTemplateContent: vi.fn(), putTemplateContent: vi.fn(), putTemplateVirtualFields: vi.fn() }));
-vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, sessionKey: context.sessionKey, invalidation: context.invalidation, notifyInvalidation: context.invalidated }), useDirtyDraft: (owner: string, dirty: boolean) => { context.dirtyOwners[owner] = dirty; } }));
-vi.mock('./Shell', () => ({ useCampaignWorkspace: () => ({ permissions: { canWrite: context.canWrite }, permissionsLoading: context.permissionsLoading }) }));
+vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, sessionKey: context.sessionKey }), useDirtyDraft: (owner: string, dirty: boolean) => { context.dirtyOwners[owner] = dirty; } }));
+vi.mock('./Shell', () => ({ useCampaignWorkspace: () => ({ permissions: { canWrite: context.canWrite }, permissionsLoading: context.permissionsLoading, reloadPermissions: context.reloadPermissions }) }));
 
 const base = (id: string, key = id): BaseField => ({ id, key, title: key, description: '', valueType: 'Number', typeRevision: 1, value: 0, options: [] });
 const virtual = (id: string, key = id): VirtualField => ({ id, key, title: key, description: '', resultType: 'Number', formulaId: 'formula', bindings: {} });
@@ -17,7 +17,7 @@ const envelope = (revision: Revision = 1, baseFields: BaseField[] = [base('a'), 
 
 describe('useTemplateFields', () => {
   beforeEach(() => {
-    context.sessionKey = 'session-a'; context.invalidation = 0; context.canWrite = true; context.permissionsLoading = false; context.invalidated.mockReset(); context.dirtyOwners = {};
+    context.sessionKey = 'session-a'; context.canWrite = true; context.permissionsLoading = false; context.reloadPermissions.mockReset(); context.dirtyOwners = {};
     api.getTemplateContent.mockReset().mockResolvedValue(envelope());
     api.putTemplateContent.mockReset().mockImplementation(async (_id: number, body: { expectedRevision: Revision; description: string; baseFields: BaseField[] }) => envelope(Number(body.expectedRevision) + 1, body.baseFields.map((field, i) => ({ ...field, id: field.id ?? `base-new-${i}` })), [virtual('v1'), virtual('v2')]));
     api.putTemplateVirtualFields.mockReset().mockImplementation(async (_id: number, body: { expectedRevision: Revision; virtualFields: VirtualField[] }) => ({ contentRevision: Number(body.expectedRevision) + 1, virtualFields: body.virtualFields.map((field, i) => ({ ...field, id: field.id ?? `virtual-new-${i}` })) }));
@@ -252,13 +252,13 @@ describe('useTemplateFields', () => {
     act(() => result.current.cancelAll()); expect(result.current.baseRows.some(value => value.rowKey === row.rowKey)).toBe(false);
   });
 
-  it('retains drafts and invalidates permissions on forbidden writes', async () => {
+  it('retains drafts and rechecks permissions on forbidden writes', async () => {
     const { result } = renderHook(() => useTemplateFields(4));
     await waitFor(() => expect(result.current.loaded).toBe(true));
     act(() => result.current.changeBase(result.current.baseRows[0].rowKey, value => ({ ...value, title: 'draft' })));
     api.putTemplateContent.mockRejectedValueOnce(new CampaignApiError(403, { code: 'forbidden', title: 'Forbidden', detail: 'Forbidden' }));
     await act(async () => result.current.saveAll());
-    expect(context.invalidated).toHaveBeenCalled(); expect(result.current.baseRows[0].field.title).toBe('draft');
+    expect(context.reloadPermissions).toHaveBeenCalledTimes(1); expect(result.current.baseRows[0].field.title).toBe('draft');
   });
 
   it.each([409, 503])('stops after a failed first phase with status %i until explicit reread', async status => {
@@ -345,10 +345,10 @@ describe('useTemplateFields', () => {
     expect(api.putTemplateVirtualFields).not.toHaveBeenCalled();
   });
 
-  it('serializes save and local mutations while busy and skips invalidation reads', async () => {
+  it('serializes save and local mutations while busy', async () => {
     let resolveBase!: (value: TemplateContentEnvelope) => void;
     api.putTemplateContent.mockReturnValueOnce(new Promise(resolve => { resolveBase = resolve; }));
-    const { result, rerender } = renderHook(() => useTemplateFields(4));
+    const { result } = renderHook(() => useTemplateFields(4));
     await waitFor(() => expect(result.current.loaded).toBe(true));
     const baseRowsBefore = result.current.baseRows, virtualRowsBefore = result.current.virtualRows;
     act(() => {
@@ -366,9 +366,7 @@ describe('useTemplateFields', () => {
       result.current.deleteBase(baseRowsBefore[1].rowKey);
       result.current.restoreBase(baseRowsBefore[1].rowKey);
       result.current.cancelAll();
-      context.invalidation++;
     });
-    rerender();
     expect(api.putTemplateContent).toHaveBeenCalledTimes(1);
     expect(api.putTemplateVirtualFields).not.toHaveBeenCalled();
     expect(api.getTemplateContent).toHaveBeenCalledTimes(1);

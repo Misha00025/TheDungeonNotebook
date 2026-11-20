@@ -62,8 +62,8 @@ const upsertCharacter = (rows: CharacterAccessEntry[], incoming: CharacterAccess
 };
 
 export function useMembersAccess(campaignId: number) {
-  const { api, sessionKey, invalidation, notifyInvalidation } = useWorkspace();
-  const { campaign, permissions, lastKnownPermissions, permissionsLoading, mode } = useCampaignWorkspace();
+  const { api, sessionKey } = useWorkspace();
+  const { campaign, permissions, lastKnownPermissions, permissionsLoading, mode, reloadPermissions } = useCampaignWorkspace();
   const identity = `${sessionKey}:${campaignId}`;
   const displayAllowed = mode === 'gm' && lastKnownPermissions.canWrite && lastKnownPermissions.canManageAccess;
   const writable = mode === 'gm' && !permissionsLoading && permissions.canWrite && permissions.canManageAccess && campaign.id === campaignId;
@@ -159,16 +159,27 @@ export function useMembersAccess(campaignId: number) {
     }
     void load();
   }, [identity, displayAllowed, load]);
-  const previousInvalidation = useRef(invalidation);
-  useEffect(() => {
-    if (previousInvalidation.current === invalidation) return;
-    previousInvalidation.current = invalidation;
-    void load();
-  }, [invalidation, load]);
-
   const memberDirty = state.members.some(row => { const op = state.operations[memberOperationKey(row.userId)]; return Boolean(op?.targetValue !== undefined && op.targetValue !== row.isAdmin); }) || Object.values(state.operations).some(op => op.characterId === undefined && (op.blocked || op.busy));
   const assignmentDirty = state.characters.some(entry => entry.assignments.some(row => { const op = state.operations[assignmentOperationKey(entry.character.id, row.userId)]; return Boolean(op?.targetValue !== undefined && op.targetValue !== row.canWrite); })) || Object.values(state.operations).some(op => op.characterId !== undefined && (op.blocked || op.busy));
   useDirtyDraft(`members-access-${identity}`, memberDirty || assignmentDirty);
+
+  const refreshCharacterPermissions = useCallback(async (characterId: string) => {
+    const identityAtStart = identity;
+    const gen = generation.current;
+    const active = () => mounted.current && identityRef.current === identityAtStart && generation.current === gen;
+    const existing = stateRef.current.characters.find(entry => entry.character.id === characterId);
+    if (!existing) return false;
+    update(current => ({ ...current, characters: current.characters.map(entry => entry.character.id === characterId ? { ...entry, loading: true, error: undefined } : entry) }));
+    try {
+      const rights = await apiRef.current.characterPermissions(campaignId, characterId);
+      if (!active()) return false;
+      update(current => ({ ...current, characters: current.characters.map(entry => entry.character.id === characterId ? { ...entry, permissions: rights, loading: false, error: rights.canManageAccess ? undefined : { kind: 'denied' } } : entry) }));
+      return true;
+    } catch (error) {
+      if (active()) update(current => ({ ...current, characters: current.characters.map(entry => entry.character.id === characterId ? { ...entry, loading: false, error } : entry) }));
+      return false;
+    }
+  }, [campaignId, identity, update]);
 
   const mutate = useCallback(async <T,>(key: string, op: MemberOperation, action: () => Promise<T>, apply: (current: MembersAccessState, result: T) => MembersAccessState, permitted: () => boolean = () => true): Promise<boolean> => {
     if (busyRef.current || !writableRef.current || !mounted.current) return false;
@@ -186,16 +197,21 @@ export function useMembersAccess(campaignId: number) {
       if (!active()) return false;
       update(current => {
         const applied = apply(current, result);
-        return { ...applied, isBusy: false, operations: removeOperation(applied.operations, key), feedback: { kind: 'success', message: successMessage(op.kind), event: ++feedbackEvent.current } };
+        const feedback = op.kind === 'role' || op.kind === 'access' ? current.feedback : { kind: 'success' as const, message: successMessage(op.kind), event: ++feedbackEvent.current };
+        return { ...applied, isBusy: false, operations: removeOperation(applied.operations, key), feedback };
       });
       confirmed = true;
-      notifyInvalidation('access');
+      if (op.characterId === undefined && String(op.userId) === sessionKey) await reloadPermissions();
+      if (op.characterId !== undefined && String(op.userId) === sessionKey) await refreshCharacterPermissions(op.characterId);
       return true;
     } catch (error) {
       if (!active()) return false;
       const blocked = (uncertain(error) && !codeIs(error, 'member_has_assignments')) || codeIs(error, 'member_already_exists') || codeIs(error, 'assignment_already_exists');
       update(current => ({ ...current, isBusy: false, operations: { ...current.operations, [key]: { ...op, busy: false, blocked, error } } }));
-      if (forbidden(error)) notifyInvalidation('access');
+      if (forbidden(error)) {
+        await reloadPermissions();
+        if (op.characterId !== undefined) await refreshCharacterPermissions(op.characterId);
+      }
       return false;
     } finally {
       if (identityRef.current === identityAtStart && generation.current === gen) {
@@ -204,7 +220,7 @@ export function useMembersAccess(campaignId: number) {
         if (pendingRead.current) { pendingRead.current = false; if (displayRef.current) void load(); }
       }
     }
-  }, [identity, load, notifyInvalidation, update]);
+  }, [identity, load, refreshCharacterPermissions, reloadPermissions, sessionKey, update]);
 
   const setMemberRole = useCallback((userId: number, isAdmin: boolean) => {
     const row = stateRef.current.members.find(item => item.userId === userId);
@@ -280,11 +296,11 @@ export function useMembersAccess(campaignId: number) {
     } catch (error) {
       if (active()) {
         update(current => ({ ...current, operations: updateReadError(current.operations, key, addKey, error) }));
-        if (forbidden(error)) notifyInvalidation('access');
+        if (forbidden(error)) reloadPermissions();
       }
       return false;
     } finally { if (identityRef.current === identityAtStart && generation.current === gen) endRead(); }
-  }, [beginRead, campaignId, endRead, identity, notifyInvalidation, update]);
+  }, [beginRead, campaignId, endRead, identity, reloadPermissions, update]);
 
   const rereadAssignment = useCallback(async (characterId: string, userId: number) => {
     const key = assignmentOperationKey(characterId, userId);
@@ -297,7 +313,10 @@ export function useMembersAccess(campaignId: number) {
     try {
       const rights = await apiRef.current.characterPermissions(campaignId, characterId);
       if (!active()) return false;
-      if (!rights.canManageAccess) throw new CampaignApiError(403, { code: 'forbidden', title: 'Forbidden', detail: 'Access management is no longer permitted.' });
+       if (!rights.canManageAccess) {
+         update(current => ({ ...current, characters: current.characters.map(entry => entry.character.id === characterId ? { ...entry, permissions: rights, loading: false, error: { kind: 'denied' } } : entry) }));
+         throw new CampaignApiError(403, { code: 'forbidden', title: 'Forbidden', detail: 'Access management is no longer permitted.' });
+       }
       if (!displayRef.current || !writableRef.current) return false;
       const rows = await apiRef.current.listAssignments(campaignId, characterId);
       if (!active()) return false;
@@ -319,11 +338,11 @@ export function useMembersAccess(campaignId: number) {
     } catch (error) {
       if (active()) {
         update(current => ({ ...current, characters: current.characters.map(entry => entry.character.id === characterId ? { ...entry, loading: false, error } : entry), operations: updateReadError(current.operations, delKey, addKey, error) }));
-        if (forbidden(error)) notifyInvalidation('access');
+        if (forbidden(error)) reloadPermissions();
       }
       return false;
     } finally { if (identityRef.current === identityAtStart && generation.current === gen) endRead(); }
-  }, [beginRead, campaignId, endRead, identity, notifyInvalidation, update]);
+  }, [beginRead, campaignId, endRead, identity, reloadPermissions, update]);
 
   const retryOperation = useCallback((key: string) => {
     const op = stateRef.current.operations[key];

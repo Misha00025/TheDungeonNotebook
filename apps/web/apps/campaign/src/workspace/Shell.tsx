@@ -8,14 +8,14 @@ import { useVisitHistory } from './VisitHistory';
 import { useResource } from './hooks';
 import { ApiError } from './Feedback';
 
-export type CampaignWorkspaceValue = { campaign: Campaign; permissions: Permissions; lastKnownPermissions: Permissions; permissionsLoading?: boolean; mode: 'gm' | 'player'; reloadCampaign: () => void };
+export type CampaignWorkspaceValue = { campaign: Campaign; permissions: Permissions; lastKnownPermissions: Permissions; permissionsLoading?: boolean; mode: 'gm' | 'player'; reloadCampaign: () => void; reloadPermissions: () => void; updateCampaign: (campaign: Campaign) => void };
 const CampaignContext = createContext<CampaignWorkspaceValue | null>(null);
 export const useCampaignWorkspace = () => { const value = useContext(CampaignContext); if (!value) throw new Error('useCampaignWorkspace requires campaign route'); return value; };
 export const useOptionalCampaignWorkspace = () => useContext(CampaignContext);
 const CampaignShell: React.FC = () => {
   const { groupId = '' } = useParams();
   const id = Number(groupId);
-  const { api, path, sessionKey, invalidation, navigate } = useWorkspace();
+  const { api, path, sessionKey, navigate } = useWorkspace();
   const { visitGroup } = useVisitHistory();
   const location = useLocation();
   const campaignSelectId = React.useId();
@@ -25,18 +25,21 @@ const CampaignShell: React.FC = () => {
   const sequence = useRef(0);
   const mounted = useRef(true);
   const route = useRef(location.pathname);
-  const scope = useRef(`${sessionKey}:${id}:${invalidation}`);
+  const scope = useRef(`${sessionKey}:${id}`);
   const recordedGroup = useRef<string | null>(null);
   const valid = Boolean(groupId.trim()) && Number.isInteger(id) && id >= -2147483648 && id <= 2147483647;
   const campaign = useResource(`${sessionKey}:${id}:campaign`, () => valid ? api.getCampaign(id) : Promise.reject(new Error('Invalid campaign id')));
   const permission = useResource(`${sessionKey}:${id}:permissions`, () => valid ? api.campaignPermissions(id) : Promise.reject(new Error('Invalid campaign id')));
-  const campaigns = useResource(`${sessionKey}:campaign-list:${invalidation}`, () => api.listCampaigns());
+  const campaigns = useResource(`${sessionKey}:campaign-list`, () => api.listCampaigns());
   const mode: 'gm' | 'player' = location.pathname.includes('/gm/') ? 'gm' : 'player';
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; sequence.current += 1; busy.current = false; }; }, []);
   useLayoutEffect(() => { if (route.current !== location.pathname) { route.current = location.pathname; sequence.current += 1; busy.current = false; setSwitchBusy(false); setSwitchError(undefined); } }, [location.pathname]);
-  useLayoutEffect(() => { const next = `${sessionKey}:${id}:${invalidation}`; if (scope.current !== next) { scope.current = next; sequence.current += 1; busy.current = false; setSwitchBusy(false); setSwitchError(undefined); } }, [sessionKey, id, invalidation]);
-  const initialInvalidation = useRef(invalidation);
-  useEffect(() => { if (initialInvalidation.current === invalidation) return; initialInvalidation.current = invalidation; campaign.reload(); permission.reload(); }, [invalidation, campaign.reload, permission.reload]);
+  useLayoutEffect(() => { const next = `${sessionKey}:${id}`; if (scope.current !== next) { scope.current = next; sequence.current += 1; busy.current = false; setSwitchBusy(false); setSwitchError(undefined); } }, [sessionKey, id]);
+  const updateCampaign = (saved: Campaign) => {
+    if (saved.id !== campaign.data?.id) return;
+    campaign.setData(saved);
+    if (campaigns.data) campaigns.setData(campaigns.data.map(item => item.id === saved.id ? { ...item, name: saved.name } : item));
+  };
   useEffect(() => {
     const identity = `${sessionKey}:${id}`;
     if (!valid || !campaign.data || campaign.loading || campaign.error || !permission.data || permission.loading || permission.error || (!permission.data.canRead && !permission.data.canWrite) || recordedGroup.current === identity) return;
@@ -51,11 +54,11 @@ const CampaignShell: React.FC = () => {
   if (permission.error && !permission.data) return <ApiError error={permission.error} onRetry={permission.reload} />;
   if (!permission.data) return <Notification kind="error" eventKey={permission.error}>Права кампании недоступны.</Notification>;
   if (mode === 'gm' && !permission.loading && !permission.error && !permission.data.canWrite) return <Navigate to={path(`/${id}/player/characters`)} replace />;
-  const effective = permission.loading || permission.error ? { ...permission.data, canWrite: false, canManageAccess: false } : permission.data;
+  const effective = permission.data;
   const canEnterGm = effective.canWrite;
   const targetMode = (next: 'gm' | 'player') => path(`/${id}/${next === 'gm' ? 'gm/overview' : 'player/characters'}`);
   const switchMode = async () => {
-    if (busy.current) return;
+    if (busy.current || permission.loading || permission.error) return;
     const target = mode === 'gm' ? 'player' : 'gm';
      const sheetRoute = location.pathname.match(/\/(?:gm|player)\/characters\/([^/]+)(?:\/(page_[1-9]\d*|overview|stats))?$/);
     if (!sheetRoute) { navigate(targetMode(target)); return; }
@@ -120,24 +123,23 @@ const CampaignShell: React.FC = () => {
   const campaignOptions = campaignItems.some(item => item.id === id)
     ? campaignItems
     : [{ id, name: campaign.data.name }, ...campaignItems];
-  return <CampaignContext.Provider value={{ campaign: campaign.data, permissions: effective, lastKnownPermissions: permission.data, permissionsLoading: permission.loading || Boolean(permission.error), mode, reloadCampaign: campaign.reload }}>
+  return <CampaignContext.Provider value={{ campaign: campaign.data, permissions: effective, lastKnownPermissions: permission.data, permissionsLoading: permission.loading || Boolean(permission.error), mode, reloadCampaign: campaign.reload, reloadPermissions: permission.reload, updateCampaign }}>
     <WorkspaceLayout navigation={<>
       <Badge>Режим: {mode === 'gm' ? 'Мастер' : 'Игрок'}</Badge>
       <Field label="Кампания" htmlFor={campaignSelectId}>
-        <Select id={campaignSelectId} value={String(id)} disabled={switchBusy} onChange={event => { void changeCampaign(Number(event.target.value)); }}>
+        <Select id={campaignSelectId} value={String(id)} disabled={switchBusy || (campaigns.loading && !campaigns.data)} aria-busy={campaigns.loading || undefined} onChange={event => { void changeCampaign(Number(event.target.value)); }}>
           {campaignOptions.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
         </Select>
       </Field>
-      {campaigns.loading && <StatePanel kind="loading">Загрузка списка кампаний…</StatePanel>}
       {Boolean(campaigns.error) && <ApiError error={campaigns.error} onRetry={campaigns.reload} />}
-      {effective.canWrite && <Button variant="secondary" disabled={switchBusy} onClick={switchMode}>{mode === 'gm' ? 'Пространство игрока' : 'Пространство мастера'}</Button>}
+      {effective.canWrite && <Button variant="secondary" disabled={switchBusy || permission.loading || Boolean(permission.error)} onClick={switchMode}>{mode === 'gm' ? 'Пространство игрока' : 'Пространство мастера'}</Button>}
        <SectionNav aria-label="Разделы кампании" hideOnMobile items={nav.map(([label, route]) => {
         const to = path(`/${id}/${route}`);
         return { label, to, active: location.pathname === to || location.pathname.startsWith(`${to}/`) };
       })} />
     </>} mobileNavigation={<BottomNavigation key={mobileNavigationKey} aria-label={validSheetCharacter ? 'Лист персонажа на телефоне' : 'Навигация кампании на телефоне'} items={mobileItems} />}>
       <Breadcrumbs items={[{ label: 'Кампании', path: path('/') }, { label: campaign.data.name, path: targetMode(mode) }, { label: title }]} />
-       {permission.loading && !location.pathname.endsWith('/gm/views') && <StatePanel kind="loading">Обновление прав кампании…</StatePanel>}{Boolean(permission.error) && <ApiError error={permission.error} onRetry={permission.reload} />}{Boolean(switchError) && <ApiError error={switchError} />}<Outlet />
+       {Boolean(permission.error) && <ApiError error={permission.error} onRetry={permission.reload} />}{Boolean(switchError) && <ApiError error={switchError} />}<Outlet />
     </WorkspaceLayout>
   </CampaignContext.Provider>;
 };

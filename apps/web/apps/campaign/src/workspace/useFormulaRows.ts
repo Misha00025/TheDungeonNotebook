@@ -27,8 +27,8 @@ const contentDirty = (row: FormulaRow) => Boolean(row.contentBaseline && (row.ex
 export const rowDirty = (row: FormulaRow) => nameDirty(row) || contentDirty(row);
 
 export function useFormulaRows(campaignId: number) {
-  const { api, sessionKey, invalidation, notifyInvalidation } = useWorkspace();
-  const { permissions, permissionsLoading, campaign } = useCampaignWorkspace();
+  const { api, sessionKey } = useWorkspace();
+  const { permissions, permissionsLoading, campaign, reloadPermissions } = useCampaignWorkspace();
   const identity = `${sessionKey}:${campaignId}`;
   const writable = Boolean(!permissionsLoading && permissions.canWrite && campaign.id === campaignId);
   const [state, setState] = useState<State>(initial);
@@ -39,7 +39,6 @@ export function useFormulaRows(campaignId: number) {
   const identityRef = useRef(identity);
   const writableRef = useRef(writable);
   const apiRef = useRef(api);
-  const invalidationRef = useRef(invalidation);
   const pendingReload = useRef(false);
   const feedbackEvent = useRef(0);
   writableRef.current = writable; apiRef.current = api;
@@ -98,12 +97,6 @@ export function useFormulaRows(campaignId: number) {
     if (identityRef.current !== identity) { identityRef.current = identity; generation.current++; busyRef.current = false; pendingReload.current = false; stateRef.current = initial(); setState(initial()); }
     void load();
   }, [identity, load]);
-  useEffect(() => {
-    if (invalidationRef.current === invalidation) return;
-    invalidationRef.current = invalidation;
-    void load(true);
-  }, [invalidation, load]);
-
   const rereadRow = useCallback(async (id: string) => {
     if (busyRef.current) return;
     const row = stateRef.current.rows.find(item => item.id === id); if (!row) return;
@@ -155,13 +148,13 @@ export function useFormulaRows(campaignId: number) {
       if (activeFor(gen, identityAtStart)) update(value => ({ ...value, feedback: { kind: 'success', message: 'Формулы сохранены.', event: ++feedbackEvent.current } }));
     } catch (error) {
       if (activeFor(gen, identityAtStart)) {
-        if (error instanceof CampaignApiError && error.status === 403) notifyInvalidation();
+        if (error instanceof CampaignApiError && error.status === 403) reloadPermissions();
         update(value => ({ ...value, feedback: successes ? { kind: 'warning', message: 'Часть изменений сохранена. Остальные изменения остались в черновике.', event: ++feedbackEvent.current } : error instanceof CampaignApiError ? undefined : { kind: 'warning', message: 'Изменения не сохранены. Проверьте доступ и повторите попытку.', event: ++feedbackEvent.current } }));
       }
     } finally {
       if (activeFor(gen, identityAtStart)) { busyRef.current = false; update(value => ({ ...value, busy: false })); if (pendingReload.current) { pendingReload.current = false; void load(true); } }
     }
-  }, [campaignId, identity, load, notifyInvalidation, update]);
+  }, [campaignId, identity, load, reloadPermissions, update]);
   const cancelAll = useCallback(() => {
     if (busyRef.current) return;
     update(value => ({ ...value, rows: value.rows.filter(row => !row.missing || row.nameBlocked || row.contentBlocked).map(row => ({ ...row, name: row.metadataBaseline.name, expression: row.contentBaseline?.data.expression ?? row.expression, parametersText: row.contentBaseline?.data.parameters.join('\n') ?? row.parametersText })) }));

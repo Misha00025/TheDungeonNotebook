@@ -69,8 +69,8 @@ const validateChangedRows = (state: State) => {
 };
 
 export function useTemplateFields(campaignId: number) {
-  const { api, sessionKey, invalidation, notifyInvalidation } = useWorkspace();
-  const { permissions, permissionsLoading } = useCampaignWorkspace();
+  const { api, sessionKey } = useWorkspace();
+  const { permissions, permissionsLoading, reloadPermissions } = useCampaignWorkspace();
   const writable = Boolean(permissions.canWrite && !permissionsLoading);
   const identity = `${sessionKey}:${campaignId}`;
   const [state, setState] = useState<State>(initialState);
@@ -164,13 +164,6 @@ export function useTemplateFields(campaignId: number) {
     }
     void read();
   }, [identity, read]);
-  const previousInvalidation = useRef(invalidation);
-  useEffect(() => {
-    if (previousInvalidation.current === invalidation) return;
-    previousInvalidation.current = invalidation;
-    if (!busyRef.current) void read(true);
-  }, [invalidation, read]);
-
   const allowed = () => writableRef.current && stateRef.current.loaded && !busyRef.current && !stateRef.current.blocked;
   const moveBase = useCallback((fromKey: string, toKey: string) => {
     if (!allowed()) return;
@@ -380,14 +373,14 @@ export function useTemplateFields(campaignId: number) {
           event: ++feedbackEvent.current,
         } : undefined,
       }));
-      if (error instanceof CampaignApiError && error.status === 403) notifyInvalidation();
+      if (error instanceof CampaignApiError && error.status === 403) reloadPermissions();
     } finally {
       if (identityRef.current === identityAtStart && generation.current === gen) {
         busyRef.current = false;
         if (mounted.current) update(value => ({ ...value, busy: false }));
       }
     }
-  }, [campaignId, identity, update, notifyInvalidation]);
+  }, [campaignId, identity, update, reloadPermissions]);
   const reread = useCallback(() => read(true), [read]);
   return {
     ...state,

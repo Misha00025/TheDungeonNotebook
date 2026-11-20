@@ -16,20 +16,19 @@ const newRequestId = () => crypto.randomUUID();
 const isUncertainCreation = (error: unknown) => error instanceof CampaignApiError && (error.unknownOutcome || ['creation_already_published', 'already_published'].includes(error.problem.code));
 
 const CampaignCard: React.FC<{ campaign: Campaign }> = ({ campaign }) => {
-  const { api, path, navigate, sessionKey, invalidation } = useWorkspace();
-  const resource = useResource<Permissions>(`${sessionKey}:${campaign.id}:permissions:${invalidation}`, () => api.campaignPermissions(campaign.id));
+  const { api, path, navigate, sessionKey } = useWorkspace();
+  const resource = useResource<Permissions>(`${sessionKey}:${campaign.id}:permissions`, () => api.campaignPermissions(campaign.id));
   const canWrite = Boolean(resource.data?.canWrite);
   const canRead = Boolean(resource.data?.canRead);
-  return <Panel as="article" className={cardStyles.card} actions={(canWrite || canRead) ? <Button className={cardStyles.entryButton} size="small" type="button" onClick={() => navigate(path(`/${campaign.id}/${canWrite ? 'gm/overview' : 'player/characters'}`))}>{canWrite ? 'Вести' : 'Играть'}</Button> : undefined}>
+  return <Panel as="article" className={cardStyles.card} aria-busy={resource.loading || undefined} actions={(canWrite || canRead) ? <Button className={cardStyles.entryButton} size="small" type="button" onClick={() => navigate(path(`/${campaign.id}/${canWrite ? 'gm/overview' : 'player/characters'}`))}>{canWrite ? 'Вести' : 'Играть'}</Button> : undefined}>
     <div className={cardStyles.identity}><h2 className={cardStyles.title}>{campaign.name}</h2>{resource.data && (canWrite || canRead) && <Badge>{canWrite ? 'ГМ' : 'Игрок'}</Badge>}</div>
-    {resource.loading && <p>Загрузка прав…</p>}
     {Boolean(resource.error) && <ApiError error={resource.error} onRetry={resource.reload} />}
     {resource.data && !canRead && !canWrite && <p>Нет доступных действий.</p>}
   </Panel>;
 };
 
 const CampaignCreateForm: React.FC<{ onClose: () => void; requestId: string; onNewRequest: () => void }> = ({ onClose, requestId, onNewRequest }) => {
-  const { api, navigate, path, notifyInvalidation } = useWorkspace();
+  const { api, navigate, path } = useWorkspace();
   const [name, setName] = useState('');
   const [administratorUserId, setAdministratorUserId] = useState('');
   const [createError, setCreateError] = useState<unknown>();
@@ -51,7 +50,6 @@ const CampaignCreateForm: React.FC<{ onClose: () => void; requestId: string; onN
     setName('');
     setAdministratorUserId('');
     setUncertain(false);
-    notifyInvalidation('campaigns');
     onClose();
     onNewRequest();
     navigate(path(`/${campaign.id}/gm/overview`));
@@ -121,8 +119,8 @@ const CampaignCreateForm: React.FC<{ onClose: () => void; requestId: string; onN
 };
 
 const Campaigns: React.FC<{ allowCreate?: boolean }> = ({ allowCreate = true }) => {
-  const { api, sessionKey, invalidation, navigate, path } = useWorkspace();
-  const campaigns = useResource(`${sessionKey}:campaign-list:${invalidation}`, () => api.listCampaigns());
+  const { api, sessionKey, navigate, path } = useWorkspace();
+  const campaigns = useResource(`${sessionKey}:campaign-list`, () => api.listCampaigns());
   const location = useLocation();
   const [createOpen, setCreateOpen] = useState(false);
   const [requestId, setRequestId] = useState(newRequestId);
@@ -133,9 +131,9 @@ const Campaigns: React.FC<{ allowCreate?: boolean }> = ({ allowCreate = true }) 
     setCreateOpen(true);
     navigate(path('/'), { replace: true });
   }, [allowCreate, requestedCreate, createOpen, navigate, path]);
-  return <main className={styles.page}>
+  return <main className={styles.page} aria-busy={campaigns.loading || undefined}>
     <h1>Кампании</h1>
-    {campaigns.loading && <p>Загрузка кампаний…</p>}
+    {campaigns.loading && !campaigns.data && <p>Загрузка кампаний…</p>}
     {Boolean(campaigns.error) && <ApiError error={campaigns.error} onRetry={campaigns.reload} />}
     {campaigns.data && (campaigns.data.length ? <List layout="horizontal" gap="medium">{campaigns.data.map((campaign: Campaign) => <CampaignCard key={campaign.id} campaign={campaign} />)}</List> : <p>Кампаний пока нет.</p>)}
     {!createOpen && (allowCreate ? <Button type="button" onClick={() => { setRequestId(newRequestId()); setCreateOpen(true); }}>Создать кампанию</Button> : <Button type="button" onClick={() => navigate(`${path('/')}?create=1`)}>Создать кампанию</Button>)}

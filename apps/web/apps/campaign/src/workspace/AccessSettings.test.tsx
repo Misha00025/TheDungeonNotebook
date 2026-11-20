@@ -6,12 +6,12 @@ import Members from './Members';
 import CampaignSettings from './CampaignSettings';
 
 const api = vi.hoisted(() => ({ listMembers: vi.fn(), listCharacters: vi.fn(), characterPermissions: vi.fn(), listAssignments: vi.fn(), getUser: vi.fn(), searchUsers: vi.fn(), putMember: vi.fn(), deleteMember: vi.fn(), putAssignment: vi.fn(), deleteAssignment: vi.fn(), renameCampaign: vi.fn(), getCampaign: vi.fn() }));
-const context = vi.hoisted(() => ({ invalidation: 0, notifyInvalidation: vi.fn(), sessionKey: '7', permissionsLoading: false }));
+const context = vi.hoisted(() => ({ reloadPermissions: vi.fn(), updateCampaign: vi.fn(), sessionKey: '7', permissionsLoading: false }));
 let campaignPermissions = { canWrite: true, canManageAccess: true, canRead: true };
 let campaign = { id: 4, name: 'Original', metadataRevision: 3 };
 
-vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, ...context }), useDirtyDraft: () => vi.fn(), useDirtyState: () => false }));
-vi.mock('./Shell', () => ({ useCampaignWorkspace: () => ({ campaign, permissions: campaignPermissions, lastKnownPermissions: campaignPermissions, permissionsLoading: context.permissionsLoading, mode: 'gm', reloadCampaign: vi.fn() }) }));
+vi.mock('./Workspace', () => ({ useWorkspace: () => ({ api, sessionKey: context.sessionKey }), useDirtyDraft: () => vi.fn(), useDirtyState: () => false }));
+vi.mock('./Shell', () => ({ useCampaignWorkspace: () => ({ campaign, permissions: campaignPermissions, lastKnownPermissions: campaignPermissions, permissionsLoading: context.permissionsLoading, mode: 'gm', reloadCampaign: vi.fn(), reloadPermissions: context.reloadPermissions, updateCampaign: context.updateCampaign }) }));
 
 const heroId = 'abcdef01-2345-6789-abcd-ef0123456789';
 const miraId = '12345678-abcd-1234-abcd-123456789abc';
@@ -25,7 +25,7 @@ const user = { id: 21, nickname: 'alice', visibleName: 'Alice' };
 const otherUser = { id: 22, nickname: 'bea', visibleName: 'Bea' };
 const setupApi = () => {
   Object.values(api).forEach(method => method.mockReset());
-  context.invalidation = 0; context.notifyInvalidation.mockReset(); context.sessionKey = '7'; context.permissionsLoading = false;
+  context.reloadPermissions.mockReset(); context.updateCampaign.mockReset(); context.sessionKey = '7'; context.permissionsLoading = false;
   api.listMembers.mockResolvedValue([member]); api.listCharacters.mockResolvedValue([hero, mira]);
   api.characterPermissions.mockResolvedValue({ canRead: true, canWrite: true, canManageAccess: true });
   api.listAssignments.mockImplementation(async (_campaignId: number, id: string) => id === heroId ? [assignment] : []);
@@ -122,7 +122,7 @@ describe('campaign members access', () => {
     await waitFor(() => expect(profileResolvers.size).toBe(2));
     await waitFor(() => expect(permissionResolvers.size).toBe(2));
     expect(screen.getByRole('table', { name: 'Участники кампании' })).toHaveAttribute('aria-busy', 'true');
-    expect(screen.getAllByRole('status').filter(node => /Загрузка…|Обработка…/.test(node.textContent ?? ''))).toHaveLength(1);
+    expect(screen.queryByText(/Загрузка…|Обработка…/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Загрузка профиля|Загрузка доступа персонажа|Загрузка участников/)).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Повысить Участник до ГМ' }).every(button => (button as HTMLButtonElement).disabled)).toBe(true);
     profileResolvers.get(21)?.(user);
@@ -314,17 +314,40 @@ describe('campaign members access', () => {
     const exactMember = { ...member, metadataRevision: losslessRevision };
     api.listMembers.mockResolvedValue([exactMember]);
     api.putMember.mockResolvedValueOnce({ ...exactMember, isAdmin: true, metadataRevision: new LosslessNumber('9007199254740994') }).mockResolvedValueOnce({ ...exactMember, isAdmin: false, metadataRevision: new LosslessNumber('9007199254740995') });
-    const view = renderAt(<Members />, '/4/gm/members');
+    renderAt(<Members />, '/4/gm/members');
     await waitFor(() => expect(screen.getByRole('button', { name: 'Повысить Alice до ГМ' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Повысить Alice до ГМ' }));
     await screen.findByRole('img', { name: 'Гейм-мастер' });
-    context.invalidation += 1;
-    view.rerender(<MemoryRouter initialEntries={['/4/gm/members']}><Routes><Route path=":groupId/gm/members" element={<Members />} /></Routes></MemoryRouter>);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Понизить Alice до игрока' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Понизить Alice до игрока' }));
     await waitFor(() => expect(api.putMember).toHaveBeenCalledTimes(2));
     expect(String(api.putMember.mock.calls[0][2].expectedRevision)).toBe('9007199254740993');
     expect(String(api.putMember.mock.calls[1][2].expectedRevision)).toBe('9007199254740994');
+    expect(api.listMembers).toHaveBeenCalledTimes(1);
+    expect(api.listCharacters).toHaveBeenCalledTimes(1);
+    expect(api.characterPermissions).toHaveBeenCalledTimes(2);
+    expect(context.reloadPermissions).not.toHaveBeenCalled();
+  });
+
+  it('refreshes only current-subject permissions after confirmed role and assignment changes', async () => {
+    context.sessionKey = '21';
+    renderAt(<Members />, '/4/gm/members');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Повысить Alice до ГМ' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Повысить Alice до ГМ' }));
+    await screen.findByRole('img', { name: 'Гейм-мастер' });
+    await waitFor(() => expect(context.reloadPermissions).toHaveBeenCalledTimes(1));
+    expect(api.listMembers).toHaveBeenCalledTimes(1);
+    expect(api.listCharacters).toHaveBeenCalledTimes(1);
+    expect(api.characterPermissions).toHaveBeenCalledTimes(2);
+    const access = await screen.findByRole('combobox', { name: 'Уровень доступа Hero для Alice' });
+    fireEvent.change(access, { target: { value: 'write' } });
+    await waitFor(() => expect(api.putAssignment).toHaveBeenCalledWith(4, heroId, 21, { canWrite: true, expectedRevision: 11 }));
+    await waitFor(() => expect(api.characterPermissions).toHaveBeenCalledTimes(3));
+    expect(api.characterPermissions).toHaveBeenLastCalledWith(4, heroId);
+    expect(context.reloadPermissions).toHaveBeenCalledTimes(1);
+    expect(api.listMembers).toHaveBeenCalledTimes(1);
+    expect(api.listCharacters).toHaveBeenCalledTimes(1);
+    expect(api.listAssignments).toHaveBeenCalledTimes(2);
   });
 
   it('shows no speculative crown when a role change fails', async () => {
@@ -422,6 +445,11 @@ describe('campaign members access', () => {
     await waitFor(() => expect(accessSelect).toHaveValue('write'));
     fireEvent.change(accessSelect, { target: { value: 'read' } });
     await waitFor(() => expect(api.putAssignment).toHaveBeenNthCalledWith(2, 4, heroId, 21, { canWrite: false, expectedRevision: 12 }));
+    expect(api.listMembers).toHaveBeenCalledTimes(1);
+    expect(api.listCharacters).toHaveBeenCalledTimes(1);
+    expect(api.characterPermissions).toHaveBeenCalledTimes(2);
+    expect(api.listAssignments).toHaveBeenCalledTimes(2);
+    expect(context.reloadPermissions).not.toHaveBeenCalled();
   });
 
   it('retains a failed access target until reread and explicit retry with the fresh revision', async () => {
@@ -564,19 +592,23 @@ describe('campaign members access', () => {
     await waitFor(() => expect(api.renameCampaign).toHaveBeenCalledWith(4, { name: 'New name', expectedRevision: 3 }));
   });
 
-  it('keeps a successful campaign name until the shell refresh arrives', async () => {
+  it('accepts each confirmed campaign rename response without a metadata read', async () => {
     api.renameCampaign.mockResolvedValueOnce({ ...campaign, name: 'First saved', metadataRevision: 4 }).mockResolvedValueOnce({ ...campaign, name: 'Second saved', metadataRevision: 5 });
     renderAt(<CampaignSettings />, '/4/gm/settings');
     const field = await screen.findByLabelText('Название кампании');
     fireEvent.change(field, { target: { value: 'First saved' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await screen.findByText('Название сохранено.');
+    expect(context.updateCampaign).toHaveBeenNthCalledWith(1, { ...campaign, name: 'First saved', metadataRevision: 4 });
     expect(field).toHaveValue('First saved');
     fireEvent.change(field, { target: { value: 'Second saved' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await waitFor(() => expect(api.renameCampaign).toHaveBeenNthCalledWith(2, 4, { name: 'Second saved', expectedRevision: 4 }));
     expect(field).toHaveValue('Second saved');
     await screen.findByText('Название сохранено.');
+    expect(context.updateCampaign).toHaveBeenNthCalledWith(2, { ...campaign, name: 'Second saved', metadataRevision: 5 });
+    expect(api.getCampaign).not.toHaveBeenCalled();
+    expect(context.reloadPermissions).not.toHaveBeenCalled();
   });
 
   it('retains the draft after conflict and requires explicit version reload', async () => {
@@ -620,6 +652,7 @@ describe('campaign members access', () => {
     view.rerender(<MemoryRouter initialEntries={['/4/gm/settings']}><Routes><Route path=":groupId/gm/settings" element={<CampaignSettings />} /></Routes></MemoryRouter>);
     expect(field).toHaveValue('Draft across refresh');
     expect(field).toBeDisabled();
+    expect(screen.queryByText('Нет доступа к настройкам кампании.')).not.toBeInTheDocument();
     context.permissionsLoading = false;
     view.rerender(<MemoryRouter initialEntries={['/4/gm/settings']}><Routes><Route path=":groupId/gm/settings" element={<CampaignSettings />} /></Routes></MemoryRouter>);
     expect(field).toHaveValue('Draft across refresh');
@@ -631,7 +664,9 @@ describe('campaign members access', () => {
     renderAt(<CampaignSettings />, '/4/gm/settings');
     fireEvent.change(await screen.findByLabelText('Название кампании'), { target: { value: 'Attempt' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
-    await waitFor(() => expect(context.notifyInvalidation).toHaveBeenCalledWith('permissions'));
+    await waitFor(() => expect(context.reloadPermissions).toHaveBeenCalledTimes(1));
+    expect(api.getCampaign).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Название кампании')).toHaveValue('Attempt');
   });
 
   it('does not treat a failed service write as success', async () => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActionRow, Button, Field, Input, List, ModalPortal, Select, StatePanel } from '@tdn/shared';
+import { ActionRow, Button, Field, Input, List, ModalPortal, Select } from '@tdn/shared';
 import { useWorkspace, useDirtyDraft } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 import { useMutation } from './hooks';
@@ -10,7 +10,7 @@ import { ApiError } from './Feedback';
 const isUncertain = (error: unknown) => error instanceof CampaignApiError && (error.unknownOutcome || ['creation_already_published', 'already_published', 'content_already_prepared'].includes(error.problem.code));
 
 const CreateCharacter: React.FC<{ campaignId: number; onClose: () => void }> = ({ campaignId, onClose }) => {
-  const { api, path, navigate, notifyInvalidation } = useWorkspace();
+  const { api, path, navigate } = useWorkspace();
   const { campaign, permissions, lastKnownPermissions, permissionsLoading, mode } = useCampaignWorkspace();
   const writable = permissions.canWrite && !permissionsLoading;
   const [requestId] = useState(() => crypto.randomUUID());
@@ -31,7 +31,6 @@ const CreateCharacter: React.FC<{ campaignId: number; onClose: () => void }> = (
   const finish = (characterId: string) => {
     if (!active.current) return;
     clearDirty();
-    notifyInvalidation('characters');
     onClose();
     navigate(path(`/${campaign.id}/gm/characters/${encodeURIComponent(characterId)}`));
   };
@@ -60,9 +59,8 @@ const CreateCharacter: React.FC<{ campaignId: number; onClose: () => void }> = (
   const abandon = () => { if (creation.busy) return; if (window.confirm('Отказаться от проверки операции? Результат создания может оставаться неизвестным.')) close(); };
   if (mode !== 'gm' || !lastKnownPermissions.canWrite) return null;
   return <ModalPortal isOpen title="Создать персонажа" onClose={uncertain ? abandon : cancel} dismissDisabled={creation.busy}>
-    <form onSubmit={submit}>
+     <form aria-busy={permissionsLoading || creation.busy || undefined} onSubmit={submit}>
       <p>Персонаж использует единственный шаблон кампании.</p>
-      {permissionsLoading && <StatePanel kind="loading">Обновление прав кампании…</StatePanel>}
       <List layout="vertical" stretch>
         <Field label="Имя" htmlFor={nameId}><Input id={nameId} autoFocus required value={name} disabled={!writable || uncertain || creation.busy} onChange={event => setName(event.target.value)} /></Field>
         <Field label="Важность" htmlFor={importanceId}><Select id={importanceId} value={importance} disabled={!writable || uncertain || creation.busy} onChange={event => setImportance(event.target.value as Importance | '')}><option value="">По умолчанию (фоновый)</option><option value="Background">Фоновый</option><option value="Secondary">Второстепенный</option><option value="Key">Ключевой</option></Select></Field>

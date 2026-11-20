@@ -14,7 +14,7 @@ const parametersFrom = (text: string) => text.split('\n').filter((item, index, v
 const isUncertain = (failure: unknown) => failure instanceof CampaignApiError && (failure.unknownOutcome || ['already_published', 'content_already_prepared', 'creation_already_published'].includes(failure.problem.code));
 
 export const CreateFormula: React.FC<{ campaignId: number; onCreated: (formula: DefinitionCreate) => void; onCancel: () => void }> = ({ campaignId, onCreated, onCancel }) => {
-  const { api, notifyInvalidation } = useWorkspace();
+  const { api } = useWorkspace();
   const { permissions, permissionsLoading, campaign } = useCampaignWorkspace();
   const writable = permissions.canWrite && !permissionsLoading && campaign.id === campaignId;
   const [name, setName] = useState('');
@@ -44,7 +44,7 @@ export const CreateFormula: React.FC<{ campaignId: number; onCreated: (formula: 
       const result = await mutation.run();
       if (result && active.current) { clearDirty(); onCreated(result); }
     } catch (failure) {
-      if (active.current) { setError(failure); if (failure instanceof CampaignApiError && failure.status === 403) notifyInvalidation(); setUncertain(isUncertain(failure)); }
+      if (active.current) { setError(failure); setUncertain(isUncertain(failure)); }
     }
   };
   const check = async () => {

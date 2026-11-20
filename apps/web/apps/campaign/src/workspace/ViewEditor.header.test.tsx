@@ -2,6 +2,8 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ViewMetadata } from './types';
+import type { PresentationNode } from './presentationModel';
+import { CampaignApiError } from './api';
 import ViewEditor from './ViewEditor';
 
 const api = vi.hoisted(() => ({
@@ -18,12 +20,12 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock('./Workspace', () => ({
-  useWorkspace: () => ({ api, notifyInvalidation: vi.fn() }),
+  useWorkspace: () => ({ api }),
   useDirtyDraft: vi.fn(),
 }));
 
 vi.mock('./PresentationEditor', () => ({
-  default: () => null,
+  default: ({ roots, onChange }: { roots: PresentationNode[]; onChange: (next: PresentationNode[]) => void }) => <div><span>{roots.map(root => root.title).join(',')}</span><button type="button" onClick={() => onChange([...roots, { kind: 'layout', nodeKey: 'draft-root', title: 'Draft root', params: null, children: [] }])}>Change roots</button></div>,
 }));
 
 const campaignId = 4;
@@ -126,5 +128,22 @@ describe('ViewEditor controls and preview diagnostics', () => {
     expect(api.putViewContent).not.toHaveBeenCalled();
     expect(api.putPresentation).not.toHaveBeenCalled();
     expect(api.putCharacterValues).not.toHaveBeenCalled();
+  });
+
+  it('retains a conflicted content draft until explicit verification', async () => {
+    api.putViewContent.mockRejectedValueOnce(new CampaignApiError(409, { code: 'conflict', title: 'Conflict', detail: 'Conflict' }));
+    api.getViewContent.mockResolvedValueOnce(content).mockResolvedValueOnce({ ...content, contentRevision: 10, data: { roots: [] } });
+    renderEditor();
+    await screen.findByLabelText('Название');
+    fireEvent.click(screen.getByRole('button', { name: 'Change roots' }));
+    expect(screen.getByText('Draft root')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    expect(await screen.findByRole('button', { name: 'Проверить сохранение' })).toBeInTheDocument();
+    expect(api.putViewContent).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить сохранение' }));
+    await waitFor(() => expect(api.getViewContent).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('Серверное дерево содержит 0 корневых компонентов.')).toBeInTheDocument();
+    expect(screen.getByText('Draft root')).toBeInTheDocument();
+    expect(api.putViewContent).toHaveBeenCalledTimes(1);
   });
 });
