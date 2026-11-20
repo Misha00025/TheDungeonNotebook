@@ -4,6 +4,7 @@ import type { ComputedSheet, FieldReference, JsonValue } from './types';
 import { displayValue } from './json';
 import { readParams, type FieldPart, type PresentationNode } from './presentationModel';
 import styles from './Presentation.module.css';
+import { compileStatListFormat } from './statListFormat';
 
 export type ResolvedField =
   | { status: 'value'; reference: FieldReference; label: string; value: JsonValue; valueType: string; sampleValue: JsonValue; sampleLabel?: string }
@@ -69,6 +70,7 @@ function valueForPart(part: FieldPart, sheet: ComputedSheet | undefined, sample:
 const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; sample: boolean; renderValue?: PresentationRendererProps['renderValue']; onDropNode?: PresentationRendererProps['onDropNode']; onDropMarker?: DropMarker; renderNodeActions?: PresentationRendererProps['renderNodeActions']; orientation?: 'row' | 'column' }> = React.memo(({ node, sheet, sample, renderValue, onDropNode, onDropMarker, renderNodeActions, orientation }) => {
   const read = useMemo(() => readParams(node.params), [node.params]);
   const params = read.status === 'supported' ? read.params : undefined;
+  const statFormat = useMemo(() => params?.type === 'stat-list' ? compileStatListFormat(params.format, params.expressions) : undefined, [node.params]);
   const placementAt = (element: HTMLElement, event: Pick<React.DragEvent, 'clientX' | 'clientY'>): PresentationDropPlacement => {
     const rect = element.getBoundingClientRect();
     const horizontal = orientation === 'row';
@@ -122,11 +124,16 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; sam
     content = <div className={styles.statList} style={{ '--presentation-columns': String(params.columns) } as React.CSSProperties}>{params.entries.map((entry, index) => {
       const field = resolveField(sheet, entry.source);
       const label = entry.label || field.label;
-      return <div className={styles.statRow} key={`${entry.source.kind}:${entry.source.fieldId}:${index}`}><span>{label}</span>{!sample && entry.source.kind === 'Base' && field.status === 'value' && renderValue ? renderValue(entry.source, label, displayResolved(field, sample)) : displayResolved(field, sample)}</div>;
+      if (field.status !== 'value') return <div className={styles.statRow} key={`${entry.source.kind}:${entry.source.fieldId}:${index}`}><span>{label}</span>{displayResolved(field, sample)}</div>;
+      const sourceValue = sample ? field.sampleValue : field.value;
+      const displayText = sample ? sampleText(field) : field.value === '' ? "''" : displayValue(field.value);
+      const formatted = statFormat?.render(sourceValue, displayText) ?? { text: displayText };
+      const valueDisplay = 'error' in formatted ? <span className={styles.diagnostic}>{formatted.error}</span> : <span className={styles.value}>{formatted.text}{sample && <span className={styles.sampleMark}>Образец</span>}</span>;
+      return <div className={styles.statRow} key={`${entry.source.kind}:${entry.source.fieldId}:${index}`}><span>{label}</span>{!sample && entry.source.kind === 'Base' && renderValue ? renderValue(entry.source, label, valueDisplay) : valueDisplay}</div>;
     })}{sample && params.entries.length === 0 && <span className={styles.placeholder}>Выберите характеристику</span>}</div>;
   }
   return content;
-  }, [node.params, node.children, sheet, sample, renderValue, onDropNode, onDropMarker, renderNodeActions, read, params]);
+  }, [node.params, node.children, sheet, sample, renderValue, onDropNode, onDropMarker, renderNodeActions, read, params, statFormat]);
   const groupAppearance = params?.type === 'group' && params.appearance === 'panel';
   const nestedChildren = params?.type !== 'group' && node.children.length > 0 ? <div className={styles.children}>{node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} sample={sample} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={onDropMarker} renderNodeActions={renderNodeActions} />)}</div> : null;
   const handleDrop = (event: React.DragEvent<HTMLElement>) => {

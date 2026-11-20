@@ -73,12 +73,12 @@ describe('PresentationRenderer UX contracts', () => {
     expect(screen.getByRole('button')).toHaveTextContent('3');
   });
 
-  it('keeps stat-list labels and passes display content as the third callback argument', () => {
-    const root = node('Характеристики', JSON.stringify({ version: 1, type: 'stat-list', columns: 1, entries: [{ source: reference(primaryId), label: 'Сила' }] }));
+  it('keeps stat-list source editable while applying the shared format', () => {
+    const root = node('Характеристики', JSON.stringify({ version: 1, type: 'stat-list', columns: 1, entries: [{ source: reference(primaryId), label: 'Сила' }], format: '$0 (${1:s})', expressions: ['floor(($0 - 10) / 2)'] }));
     const callback = vi.fn((_ref: FieldReference, _label: string, display?: React.ReactNode) => <button type="button">{display}</button>);
     render(<PresentationRenderer roots={[root]} sheet={sheet} renderValue={callback} />);
     expect(screen.getByText('Сила')).toBeInTheDocument();
     expect(callback).toHaveBeenCalledWith({ kind: 'Base', fieldId: primaryId }, 'Сила', expect.anything());
-    expect(screen.getByRole('button')).toHaveTextContent('3');
+    expect(screen.getByRole('button')).toHaveTextContent('3 (-4)');
   });
 });

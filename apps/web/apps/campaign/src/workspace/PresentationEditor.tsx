@@ -2,11 +2,12 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { isLosslessNumber } from 'lossless-json';
 import type { ComputedSheet, FieldReference, JsonValue } from './types';
 import { stringifyJson } from './json';
-import { duplicateNode, findNode, insertNode, makeNode, moveNode, patchNodeParams, readParams, removeTreeNode, updateNode, type FieldPart, type PresentationNode, type PresentationType } from './presentationModel';
+import { duplicateNode, findNode, insertNode, makeNode, moveNode, patchNodeParams, readParams, removeTreeNode, updateNode, type FieldPart, type JsonFieldReference, type PresentationNode, type PresentationType } from './presentationModel';
 import PresentationRenderer, { type PresentationDropPlacement } from './PresentationRenderer';
 import styles from './Presentation.module.css';
 import IconButton from '@tdn/shared/ui/Buttons/IconButton/IconButton';
 import ModalPortal from '@tdn/shared/ui/ModalPortal/ModalPortal';
+import { compileStatListFormat } from './statListFormat';
 
 export type PresentationEditorProps = { roots: PresentationNode[]; onChange: (roots: PresentationNode[]) => void; sheet?: ComputedSheet; choicesSheet?: ComputedSheet; sample?: boolean; disabled?: boolean };
 type FieldOption = { reference: FieldReference; value: string; label: string; numeric: boolean };
@@ -51,9 +52,17 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
   const [preview, setPreview] = useState(false);
   const rootDropRef = useRef<HTMLDivElement>(null);
   const [settingsDraft, setSettingsDraft] = useState<PresentationNode | null>(null);
+  const [statSearch, setStatSearch] = useState('');
   const settingsDraftRef = useRef<PresentationNode | null>(null);
   const activeSettings = settingsDraft && findNode(roots, settingsDraft.nodeKey) ? settingsDraft : undefined;
   const settingsRead = activeSettings ? readParams(activeSettings.params) : undefined;
+  const statFormat = useMemo(() => {
+    const current = activeSettings ? readParams(activeSettings.params) : undefined;
+    return current?.status === 'supported' && current.type === 'stat-list'
+      ? compileStatListFormat(current.params.format, current.params.expressions)
+      : undefined;
+  }, [activeSettings?.params]);
+  useEffect(() => { setStatSearch(''); }, [activeSettings?.nodeKey]);
   useEffect(() => {
     const draft = settingsDraftRef.current;
     if (draft && (preview || !findNode(roots, draft.nodeKey))) {
@@ -149,7 +158,7 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
     const defaultsValue = makeNode(type).params;
     const defaults = isJsonObject(defaultsValue) ? defaultsValue : {};
     const source = isJsonObject(current.params) ? current.params : { legacyParams: current.params };
-    const reserved = new Set(['version', 'type', 'direction', 'columns', 'gap', 'appearance', 'parts', 'primary', 'current', 'maximum', 'showBar', 'entries', 'legacyFormatError']);
+    const reserved = new Set(['version', 'type', 'direction', 'columns', 'gap', 'appearance', 'parts', 'primary', 'current', 'maximum', 'showBar', 'entries', 'format', 'expressions', 'legacyFormatError']);
     const unknown = Object.fromEntries(Object.entries(source).filter(([key]) => !reserved.has(key)));
     updateSettingsDraft(node => ({ ...node, params: { ...unknown, ...defaults } }));
   };
@@ -193,7 +202,7 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
     });
     patch({ parts: jsonParts, ...(stillPresent ? {} : { primary: null }) });
   };
-  const updateEntries = (entries: { source: ReturnType<typeof asJsonReference>; label: string }[]) => patch({ entries: entries.map(entry => ({ source: { kind: entry.source.kind, fieldId: entry.source.fieldId }, label: entry.label })) });
+  const updateEntries = (entries: { source: JsonFieldReference; label: string; [key: string]: JsonValue }[]) => patch({ entries });
 
   return <section className={styles.editor}>
     <header className={styles.editorHeader}><h2>Конструктор отображения</h2><button type="button" disabled={disabled} onClick={() => { setPreview(value => !value); settingsDraftRef.current = null; setSettingsDraft(null); }}>{preview ? 'Редактировать' : 'Предпросмотр'}</button></header>
@@ -227,14 +236,28 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
             <label>Текущее значение<select disabled={disabled} value={referenceValue(settingsRead.params.current ?? undefined)} onChange={event => { const reference = parseReference(event.target.value); patch({ current: reference ? asJsonReference(reference) : null }); }}><option value="">Выберите характеристику</option>{settingsRead.params.current && !choices.some(option => option.numeric && option.value === referenceValue(settingsRead.params.current!)) && <option value={referenceValue(settingsRead.params.current)}>Сохранённый источник недоступен или имеет другой тип</option>}{choices.filter(option => option.numeric).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
             <label>Максимум<select disabled={disabled} value={referenceValue(settingsRead.params.maximum ?? undefined)} onChange={event => patch({ maximum: event.target.value ? asJsonReference(parseReference(event.target.value)!) : null })}><option value="">Не задан</option>{settingsRead.params.maximum && !choices.some(option => option.numeric && option.value === referenceValue(settingsRead.params.maximum!)) && <option value={referenceValue(settingsRead.params.maximum)}>Сохранённый максимум недоступен</option>}{choices.filter(option => option.numeric).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
             <label><input type="checkbox" disabled={disabled} checked={settingsRead.params.showBar} onChange={event => patch({ showBar: event.target.checked })} />Показывать шкалу</label>
-          </> : <>
-            <h4>Характеристики</h4>{settingsRead.params.entries.map((entry, index) => <div className={styles.entryEditor} key={`${entry.source.kind}:${entry.source.fieldId}:${index}`}>
-              <label>Источник<select disabled={disabled} value={referenceValue(entry.source)} onChange={event => { const reference = parseReference(event.target.value); if (!reference) return; const entries = [...settingsRead.params.entries]; entries[index] = { ...entry, source: asJsonReference(reference) }; updateEntries(entries); }}><option value="">Выберите характеристику</option>{choices.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-              <label>Подпись<input disabled={disabled} value={entry.label} onChange={event => { const entries = [...settingsRead.params.entries]; entries[index] = { ...entry, label: event.target.value }; updateEntries(entries); }} /></label>
-              <div className={styles.partActions}><button type="button" disabled={disabled || index === 0} onClick={() => updateEntries(reorder(settingsRead.params.entries, index, -1))}>Выше</button><button type="button" disabled={disabled || index === settingsRead.params.entries.length - 1} onClick={() => updateEntries(reorder(settingsRead.params.entries, index, 1))}>Ниже</button><button type="button" disabled={disabled} onClick={() => updateEntries(settingsRead.params.entries.filter((_, entryIndex) => entryIndex !== index))}>Удалить</button></div>
-            </div>)}
-            <button type="button" disabled={disabled || choices.length === 0} onClick={() => updateEntries([...settingsRead.params.entries, { source: asJsonReference(choices[0].reference), label: '' }])}>Добавить характеристику</button>
-            <label>Колонки<select disabled={disabled} value={settingsRead.params.columns} onChange={event => patch({ columns: Number(event.target.value) })}>{[1, 2, 3, 4].map(value => <option key={value}>{value}</option>)}</select></label>
+           </> : <>
+             <h4>Характеристики</h4>
+             <label>Поиск характеристик<input value={statSearch} disabled={disabled} onChange={event => setStatSearch(event.target.value)} /></label>
+             <div className={styles.statChoices}>
+               {settingsRead.params.entries.filter(entry => !choices.some(option => referenceValue(option.reference) === referenceValue(entry.source))).map((entry, index) => <label key={`missing-${entry.source.kind}:${entry.source.fieldId}:${index}`}><input type="checkbox" checked disabled={disabled} onChange={() => updateEntries(settingsRead.params.entries.filter(item => item.source.kind !== entry.source.kind || item.source.fieldId !== entry.source.fieldId))} />Характеристика недоступна</label>)}
+               {choices.filter(option => option.label.toLocaleLowerCase().includes(statSearch.toLocaleLowerCase())).map(option => {
+                 const index = settingsRead.params.entries.findIndex(entry => referenceValue(entry.source) === option.value);
+                 return <label key={option.value}><input type="checkbox" disabled={disabled} checked={index >= 0} onChange={event => {
+                   if (event.target.checked) { if (index < 0) updateEntries([...settingsRead.params.entries, { source: asJsonReference(option.reference), label: '' }]); }
+                   else updateEntries(settingsRead.params.entries.filter(entry => referenceValue(entry.source) !== option.value));
+                 }} />{option.label}</label>;
+               })}
+             </div>
+             <>
+               <label>Формат вывода<input disabled={disabled} value={settingsRead.params.format} onChange={event => patch({ format: event.target.value })} /></label>
+               <small>$0 — исходное значение, $1 и далее — результаты выражений; ${'{1:s}'} выводит со знаком, $$ — знак доллара.</small>
+               {statFormat?.error && <span className={styles.diagnostic} role="status">{statFormat.error}</span>}
+               <p>В выражениях $0 — значение текущей характеристики. Доступны +, -, *, /, %, floor, ceil, round, abs, min, max.</p>
+               {settingsRead.params.expressions.map((expression, index) => expression === null ? null : <div className={styles.expressionEditor} key={index}><span>${index + 1}</span><input aria-label={`Выражение $${index + 1}`} disabled={disabled} value={expression} onChange={event => { const expressions = [...settingsRead.params.expressions]; expressions[index] = event.target.value; patch({ expressions }); }} />{statFormat?.expressionErrors[index] && <span className={styles.diagnostic} role="status">{statFormat.expressionErrors[index]}</span>}<button type="button" disabled={disabled} onClick={() => { const expressions = [...settingsRead.params.expressions]; expressions[index] = null; patch({ expressions }); }}>Удалить</button></div>)}
+               <button type="button" disabled={disabled} onClick={() => patch({ expressions: [...settingsRead.params.expressions, ''] })}>Добавить выражение</button>
+             </>
+             <label>Колонки<select disabled={disabled} value={settingsRead.params.columns} onChange={event => patch({ columns: Number(event.target.value) })}>{[1, 2, 3, 4].map(value => <option key={value}>{value}</option>)}</select></label>
           </>}
         </div>}
       </ModalPortal>

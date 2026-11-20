@@ -10,7 +10,7 @@ export type PresentationParams =
   | { version: 1; type: 'group'; direction: 'row' | 'column'; columns: number; gap: 'small' | 'medium' | 'large'; appearance: 'plain' | 'panel'; [key: string]: JsonValue }
   | { version: 1; type: 'composite'; parts: FieldPart[]; primary: JsonFieldReference | null; [key: string]: JsonValue }
   | { version: 1; type: 'resource'; current: JsonFieldReference | null; maximum: JsonFieldReference | null; showBar: boolean; [key: string]: JsonValue }
-  | { version: 1; type: 'stat-list'; entries: { source: JsonFieldReference; label: string; [key: string]: JsonValue }[]; columns: number; [key: string]: JsonValue };
+  | { version: 1; type: 'stat-list'; entries: { source: JsonFieldReference; label: string; [key: string]: JsonValue }[]; columns: number; format: string; expressions: (string | null)[]; [key: string]: JsonValue };
 export type ParamsRead = { [T in PresentationType]: { status: 'supported'; type: T; params: Extract<PresentationParams, { type: T }> } }[PresentationType] | { status: 'unsupported' | 'invalid'; message: string; params: JsonValue };
 
 const isRecord = (value: unknown): value is Record<string, JsonValue> => typeof value === 'object' && value !== null && !Array.isArray(value) && !isLosslessNumber(value);
@@ -43,8 +43,8 @@ export function readParams(params: JsonValue): ParamsRead {
       ? Array.isArray(params.parts) && params.parts.every(validPart) && (params.primary === null || validRef(params.primary) && params.primary.kind === 'Base')
       : type === 'resource'
         ? (params.current === null || validRef(params.current)) && (params.maximum === null || validRef(params.maximum)) && typeof params.showBar === 'boolean'
-        : Array.isArray(params.entries) && params.entries.every(entry => isRecord(entry) && validRef(entry.source) && typeof entry.label === 'string') && positiveInteger(params.columns);
-  return valid ? { status: 'supported', type, params: { ...params, version: 1, type } as PresentationParams } as ParamsRead : { status: 'invalid', message: 'Настройки отображения заполнены некорректно.', params };
+        : Array.isArray(params.entries) && params.entries.every(entry => isRecord(entry) && validRef(entry.source) && typeof entry.label === 'string') && positiveInteger(params.columns) && (params.format === undefined || typeof params.format === 'string') && (params.expressions === undefined || Array.isArray(params.expressions) && params.expressions.every(expression => expression === null || typeof expression === 'string'));
+  return valid ? { status: 'supported', type, params: { ...params, version: 1, type, ...(type === 'stat-list' ? { format: typeof params.format === 'string' ? params.format : '$0', expressions: Array.isArray(params.expressions) ? params.expressions as (string | null)[] : [] } : {}) } as PresentationParams } as ParamsRead : { status: 'invalid', message: 'Настройки отображения заполнены некорректно.', params };
 }
 
 const stringParam = (value: JsonValue | undefined, fallback: string): string => typeof value === 'string' ? value : fallback;
@@ -54,7 +54,7 @@ export const makeNode = (type: PresentationType, title = ''): PresentationNode =
     ? { version: 1, type, direction: 'column', columns: 1, gap: 'medium', appearance: 'plain' }
     : type === 'composite' ? { version: 1, type, parts: [], primary: null }
       : type === 'resource' ? { version: 1, type, current: null, maximum: null, showBar: true }
-        : { version: 1, type, entries: [], columns: 1 },
+         : { version: 1, type, entries: [], columns: 1, format: '$0', expressions: [] },
 });
 
 function parseWidgetFormat(format: string, sources: WidgetNode['sources']): FieldPart[] | null {

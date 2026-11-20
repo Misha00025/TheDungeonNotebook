@@ -14,6 +14,8 @@
   },
   "dependencies": {
     "@tdn/shared": "*",
+    "decimal.js": "10.6.0",
+    "jsep": "1.4.0",
     "lossless-json": "4.3.0"
   }
 }

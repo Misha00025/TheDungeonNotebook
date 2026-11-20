@@ -52,13 +52,25 @@
 .statRow {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: .75rem;
   min-width: 0;
 }
 
+.statRow {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  padding: .5rem .75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+}
+
 .statRow > span:first-child {
   color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.statRow > :not(span:first-child) {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
@@ -336,7 +348,8 @@
 
 .properties label,
 .partEditor,
-.entryEditor {
+.entryEditor,
+.expressionEditor {
   display: grid;
   gap: .3rem;
   min-width: 0;
@@ -357,7 +370,8 @@
 }
 
 .partEditor,
-.entryEditor {
+.entryEditor,
+.expressionEditor {
   padding: .6rem 0;
   border-bottom: 1px solid var(--border-color);
 }
@@ -386,14 +400,24 @@
 }
 
 @media (max-width: 520px) {
-  .statRow {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
   .canvas {
     padding: .5rem;
   }
+}
+
+.statChoices,
+.expressionEditor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: .45rem;
+  min-width: 0;
+}
+
+.statChoices label {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  min-width: 0;
 }
 
 @media (max-width: 600px) {
