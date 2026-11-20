@@ -73,6 +73,8 @@ export { default as FormGrid } from './ui/Form/FormGrid';
 export type { FormGridProps } from './ui/Form/FormGrid';
 export { default as Input } from './ui/Form/Input';
 export type { InputProps } from './ui/Form/Input';
+export { default as FileInput } from './ui/Form/FileInput';
+export type { FileInputProps } from './ui/Form/FileInput';
 export { default as Select } from './ui/Form/Select';
 export type { SelectProps } from './ui/Form/Select';
 export { default as Textarea } from './ui/Form/Textarea';

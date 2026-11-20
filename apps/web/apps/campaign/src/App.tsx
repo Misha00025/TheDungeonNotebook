@@ -15,6 +15,7 @@ import CampaignManagement from './workspace/CampaignManagement';
 import Templates from './workspace/Templates';
 import Formulas from './workspace/Formulas';
 import Views from './workspace/Views';
+import LegacyExportDiscovery from './workspace/LegacyExportDiscovery';
 import CharacterSheet from './workspace/CharacterSheet';
 import '@tdn/shared/styles/globals.css';
 
@@ -71,7 +72,7 @@ const GuardedRoutes: React.FC = () => {
       <Route path="gm/settings" element={<CampaignManagement />}>
         <Route index element={<CampaignSettings />} />
         <Route path="members" element={<Members />} />
-        <Route path="export" element={<React.Fragment />} />
+        <Route path="export" element={<LegacyExportDiscovery />} />
       </Route>
       <Route path="users" element={<LegacySectionEntry target="members" />} />
       <Route path="settings" element={<LegacySectionEntry target="settings" />} />

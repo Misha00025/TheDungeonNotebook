@@ -47,7 +47,7 @@
 | `Button`, `LinkButton`, `IconButton`, `DragHandle` | `packages/shared/src/ui/Buttons/Button.tsx`, `packages/shared/src/ui/Buttons/LinkButton.tsx`, `packages/shared/src/ui/Buttons/IconButton/IconButton.tsx`, `packages/shared/src/ui/Buttons/DragHandle.tsx`, `packages/shared/src/styles/components/Button.module.css`, `packages/shared/src/ui/Buttons/IconButton/IconButton.module.css`, `packages/shared/src/ui/Buttons/DragHandle.module.css` |
 | `Panel`, `Badge`, `StatePanel`, `Statistic` | `packages/shared/src/ui/Panel/Panel.tsx`, `packages/shared/src/ui/Panel/Panel.module.css`, `packages/shared/src/ui/StatePanel/StatePanel.tsx`, `packages/shared/src/ui/Statistic/Statistic.tsx`, `packages/shared/src/ui/Statistic/Statistic.module.css` |
 | `DataTable` | `packages/shared/src/ui/DataTable/DataTable.tsx`, `packages/shared/src/ui/DataTable/DataTable.module.css` |
-| `Field`, `Input`, `Select`, `Textarea`, `Checkbox` | `packages/shared/src/ui/Form/Field.tsx`, `packages/shared/src/ui/Form/Input.tsx`, `packages/shared/src/ui/Form/Select.tsx`, `packages/shared/src/ui/Form/Textarea.tsx`, `packages/shared/src/ui/Form/Checkbox.tsx`, `packages/shared/src/ui/Form/Field.module.css`, `packages/shared/src/styles/components/Input.module.css`, `packages/shared/src/ui/Form/Checkbox.module.css` |
+| `Field`, `Input`, `FileInput`, `Select`, `Textarea`, `Checkbox` | `packages/shared/src/ui/Form/Field.tsx`, `packages/shared/src/ui/Form/Input.tsx`, `packages/shared/src/ui/Form/FileInput.tsx`, `packages/shared/src/ui/Form/Select.tsx`, `packages/shared/src/ui/Form/Textarea.tsx`, `packages/shared/src/ui/Form/Checkbox.tsx`, `packages/shared/src/ui/Form/Field.module.css`, `packages/shared/src/styles/components/Input.module.css`, `packages/shared/src/ui/Form/Checkbox.module.css` |
 | `FieldSet` | `packages/shared/src/ui/Form/FieldSet.tsx`, `packages/shared/src/ui/Form/FieldSet.module.css` |
 | `FormGrid` | `packages/shared/src/ui/Form/FormGrid.tsx`, `packages/shared/src/ui/Form/FormGrid.module.css` |
 | `WorkspaceLayout` | `packages/shared/src/ui/WorkspaceLayout/WorkspaceLayout.tsx`, `packages/shared/src/ui/WorkspaceLayout/WorkspaceLayout.module.css` |
@@ -62,6 +62,8 @@
 | `BottomNavigation`, `NavigationIcon` | `packages/shared/src/ui/BottomNavigation/BottomNavigation.tsx`, `packages/shared/src/ui/BottomNavigation/BottomNavigation.module.css`, `packages/shared/src/ui/NavigationIcon/NavigationIcon.tsx`, private hook `packages/shared/src/ui/hooks/useMediaQuery.ts` |
 | `ModalPortal` | `packages/shared/src/ui/ModalPortal/ModalPortal.tsx`, `packages/shared/src/ui/ModalPortal/ModalPortal.module.css` |
 | `Notification` | `packages/shared/src/ui/Notification/Notification.tsx`, `packages/shared/src/ui/Notification/Notification.module.css`, `packages/shared/src/styles/globals.css` |
+
+`FileInput` uses the shared `Button` as its visible trigger for a hidden native file input. It accepts the native file input props plus `buttonLabel` (default `Выбрать файл`), and its ref points to the native input so the consumer can clear it. The consumer owns the selected `File`, file name, and parsing; no upload is performed.
 
 Публичный API shared-пакета объявляется в `packages/shared/src/index.ts`. При добавлении компонента экспортируйте сам компонент и его публичный тип пропсов. Сначала проверьте реальные потребители и существующие аналоги, затем вносите минимальное совместимое расширение и выбирайте только необходимые unit/component-тесты по критериям раздела «Проверки». Не считайте пилотную интеграцию миграцией всех экранов: остальные экраны переносятся отдельно.
 
