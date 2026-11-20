@@ -11,6 +11,7 @@ import Characters from './workspace/Characters';
 import CampaignOverview from './workspace/CampaignOverview';
 import Members from './workspace/Members';
 import CampaignSettings from './workspace/CampaignSettings';
+import CampaignManagement from './workspace/CampaignManagement';
 import Templates from './workspace/Templates';
 import Formulas from './workspace/Formulas';
 import Views from './workspace/Views';
@@ -45,7 +46,12 @@ const LegacySectionEntry: React.FC<{ target: 'members' | 'settings' | 'templates
   const resource = useResource(`${sessionKey}:${id}:legacy-section`, () => api.campaignPermissions(id));
   if (resource.loading) return <p>Загрузка прав кампании…</p>;
   if (resource.error) return <ApiError error={resource.error} onRetry={resource.reload} />;
-  return <Navigate to={path(`/${id}/${resource.data?.canWrite ? target === 'templates' ? 'gm/templates' : `gm/${target}` : 'player/characters'}`)} replace />;
+  return <Navigate to={path(`/${id}/${resource.data?.canWrite ? target === 'templates' ? 'gm/templates' : target === 'members' ? 'gm/settings/members' : 'gm/settings' : 'player/characters'}`)} replace />;
+};
+const LegacyMembersEntry: React.FC = () => {
+  const { groupId = '' } = useParams();
+  const { path } = useWorkspace();
+  return <Navigate to={path(`/${groupId}/gm/settings/members`)} replace />;
 };
 const GuardedRoutes: React.FC = () => {
   const accepted = useAcceptedLocation();
@@ -61,8 +67,12 @@ const GuardedRoutes: React.FC = () => {
       <Route path="gm/characters" element={<Characters />} />
       <Route path="gm/characters/:characterId" element={<CharacterSheetRoute />} />
       <Route path="gm/characters/:characterId/:pageKey" element={<CharacterSheetRoute />} />
-      <Route path="gm/members" element={<Members />} />
-      <Route path="gm/settings" element={<CampaignSettings />} />
+      <Route path="gm/members" element={<LegacyMembersEntry />} />
+      <Route path="gm/settings" element={<CampaignManagement />}>
+        <Route index element={<CampaignSettings />} />
+        <Route path="members" element={<Members />} />
+        <Route path="export" element={<React.Fragment />} />
+      </Route>
       <Route path="users" element={<LegacySectionEntry target="members" />} />
       <Route path="settings" element={<LegacySectionEntry target="settings" />} />
       <Route path="player/characters" element={<Characters />} />

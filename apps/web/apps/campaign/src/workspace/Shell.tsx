@@ -88,15 +88,14 @@ const CampaignShell: React.FC = () => {
     catch (error) { if (mounted.current && sequence.current === current && route.current === pathname) setSwitchError(error); }
     finally { if (mounted.current && sequence.current === current) { busy.current = false; setSwitchBusy(false); } }
   };
-  const nav: [string, string][] = mode === 'gm' ? [['Обзор', 'gm/overview'], ['Персонажи', 'gm/characters'], ['Шаблон', 'gm/templates'], ['Формулы', 'gm/formulas'], ['Представления', 'gm/views'], ['Участники и доступ', 'gm/members'], ['Настройки', 'gm/settings']] : [['Мои персонажи', 'player/characters']];
-  const title = nav.find(([, suffix]) => location.pathname.endsWith(`/${suffix}`))?.[0] ?? campaign.data.name;
+  const nav: [string, string][] = mode === 'gm' ? [['Обзор', 'gm/overview'], ['Персонажи', 'gm/characters'], ['Шаблон', 'gm/templates'], ['Формулы', 'gm/formulas'], ['Представления', 'gm/views'], ['Управление', 'gm/settings']] : [['Мои персонажи', 'player/characters']];
+  const title = mode === 'gm' && location.pathname.includes(`/${id}/gm/settings`) ? 'Управление' : nav.find(([, suffix]) => location.pathname.endsWith(`/${suffix}`))?.[0] ?? campaign.data.name;
   const sectionIcons: Record<string, NavigationIconName> = {
     'gm/overview': 'home',
     'gm/characters': 'people',
     'gm/templates': 'document',
     'gm/formulas': 'function',
     'gm/views': 'layout',
-    'gm/members': 'access',
     'gm/settings': 'settings',
     'player/characters': 'people',
   };
@@ -104,7 +103,7 @@ const CampaignShell: React.FC = () => {
     const to = path(`/${id}/${route}`);
     return {
       id: route,
-      label: route === 'gm/members' ? 'Участники' : label,
+      label,
       icon: <NavigationIcon name={sectionIcons[route]} />,
       to,
       active: location.pathname === to || location.pathname.startsWith(`${to}/`),

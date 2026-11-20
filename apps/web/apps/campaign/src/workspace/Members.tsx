@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ActionRow, Button, DataTable, Field, IconButton, Input, List, ListItem, ModalPortal, Notification, PageHeader, Panel, Select } from '@tdn/shared';
+import { ActionRow, Button, DataTable, Field, IconButton, Input, List, ListItem, ModalPortal, Notification, Panel, Select } from '@tdn/shared';
 import { useWorkspace } from './Workspace';
 import { useResource } from './hooks';
 import { ApiError } from './Feedback';
@@ -206,7 +206,6 @@ const MembersPage: React.FC<{ campaignId: number }> = ({ campaignId }) => {
   const assignmentErrors = Boolean(access.charsError || access.characters.some(entry => Boolean(entry.error || entry.unavailable)));
   const sectionReadErrorsSettled = access.displayAllowed && !participantsLoading && !processing;
   return <section className={styles.page} aria-busy={participantsLoading || access.isBusy || searching || undefined}>
-    <PageHeader title="Участники и доступ" />
     {access.feedback ? <Notification kind={access.feedback.kind} eventKey={String(access.feedback.event)}>{access.feedback.message}</Notification> : null}
     {sectionReadErrorsSettled && (assignmentErrors || profilesFailed) && <Notification kind="warning" eventKey={`members-section-read:${sessionKey}:${campaignId}`}>{assignmentErrors && profilesFailed ? 'Не все данные списка участников доступны.' : assignmentErrors ? 'Не все назначения доступны.' : 'Не все профили доступны.'}</Notification>}
     {!access.displayAllowed && <p>Список членства доступен только управляющим доступом.</p>}

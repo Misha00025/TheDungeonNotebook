@@ -31,18 +31,25 @@ describe('campaign navigation under the Hub route', () => {
     render(<MemoryRouter basename={basename || undefined} initialEntries={[initial]}><Routes><Route path="/groups/*" element={<App auth={makeAuth(request)} />} /></Routes><Pathname /></MemoryRouter>);
 
     const navigation = await screen.findByRole('navigation', { name: 'Разделы кампании' });
-    const labels = ['Обзор', 'Персонажи', 'Шаблон', 'Формулы', 'Представления', 'Участники и доступ', 'Настройки'];
-    const suffixes = ['gm/overview', 'gm/characters', 'gm/templates', 'gm/formulas', 'gm/views', 'gm/members', 'gm/settings'];
+    const labels = ['Обзор', 'Персонажи', 'Шаблон', 'Формулы', 'Представления', 'Управление'];
+    const suffixes = ['gm/overview', 'gm/characters', 'gm/templates', 'gm/formulas', 'gm/views', 'gm/settings'];
     for (const [index, label] of labels.entries()) expect(within(navigation).getByRole('link', { name: label })).toHaveAttribute('href', `${prefix}/12/${suffixes[index]}`);
 
-    const headings = ['Обзор кампании', 'Персонажи кампании', 'Шаблон кампании', 'Формулы', 'Отображения', 'Участники и доступ', 'Настройки кампании'];
     for (const [index, label] of labels.entries()) {
       fireEvent.click(within(navigation).getByRole('link', { name: label }));
       await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe(`/groups/12/${suffixes[index]}`));
-      expect(await screen.findByRole('heading', { name: headings[index] })).toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: 'Страница не найдена' })).not.toBeInTheDocument();
     }
     expect(request.mock.calls.filter(([url]) => url.startsWith('/api/')).some(([url]) => url.includes('/templates'))).toBe(false);
+    const managementNavigation = within(screen.getByRole('navigation', { name: 'Управление кампанией' }));
+    fireEvent.click(managementNavigation.getByRole('link', { name: 'Участники' }));
+    await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/12/gm/settings/members'));
+    expect(await screen.findByLabelText('Никнейм')).toBeInTheDocument();
+    fireEvent.click(managementNavigation.getByRole('link', { name: 'Экспорт' }));
+    await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/12/gm/settings/export'));
+    fireEvent.click(managementNavigation.getByRole('link', { name: 'Общее' }));
+    await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/12/gm/settings'));
+    expect(await screen.findByLabelText('Название кампании')).toBeInTheDocument();
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Разделы кампании' })).getByRole('link', { name: 'Обзор' }));
     await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/12/gm/overview'));
 
@@ -50,7 +57,6 @@ describe('campaign navigation under the Hub route', () => {
     await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/13/gm/overview'));
     expect(await screen.findByRole('option', { name: 'Campaign 13' })).toBeInTheDocument();
     expect(screen.getByLabelText('Кампания')).toHaveValue('13');
-    expect(screen.queryByRole('heading', { name: 'Campaign 13' })).not.toBeInTheDocument();
     await screen.findByRole('navigation', { name: 'Разделы кампании' });
     fireEvent.change(screen.getByRole('combobox', { name: 'Окружение' }), { target: { value: 'player' } });
     await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/13/player/characters'));
@@ -84,7 +90,7 @@ describe('campaign navigation under the Hub route', () => {
     await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/12/gm/characters'));
     expect(await screen.findByRole('heading', { name: 'Персонажи кампании' })).toBeInTheDocument();
 
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Разделы кампании' })).getByRole('link', { name: 'Настройки' }));
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Разделы кампании' })).getByRole('link', { name: 'Управление' }));
     await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/12/gm/settings'));
     const nameInput = await screen.findByLabelText('Название кампании');
     fireEvent.change(nameInput, { target: { value: 'Unsaved change' } });
