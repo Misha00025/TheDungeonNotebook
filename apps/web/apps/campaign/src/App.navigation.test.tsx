@@ -52,7 +52,7 @@ describe('campaign navigation under the Hub route', () => {
     expect(screen.getByLabelText('Кампания')).toHaveValue('13');
     expect(screen.queryByRole('heading', { name: 'Campaign 13' })).not.toBeInTheDocument();
     await screen.findByRole('navigation', { name: 'Разделы кампании' });
-    fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Окружение' }), { target: { value: 'player' } });
     await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/13/player/characters'));
     expect(request).toHaveBeenCalled();
   });
@@ -90,10 +90,11 @@ describe('campaign navigation under the Hub route', () => {
     fireEvent.change(nameInput, { target: { value: 'Unsaved change' } });
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
     const overview = within(screen.getByRole('navigation', { name: 'Разделы кампании' })).getByRole('link', { name: 'Обзор' });
-    fireEvent.click(overview);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Окружение' }), { target: { value: 'player' } });
     expect(confirm).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/12/gm/settings');
     expect(screen.getByLabelText('Название кампании')).toHaveValue('Unsaved change');
+    expect(screen.getByRole('combobox', { name: 'Окружение' })).toHaveValue('gm');
     fireEvent.click(overview);
     expect(await screen.findByRole('heading', { name: 'Обзор кампании' })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/12/gm/overview'));

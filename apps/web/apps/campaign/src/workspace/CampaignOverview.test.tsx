@@ -34,7 +34,7 @@ describe('CampaignOverview', () => {
     api.listViews.mockResolvedValue([{ id: 'view-1' }]);
   });
 
-  it('shows character count, empty placeholders, roster content, and existing quick actions', async () => {
+  it('shows character count, empty placeholders, and roster content', async () => {
     renderOverview();
     const statistic = await screen.findByRole('article', { name: 'Персонажи' });
     expect(within(statistic).getAllByText('Персонажи')).toHaveLength(1);
@@ -52,10 +52,6 @@ describe('CampaignOverview', () => {
     expect(screen.queryByText('Ключевой')).not.toBeInTheDocument();
     expect(screen.queryByText('Можно вести и редактировать')).not.toBeInTheDocument();
     expect(screen.queryByText('Только просмотр')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'К списку персонажей' })).toHaveAttribute('href', '/groups/12/gm/characters');
-    expect(screen.getByRole('link', { name: 'Настроить шаблон' })).toHaveAttribute('href', '/groups/12/gm/templates');
-    expect(screen.getByRole('link', { name: 'Настроить формулы' })).toHaveAttribute('href', '/groups/12/gm/formulas');
-    expect(screen.getByRole('link', { name: 'Настроить представления' })).toHaveAttribute('href', '/groups/12/gm/views');
     expect(api.listCharacters).toHaveBeenCalledTimes(1);
     expect(api.listAssignments).toHaveBeenCalledTimes(1);
     expect(api.getUser).toHaveBeenCalledTimes(1);

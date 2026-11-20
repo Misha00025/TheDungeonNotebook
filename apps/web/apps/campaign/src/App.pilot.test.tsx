@@ -123,9 +123,9 @@ describe('campaign SDK pilot', () => {
     const restoredKeyGroup = await screen.findByRole('region', { name: 'Ключевые' });
     expect(within(restoredKeyGroup).getByRole('button', { name: `Открыть лист ${playerCharacters[0].name}` })).toHaveTextContent('Pilot description');
     expect(request.mock.calls.filter(([url]) => url === '/api/campaigns/12/characters')).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Окружение' }), { target: { value: 'player' } });
     await waitFor(() => expect(screen.getByLabelText('Current pathname')).toHaveTextContent('/groups/12/player/characters'));
-    fireEvent.click(screen.getByRole('button', { name: 'Пространство мастера' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Окружение' }), { target: { value: 'gm' } });
     await waitFor(() => expect(screen.getByLabelText('Current pathname')).toHaveTextContent('/groups/12/gm/overview'));
     expect(request.mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true);
   });

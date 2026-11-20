@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Navigate, Outlet, useLocation, useParams } from 'react-router-dom';
-import { Badge, BottomNavigation, Breadcrumbs, Button, Field, NavigationIcon, Notification, SectionNav, Select, StatePanel, WorkspaceLayout } from '@tdn/shared';
+import { BottomNavigation, Breadcrumbs, Field, NavigationIcon, Notification, SectionNav, Select, StatePanel, WorkspaceLayout } from '@tdn/shared';
 import type { BottomNavigationItem, NavigationIconName } from '@tdn/shared';
 import type { Campaign, Permissions } from './types';
 import { useWorkspace } from './Workspace';
@@ -19,6 +19,7 @@ const CampaignShell: React.FC = () => {
   const { visitGroup } = useVisitHistory();
   const location = useLocation();
   const campaignSelectId = React.useId();
+  const modeSelectId = React.useId();
   const [switchBusy, setSwitchBusy] = useState(false);
   const [switchError, setSwitchError] = useState<unknown>();
   const busy = useRef(false);
@@ -57,9 +58,8 @@ const CampaignShell: React.FC = () => {
   const effective = permission.data;
   const canEnterGm = effective.canWrite;
   const targetMode = (next: 'gm' | 'player') => path(`/${id}/${next === 'gm' ? 'gm/overview' : 'player/characters'}`);
-  const switchMode = async () => {
-    if (busy.current || permission.loading || permission.error) return;
-    const target = mode === 'gm' ? 'player' : 'gm';
+  const switchMode = async (target: 'gm' | 'player') => {
+    if (target === mode || busy.current || permission.loading || permission.error) return;
      const sheetRoute = location.pathname.match(/\/(?:gm|player)\/characters\/([^/]+)(?:\/(page_[1-9]\d*|overview|stats|all-stats))?$/);
     if (!sheetRoute) { navigate(targetMode(target)); return; }
     busy.current = true; const current = ++sequence.current; const pathname = location.pathname; setSwitchBusy(true); setSwitchError(undefined);
@@ -125,14 +125,18 @@ const CampaignShell: React.FC = () => {
     : [{ id, name: campaign.data.name }, ...campaignItems];
   return <CampaignContext.Provider value={{ campaign: campaign.data, permissions: effective, lastKnownPermissions: permission.data, permissionsLoading: permission.loading || Boolean(permission.error), mode, reloadCampaign: campaign.reload, reloadPermissions: permission.reload, updateCampaign }}>
     <WorkspaceLayout navigation={<>
-      <Badge>Режим: {mode === 'gm' ? 'Мастер' : 'Игрок'}</Badge>
       <Field label="Кампания" htmlFor={campaignSelectId}>
         <Select id={campaignSelectId} value={String(id)} disabled={switchBusy || (campaigns.loading && !campaigns.data)} aria-busy={campaigns.loading || undefined} onChange={event => { void changeCampaign(Number(event.target.value)); }}>
           {campaignOptions.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
         </Select>
       </Field>
       {Boolean(campaigns.error) && <ApiError error={campaigns.error} onRetry={campaigns.reload} />}
-      {effective.canWrite && <Button variant="secondary" disabled={switchBusy || permission.loading || Boolean(permission.error)} onClick={switchMode}>{mode === 'gm' ? 'Пространство игрока' : 'Пространство мастера'}</Button>}
+      {effective.canWrite && <Field label="Окружение" htmlFor={modeSelectId}>
+        <Select id={modeSelectId} value={mode} disabled={switchBusy || permission.loading || Boolean(permission.error)} aria-busy={switchBusy || undefined} onChange={event => { void switchMode(event.target.value as 'gm' | 'player'); }}>
+          <option value="gm">Пространство мастера</option>
+          <option value="player">Пространство игрока</option>
+        </Select>
+      </Field>}
        <SectionNav aria-label="Разделы кампании" hideOnMobile items={nav.map(([label, route]) => {
         const to = path(`/${id}/${route}`);
         return { label, to, active: location.pathname === to || location.pathname.startsWith(`${to}/`) };

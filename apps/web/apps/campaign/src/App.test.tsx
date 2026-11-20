@@ -161,8 +161,8 @@ describe('campaign first iteration', () => {
     expect(within(table).getByText('Защита')).toBeInTheDocument();
     expect(within(table).queryByRole('button', { name: /Изменить показатель/ })).not.toBeInTheDocument();
     expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
-    fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
-    expect(await screen.findByRole('button', { name: 'Пространство мастера' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Окружение' }), { target: { value: 'player' } });
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Окружение' })).toHaveValue('player'));
     expect(await screen.findByRole('heading', { name: 'Hero' })).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Инструменты мастера' })).not.toBeInTheDocument();
     expect(screen.queryByRole('table', { name: 'Все характеристики' })).not.toBeInTheDocument();
@@ -257,6 +257,7 @@ describe('campaign first iteration', () => {
     });
     const gm = renderApp('/12/gm/overview', request);
     expect(await screen.findByRole('heading', { name: 'Мои персонажи' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Окружение' })).not.toBeInTheDocument();
     gm.unmount();
     renderApp('/12/player/characters', request);
     expect(await screen.findByRole('heading', { name: 'Hero', level: 4 })).toBeInTheDocument();
@@ -326,15 +327,17 @@ describe('campaign first iteration', () => {
     });
     renderApp(`/12/gm/characters/${id}/page_2`, request);
     expect(await screen.findByRole('link', { name: 'Дополнительно' })).toHaveAttribute('aria-current', 'page');
-    fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Окружение' }), { target: { value: 'player' } });
     await waitFor(() => expect(screen.getByRole('link', { name: 'Дополнительно' })).toHaveAttribute('href', `/12/player/characters/${id}/page_2`));
+    expect(screen.getByRole('combobox', { name: 'Окружение' })).toHaveValue('player');
     expect(screen.getByRole('link', { name: 'Дополнительно' })).toHaveAttribute('aria-current', 'page');
     expect(request.mock.calls.some(([url]) => url === `/api/campaigns/12/characters/${id}/permissions`)).toBe(true);
     expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(true);
     expect(request.mock.calls.map(([url]) => url).some(url => /formulas|virtual-fields|custom-virtual-fields|virtual-overrides|assignments/.test(url))).toBe(false);
-    fireEvent.click(screen.getByRole('button', { name: 'Пространство мастера' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Окружение' }), { target: { value: 'gm' } });
     await waitFor(() => expect(screen.getByRole('link', { name: 'Дополнительно' })).toHaveAttribute('href', `/12/gm/characters/${id}/page_2`));
     expect(screen.getByRole('link', { name: 'Дополнительно' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('combobox', { name: 'Окружение' })).toHaveValue('gm');
   });
 
   it.each([403, 404])('falls back to the target character list when mode access returns %s', async status => {
@@ -354,7 +357,7 @@ describe('campaign first iteration', () => {
     });
     renderApp(`/12/gm/characters/${id}/page_2`, request);
     await screen.findByRole('link', { name: 'Дополнительно' });
-    fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Окружение' }), { target: { value: 'player' } });
     expect(await screen.findByRole('heading', { name: 'Мои персонажи' })).toBeInTheDocument();
     expect(request.mock.calls.some(([url]) => url.endsWith('/assignments'))).toBe(false);
   });
@@ -375,11 +378,12 @@ describe('campaign first iteration', () => {
     });
     renderApp(`/12/gm/characters/${id}/page_2`, request);
     await screen.findByRole('link', { name: 'Дополнительно' });
-    fireEvent.click(screen.getByRole('button', { name: 'Пространство игрока' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Окружение' }), { target: { value: 'player' } });
     expect(await screen.findByText('Зависимый сервис временно недоступен.')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('Try later');
     expect(document.body.textContent).not.toContain('dependency_unavailable');
     expect(screen.getByRole('link', { name: 'Дополнительно' })).toHaveAttribute('href', `/12/gm/characters/${id}/page_2`);
+    expect(screen.getByRole('combobox', { name: 'Окружение' })).toHaveValue('gm');
     expect(screen.getByRole('link', { name: 'Дополнительно' })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('heading', { name: 'Мои персонажи' })).not.toBeInTheDocument();
     expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(true);
@@ -412,7 +416,7 @@ describe('campaign first iteration', () => {
       return response([]);
     });
     renderApp('/12/gm/characters', request);
-    fireEvent.click(await screen.findByRole('button', { name: 'Пространство игрока' }));
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Окружение' }), { target: { value: 'player' } });
     expect(await screen.findByRole('heading', { name: 'Мои персонажи' })).toBeInTheDocument();
     await screen.findByRole('option', { name: 'Campaign 13' });
     fireEvent.change(screen.getByLabelText('Кампания'), { target: { value: '13' } });

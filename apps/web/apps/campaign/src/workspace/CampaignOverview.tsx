@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActionRow, LinkButton, List, PageHeader, Panel, StatePanel, Statistic } from '@tdn/shared';
+import { List, PageHeader, Panel, StatePanel, Statistic } from '@tdn/shared';
 import { useWorkspace } from './Workspace';
 import { useResource } from './hooks';
 import { useCampaignWorkspace } from './Shell';
@@ -8,7 +8,7 @@ import GMOverviewRoster from './GMOverviewRoster';
 import { ApiError } from './Feedback';
 
 const CampaignOverview: React.FC = () => {
-  const { path, api, sessionKey } = useWorkspace();
+  const { api, sessionKey } = useWorkspace();
   const { campaign, mode } = useCampaignWorkspace();
   const characters = useResource(`${sessionKey}:${campaign.id}:overview-characters`, () => api.listCharacters(campaign.id));
 
@@ -26,21 +26,11 @@ const CampaignOverview: React.FC = () => {
       <Panel title="Квесты" />
       <Panel title="Заметки" />
     </List>
-    <List layout="grid" columns={2} minItemWidth="18rem">
-      <Panel title="Персонажи кампании" headingLevel={3}>
-        {mode === 'gm'
-          ? characters.data !== undefined && <GMOverviewRoster campaignId={campaign.id} characters={characters.data} resourceKey={`${sessionKey}:${campaign.id}:overview-roster`} />
-          : <Characters compact />}
-      </Panel>
-      <Panel title="Быстрые действия" headingLevel={3}>
-        <List layout="vertical" stretch>
-          <ActionRow><LinkButton to={path(`/${campaign.id}/${mode}/characters`)} variant="secondary">К списку персонажей</LinkButton></ActionRow>
-          <ActionRow><LinkButton to={path(`/${campaign.id}/gm/templates`)} variant="secondary">Настроить шаблон</LinkButton></ActionRow>
-          <ActionRow><LinkButton to={path(`/${campaign.id}/gm/formulas`)} variant="secondary">Настроить формулы</LinkButton></ActionRow>
-          <ActionRow><LinkButton to={path(`/${campaign.id}/gm/views`)} variant="secondary">Настроить представления</LinkButton></ActionRow>
-        </List>
-      </Panel>
-    </List>
+    <Panel title="Персонажи кампании" headingLevel={3}>
+      {mode === 'gm'
+        ? characters.data !== undefined && <GMOverviewRoster campaignId={campaign.id} characters={characters.data} resourceKey={`${sessionKey}:${campaign.id}:overview-roster`} />
+        : <Characters compact />}
+    </Panel>
   </List></section>;
 };
 
