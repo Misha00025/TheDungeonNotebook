@@ -112,7 +112,7 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; sam
     body = <div className={styles.statList} style={{ '--presentation-columns': String(params.columns) } as React.CSSProperties}>{params.entries.map((entry, index) => {
       const field = resolveField(sheet, entry.source);
       const label = entry.label || field.label;
-      return <div className={styles.statRow} key={`${entry.source.kind}:${entry.source.fieldId}:${index}`}><span>{label}</span>{!sample && entry.source.kind === 'Base' && field.status === 'value' && renderValue ? renderValue(entry.source, label) : displayResolved(field, sample)}</div>;
+      return <div className={styles.statRow} key={`${entry.source.kind}:${entry.source.fieldId}:${index}`}><span>{label}</span>{!sample && entry.source.kind === 'Base' && field.status === 'value' && renderValue ? renderValue(entry.source, label, displayResolved(field, sample)) : displayResolved(field, sample)}</div>;
     })}{sample && params.entries.length === 0 && <span className={styles.placeholder}>Выберите характеристику</span>}</div>;
   }
   const groupAppearance = params?.type === 'group' && params.appearance === 'panel';

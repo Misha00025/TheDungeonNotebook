@@ -281,18 +281,18 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
     <SectionLoading loading={loading}>
       {Boolean(loadError) && <><ApiError error={loadError} /><div className={styles.recovery}>{loadErrorAction}</div></>}
       {snapshot ? <>
-        <header className={styles.header}><h2>Отображение: {name}</h2><p>Изменения определения сразу доступны всем назначенным страницам кампании.</p></header>
         {snapshot.legacy && <Notification kind="info" eventKey={`legacy:${viewId}`}>Старый формат виджета будет переведён в текущий при явном сохранении. Исходные настройки сохранены в модели отображения.</Notification>}
         {draftOffer?.status === 'available' && <div className={styles.draftOffer}><p>Найден локальный черновик.</p><ActionRow><Button type="button" disabled={saving} onClick={restoreLocal}>Восстановить локальный черновик</Button><Button variant="secondary" type="button" disabled={saving} onClick={deleteLocal}>Удалить локальный черновик</Button></ActionRow></div>}
         {draftOffer?.status === 'error' && <Notification kind="warning" eventKey={draftOffer.message}>{draftOffer.message}</Notification>}
         {draftMessage && <Notification kind={draftMessageKind} eventKey={draftMessage}>{draftMessage}</Notification>}
-         <div className={styles.metadataFields}><Field label="Название" htmlFor={nameInputId}><Input id={nameInputId} value={name} disabled={!writable || saving} onChange={event => { setName(event.target.value); setMetadataSaved(false); }} /></Field></div>
-        <div className={styles.previewControls}>
+        <div className={styles.editorControls}>
+          <Field label="Название" htmlFor={nameInputId}><Input id={nameInputId} value={name} disabled={!writable || saving} onChange={event => { setName(event.target.value); setMetadataSaved(false); }} /></Field>
           <Field label="Предпросмотр" htmlFor={previewSelectId}><Select id={previewSelectId} value={characterId} disabled={!templateSheet} onChange={event => selectCharacter(event.target.value)}><option value="">Образец на основе шаблона</option>{characters.map(character => <option key={character.id} value={character.id}>{character.name}</option>)}</Select></Field>
-          {!characterId && Boolean(templateSheet) && <p>Образец. Используются типы и названия полей шаблона, игровые значения не загружаются.</p>}
-          {Boolean(characterId && previewError) && <><ApiError error={previewError} /><Button variant="secondary" type="button" disabled={previewLoading} onClick={() => selectCharacter(characterId)}>Повторить предпросмотр</Button></>}
-          {Boolean(charactersError) && <><ApiError error={charactersError} onRetry={retryCharacters} /><Button variant="secondary" type="button" onClick={retryCharacters}>Повторить загрузку персонажей</Button></>}
         </div>
+        {(Boolean(characterId && previewError) || Boolean(charactersError)) && <div className={styles.previewDiagnostics}>
+           {Boolean(characterId && previewError) && <><ApiError error={previewError} /><Button variant="secondary" type="button" disabled={previewLoading} onClick={() => selectCharacter(characterId)}>Повторить предпросмотр</Button></>}
+           {Boolean(charactersError) && <><ApiError error={charactersError} onRetry={retryCharacters} /><Button variant="secondary" type="button" onClick={retryCharacters}>Повторить загрузку персонажей</Button></>}
+        </div>}
         {templateSheet ? <div className={styles.previewCanvasSection} aria-busy={previewLoading}>
           <PresentationEditor roots={roots} onChange={next => { setRoots(next); setContentSaved(false); }} sheet={effectiveSheet} choicesSheet={templateSheet} sample={!characterId} disabled={!writable || saving} />
           {previewLoading && <div className={styles.previewOverlay}><StatePanel kind="loading">Загрузка данных выбранного персонажа…</StatePanel></div>}

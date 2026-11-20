@@ -59,6 +59,18 @@ describe('Views workspace UX contracts', () => {
     confirm.mockRestore();
   });
 
+  it('omits the ordinary refresh button and does not reload the list on focus or visibility changes', async () => {
+    const request = makeRequest();
+    render(tree(request));
+    await screen.findByLabelText('Сохранённое отображение');
+    expect(screen.queryByRole('button', { name: 'Обновить список' })).not.toBeInTheDocument();
+    expect(request.mock.calls.filter(([url]) => url === '/api/campaigns/4/views')).toHaveLength(1);
+    fireEvent(window, new Event('focus'));
+    fireEvent(document, new Event('visibilitychange'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(request.mock.calls.filter(([url]) => url === '/api/campaigns/4/views')).toHaveLength(1);
+  });
+
   it('keeps the selected editor mounted across pages modal and scopes close confirmation to page drafts', async () => {
     const request = makeRequest();
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);

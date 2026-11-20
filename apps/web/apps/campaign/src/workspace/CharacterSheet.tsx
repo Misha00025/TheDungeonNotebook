@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ActionRow, Badge, Button, IconButton, Input, LinkButton, List, ModalPortal, Notification, PageHeader, Select, StatePanel, TabBar, Textarea } from '@tdn/shared';
+import { ActionRow, Badge, Button, IconButton, Input, LinkButton, List, Notification, PageHeader, Select, StatePanel, TabBar, Textarea } from '@tdn/shared';
 import type { NotificationKind } from '@tdn/shared';
 import { useWorkspace, useDirtyDraft } from './Workspace';
 import { useOptionalCampaignWorkspace } from './Shell';
@@ -15,6 +15,7 @@ import styles from './Workspace.module.css';
 import CharacterPresentation from './CharacterPresentation';
 import characterStyles from './CharacterSheet.module.css';
 import { readPages } from './presentationModel';
+import InlineValueEditor from './InlineValueEditor';
 
 const importanceLabel: Record<string, string> = { Background: 'Фоновый', Secondary: 'Второстепенный', Key: 'Ключевой' };
 type MetadataDraft = { name: string; importance: CharacterMetadata['importance'] };
@@ -42,7 +43,6 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
   const [presentationRefreshKey, setPresentationRefreshKey] = useState(0);
   const [descriptionDraft, setDescriptionDraft] = useState<string>();
   const [fieldDrafts, setFieldDrafts] = useState<Record<string, JsonValue>>({});
-  const [activeValueEditor, setActiveValueEditor] = useState<{ fieldId: string; label: string }>();
   const [rawDrafts, setRawDrafts] = useState<Record<string, string>>({});
   const [fieldFingerprints, setFieldFingerprints] = useState<Record<string, FieldFingerprint>>({});
   const [validity, setValidity] = useState<Record<string, string | undefined>>({});
@@ -434,7 +434,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
     if (reference.kind !== 'Base' || !editorAllowed || permissionError) return undefined;
     const field = sheetRef.current?.baseFields.find(item => item.id === reference.fieldId);
     if (!field) return <span role="status">Характеристика недоступна.</span>;
-    if (display !== undefined) return <button className={characterStyles.valueTrigger} type="button" aria-label={`Изменить показатель ${label}`} disabled={permissionPending || !canWrite || sheetBlocked || snapshotBusy || contentBusy} onClick={() => setActiveValueEditor({ fieldId: field.id, label })}>{display}</button>;
+    const inlineDisabled = permissionPending || !canWrite || sheetBlocked || snapshotBusy || contentBusy;
     const fingerprint = fieldFingerprints[field.id];
     const fingerprintMismatch = Boolean(fingerprint && !sameFingerprint(fingerprint, fieldFingerprint(field)));
     const hasDraft = Object.prototype.hasOwnProperty.call(fieldDrafts, field.id) || Object.prototype.hasOwnProperty.call(rawDrafts, field.id) || Boolean(validity[field.id]);
@@ -442,11 +442,11 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
     const raw = Object.prototype.hasOwnProperty.call(rawDrafts, field.id) ? rawDrafts[field.id] : undefined;
     const fieldIssue = validity[field.id] ?? (fingerprintMismatch ? 'Тип характеристики изменился; проверьте или отмените черновик.' : undefined);
     const inputFingerprint = fingerprintMismatch ? fingerprint! : fingerprint ?? fieldFingerprint(field);
-    return <div className={characterStyles.valueEditor} onKeyDown={event => {
-      if (event.key !== 'Enter' || event.nativeEvent.isComposing || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLButtonElement) return;
+    const editor = <div className={characterStyles.valueEditor} onKeyDown={event => {
+      if (display !== undefined || event.key !== 'Enter' || event.nativeEvent.isComposing || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLButtonElement) return;
       event.preventDefault(); saveField(field.id);
     }}>
-      <fieldset className={characterStyles.valueField} disabled={permissionPending || !canWrite || sheetBlocked || snapshotBusy}>
+      <fieldset className={characterStyles.valueField} disabled={permissionPending || !canWrite || sheetBlocked || snapshotBusy || contentBusy}>
         <ValueInput key={`${field.id}:${resetCounters[field.id] ?? 0}`} label={label} compact field={{ valueType: inputFingerprint.valueType, options: inputFingerprint.options }} value={value} controlledNumericDraft={raw} onRawChange={inputFingerprint.valueType === 'Integer' || inputFingerprint.valueType === 'Number' ? next => {
           captureFingerprint(field); updateRawDrafts(current => ({ ...current, [field.id]: next })); setWriteStatus('');
         } : undefined} onChange={next => { captureFingerprint(field); updateDrafts(current => ({ ...current, [field.id]: next })); setWriteStatus(''); }} onValidityChange={error => {
@@ -460,11 +460,13 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
         }} />
       </fieldset>
       {fieldIssue && <span role="alert">{fieldIssue}</span>}
-      {hasDraft && <ActionRow>
+      {display === undefined && hasDraft && <ActionRow>
         <Button type="button" disabled={!canWrite || permissionPending || contentBusy || sheetBlocked || snapshotBusy || Boolean(fieldIssue)} onClick={() => saveField(field.id)}>Сохранить значение {label}</Button>
         <Button variant="secondary" type="button" disabled={contentBusy} onClick={() => cancelField(field.id)}>Отменить</Button>
       </ActionRow>}
     </div>;
+    if (display !== undefined) return <InlineValueEditor display={display} label={label} disabled={inlineDisabled} issue={fieldIssue} onCommit={() => { if (Object.prototype.hasOwnProperty.call(fieldDraftsRef.current, field.id) || Object.prototype.hasOwnProperty.call(rawDraftsRef.current, field.id)) saveField(field.id); }}>{editor}</InlineValueEditor>;
+    return editor;
   };
   const onVisibleFieldsChange = useCallback((next: string[]) => {
     setVisibleFieldIds(current => current.length === next.length && current.every((id, index) => id === next[index]) ? current : next);
@@ -517,7 +519,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
 
   if (!metadata || !sheet) {
     return <section className={characterStyles.sheetSection} aria-busy={!metadataResource.error && !sheetResource.error}>
-      {(metadataResource.error || sheetResource.error) ? <><ApiError error={metadataResource.error ?? sheetResource.error} onRetry={retryInitialLoad} /><Button variant="secondary" type="button" onClick={retryInitialLoad}>Обновить лист</Button></> : <div className={characterStyles.loadingOverlay}><StatePanel kind="loading">Загрузка листа персонажа…</StatePanel></div>}
+      {(metadataResource.error || sheetResource.error) ? <ApiError error={metadataResource.error ?? sheetResource.error} onRetry={retryInitialLoad} /> : <div className={characterStyles.loadingOverlay}><StatePanel kind="loading">Загрузка листа персонажа…</StatePanel></div>}
     </section>;
   }
   const ensureMetadataDraft = () => setMetadataDraft(current => current ?? { name: metadata.name, importance: metadata.importance });
@@ -566,7 +568,6 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
       />
       <TabBar basePath={pageBase} aria-label="Страницы персонажа" tabs={pages.map(page => ({ id: page.key, label: page.title, path: page.key }))} />
       {baseEntryWithDraft && pages.length > 0 && <div className={characterStyles.pageConflict}><Notification kind="info" eventKey={`${scope}:base-entry`}>Черновые значения сохранены. Сейчас показана первая доступная страница без смены адреса.</Notification><Button variant="secondary" type="button" onClick={() => goToPage(pages[0].key)}>Открыть страницу «{pages[0].title}»</Button></div>}
-      <ActionRow><Button variant="secondary" type="button" disabled={snapshotBusy} onClick={() => void refreshAll()}>Обновить страницы</Button></ActionRow>
       {presentationUnavailable && <ApiError error={presentationError ?? presentationResource.error} onRetry={() => void refreshAll()} />}
       {!presentationUnavailable && pages.length === 0 && <StatePanel kind="empty" title="Страницы кампании">Для кампании ещё не настроены страницы.{canManageViews && <LinkButton to={path(`/${campaignId}/gm/views`)}>Настроить страницы</LinkButton>}</StatePanel>}
       {!presentationUnavailable && pageRefreshConflict && <div className={characterStyles.pageConflict}><Notification kind="warning" eventKey={`${scope}:${pageKey ?? ''}`}>Текущая страница больше не назначена. Неподтверждённые значения сохранены ниже.</Notification>{pages.length > 0 && <Button type="button" onClick={openCurrentPage}>Перейти к доступной странице «{pages[0].title}»</Button>}</div>}
@@ -579,10 +580,6 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
       {writeStatus && <Notification kind={writeStatusKind} eventKey={writeStatusEvent}>{writeStatus}</Notification>}
     </List>}
     {loadedRecovery.length > 0 && <section className={characterStyles.recoveryTray} aria-label="Неподтверждённые значения"><h2>Неподтверждённые значения</h2>{loadedRecovery}</section>}
-     {Boolean(presentation && presentationUnavailable) && <Button variant="secondary" type="button" onClick={() => void refreshAll()}>Обновить страницы</Button>}
-     <ModalPortal isOpen={Boolean(activeValueEditor)} title="Изменить значение" onClose={() => { if (!contentBusyRef.current) setActiveValueEditor(undefined); }} dismissDisabled={contentBusy}>
-       {activeValueEditor && (renderValue({ kind: 'Base', fieldId: activeValueEditor.fieldId }, activeValueEditor.label) ?? <p role="status">Редактирование сейчас недоступно. Неподтверждённый ввод сохранён.</p>)}
-     </ModalPortal>
   </section>;
 };
 

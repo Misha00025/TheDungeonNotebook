@@ -82,7 +82,6 @@ const Views: React.FC = () => {
     setCreating(true); setSelectedId(''); setShowPages(false);
   };
   const initialLoading = permissionsLoading || (!viewsResource.data && viewsResource.loading);
-
   return <main className={styles.page}>
     <h1>Отображения</h1>
     <div className={sectionStyles.sectionBody} aria-busy={initialLoading}>
@@ -91,7 +90,6 @@ const Views: React.FC = () => {
     <div className={styles.actions}>
       <Button type="button" disabled={!canWrite || creating || initialLoading} onClick={openCreate}>Создать отображение</Button>
       <Button variant="secondary" type="button" disabled={!canWrite || permissionsLoading || initialLoading} onClick={openPages}>Страницы кампании</Button>
-      <Button variant="secondary" type="button" disabled={initialLoading} onClick={viewsResource.reload}>Обновить список</Button>
     </div>
     <Field label="Сохранённое отображение" htmlFor={viewSelectId}><Select id={viewSelectId} value={selectedId} disabled={!viewsResource.data} onChange={event => changeSelection(event.target.value)}><option value="">Выберите отображение</option>{viewsResource.data?.map(view => <option key={view.id} value={view.id}>{view.name}</option>)}</Select></Field>
     {viewsResource.data && viewsResource.data.length === 0 && <StatePanel kind="empty">Сохранённых отображений пока нет.</StatePanel>}

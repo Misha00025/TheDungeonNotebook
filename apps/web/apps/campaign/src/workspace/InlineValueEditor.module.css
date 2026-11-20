@@ -1,0 +1,37 @@
+.editor {
+  display: inline-grid;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.display {
+  display: inline;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.display:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--accent-color);
+  text-underline-offset: .15em;
+}
+
+.display:focus-visible {
+  border-radius: var(--border-radius-sm);
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.issue {
+  margin-inline-start: .2em;
+  color: var(--danger-color);
+  font-size: .75em;
+  font-weight: 700;
+}

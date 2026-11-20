@@ -4,7 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { RemoteAuthProvider } from '@tdn/shared';
 import type { HubRemoteProps } from '@tdn/shared';
 import { LosslessNumber } from 'lossless-json';
-import { stringifyJson } from './json';
+import { parseJson, stringifyJson } from './json';
+import type { JsonValue } from './types';
 import CharacterSheet from './CharacterSheet';
 import { DirtyProvider, WorkspaceProvider } from './Workspace';
 
@@ -23,22 +24,35 @@ const presentation = { contentRevision: 4, defaults: { page_1: 'view-key' }, con
 const roots = [
   { kind: 'layout', nodeKey: 'composite', title: 'Защита', params: { version: 1, type: 'composite', parts: [{ source: { kind: 'Base', fieldId: firstId } }, { text: ' (' }, { source: { kind: 'Base', fieldId: primaryId }, signed: true }, { text: ')' }], primary: { kind: 'Base', fieldId: primaryId } }, children: [] },
   { kind: 'layout', nodeKey: 'resource', title: 'Запас', params: { version: 1, type: 'resource', current: { kind: 'Base', fieldId: primaryId }, maximum: { kind: 'Base', fieldId: maximumId }, showBar: false }, children: [] },
+  { kind: 'layout', nodeKey: 'stats', title: 'Статы', params: { version: 1, type: 'stat-list', columns: 1, entries: [{ source: { kind: 'Base', fieldId: primaryId }, label: 'Сила' }] }, children: [] },
 ];
 const resolved = { contextKey: 'page_1', viewMetadata: { id: 'view-id', key: 'view-key', campaignId: 12, name: 'View', metadataRevision: 1 }, viewContent: { campaignId: 12, resourceId: 'view-id', contentRevision: 3, data: { roots } }, contextParams: null, contentRevision: 3 };
 const auth = (request: (url: string, options?: RequestInit) => Promise<Response>) => ({ status: 'authenticated', authenticated: true, userId: 4, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
 const renderSheet = (request: (url: string, options?: RequestInit) => Promise<Response>) => render(<MemoryRouter initialEntries={[`/12/player/characters/${characterId}/page_1`]}><RemoteAuthProvider auth={auth(request)}><WorkspaceProvider mountPath="/"><DirtyProvider><CharacterSheet campaignId={12} characterId={characterId} pageKey="page_1" /></DirtyProvider></WorkspaceProvider></RemoteAuthProvider></MemoryRouter>);
-const requestFixture = (permission: { canRead: boolean; canWrite: boolean }, put: (url: string, options?: RequestInit) => Promise<Response> = async () => response({ ...computedSheet, contentRevision: 8 })) => vi.fn(async (url: string, options?: RequestInit) => {
-  if (url.endsWith(`/characters/${characterId}/permissions`)) return response({ ...permission, canManageAccess: false });
-  if (url.endsWith(`/characters/${characterId}/computed-sheet`)) return response(computedSheet);
-  if (url.endsWith(`/characters/${characterId}`)) return response({ id: characterId, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
-  if (url.endsWith('/presentation/resolve?contextKey=page_1')) return response(resolved);
-  if (url.endsWith('/presentation')) return response(presentation);
-  if (options?.method === 'PUT') return put(url, options);
-  return response([]);
-});
+const requestFixture = (permission: { canRead: boolean; canWrite: boolean }, put: (url: string, options?: RequestInit) => Promise<Response> = async () => response({ ...computedSheet, contentRevision: 8 })) => {
+  let currentSheet = computedSheet;
+  return vi.fn(async (url: string, options?: RequestInit) => {
+    if (url.endsWith(`/characters/${characterId}/permissions`)) return response({ ...permission, canManageAccess: false });
+    if (url.endsWith(`/characters/${characterId}/computed-sheet`)) return response(currentSheet);
+    if (url.endsWith(`/characters/${characterId}`)) return response({ id: characterId, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
+    if (url.endsWith('/presentation/resolve?contextKey=page_1')) return response(resolved);
+      if (url.endsWith('/presentation')) return response(presentation);
+      if (options?.method === 'PUT') {
+        const result = await put(url, options);
+        if (result.ok && url.includes('/base-values/')) {
+          const body = parseJson(String(options.body)) as { value: JsonValue };
+          const fieldId = url.split('/').at(-1);
+          currentSheet = { ...currentSheet, contentRevision: 8, baseFields: currentSheet.baseFields.map(field => field.id === fieldId ? { ...field, effectiveValue: body.value as typeof field.effectiveValue } : field) } as typeof computedSheet;
+          return response(currentSheet);
+        }
+        return result;
+    }
+    return response([]);
+  });
+};
 
 describe('CharacterSheet presentation UX', () => {
-  it('opens the selected primary field only after clicking anywhere on the whole record and writes only that field on explicit save', async () => {
+  it('opens only the clicked primary field in place and writes only that field on outside blur', async () => {
     const request = requestFixture({ canRead: true, canWrite: true });
     renderSheet(request);
     const triggers = await screen.findAllByRole('button', { name: 'Изменить показатель Primary source secret' });
@@ -47,18 +61,23 @@ describe('CharacterSheet presentation UX', () => {
     expect(triggers.some(trigger => trigger.textContent === '20')).toBe(false);
     expect(record).toHaveTextContent('16 (+3)');
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain('First source secret');
     expect(document.body.textContent).not.toContain('Maximum source secret');
     expect(screen.getByText('/')).toBeInTheDocument();
     fireEvent.click(within(record).getByText('16'));
-    const dialog = await screen.findByRole('dialog', { name: 'Изменить значение' });
-    const input = within(dialog).getByRole('textbox', { name: 'Primary source secret' });
+    const input = await screen.findByRole('textbox', { name: 'Primary source secret' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Изменить показатель Primary source secret' })).toHaveLength(1);
+    expect(screen.getAllByRole('textbox', { name: 'Primary source secret' })).toHaveLength(1);
+    expect(within(screen.getByRole('article', { name: 'Запас' })).getByRole('button', { name: 'Изменить показатель Primary source secret' })).toHaveTextContent('3');
     expect(input).toHaveValue('3');
     expect(input).not.toHaveValue('16 (+3)');
     expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
     fireEvent.change(input, { target: { value: '9223372036854775807' } });
     expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить значение Primary source secret' }));
+    fireEvent.blur(input, { relatedTarget: document.body });
+    expect(screen.queryByRole('textbox', { name: 'Primary source secret' })).not.toBeInTheDocument();
     await waitFor(() => expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1));
     const [url, options] = request.mock.calls.find(([, requestOptions]) => requestOptions?.method === 'PUT')!;
     expect(url).toBe(`/api/campaigns/12/characters/${characterId}/base-values/${primaryId}`);
@@ -67,24 +86,19 @@ describe('CharacterSheet presentation UX', () => {
     expect(url).not.toContain(maximumId);
   });
 
-  it('keeps an invalid raw draft across modal close and reopen without writing it', async () => {
+  it('keeps an invalid raw draft across blur and reopen without writing it', async () => {
     const request = requestFixture({ canRead: true, canWrite: true });
     renderSheet(request);
     fireEvent.click((await screen.findAllByRole('button', { name: 'Изменить показатель Primary source secret' }))[0]!);
-    let dialog = await screen.findByRole('dialog', { name: 'Изменить значение' });
-    let input = within(dialog).getByRole('textbox', { name: 'Primary source secret' });
+    let input = await screen.findByRole('textbox', { name: 'Primary source secret' });
     fireEvent.change(input, { target: { value: '-' } });
-    const errors = within(dialog).getAllByRole('alert');
-    expect(errors.length).toBeGreaterThan(0);
-    errors.forEach(error => expect(error).toHaveTextContent('Введите целое число.'));
-    expect(within(dialog).getByRole('button', { name: 'Сохранить значение Primary source secret' })).toBeDisabled();
+    expect(screen.getAllByRole('alert').every(error => error.textContent?.includes('Введите целое число.'))).toBe(true);
     expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Закрыть' }));
-    expect(screen.queryByRole('dialog', { name: 'Изменить значение' })).not.toBeInTheDocument();
+    fireEvent.blur(input, { relatedTarget: document.body });
+    expect(screen.queryByRole('textbox', { name: 'Primary source secret' })).not.toBeInTheDocument();
     expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
     fireEvent.click(screen.getAllByRole('button', { name: 'Изменить показатель Primary source secret' })[0]!);
-    dialog = await screen.findByRole('dialog', { name: 'Изменить значение' });
-    input = within(dialog).getByRole('textbox', { name: 'Primary source secret' });
+    input = await screen.findByRole('textbox', { name: 'Primary source secret' });
     expect(input).toHaveValue('-');
     expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
   });
@@ -100,26 +114,70 @@ describe('CharacterSheet presentation UX', () => {
     expect(within(resource).getByText('/')).toBeInTheDocument();
     expect(within(resource).getByText('20')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Изменить показатель/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('dialog', { name: 'Изменить значение' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain('First source secret');
     expect(document.body.textContent).not.toContain('Primary source secret');
     expect(document.body.textContent).not.toContain('Maximum source secret');
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
-  it('blocks modal dismissal while the explicit field write is pending', async () => {
+  it('closes the inline editor while a write is pending and disables further writes', async () => {
     let resolveWrite!: (value: Response) => void;
     const request = requestFixture({ canRead: true, canWrite: true }, () => new Promise(resolve => { resolveWrite = resolve; }));
     renderSheet(request);
     fireEvent.click((await screen.findAllByRole('button', { name: 'Изменить показатель Primary source secret' }))[0]!);
-    const dialog = await screen.findByRole('dialog', { name: 'Изменить значение' });
-    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Primary source secret' }), { target: { value: '4' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить значение Primary source secret' }));
-    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Закрыть' })).toBeDisabled());
-    const cancel = new Event('cancel', { cancelable: true });
-    fireEvent(dialog, cancel);
-    expect(cancel.defaultPrevented).toBe(true);
-    expect(screen.getByRole('dialog', { name: 'Изменить значение' })).toBeInTheDocument();
+    const input = await screen.findByRole('textbox', { name: 'Primary source secret' });
+    fireEvent.change(input, { target: { value: '4' } });
+    fireEvent.blur(input, { relatedTarget: document.body });
+    await waitFor(() => expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1));
+    expect(screen.queryByRole('textbox', { name: 'Primary source secret' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Изменить показатель Primary source secret' }).every(button => (button as HTMLButtonElement).disabled)).toBe(true);
     resolveWrite(response({ ...computedSheet, contentRevision: 8 }));
-    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Закрыть' })).toBeEnabled());
+    await waitFor(() => {
+      const triggers = screen.getAllByRole('button', { name: 'Изменить показатель Primary source secret' });
+      expect(triggers).toHaveLength(2);
+      expect(triggers.every(trigger => (trigger as HTMLButtonElement).disabled === false)).toBe(true);
+    });
+    expect(screen.getByRole('article', { name: 'Защита' })).toHaveTextContent('16 (+4)');
+    expect(screen.getByRole('article', { name: 'Запас' })).toHaveTextContent('4/20');
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1);
+  });
+
+  it('does not write an unchanged value on click and blur and commits a stat-list value through the same pipeline', async () => {
+    const request = requestFixture({ canRead: true, canWrite: true });
+    renderSheet(request);
+    const statValue = await screen.findByRole('button', { name: 'Изменить показатель Сила' });
+    expect(screen.getByText('Сила')).toBeInTheDocument();
+    fireEvent.click(statValue);
+    const input = await screen.findByRole('textbox', { name: 'Сила' });
+    fireEvent.blur(input, { relatedTarget: document.body });
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить показатель Сила' }));
+    const changed = await screen.findByRole('textbox', { name: 'Сила' });
+    fireEvent.change(changed, { target: { value: '5' } });
+    fireEvent.keyDown(changed, { key: 'Enter' });
+    fireEvent.blur(changed, { relatedTarget: document.body });
+    await waitFor(() => expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1));
+    const [url, options] = request.mock.calls.find(([, requestOptions]) => requestOptions?.method === 'PUT')!;
+    expect(url).toContain(`/base-values/${primaryId}`);
+    expect(String(options?.body)).toBe('{"value":5,"expectedRevision":7}');
+    expect(request.mock.calls.filter(([path, requestOptions]) => requestOptions?.method === 'PUT' && (path.includes('/presentation') || path.includes('/assignments')))).toHaveLength(0);
+  });
+
+  it('keeps an unknown field-write outcome blocked without retrying and retains the draft for verification', async () => {
+    const request = requestFixture({ canRead: true, canWrite: true }, async () => response({ code: 'write_outcome_unknown', title: 'Unknown', detail: 'Unknown' }, 502));
+    renderSheet(request);
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Изменить показатель Primary source secret' }))[0]!);
+    const input = await screen.findByRole('textbox', { name: 'Primary source secret' });
+    fireEvent.change(input, { target: { value: '4' } });
+    fireEvent.blur(input, { relatedTarget: document.body });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Проверить данные и права' })).toBeInTheDocument());
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить данные и права' }));
+    await waitFor(() => expect(request.mock.calls.filter(([url, options]) => url.endsWith(`/characters/${characterId}/computed-sheet`) && options?.method !== 'PUT')).toHaveLength(2));
+    expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1);
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Изменить показатель Primary source secret' })[0]).toBeEnabled());
+    fireEvent.click(screen.getAllByRole('button', { name: 'Изменить показатель Primary source secret' })[0]!);
+    expect(await screen.findByRole('textbox', { name: 'Primary source secret' })).toHaveValue('4');
   });
 });

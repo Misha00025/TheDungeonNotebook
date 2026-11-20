@@ -33,19 +33,27 @@
 }
 
 .header p,
-.previewControls > p,
 .pagePreview p {
   color: var(--text-secondary);
 }
 
-.metadataFields {
-  max-width: 32rem;
+.editorControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: .75rem;
+  min-width: 0;
 }
 
-.previewControls {
+.editorControls > *,
+.previewDiagnostics > * {
+  min-width: 0;
+}
+
+.previewDiagnostics {
   display: grid;
   gap: .75rem;
-  max-width: 34rem;
+  min-width: 0;
 }
 
 .previewCanvasSection {
@@ -63,11 +71,6 @@
   padding: 1rem;
   background: color-mix(in srgb, var(--bg-primary) 38%, transparent);
   pointer-events: none;
-}
-
-.previewControls > label,
-.previewControls > div {
-  min-width: 0;
 }
 
 .draftOffer,
@@ -135,6 +138,10 @@
 }
 
 @media (max-width: 760px) {
+  .editorControls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .pageRow {
     grid-template-columns: minmax(0, 1fr);
   }
