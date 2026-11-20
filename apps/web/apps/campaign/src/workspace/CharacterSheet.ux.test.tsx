@@ -24,7 +24,7 @@ const presentation = { contentRevision: 4, defaults: { page_1: 'view-key' }, con
 const roots = [
   { kind: 'layout', nodeKey: 'composite', title: 'Защита', params: { version: 1, type: 'composite', parts: [{ source: { kind: 'Base', fieldId: firstId } }, { text: ' (' }, { source: { kind: 'Base', fieldId: primaryId }, signed: true }, { text: ')' }], primary: { kind: 'Base', fieldId: primaryId } }, children: [] },
   { kind: 'layout', nodeKey: 'resource', title: 'Запас', params: { version: 1, type: 'resource', current: { kind: 'Base', fieldId: primaryId }, maximum: { kind: 'Base', fieldId: maximumId }, showBar: false }, children: [] },
-  { kind: 'layout', nodeKey: 'stats', title: 'Статы', params: { version: 1, type: 'stat-list', columns: 1, entries: [{ source: { kind: 'Base', fieldId: primaryId }, label: 'Сила' }] }, children: [] },
+  { kind: 'layout', nodeKey: 'stats', title: 'Статы', params: { version: 1, type: 'stat-list', columns: 1, condition: '$0 > 3', entries: [{ source: { kind: 'Base', fieldId: primaryId }, label: 'Сила' }] }, children: [] },
 ];
 const resolved = { contextKey: 'page_1', viewMetadata: { id: 'view-id', key: 'view-key', campaignId: 12, name: 'View', metadataRevision: 1 }, viewContent: { campaignId: 12, resourceId: 'view-id', contentRevision: 3, data: { roots } }, contextParams: null, contentRevision: 3 };
 const auth = (request: (url: string, options?: RequestInit) => Promise<Response>) => ({ status: 'authenticated', authenticated: true, userId: 4, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
@@ -146,6 +146,7 @@ describe('CharacterSheet presentation UX', () => {
   it('does not write an unchanged value on click and blur and commits a stat-list value through the same pipeline', async () => {
     const request = requestFixture({ canRead: true, canWrite: true });
     renderSheet(request);
+    fireEvent.click(await screen.findByText('Остальные характеристики (1)'));
     const statValue = await screen.findByRole('button', { name: 'Изменить показатель Сила' });
     expect(screen.getByText('Сила')).toBeInTheDocument();
     fireEvent.click(statValue);
@@ -158,6 +159,7 @@ describe('CharacterSheet presentation UX', () => {
     fireEvent.keyDown(changed, { key: 'Enter' });
     fireEvent.blur(changed, { relatedTarget: document.body });
     await waitFor(() => expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByText('Остальные характеристики (1)')).not.toBeInTheDocument());
     const [url, options] = request.mock.calls.find(([, requestOptions]) => requestOptions?.method === 'PUT')!;
     expect(url).toContain(`/base-values/${primaryId}`);
     expect(String(options?.body)).toBe('{"value":5,"expectedRevision":7}');

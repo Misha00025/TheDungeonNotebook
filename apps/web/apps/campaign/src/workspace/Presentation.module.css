@@ -420,6 +420,15 @@
   min-width: 0;
 }
 
+.statChoices {
+  height: 16rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  align-content: start;
+  grid-auto-rows: min-content;
+  padding: .25rem;
+}
+
 @media (max-width: 600px) {
   .groupChildren,
   .statList {

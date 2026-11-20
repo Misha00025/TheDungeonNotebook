@@ -30,6 +30,19 @@ const article = (name: string) => screen.getByRole('article', { name });
 const allKeys = (nodes: PresentationNode[]): string[] => nodes.flatMap(item => [item.nodeKey, ...allKeys(item.children)]);
 
 describe('PresentationEditor inline actions and settings', () => {
+  it('includes character virtual fields alongside an empty template catalog', () => {
+    const emptySheet: ComputedSheet = { contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [], virtualFields: [], formulaContentRevisions: [] };
+    const characterSheet: ComputedSheet = { ...emptySheet, virtualFields: [{ id: 'virtual-field', key: 'bonus', title: 'Бонус', description: '', resultType: 'Integer', value: 2, diagnostic: null }] };
+    const onChange = vi.fn();
+    render(<PresentationEditor roots={[makeNode('stat-list', 'Характеристики')]} onChange={onChange} choicesSheet={emptySheet} sheet={characterSheet} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Настройки компонента' }));
+    fireEvent.click(screen.getByLabelText('Бонус — вычисляемая'));
+    fireEvent.click(screen.getByRole('button', { name: 'Закрыть' }));
+
+    expect(onChange.mock.calls[0]?.[0][0].params).toMatchObject({ entries: [{ source: { kind: 'Virtual', fieldId: 'virtual-field' }, label: '' }] });
+  });
+
   it('shows four palette choices and five actions only inside the selected node; selection alone does not open settings', () => {
     const root = group('root-a', 'Первая группа');
     render(<Harness initialRoots={[root]} />);

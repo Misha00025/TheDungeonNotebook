@@ -13,6 +13,7 @@ type Props = {
   characterId: string;
   pageKey: string;
   sheet: ComputedSheet;
+  conditionSheet?: ComputedSheet;
   refreshKey?: number;
   renderValue?: (reference: FieldReference, label: string, display?: React.ReactNode) => React.ReactNode;
   onVisibleFieldsChange?: (fieldIds: string[]) => void;
@@ -37,7 +38,7 @@ function editableBaseFields(roots: PresentationNode[], sheet: ComputedSheet): st
   return [...ids];
 }
 
-const CharacterPresentation: React.FC<Props> = ({ campaignId, characterId, pageKey, sheet, refreshKey = 0, renderValue, onVisibleFieldsChange }) => {
+const CharacterPresentation: React.FC<Props> = ({ campaignId, characterId, pageKey, sheet, conditionSheet, refreshKey = 0, renderValue, onVisibleFieldsChange }) => {
   const { api, sessionKey } = useWorkspace();
   const [retry, setRetry] = useState(0);
   const scope = `${sessionKey}:${campaignId}:${characterId}:${pageKey}:${refreshKey}:${retry}`;
@@ -52,7 +53,7 @@ const CharacterPresentation: React.FC<Props> = ({ campaignId, characterId, pageK
     {resolved.loading && !resolved.data && <StatePanel kind="loading">Загрузка страницы…</StatePanel>}
     {Boolean(resolved.error) && <div className={styles.recovery}><ApiError error={resolved.error} /><Button variant="secondary" type="button" onClick={() => setRetry(value => value + 1)}>Повторить загрузку страницы</Button></div>}
     {rendererAvailable && resolved.data ? <>
-      {resolved.data.viewContent.data.roots.length === 0 ? <div className={styles.emptyCanvas} aria-label="Пустое отображение" /> : <PresentationRenderer roots={roots} sheet={sheet} renderValue={renderValue} />}
+      {resolved.data.viewContent.data.roots.length === 0 ? <div className={styles.emptyCanvas} aria-label="Пустое отображение" /> : <PresentationRenderer roots={roots} sheet={sheet} conditionSheet={conditionSheet} renderValue={renderValue} />}
     </> : null}
   </section>;
 };

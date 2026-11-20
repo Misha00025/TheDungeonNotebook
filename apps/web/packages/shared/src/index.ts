@@ -65,6 +65,8 @@ export { default as Statistic } from './ui/Statistic/Statistic';
 export type { StatisticProps } from './ui/Statistic/Statistic';
 export { default as Field } from './ui/Form/Field';
 export type { FieldProps } from './ui/Form/Field';
+export { default as Checkbox } from './ui/Form/Checkbox';
+export type { CheckboxProps } from './ui/Form/Checkbox';
 export { default as FieldSet } from './ui/Form/FieldSet';
 export type { FieldSetProps } from './ui/Form/FieldSet';
 export { default as FormGrid } from './ui/Form/FormGrid';

@@ -73,6 +73,97 @@ function compileExpression(expression: string | null): CompiledExpression {
   catch (error) { return { error: error instanceof Error ? error.message : 'Некорректное выражение.' }; }
 }
 
+type ConditionValue = Decimal | string | boolean | null;
+type CompiledCondition = { ast?: Ast; error?: string };
+
+function finiteConditionNumber(value: Decimal): Decimal {
+  if (!value.isFinite()) throw new Error('Результат условия не является конечным числом.');
+  return value;
+}
+
+function validateCondition(node: Ast): void {
+  if (node.type === 'Literal') {
+    if (typeof node.raw === 'string' && /^(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(node.raw)) return;
+    if (node.value === null || typeof node.value === 'boolean' || typeof node.value === 'string') return;
+    throw new Error('В условии обнаружено неподдерживаемое значение.');
+  }
+  if (node.type === 'Identifier' && node.name === '$0') return;
+  if (node.type === 'UnaryExpression' && ['+', '-', '!'].includes(String(node.operator))) { validateCondition(node.argument as Ast); return; }
+  if (node.type === 'BinaryExpression') {
+    if (['+', '-', '*', '/', '%'].includes(String(node.operator))) { validate(node); return; }
+    if (['>', '>=', '<', '<=', '==', '!=', '===', '!==', '&&', '||'].includes(String(node.operator))) {
+      validateCondition(node.left as Ast); validateCondition(node.right as Ast); return;
+    }
+  }
+  if (node.type === 'CallExpression') { validate(node); return; }
+  throw new Error('В условии обнаружена неподдерживаемая операция или переменная.');
+}
+
+function conditionValue(node: Ast, value: JsonValue): ConditionValue {
+  if (node.type === 'Literal') {
+    if (typeof node.raw === 'string' && /^(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/.test(node.raw)) return finiteConditionNumber(new Arithmetic(node.raw));
+    return node.value as string | boolean | null;
+  }
+  if (node.type === 'Identifier') {
+    if (typeof value === 'number' || isLosslessNumber(value)) return numeric(value);
+    if (typeof value === 'string' || typeof value === 'boolean' || value === null) return value;
+    throw new Error('Для условия поддерживаются только простые значения характеристики.');
+  }
+  if (node.type === 'CallExpression' || node.type === 'BinaryExpression' && ['+', '-', '*', '/', '%'].includes(String(node.operator)) || node.type === 'UnaryExpression' && ['+', '-'].includes(String(node.operator))) return finiteConditionNumber(evaluate(node, value));
+  if (node.type === 'UnaryExpression' && node.operator === '!') {
+    const operand = conditionValue(node.argument as Ast, value);
+    if (typeof operand !== 'boolean') throw new Error('Оператор ! требует логическое значение.');
+    return !operand;
+  }
+  if (node.type === 'BinaryExpression') {
+    const operator = String(node.operator);
+    const left = conditionValue(node.left as Ast, value);
+    if (operator === '&&' || operator === '||') {
+      if (typeof left !== 'boolean') throw new Error('Логические операторы требуют логические значения.');
+      if (operator === '&&' && !left) return false;
+      if (operator === '||' && left) return true;
+      const right = conditionValue(node.right as Ast, value);
+      if (typeof right !== 'boolean') throw new Error('Логические операторы требуют логические значения.');
+      return right;
+    }
+    const right = conditionValue(node.right as Ast, value);
+    if (['>', '>=', '<', '<='].includes(operator)) {
+      if (!(left instanceof Arithmetic) || !(right instanceof Arithmetic)) throw new Error('Сравнение >, >=, < и <= требует числовые значения.');
+      if (operator === '>') return left.greaterThan(right);
+      if (operator === '>=') return left.greaterThanOrEqualTo(right);
+      if (operator === '<') return left.lessThan(right);
+      return left.lessThanOrEqualTo(right);
+    }
+    const equal = left instanceof Arithmetic && right instanceof Arithmetic ? left.eq(right) : typeof left === typeof right && left === right;
+    return operator === '==' || operator === '===' ? equal : !equal;
+  }
+  throw new Error('Не удалось вычислить условие.');
+}
+
+function compileCondition(condition: string): CompiledCondition {
+  if (!condition.trim()) return {};
+  let ast: Ast;
+  try { ast = jsep(condition) as unknown as Ast; }
+  catch { return { error: 'Некорректное условие.' }; }
+  try { validateCondition(ast); return { ast }; }
+  catch (error) { return { error: error instanceof Error ? error.message : 'Некорректное условие.' }; }
+}
+
+export function compileStatListCondition(condition: string) {
+  const compiled = compileCondition(condition);
+  return {
+    error: compiled.error,
+    test(value: JsonValue): { matches: boolean; error?: string } {
+      if (!compiled.ast) return { matches: true, ...(compiled.error ? { error: compiled.error } : {}) };
+      try {
+        const result = conditionValue(compiled.ast, value);
+        if (typeof result !== 'boolean') throw new Error('Условие должно возвращать логическое значение.');
+        return { matches: result };
+      } catch (error) { return { matches: true, error: error instanceof Error ? error.message : 'Не удалось вычислить условие.' }; }
+    },
+  };
+}
+
 export function compileStatListFormat(format: string, expressions: (string | null)[]) {
   const compiled = expressions.map(compileExpression);
   const expressionErrors = compiled.map(item => item.error);

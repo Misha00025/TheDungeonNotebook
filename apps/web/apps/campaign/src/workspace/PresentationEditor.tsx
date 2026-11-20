@@ -7,7 +7,8 @@ import PresentationRenderer, { type PresentationDropPlacement } from './Presenta
 import styles from './Presentation.module.css';
 import IconButton from '@tdn/shared/ui/Buttons/IconButton/IconButton';
 import ModalPortal from '@tdn/shared/ui/ModalPortal/ModalPortal';
-import { compileStatListFormat } from './statListFormat';
+import Checkbox from '@tdn/shared/ui/Form/Checkbox';
+import { compileStatListCondition, compileStatListFormat } from './statListFormat';
 
 export type PresentationEditorProps = { roots: PresentationNode[]; onChange: (roots: PresentationNode[]) => void; sheet?: ComputedSheet; choicesSheet?: ComputedSheet; sample?: boolean; disabled?: boolean };
 type FieldOption = { reference: FieldReference; value: string; label: string; numeric: boolean };
@@ -62,6 +63,10 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
       ? compileStatListFormat(current.params.format, current.params.expressions)
       : undefined;
   }, [activeSettings?.params]);
+  const statCondition = useMemo(() => {
+    const current = activeSettings ? readParams(activeSettings.params) : undefined;
+    return current?.status === 'supported' && current.type === 'stat-list' ? compileStatListCondition(current.params.condition) : undefined;
+  }, [activeSettings?.params]);
   useEffect(() => { setStatSearch(''); }, [activeSettings?.nodeKey]);
   useEffect(() => {
     const draft = settingsDraftRef.current;
@@ -83,10 +88,21 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
       clear();
     };
   }, [disabled, preview]);
-  const choices = useMemo<FieldOption[]>(() => [
-    ...(choicesSheet?.baseFields ?? sheet?.baseFields ?? []).map(field => ({ reference: { kind: 'Base' as const, fieldId: field.id }, value: `Base:${encodeURIComponent(field.id)}`, label: `${field.title || field.key} — характеристика`, numeric: field.valueType === 'Integer' || field.valueType === 'Number' })),
-    ...(choicesSheet?.virtualFields ?? sheet?.virtualFields ?? []).map(field => ({ reference: { kind: 'Virtual' as const, fieldId: field.id }, value: `Virtual:${encodeURIComponent(field.id)}`, label: `${field.title || field.key} — вычисляемая`, numeric: true })),
-  ], [sheet, choicesSheet]);
+  const choices = useMemo<FieldOption[]>(() => {
+    const fields: FieldOption[] = [];
+    const seen = new Set<string>();
+    for (const source of [choicesSheet, sheet]) {
+      for (const field of source?.baseFields ?? []) {
+        const key = `Base:${field.id}`;
+        if (!seen.has(key)) { seen.add(key); fields.push({ reference: { kind: 'Base', fieldId: field.id }, value: `Base:${encodeURIComponent(field.id)}`, label: `${field.title || field.key} — характеристика`, numeric: field.valueType === 'Integer' || field.valueType === 'Number' }); }
+      }
+      for (const field of source?.virtualFields ?? []) {
+        const key = `Virtual:${field.id}`;
+        if (!seen.has(key)) { seen.add(key); fields.push({ reference: { kind: 'Virtual', fieldId: field.id }, value: `Virtual:${encodeURIComponent(field.id)}`, label: `${field.title || field.key} — вычисляемая`, numeric: true }); }
+      }
+    }
+    return fields;
+  }, [sheet, choicesSheet]);
   const refsFromParts = settingsRead?.status === 'supported' && settingsRead.type === 'composite' ? settingsRead.params.parts.flatMap(part => 'source' in part ? [part.source] : []) : [];
   const partBaseChoices = choices.filter(option => option.reference.kind === 'Base' && refsFromParts.some(reference => reference.kind === 'Base' && reference.fieldId === option.reference.fieldId));
 
@@ -158,7 +174,7 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
     const defaultsValue = makeNode(type).params;
     const defaults = isJsonObject(defaultsValue) ? defaultsValue : {};
     const source = isJsonObject(current.params) ? current.params : { legacyParams: current.params };
-    const reserved = new Set(['version', 'type', 'direction', 'columns', 'gap', 'appearance', 'parts', 'primary', 'current', 'maximum', 'showBar', 'entries', 'format', 'expressions', 'legacyFormatError']);
+    const reserved = new Set(['version', 'type', 'direction', 'columns', 'gap', 'appearance', 'parts', 'primary', 'current', 'maximum', 'showBar', 'entries', 'format', 'expressions', 'condition', 'legacyFormatError']);
     const unknown = Object.fromEntries(Object.entries(source).filter(([key]) => !reserved.has(key)));
     updateSettingsDraft(node => ({ ...node, params: { ...unknown, ...defaults } }));
   };
@@ -227,7 +243,7 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
             <label>Оформление<select disabled={disabled} value={settingsRead.params.appearance} onChange={event => patch({ appearance: event.target.value })}><option value="plain">Простое</option><option value="panel">Панель</option></select></label>
           </> : settingsRead.type === 'composite' ? <>
             <h4>Состав</h4>{settingsRead.params.parts.map((part, index) => <div className={styles.partEditor} key={index}>
-              {'text' in part ? <><span>Текст</span><input aria-label={`Текст, часть ${index + 1}`} disabled={disabled} value={part.text} onChange={event => { const parts = [...settingsRead.params.parts]; parts[index] = { text: event.target.value }; updateParts(parts); }} /></> : <><span>Характеристика</span><select aria-label={`Характеристика, часть ${index + 1}`} disabled={disabled} value={referenceValue(part.source)} onChange={event => { const reference = parseReference(event.target.value); if (!reference) return; const parts = [...settingsRead.params.parts]; parts[index] = { source: asJsonReference(reference), ...(part.signed ? { signed: true } : {}) }; updateParts(parts); }}><option value="">Выберите характеристику</option>{choices.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select><label><input type="checkbox" disabled={disabled} checked={Boolean(part.signed)} onChange={event => { const parts = [...settingsRead.params.parts]; parts[index] = { source: part.source, ...(event.target.checked ? { signed: true } : {}) }; updateParts(parts); }} />Со знаком</label></>}
+               {'text' in part ? <><span>Текст</span><input aria-label={`Текст, часть ${index + 1}`} disabled={disabled} value={part.text} onChange={event => { const parts = [...settingsRead.params.parts]; parts[index] = { text: event.target.value }; updateParts(parts); }} /></> : <><span>Характеристика</span><select aria-label={`Характеристика, часть ${index + 1}`} disabled={disabled} value={referenceValue(part.source)} onChange={event => { const reference = parseReference(event.target.value); if (!reference) return; const parts = [...settingsRead.params.parts]; parts[index] = { source: asJsonReference(reference), ...(part.signed ? { signed: true } : {}) }; updateParts(parts); }}><option value="">Выберите характеристику</option>{choices.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select><label><Checkbox disabled={disabled} checked={Boolean(part.signed)} onChange={event => { const parts = [...settingsRead.params.parts]; parts[index] = { source: part.source, ...(event.target.checked ? { signed: true } : {}) }; updateParts(parts); }} />Со знаком</label></>}
               <div className={styles.partActions}><button type="button" disabled={disabled || index === 0} onClick={() => updateParts(reorder(settingsRead.params.parts, index, -1))}>Выше</button><button type="button" disabled={disabled || index === settingsRead.params.parts.length - 1} onClick={() => updateParts(reorder(settingsRead.params.parts, index, 1))}>Ниже</button><button type="button" disabled={disabled} onClick={() => updateParts(settingsRead.params.parts.filter((_, partIndex) => partIndex !== index))}>Удалить</button></div>
             </div>)}
             <div className={styles.inlineActions}><button type="button" disabled={disabled} onClick={() => updateParts([...settingsRead.params.parts, newPart('text')])}>Добавить текст</button><button type="button" disabled={disabled || choices.length === 0} onClick={() => updateParts([...settingsRead.params.parts, newPart('source')])}>Добавить характеристику</button></div>
@@ -235,22 +251,25 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
           </> : settingsRead.type === 'resource' ? <>
             <label>Текущее значение<select disabled={disabled} value={referenceValue(settingsRead.params.current ?? undefined)} onChange={event => { const reference = parseReference(event.target.value); patch({ current: reference ? asJsonReference(reference) : null }); }}><option value="">Выберите характеристику</option>{settingsRead.params.current && !choices.some(option => option.numeric && option.value === referenceValue(settingsRead.params.current!)) && <option value={referenceValue(settingsRead.params.current)}>Сохранённый источник недоступен или имеет другой тип</option>}{choices.filter(option => option.numeric).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
             <label>Максимум<select disabled={disabled} value={referenceValue(settingsRead.params.maximum ?? undefined)} onChange={event => patch({ maximum: event.target.value ? asJsonReference(parseReference(event.target.value)!) : null })}><option value="">Не задан</option>{settingsRead.params.maximum && !choices.some(option => option.numeric && option.value === referenceValue(settingsRead.params.maximum!)) && <option value={referenceValue(settingsRead.params.maximum)}>Сохранённый максимум недоступен</option>}{choices.filter(option => option.numeric).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-            <label><input type="checkbox" disabled={disabled} checked={settingsRead.params.showBar} onChange={event => patch({ showBar: event.target.checked })} />Показывать шкалу</label>
+             <label><Checkbox disabled={disabled} checked={settingsRead.params.showBar} onChange={event => patch({ showBar: event.target.checked })} />Показывать шкалу</label>
            </> : <>
              <h4>Характеристики</h4>
              <label>Поиск характеристик<input value={statSearch} disabled={disabled} onChange={event => setStatSearch(event.target.value)} /></label>
              <div className={styles.statChoices}>
-               {settingsRead.params.entries.filter(entry => !choices.some(option => referenceValue(option.reference) === referenceValue(entry.source))).map((entry, index) => <label key={`missing-${entry.source.kind}:${entry.source.fieldId}:${index}`}><input type="checkbox" checked disabled={disabled} onChange={() => updateEntries(settingsRead.params.entries.filter(item => item.source.kind !== entry.source.kind || item.source.fieldId !== entry.source.fieldId))} />Характеристика недоступна</label>)}
+                {settingsRead.params.entries.filter(entry => !choices.some(option => referenceValue(option.reference) === referenceValue(entry.source))).map((entry, index) => <label key={`missing-${entry.source.kind}:${entry.source.fieldId}:${index}`}><Checkbox checked disabled={disabled} onChange={() => updateEntries(settingsRead.params.entries.filter(item => item.source.kind !== entry.source.kind || item.source.fieldId !== entry.source.fieldId))} />Характеристика недоступна</label>)}
                {choices.filter(option => option.label.toLocaleLowerCase().includes(statSearch.toLocaleLowerCase())).map(option => {
                  const index = settingsRead.params.entries.findIndex(entry => referenceValue(entry.source) === option.value);
-                 return <label key={option.value}><input type="checkbox" disabled={disabled} checked={index >= 0} onChange={event => {
+                  return <label key={option.value}><Checkbox disabled={disabled} checked={index >= 0} onChange={event => {
                    if (event.target.checked) { if (index < 0) updateEntries([...settingsRead.params.entries, { source: asJsonReference(option.reference), label: '' }]); }
                    else updateEntries(settingsRead.params.entries.filter(entry => referenceValue(entry.source) !== option.value));
                  }} />{option.label}</label>;
                })}
              </div>
-             <>
-               <label>Формат вывода<input disabled={disabled} value={settingsRead.params.format} onChange={event => patch({ format: event.target.value })} /></label>
+              <>
+                <label>Условие отображения<input disabled={disabled} value={settingsRead.params.condition} onChange={event => patch({ condition: event.target.value })} /></label>
+                <small>$0 — значение строки. Например: $0 &gt; 0. Остальные характеристики можно раскрыть на листе.</small>
+                {statCondition?.error && <span className={styles.diagnostic} role="status">{statCondition.error}</span>}
+                <label>Формат вывода<input disabled={disabled} value={settingsRead.params.format} onChange={event => patch({ format: event.target.value })} /></label>
                <small>$0 — исходное значение, $1 и далее — результаты выражений; ${'{1:s}'} выводит со знаком, $$ — знак доллара.</small>
                {statFormat?.error && <span className={styles.diagnostic} role="status">{statFormat.error}</span>}
                <p>В выражениях $0 — значение текущей характеристики. Доступны +, -, *, /, %, floor, ceil, round, abs, min, max.</p>
