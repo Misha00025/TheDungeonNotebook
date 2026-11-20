@@ -38,9 +38,12 @@
   min-width: 0;
 }
 
+.composite {
+  font-size: 1.15rem;
+}
+
 .compositeParts {
   overflow-wrap: anywhere;
-  font-size: 1.15rem;
 }
 
 .compositeValue,
@@ -48,30 +51,37 @@
   font-weight: 650;
 }
 
-.resourceValues,
-.statRow {
+.resourceValues {
   display: flex;
   align-items: baseline;
-  gap: .75rem;
+  gap: .5rem;
   min-width: 0;
+  flex-wrap: nowrap;
 }
 
 .statRow {
-  justify-content: flex-start;
-  flex-wrap: wrap;
+  display: grid;
+  grid-column: span 2;
+  grid-template-columns: subgrid;
+  align-items: baseline;
+  min-width: 0;
   padding: .5rem .75rem;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-md);
 }
 
-.statRow > span:first-child {
+.statLabel {
+  min-width: 0;
   color: var(--text-secondary);
   overflow-wrap: anywhere;
 }
 
-.statRow > :not(span:first-child) {
+.statValue {
+  display: block;
+  width: 100%;
   min-width: 0;
   overflow-wrap: anywhere;
+  font: inherit;
 }
 
 .resourceValues > div {
@@ -81,12 +91,28 @@
   min-width: 0;
 }
 
+.resourceCurrent {
+  flex: 0 1 auto;
+  inline-size: max-content;
+  max-inline-size: 50%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.resourceMaximum {
+  flex: 0 1 auto;
+  inline-size: max-content;
+  max-inline-size: 50%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .resourceValues {
   justify-content: flex-start;
-  flex-wrap: wrap;
 }
 
 .resourceSeparator {
+  flex: 0 0 auto;
   color: var(--text-secondary);
 }
 
@@ -105,8 +131,13 @@
 }
 
 .statList {
+  --stat-column-count: var(--presentation-columns, 1);
+  --stat-label-cap: calc((100% - (2 * var(--stat-column-count) - 1) * .75rem) / (2 * var(--stat-column-count)));
   display: grid;
-  gap: .5rem;
+  grid-template-columns: repeat(var(--stat-column-count), fit-content(var(--stat-label-cap)) minmax(0, 1fr));
+  column-gap: .75rem;
+  row-gap: .5rem;
+  min-width: 0;
 }
 
 .placeholder,
@@ -390,8 +421,7 @@
   background: color-mix(in srgb, var(--danger-color) 8%, var(--bg-primary));
 }
 
-.groupChildren,
-.statList {
+.groupChildren {
   grid-template-columns: repeat(var(--presentation-columns, 1), minmax(0, 1fr));
 }
 
@@ -430,8 +460,11 @@
 }
 
 @media (max-width: 600px) {
-  .groupChildren,
-  .statList {
+  .groupChildren {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .statList {
+    --stat-column-count: 1;
   }
 }

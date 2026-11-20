@@ -1,12 +1,19 @@
 .editor {
-  display: inline-grid;
-  max-width: 100%;
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
 }
 
 .display {
-  display: inline;
+  display: block;
+  width: 100%;
+  height: 100%;
   max-width: 100%;
+  min-width: 0;
+  min-height: 0;
   padding: 0;
   border: 0;
   background: transparent;
@@ -24,9 +31,24 @@
 }
 
 .display:focus-visible {
-  border-radius: var(--border-radius-sm);
-  outline: 2px solid var(--accent-color);
-  outline-offset: 2px;
+  outline: 0;
+  box-shadow: inset 0 -1px var(--accent-color);
+}
+
+.sizer {
+  grid-area: 1 / 1;
+  min-width: 0;
+  visibility: hidden;
+  overflow-wrap: anywhere;
+  font: inherit;
+  line-height: inherit;
+}
+
+.inputLayer {
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+  min-height: 0;
 }
 
 .issue {

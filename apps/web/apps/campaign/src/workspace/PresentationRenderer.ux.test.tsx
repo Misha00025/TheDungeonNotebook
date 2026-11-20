@@ -56,21 +56,26 @@ describe('PresentationRenderer UX contracts', () => {
     expect(screen.queryByText('Внутреннее имя ошибки')).not.toBeInTheDocument();
   });
 
-  it('renders resources as current / maximum, edits only current, and omits a dangling slash without maximum', () => {
+  it('renders and edits base resource current and maximum while keeping virtual maximum read-only', () => {
     const resource = (maximum: string) => node('Запас сил', JSON.stringify({ version: 1, type: 'resource', current: reference(primaryId), maximum: maximum ? reference(maximum) : null, showBar: false }));
-    const callback = vi.fn((_ref: FieldReference, _label: string, display?: React.ReactNode) => <button type="button">{display}</button>);
+    const callback = vi.fn((_ref: FieldReference, label: string, display?: React.ReactNode) => <button type="button" aria-label={label}>{display}</button>);
     const { rerender } = render(<PresentationRenderer roots={[resource(maximumId)]} sheet={sheet} renderValue={callback} />);
     expect(screen.getByRole('heading', { name: 'Запас сил' })).toBeInTheDocument();
-    expect(screen.getByRole('button')).toHaveTextContent('3');
+    expect(screen.getByRole('button', { name: 'Основной источник' })).toHaveTextContent('3');
+    expect(screen.getByRole('button', { name: 'Предел источника' })).toHaveTextContent('20');
     expect(screen.getByText('/')).toBeInTheDocument();
-    expect(screen.getByText('20')).toBeInTheDocument();
-    expect(callback).toHaveBeenCalledTimes(1);
-    expect(callback.mock.calls[0]?.[0]).toEqual({ kind: 'Base', fieldId: primaryId });
+    expect(callback).toHaveBeenCalledWith({ kind: 'Base', fieldId: primaryId }, 'Основной источник', expect.anything());
+    expect(callback).toHaveBeenCalledWith({ kind: 'Base', fieldId: maximumId }, 'Предел источника', expect.anything());
     expect(screen.queryByText('Основной источник')).not.toBeInTheDocument();
     expect(screen.queryByText('Предел источника')).not.toBeInTheDocument();
+    const virtualMaximum = node('Запас сил', JSON.stringify({ version: 1, type: 'resource', current: reference(primaryId), maximum: reference('virtual-maximum', 'Virtual'), showBar: false }));
+    rerender(<PresentationRenderer roots={[virtualMaximum]} sheet={{ ...sheet, virtualFields: [{ id: 'virtual-maximum', key: 'virtual-maximum', title: 'Вычисленный предел', description: '', resultType: 'Integer', value: 20, diagnostic: null }] }} renderValue={callback} />);
+    expect(screen.getByRole('button', { name: 'Основной источник' })).toHaveTextContent('3');
+    expect(screen.getByText('20')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Вычисленный предел' })).not.toBeInTheDocument();
     rerender(<PresentationRenderer roots={[resource('')]} sheet={sheet} renderValue={callback} />);
     expect(screen.queryByText('/')).not.toBeInTheDocument();
-    expect(screen.getByRole('button')).toHaveTextContent('3');
+    expect(screen.getByRole('button', { name: 'Основной источник' })).toHaveTextContent('3');
   });
 
   it('keeps stat-list source editable while applying the shared format', () => {

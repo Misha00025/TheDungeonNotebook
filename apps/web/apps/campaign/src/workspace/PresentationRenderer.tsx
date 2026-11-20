@@ -102,7 +102,7 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; con
         return <span key={`source-${index}`} className={value.error ? styles.diagnostic : styles.compositeValue}>{value.text !== undefined ? <>{value.text}{sample && <span className={styles.sampleMark}>Образец</span>}</> : sample ? <span className={styles.placeholder}>Выберите характеристику</span> : value.error}</span>;
       });
     const formattedParts = <span className={styles.compositeParts}>{partsContent}</span>;
-    content = <div className={styles.composite}>
+     content = <div className={styles.composite}>
       {renderEditable && !sample && primary && primaryResult ? renderValue!(primary, primaryResult.label, formattedParts) : formattedParts}
     </div>;
   } else if (params?.type === 'resource') {
@@ -111,6 +111,7 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; con
     const currentNumeric = current?.status === 'value' && numericType(current.valueType);
     const maximumNumeric = maximum?.status === 'value' && numericType(maximum.valueType);
     const currentEditable = Boolean(!sample && params.current?.kind === 'Base' && currentNumeric && renderValue);
+    const maximumEditable = Boolean(!sample && params.maximum?.kind === 'Base' && maximumNumeric && renderValue);
     const currentValue = sample && current?.status === 'value' && numericType(current.valueType) ? current.sampleValue : current?.status === 'value' ? current.value : undefined;
     const maximumValue = sample && maximum?.status === 'value' && numericType(maximum.valueType) ? maximum.sampleValue : maximum?.status === 'value' ? maximum.value : undefined;
     const numericCurrent = currentValue !== undefined && isNumeric(currentValue) ? Number(String(currentValue)) : undefined;
@@ -118,8 +119,8 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; con
     const hasValidMaximum = currentNumeric && maximumNumeric && numericCurrent !== undefined && numericMaximum !== undefined && Number.isFinite(numericCurrent) && Number.isFinite(numericMaximum) && numericMaximum > 0;
     const barWidth = hasValidMaximum && numericCurrent !== undefined && numericMaximum !== undefined ? Math.max(0, Math.min(100, numericCurrent / numericMaximum * 100)) : undefined;
     content = <div className={styles.resource}>
-      <div className={styles.resourceValues}><div>{current?.status === 'value' && !currentNumeric ? <span className={styles.diagnostic}>Для ресурса нужна числовая характеристика.</span> : currentEditable && params.current && current?.status === 'value' ? renderValue!(params.current, current.label, displayResolved(current, sample)) : current ? displayResolved(current, sample) : <span className={styles.placeholder}>Выберите характеристику</span>}</div>
-        {params.maximum ? <><span className={styles.resourceSeparator} aria-hidden="true">/</span><div>{maximum?.status === 'value' && !maximumNumeric ? <span className={styles.diagnostic}>Максимум должен быть числовым.</span> : maximum ? displayResolved(maximum, sample) : <span className={styles.placeholder}>Максимум недоступен</span>}</div></> : null}</div>
+       <div className={styles.resourceValues}><div className={styles.resourceCurrent}>{current?.status === 'value' && !currentNumeric ? <span className={styles.diagnostic}>Для ресурса нужна числовая характеристика.</span> : currentEditable && params.current && current?.status === 'value' ? renderValue!(params.current, current.label, displayResolved(current, sample)) : current ? displayResolved(current, sample) : <span className={styles.placeholder}>Выберите характеристику</span>}</div>
+          {params.maximum ? <><span className={styles.resourceSeparator} aria-hidden="true">/</span><div className={styles.resourceMaximum}>{maximum?.status === 'value' && !maximumNumeric ? <span className={styles.diagnostic}>Максимум должен быть числовым.</span> : maximumEditable && maximum?.status === 'value' ? renderValue!(params.maximum, maximum.label, displayResolved(maximum, sample)) : maximum ? displayResolved(maximum, sample) : <span className={styles.placeholder}>Максимум недоступен</span>}</div></> : null}</div>
       {params.showBar && hasValidMaximum && <div className={styles.progressTrack} role="img" aria-label={sample ? 'Образец соотношения текущего значения и максимума' : 'Соотношение текущего значения и максимума'}><span style={{ width: `${barWidth}%` }} /></div>}
     </div>;
   } else if (params?.type === 'stat-list') {
@@ -131,7 +132,7 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; con
       const label = entry.label || field.label;
       const key = `${entry.source.kind}:${entry.source.fieldId}:${index}`;
       if (field.status !== 'value') {
-        mainRows.push(<div className={styles.statRow} key={key}><span>{label}</span>{displayResolved(field, sample)}</div>);
+         mainRows.push(<div className={styles.statRow} key={key}><span className={styles.statLabel}>{label}</span><span className={styles.statValue}>{displayResolved(field, sample)}</span></div>);
         return;
       }
       const sourceValue = sample ? field.sampleValue : field.value;
@@ -140,7 +141,7 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; con
       const valueDisplay = 'error' in formatted ? <span className={styles.diagnostic}>{formatted.error}</span> : <span className={styles.value}>{formatted.text}{sample && <span className={styles.sampleMark}>Образец</span>}</span>;
       const predicate = sample ? statCondition?.test(sourceValue) : conditionField.status === 'value' ? statCondition?.test(conditionField.value) : undefined;
       const rowValue = predicate?.error && !statCondition?.error ? <>{valueDisplay}<span className={styles.diagnostic}>Условие отображения не удалось вычислить.</span></> : valueDisplay;
-      const row = <div className={styles.statRow} key={key}><span>{label}</span>{!sample && entry.source.kind === 'Base' && renderValue ? renderValue(entry.source, label, rowValue) : rowValue}</div>;
+       const row = <div className={styles.statRow} key={key}><span className={styles.statLabel}>{label}</span><span className={styles.statValue}>{!sample && entry.source.kind === 'Base' && renderValue ? renderValue(entry.source, label, rowValue) : rowValue}</span></div>;
       if (predicate?.matches === false) hiddenRows.push(row);
       else mainRows.push(row);
     });

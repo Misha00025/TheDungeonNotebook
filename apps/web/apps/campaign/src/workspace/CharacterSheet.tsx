@@ -435,12 +435,13 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
     const raw = Object.prototype.hasOwnProperty.call(rawDrafts, field.id) ? rawDrafts[field.id] : undefined;
     const fieldIssue = validity[field.id] ?? (fingerprintMismatch ? 'Тип характеристики изменился; проверьте или отмените черновик.' : undefined);
     const inputFingerprint = fingerprintMismatch ? fingerprint! : fingerprint ?? fieldFingerprint(field);
-    const editor = <div className={characterStyles.valueEditor} onKeyDown={event => {
+    const inline = display !== undefined;
+    const editor = <div className={`${characterStyles.valueEditor} ${inline ? characterStyles.inlineValueEditor : ''}`} onKeyDown={event => {
       if (display !== undefined || event.key !== 'Enter' || event.nativeEvent.isComposing || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLButtonElement) return;
       event.preventDefault(); saveField(field.id);
     }}>
-      <fieldset className={characterStyles.valueField} disabled={permissionPending || !canWrite || sheetBlocked || snapshotBusy || contentBusy}>
-        <ValueInput key={`${field.id}:${resetCounters[field.id] ?? 0}`} label={label} compact field={{ valueType: inputFingerprint.valueType, options: inputFingerprint.options }} value={value} controlledNumericDraft={raw} onRawChange={inputFingerprint.valueType === 'Integer' || inputFingerprint.valueType === 'Number' ? next => {
+      <fieldset className={`${characterStyles.valueField} ${inline ? characterStyles.inlineValueField : ''}`} disabled={permissionPending || !canWrite || sheetBlocked || snapshotBusy || contentBusy}>
+        <ValueInput key={`${field.id}:${resetCounters[field.id] ?? 0}`} label={label} compact inline={inline} field={{ valueType: inputFingerprint.valueType, options: inputFingerprint.options }} value={value} controlledNumericDraft={raw} onRawChange={inputFingerprint.valueType === 'Integer' || inputFingerprint.valueType === 'Number' ? next => {
           captureFingerprint(field); updateRawDrafts(current => ({ ...current, [field.id]: next })); setWriteStatus('');
         } : undefined} onChange={next => { captureFingerprint(field); updateDrafts(current => ({ ...current, [field.id]: next })); setWriteStatus(''); }} onValidityChange={error => {
           if (validityRef.current[field.id] === error) return;

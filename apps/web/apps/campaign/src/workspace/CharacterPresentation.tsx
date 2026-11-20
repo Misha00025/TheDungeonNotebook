@@ -29,7 +29,7 @@ function editableBaseFields(roots: PresentationNode[], sheet: ComputedSheet): st
         const primary = result.params.primary;
         if (primary?.kind === 'Base' && result.params.parts.some(part => 'source' in part && part.source.kind === 'Base' && part.source.fieldId === primary.fieldId) && known.has(primary.fieldId)) ids.add(primary.fieldId);
       }
-      if (result.type === 'resource' && result.params.current?.kind === 'Base' && known.has(result.params.current.fieldId)) ids.add(result.params.current.fieldId);
+      if (result.type === 'resource') [result.params.current, result.params.maximum].forEach(reference => { if (reference?.kind === 'Base' && known.has(reference.fieldId)) ids.add(reference.fieldId); });
       if (result.type === 'stat-list') result.params.entries.forEach(entry => { if (entry.source.kind === 'Base' && known.has(entry.source.fieldId)) ids.add(entry.source.fieldId); });
     }
     visit(node.children);

@@ -86,6 +86,19 @@ describe('CharacterSheet presentation UX', () => {
     expect(url).not.toContain(maximumId);
   });
 
+  it('writes only the selected resource maximum', async () => {
+    const request = requestFixture({ canRead: true, canWrite: true });
+    renderSheet(request);
+    fireEvent.click(await screen.findByRole('button', { name: 'Изменить показатель Maximum source secret' }));
+    const input = await screen.findByRole('textbox', { name: 'Maximum source secret' });
+    fireEvent.change(input, { target: { value: '25' } });
+    fireEvent.blur(input, { relatedTarget: document.body });
+    await waitFor(() => expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1));
+    const [url, options] = request.mock.calls.find(([, requestOptions]) => requestOptions?.method === 'PUT')!;
+    expect(url).toBe(`/api/campaigns/12/characters/${characterId}/base-values/${maximumId}`);
+    expect(String(options?.body)).toBe('{"value":25,"expectedRevision":7}');
+  });
+
   it('keeps an invalid raw draft across blur and reopen without writing it', async () => {
     const request = requestFixture({ canRead: true, canWrite: true });
     renderSheet(request);

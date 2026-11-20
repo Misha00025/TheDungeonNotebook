@@ -3,9 +3,11 @@ import styles from './InlineValueEditor.module.css';
 
 const InlineValueEditor: React.FC<{ display: React.ReactNode; label: string; disabled: boolean; issue?: string; onCommit: () => void; children: React.ReactNode }> = ({ display, label, disabled, issue, onCommit, children }) => {
   const [editing, setEditing] = useState(false);
+  const [sessionDisplay, setSessionDisplay] = useState<React.ReactNode>(display);
   const editingRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const finishingRef = useRef(false);
+  const displayContent = <>{display}{issue && <span className={styles.issue} aria-hidden="true">!</span>}</>;
 
   useLayoutEffect(() => {
     if (!editing) return;
@@ -33,7 +35,7 @@ const InlineValueEditor: React.FC<{ display: React.ReactNode; label: string; dis
       event.preventDefault(); event.stopPropagation(); finish(true);
     }
   }}>
-    {editing ? children : <button className={styles.display} type="button" aria-label={`Изменить показатель ${label}`} aria-invalid={Boolean(issue)} title={issue} disabled={disabled} onClick={event => { event.stopPropagation(); finishingRef.current = false; editingRef.current = true; setEditing(true); }} onKeyDown={event => event.stopPropagation()}>{display}{issue && <span className={styles.issue} aria-hidden="true">!</span>}</button>}
+    {editing ? <><span className={styles.sizer} aria-hidden="true" inert>{sessionDisplay}</span><div className={styles.inputLayer}>{children}</div></> : <button className={styles.display} type="button" aria-label={`Изменить показатель ${label}`} aria-invalid={Boolean(issue)} title={issue} disabled={disabled} onClick={event => { event.stopPropagation(); finishingRef.current = false; editingRef.current = true; setSessionDisplay(displayContent); setEditing(true); }} onKeyDown={event => event.stopPropagation()}>{displayContent}</button>}
   </div>;
 };
 
