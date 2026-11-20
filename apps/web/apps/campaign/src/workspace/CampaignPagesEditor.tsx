@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ActionRow, Button, Field, Input, Notification, Select, StatePanel } from '@tdn/shared';
 import type { PresentationEnvelope, ViewMetadata } from './types';
 import { useWorkspace, useDirtyDraft } from './Workspace';
@@ -39,7 +39,7 @@ const CampaignPageRow: React.FC<{
   </article>;
 };
 
-const CampaignPagesEditor: React.FC<{ campaignId: number; sessionKey: string; canWrite: boolean; permissionsLoading: boolean; views: ViewMetadata[] }> = ({ campaignId, sessionKey, canWrite, permissionsLoading, views }) => {
+const CampaignPagesEditor: React.FC<{ campaignId: number; sessionKey: string; canWrite: boolean; permissionsLoading: boolean; views: ViewMetadata[]; onStateChange?: (state: { dirty: boolean; busy: boolean }) => void; embedded?: boolean }> = ({ campaignId, sessionKey, canWrite, permissionsLoading, views, onStateChange, embedded = false }) => {
   const { api, notifyInvalidation } = useWorkspace();
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -68,9 +68,13 @@ const CampaignPagesEditor: React.FC<{ campaignId: number; sessionKey: string; ca
   scopeRef.current = activeScope;
   const writable = canWrite && !forbidden;
   const dirty = Boolean(presentation) && stringifyJson(pages) !== stringifyJson(baselinePages);
+  const busy = saving || checking || saveLock.current || verifyLock.current;
   const availableViews = useMemo(() => new Map(views.map(view => [view.key, view])), [views]);
   const valid = pages.every(page => Boolean(page.title.trim()) && Boolean(page.viewKey) && availableViews.has(page.viewKey));
   useDirtyDraft(`campaign-pages-${sessionKey}:${campaignId}`, dirty);
+  const stateRef = useRef({ dirty: false, busy: true });
+  stateRef.current = { dirty, busy };
+  useLayoutEffect(() => { onStateChange?.(stateRef.current); }, [onStateChange, dirty, busy]);
 
   const isCurrent = (requestScope: string, generation: number) => mounted.current && scopeRef.current === requestScope && loadGeneration.current === generation;
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; loadGeneration.current += 1; }; }, []);
@@ -165,7 +169,7 @@ const CampaignPagesEditor: React.FC<{ campaignId: number; sessionKey: string; ca
   const loadingOverlay = <div className={styles.loadingOverlay}><StatePanel kind="loading">Загрузка настроек страниц…</StatePanel></div>;
 
   return <section className={styles.section} aria-label="Страницы кампании" aria-busy={loading}>
-    <header className={styles.header}><h2>Страницы кампании</h2><p>Страницы задают общие разделы кампании и назначают сохранённые отображения.</p></header>
+    <header className={styles.header}>{!embedded && <h2>Страницы кампании</h2>}<p>Страницы задают общие разделы кампании и назначают сохранённые отображения.</p></header>
     {Boolean(loadError) && <><ApiError error={loadError} /><Button variant="secondary" type="button" onClick={() => setLoadAttempt(value => value + 1)}>Повторить загрузку</Button></>}
     {loading && loadingOverlay}
     {presentation ? <>

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ActionRow, Badge, Button, IconButton, Input, LinkButton, List, Notification, PageHeader, Select, StatePanel, TabBar, Textarea } from '@tdn/shared';
+import { ActionRow, Badge, Button, IconButton, Input, LinkButton, List, ModalPortal, Notification, PageHeader, Select, StatePanel, TabBar, Textarea } from '@tdn/shared';
 import type { NotificationKind } from '@tdn/shared';
 import { useWorkspace, useDirtyDraft } from './Workspace';
 import { useOptionalCampaignWorkspace } from './Shell';
@@ -42,6 +42,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
   const [presentationRefreshKey, setPresentationRefreshKey] = useState(0);
   const [descriptionDraft, setDescriptionDraft] = useState<string>();
   const [fieldDrafts, setFieldDrafts] = useState<Record<string, JsonValue>>({});
+  const [activeValueEditor, setActiveValueEditor] = useState<{ fieldId: string; label: string }>();
   const [rawDrafts, setRawDrafts] = useState<Record<string, string>>({});
   const [fieldFingerprints, setFieldFingerprints] = useState<Record<string, FieldFingerprint>>({});
   const [validity, setValidity] = useState<Record<string, string | undefined>>({});
@@ -429,10 +430,11 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
 
   const retrySnapshot = () => { if (!snapshotBusyRef.current) void refreshAll(); };
 
-  const renderValue = (reference: FieldReference, label: string): React.ReactNode => {
+  const renderValue = (reference: FieldReference, label: string, display?: React.ReactNode): React.ReactNode => {
     if (reference.kind !== 'Base' || !editorAllowed || permissionError) return undefined;
     const field = sheetRef.current?.baseFields.find(item => item.id === reference.fieldId);
     if (!field) return <span role="status">Характеристика недоступна.</span>;
+    if (display !== undefined) return <button className={characterStyles.valueTrigger} type="button" aria-label={`Изменить показатель ${label}`} disabled={permissionPending || !canWrite || sheetBlocked || snapshotBusy || contentBusy} onClick={() => setActiveValueEditor({ fieldId: field.id, label })}>{display}</button>;
     const fingerprint = fieldFingerprints[field.id];
     const fingerprintMismatch = Boolean(fingerprint && !sameFingerprint(fingerprint, fieldFingerprint(field)));
     const hasDraft = Object.prototype.hasOwnProperty.call(fieldDrafts, field.id) || Object.prototype.hasOwnProperty.call(rawDrafts, field.id) || Boolean(validity[field.id]);
@@ -577,7 +579,10 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
       {writeStatus && <Notification kind={writeStatusKind} eventKey={writeStatusEvent}>{writeStatus}</Notification>}
     </List>}
     {loadedRecovery.length > 0 && <section className={characterStyles.recoveryTray} aria-label="Неподтверждённые значения"><h2>Неподтверждённые значения</h2>{loadedRecovery}</section>}
-    {Boolean(presentation && presentationUnavailable) && <Button variant="secondary" type="button" onClick={() => void refreshAll()}>Обновить страницы</Button>}
+     {Boolean(presentation && presentationUnavailable) && <Button variant="secondary" type="button" onClick={() => void refreshAll()}>Обновить страницы</Button>}
+     <ModalPortal isOpen={Boolean(activeValueEditor)} title="Изменить значение" onClose={() => { if (!contentBusyRef.current) setActiveValueEditor(undefined); }} dismissDisabled={contentBusy}>
+       {activeValueEditor && (renderValue({ kind: 'Base', fieldId: activeValueEditor.fieldId }, activeValueEditor.label) ?? <p role="status">Редактирование сейчас недоступно. Неподтверждённый ввод сохранён.</p>)}
+     </ModalPortal>
   </section>;
 };
 

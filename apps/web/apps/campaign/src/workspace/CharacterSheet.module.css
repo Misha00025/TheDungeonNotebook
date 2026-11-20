@@ -23,7 +23,32 @@
   border: 0;
   padding: 0;
   margin: 0;
-  min-width: 12rem;
+  min-width: 0;
+}
+
+.valueTrigger {
+  display: inline;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.valueTrigger:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--accent-color);
+  text-underline-offset: .15em;
+}
+
+.valueTrigger:focus-visible {
+  border-radius: var(--border-radius-sm);
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
 }
 
 .sheetSection {

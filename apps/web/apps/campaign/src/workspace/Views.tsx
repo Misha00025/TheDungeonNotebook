@@ -1,12 +1,11 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ActionRow, Button, Field, Input, ModalPortal, Select, StatePanel } from '@tdn/shared';
-import type { DefinitionCreate, PresentationEnvelope, ViewMetadata } from './types';
+import type { DefinitionCreate, ViewMetadata } from './types';
 import { useWorkspace, useDirtyDraft, useDirtyState } from './Workspace';
 import { CampaignApiError, runCreation } from './api';
 import { useCampaignWorkspace } from './Shell';
 import { useResource, useMutation } from './hooks';
-import { readPages } from './presentationModel';
 import { ApiError } from './Feedback';
 import ViewEditor from './ViewEditor';
 import CampaignPagesEditor from './CampaignPagesEditor';
@@ -58,55 +57,49 @@ const Views: React.FC = () => {
   const { permissions, permissionsLoading } = useCampaignWorkspace();
   const canWrite = Boolean(permissions.canWrite && !permissionsLoading);
   const viewsResource = useResource<ViewMetadata[]>(`${sessionKey}:${campaignId}:views:${invalidation}`, () => api.listViews(campaignId));
-  const presentationResource = useResource<PresentationEnvelope>(`${sessionKey}:${campaignId}:presentation:${invalidation}`, () => api.getPresentation(campaignId));
   const [selectedId, setSelectedId] = useState('');
   const [creating, setCreating] = useState(false);
   const [showPages, setShowPages] = useState(false);
+  const [pageState, setPageState] = useState({ dirty: false, busy: false });
   const dirty = useDirtyState();
-  const pages = presentationResource.data ? readPages(presentationResource.data) : [];
+  const pagesStateRef = useRef(pageState);
+  pagesStateRef.current = pageState;
+  const onPagesStateChange = useCallback((state: { dirty: boolean; busy: boolean }) => setPageState(current => current.dirty === state.dirty && current.busy === state.busy ? current : state), []);
   const changeSelection = (id: string) => {
     if (id === selectedId) return;
     if (dirty && !window.confirm('Есть несохранённые изменения. Переключить раздел?')) return;
-    setSelectedId(id); setCreating(false); setShowPages(false);
+    setSelectedId(id); setCreating(false);
   };
-  const openPages = () => {
-    if (dirty && !window.confirm('Есть несохранённые изменения. Открыть настройки страниц кампании?')) return;
-    setSelectedId(''); setCreating(false); setShowPages(true);
+  const openPages = () => { setPageState({ dirty: false, busy: false }); setShowPages(true); };
+  const closePages = () => {
+    if (pagesStateRef.current.busy) return;
+    if (pagesStateRef.current.dirty && !window.confirm('Отменить несохранённые назначения страниц?')) return;
+    setShowPages(false);
   };
   const openCreate = () => {
     if (creating) return;
     if (dirty && !window.confirm('Есть несохранённые изменения. Открыть создание отображения?')) return;
     setCreating(true); setSelectedId(''); setShowPages(false);
   };
-  const presentationForView = (viewKey: string) => pages.filter(page => page.viewKey === viewKey).map(page => page.title);
-  const initialLoading = permissionsLoading || (!viewsResource.data && viewsResource.loading) || (!presentationResource.data && presentationResource.loading);
+  const initialLoading = permissionsLoading || (!viewsResource.data && viewsResource.loading);
 
   return <main className={styles.page}>
     <h1>Отображения</h1>
     <div className={sectionStyles.sectionBody} aria-busy={initialLoading}>
     {Boolean(viewsResource.error) && <ApiError error={viewsResource.error} onRetry={viewsResource.reload} />}
-    {Boolean(presentationResource.error) && <ApiError error={presentationResource.error} onRetry={presentationResource.reload} />}
     {initialLoading && <div className={sectionStyles.loadingOverlay}><StatePanel kind="loading">{permissionsLoading ? 'Проверка прав и загрузка раздела…' : 'Загрузка отображений кампании…'}</StatePanel></div>}
     <div className={styles.actions}>
       <Button type="button" disabled={!canWrite || creating || initialLoading} onClick={openCreate}>Создать отображение</Button>
       <Button variant="secondary" type="button" disabled={!canWrite || permissionsLoading || initialLoading} onClick={openPages}>Страницы кампании</Button>
-      <Button variant="secondary" type="button" disabled={initialLoading} onClick={() => { viewsResource.reload(); presentationResource.reload(); }}>Обновить список</Button>
+      <Button variant="secondary" type="button" disabled={initialLoading} onClick={viewsResource.reload}>Обновить список</Button>
     </div>
     <Field label="Сохранённое отображение" htmlFor={viewSelectId}><Select id={viewSelectId} value={selectedId} disabled={!viewsResource.data} onChange={event => changeSelection(event.target.value)}><option value="">Выберите отображение</option>{viewsResource.data?.map(view => <option key={view.id} value={view.id}>{view.name}</option>)}</Select></Field>
-    {viewsResource.data && viewsResource.data.length > 0 && <div className={styles.grid}>
-      {viewsResource.data.map(view => {
-        const assignments = presentationForView(view.key);
-        return <article className={styles.card} key={`${sessionKey}:${campaignId}:${view.id}`}>
-          <h2>{view.name}</h2><p>Область назначения: кампания.</p>
-          {assignments.length > 0 ? <div><span>Страницы:</span><ul>{assignments.map((title, index) => <li key={`${title}:${index}`}>{title}</li>)}</ul></div> : <p>Не назначено страницам кампании.</p>}
-          <Button variant="secondary" type="button" onClick={() => changeSelection(view.id)}>Открыть отображение</Button>
-        </article>;
-      })}
-    </div>}
     {viewsResource.data && viewsResource.data.length === 0 && <StatePanel kind="empty">Сохранённых отображений пока нет.</StatePanel>}
-    {creating && <CreateView key={`${sessionKey}:${campaignId}:create`} campaignId={campaignId} canWrite={canWrite} onCancel={() => setCreating(false)} onCreated={created => { setSelectedId(created.id); setCreating(false); viewsResource.reload(); presentationResource.reload(); }} />}
-    {showPages && <CampaignPagesEditor key={`${sessionKey}:${campaignId}:pages`} campaignId={campaignId} sessionKey={sessionKey} canWrite={canWrite} permissionsLoading={Boolean(permissionsLoading)} views={viewsResource.data ?? []} />}
+    {creating && <CreateView key={`${sessionKey}:${campaignId}:create`} campaignId={campaignId} canWrite={canWrite} onCancel={() => setCreating(false)} onCreated={created => { setSelectedId(created.id); setCreating(false); viewsResource.reload(); }} />}
     {selectedId && !creating && <ViewEditor key={`${sessionKey}:${campaignId}:${selectedId}`} sessionKey={sessionKey} campaignId={campaignId} viewId={selectedId} canWrite={canWrite} permissionsLoading={Boolean(permissionsLoading)} />}
+    <ModalPortal isOpen={showPages} title="Страницы кампании" size="wide" onClose={closePages} dismissDisabled={pageState.busy}>
+      <CampaignPagesEditor key={`${sessionKey}:${campaignId}:pages`} campaignId={campaignId} sessionKey={sessionKey} canWrite={canWrite} permissionsLoading={Boolean(permissionsLoading)} views={viewsResource.data ?? []} onStateChange={onPagesStateChange} embedded />
+    </ModalPortal>
     </div>
   </main>;
 };

@@ -14,7 +14,7 @@ export type PresentationRendererProps = {
   roots: PresentationNode[];
   sheet?: ComputedSheet;
   sample?: boolean;
-  renderValue?: (reference: FieldReference, label: string) => React.ReactNode;
+  renderValue?: (reference: FieldReference, label: string, display?: React.ReactNode) => React.ReactNode;
   selectedKey?: string;
   onSelect?: (nodeKey: string) => void;
   onDropNode?: (targetKey: string, placement: PresentationDropPlacement, event: React.DragEvent) => void;
@@ -82,13 +82,14 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; sam
     const primary = params.primary && params.primary.kind === 'Base' && params.parts.some(part => 'source' in part && part.source.kind === 'Base' && part.source.fieldId === params.primary?.fieldId) ? params.primary : null;
     const primaryResult = primary ? resolveField(sheet, primary) : undefined;
     const renderEditable = Boolean(primary && primaryResult?.status === 'value' && renderValue && params.parts.some(part => 'source' in part && part.source.kind === 'Base' && part.source.fieldId === primary.fieldId));
-    body = <div className={styles.composite}>
-      <div className={styles.compositeParts}>{params.parts.map((part, index) => {
+    const partsContent = params.parts.map((part, index) => {
         const value = valueForPart(part, sheet, sample);
         if ('text' in part) return <React.Fragment key={`text-${index}`}>{part.text}</React.Fragment>;
-        return <span key={`source-${index}`} className={value.error ? styles.diagnostic : styles.compositeValue} title={value.error ?? value.label}>{value.text !== undefined ? <>{value.text}{sample && <span className={styles.sampleMark}>Образец</span>}</> : sample ? <span className={styles.placeholder}>Выберите характеристику</span> : value.error}</span>;
-      })}</div>
-      {primary && primaryResult ? <div className={styles.primaryValue}><span>{primaryResult.label}</span>{renderEditable && !sample ? renderValue!(primary, primaryResult.label) : displayResolved(primaryResult, sample)}</div> : null}
+        return <span key={`source-${index}`} className={value.error ? styles.diagnostic : styles.compositeValue}>{value.text !== undefined ? <>{value.text}{sample && <span className={styles.sampleMark}>Образец</span>}</> : sample ? <span className={styles.placeholder}>Выберите характеристику</span> : value.error}</span>;
+      });
+    const formattedParts = <span className={styles.compositeParts}>{partsContent}</span>;
+    body = <div className={styles.composite}>
+      {renderEditable && !sample && primary && primaryResult ? renderValue!(primary, primaryResult.label, formattedParts) : formattedParts}
     </div>;
   } else if (params?.type === 'resource') {
     const current = params.current ? resolveField(sheet, params.current) : undefined;
@@ -103,8 +104,8 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; sam
     const hasValidMaximum = currentNumeric && maximumNumeric && numericCurrent !== undefined && numericMaximum !== undefined && Number.isFinite(numericCurrent) && Number.isFinite(numericMaximum) && numericMaximum > 0;
     const barWidth = hasValidMaximum && numericCurrent !== undefined && numericMaximum !== undefined ? Math.max(0, Math.min(100, numericCurrent / numericMaximum * 100)) : undefined;
     body = <div className={styles.resource}>
-      <div className={styles.resourceValues}><div><span>{current?.label ?? 'Текущее значение'}</span>{current?.status === 'value' && !currentNumeric ? <span className={styles.diagnostic}>Для ресурса нужна числовая характеристика.</span> : currentEditable && params.current && current?.status === 'value' ? renderValue!(params.current, current.label) : current ? displayResolved(current, sample) : <span className={styles.placeholder}>Выберите характеристику</span>}</div>
-        {params.maximum ? <div><span>{maximum?.label ?? 'Максимум'}</span>{maximum?.status === 'value' && !maximumNumeric ? <span className={styles.diagnostic}>Максимум должен быть числовым.</span> : maximum ? displayResolved(maximum, sample) : <span className={styles.placeholder}>Максимум недоступен</span>}</div> : null}</div>
+      <div className={styles.resourceValues}><div>{current?.status === 'value' && !currentNumeric ? <span className={styles.diagnostic}>Для ресурса нужна числовая характеристика.</span> : currentEditable && params.current && current?.status === 'value' ? renderValue!(params.current, current.label, displayResolved(current, sample)) : current ? displayResolved(current, sample) : <span className={styles.placeholder}>Выберите характеристику</span>}</div>
+        {params.maximum ? <><span className={styles.resourceSeparator} aria-hidden="true">/</span><div>{maximum?.status === 'value' && !maximumNumeric ? <span className={styles.diagnostic}>Максимум должен быть числовым.</span> : maximum ? displayResolved(maximum, sample) : <span className={styles.placeholder}>Максимум недоступен</span>}</div></> : null}</div>
       {params.showBar && hasValidMaximum && <div className={styles.progressTrack} role="img" aria-label={sample ? 'Образец соотношения текущего значения и максимума' : 'Соотношение текущего значения и максимума'}><span style={{ width: `${barWidth}%` }} /></div>}
     </div>;
   } else if (params?.type === 'stat-list') {

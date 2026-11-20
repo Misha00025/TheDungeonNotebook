@@ -52,7 +52,6 @@
   font-weight: 650;
 }
 
-.primaryValue,
 .resourceValues,
 .statRow {
   display: flex;
@@ -62,8 +61,6 @@
   min-width: 0;
 }
 
-.primaryValue > span:first-child,
-.resourceValues > div > span:first-child,
 .statRow > span:first-child {
   color: var(--text-secondary);
   overflow-wrap: anywhere;
@@ -74,6 +71,15 @@
   flex-direction: column;
   gap: .25rem;
   min-width: 0;
+}
+
+.resourceValues {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.resourceSeparator {
+  color: var(--text-secondary);
 }
 
 .progressTrack {
@@ -359,7 +365,6 @@
 }
 
 @media (max-width: 520px) {
-  .resourceValues,
   .statRow {
     align-items: flex-start;
     flex-direction: column;

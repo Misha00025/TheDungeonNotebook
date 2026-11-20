@@ -16,6 +16,7 @@ import {
   parseDraft,
   patchNodeParams,
   readLocalDraft,
+  readParams,
   readPages,
   removeTreeNode,
   stringifyDraft,
@@ -25,6 +26,7 @@ import {
   type LocalDraft,
   type LocalDraftScope,
   type PresentationNode,
+  type PresentationPage,
 } from './presentationModel';
 
 function object(value: JsonValue): Record<string, JsonValue> {

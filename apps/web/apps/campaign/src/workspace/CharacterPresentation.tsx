@@ -14,7 +14,7 @@ type Props = {
   pageKey: string;
   sheet: ComputedSheet;
   refreshKey?: number;
-  renderValue?: (reference: FieldReference, label: string) => React.ReactNode;
+  renderValue?: (reference: FieldReference, label: string, display?: React.ReactNode) => React.ReactNode;
   onVisibleFieldsChange?: (fieldIds: string[]) => void;
 };
 
