@@ -86,7 +86,7 @@ const Views: React.FC = () => {
     <h1>Отображения</h1>
     <div className={sectionStyles.sectionBody} aria-busy={initialLoading}>
     {Boolean(viewsResource.error) && <ApiError error={viewsResource.error} onRetry={viewsResource.reload} />}
-    {initialLoading && <div className={sectionStyles.loadingOverlay}><StatePanel kind="loading">{permissionsLoading ? 'Проверка прав и загрузка раздела…' : 'Загрузка отображений кампании…'}</StatePanel></div>}
+    {initialLoading && <StatePanel kind="loading">{permissionsLoading ? 'Проверка прав и загрузка раздела…' : 'Загрузка отображений кампании…'}</StatePanel>}
     <div className={styles.actions}>
       <Button type="button" disabled={!canWrite || creating || initialLoading} onClick={openCreate}>Создать отображение</Button>
       <Button variant="secondary" type="button" disabled={!canWrite || permissionsLoading || initialLoading} onClick={openPages}>Страницы кампании</Button>

@@ -368,7 +368,7 @@ describe('PresentationEditor inline actions and settings', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(onRootsChange).not.toHaveBeenCalled();
 
-    rerender(<PresentationRenderer roots={[root]} selectedKey="root" onSelect={vi.fn()} />);
+    rerender(<PresentationRenderer roots={[root]} />);
     expect(screen.queryByRole('group', { name: 'Действия компонента' })).not.toBeInTheDocument();
   });
 

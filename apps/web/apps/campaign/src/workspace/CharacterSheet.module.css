@@ -58,16 +58,6 @@
   min-width: 0;
 }
 
-.loadingOverlay {
-  position: absolute;
-  z-index: 5;
-  inset: 0;
-  display: grid;
-  align-content: start;
-  padding: 1rem;
-  background: color-mix(in srgb, var(--bg-primary) 84%, transparent);
-}
-
 .accessState,
 .recoveryTray,
 .pageConflict {

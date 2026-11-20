@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { isLosslessNumber } from 'lossless-json';
 import type { ComputedSheet, FieldReference, JsonValue } from './types';
 import { displayValue } from './json';
@@ -10,13 +10,12 @@ export type ResolvedField =
   | { status: 'missing'; reference: FieldReference; label: string; message: string; valueType?: string }
   | { status: 'diagnostic'; reference: FieldReference; label: string; message: string; valueType?: string };
 export type PresentationDropPlacement = 'before' | 'after' | 'inside';
+type DropMarker = (element: HTMLElement, placement: PresentationDropPlacement | null) => void;
 export type PresentationRendererProps = {
   roots: PresentationNode[];
   sheet?: ComputedSheet;
   sample?: boolean;
   renderValue?: (reference: FieldReference, label: string, display?: React.ReactNode) => React.ReactNode;
-  selectedKey?: string;
-  onSelect?: (nodeKey: string) => void;
   onDropNode?: (targetKey: string, placement: PresentationDropPlacement, event: React.DragEvent) => void;
   renderNodeActions?: (node: PresentationNode) => React.ReactNode;
 };
@@ -67,17 +66,27 @@ function valueForPart(part: FieldPart, sheet: ComputedSheet | undefined, sample:
   return { label: result.label, text: result.value === '' ? "''" : displayValue(result.value) };
 }
 
-const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; sample: boolean; renderValue?: PresentationRendererProps['renderValue']; selectedKey?: string; onSelect?: PresentationRendererProps['onSelect']; onDropNode?: PresentationRendererProps['onDropNode']; renderNodeActions?: PresentationRendererProps['renderNodeActions'] }> = ({ node, sheet, sample, renderValue, selectedKey, onSelect, onDropNode, renderNodeActions }) => {
-  const [dropActive, setDropActive] = useState(false);
-  const read = readParams(node.params);
+const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; sample: boolean; renderValue?: PresentationRendererProps['renderValue']; onDropNode?: PresentationRendererProps['onDropNode']; onDropMarker?: DropMarker; renderNodeActions?: PresentationRendererProps['renderNodeActions']; orientation?: 'row' | 'column' }> = React.memo(({ node, sheet, sample, renderValue, onDropNode, onDropMarker, renderNodeActions, orientation }) => {
+  const read = useMemo(() => readParams(node.params), [node.params]);
   const params = read.status === 'supported' ? read.params : undefined;
-  const select = (event: React.MouseEvent | React.KeyboardEvent) => { event.stopPropagation(); onSelect?.(node.nodeKey); };
-  const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); select(event); } };
-  const drop = (placement: PresentationDropPlacement) => <div className={`${styles.dropZone} ${placement === 'before' ? styles.dropBefore : placement === 'after' ? styles.dropAfter : styles.dropInside}`} onDragOver={event => { event.preventDefault(); event.stopPropagation(); }} onDrop={event => { event.preventDefault(); event.stopPropagation(); onDropNode?.(node.nodeKey, placement, event); setDropActive(false); }}>{placement === 'inside' ? 'Внутрь' : placement === 'before' ? 'Перед' : 'После'}</div>;
-  let body: React.ReactNode = null;
+  const placementAt = (element: HTMLElement, event: Pick<React.DragEvent, 'clientX' | 'clientY'>): PresentationDropPlacement => {
+    const rect = element.getBoundingClientRect();
+    const horizontal = orientation === 'row';
+    const ratio = horizontal ? (event.clientX - rect.left) / rect.width : (event.clientY - rect.top) / rect.height;
+    return params?.type === 'group' ? ratio < .25 ? 'before' : ratio > .75 ? 'after' : 'inside' : ratio < .5 ? 'before' : 'after';
+  };
+  const onDropOver = (event: React.DragEvent<HTMLElement>) => {
+    if (!onDropNode || !onDropMarker) return;
+    if (!Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) { onDropMarker(event.currentTarget, null); return; }
+    event.preventDefault();
+    event.stopPropagation();
+    onDropMarker(event.currentTarget, placementAt(event.currentTarget, event));
+  };
+  const body = useMemo(() => {
+  let content: React.ReactNode = null;
   if (params?.type === 'group') {
-    body = <div className={`${styles.children} ${params.direction === 'row' ? styles.rowChildren : styles.groupChildren}`} style={{ '--presentation-columns': String(params.columns), display: params.direction === 'row' ? 'flex' : 'grid', flexDirection: params.direction === 'row' ? 'row' : undefined, flexWrap: params.direction === 'row' ? 'wrap' : undefined, gap: params.gap === 'small' ? '.5rem' : params.gap === 'large' ? '1.5rem' : '1rem' } as React.CSSProperties}>
-      {node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} sample={sample} renderValue={renderValue} selectedKey={selectedKey} onSelect={onSelect} onDropNode={onDropNode} renderNodeActions={renderNodeActions} />)}
+    content = <div className={`${styles.children} ${params.direction === 'row' ? styles.rowChildren : styles.groupChildren}`} style={{ '--presentation-columns': String(params.columns), display: params.direction === 'row' ? 'flex' : 'grid', flexDirection: params.direction === 'row' ? 'row' : undefined, flexWrap: params.direction === 'row' ? 'wrap' : undefined, gap: params.gap === 'small' ? '.5rem' : params.gap === 'large' ? '1.5rem' : '1rem' } as React.CSSProperties}>
+      {node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} sample={sample} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={onDropMarker} renderNodeActions={renderNodeActions} orientation={params.direction} />)}
     </div>;
   } else if (params?.type === 'composite') {
     const primary = params.primary && params.primary.kind === 'Base' && params.parts.some(part => 'source' in part && part.source.kind === 'Base' && part.source.fieldId === params.primary?.fieldId) ? params.primary : null;
@@ -89,7 +98,7 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; sam
         return <span key={`source-${index}`} className={value.error ? styles.diagnostic : styles.compositeValue}>{value.text !== undefined ? <>{value.text}{sample && <span className={styles.sampleMark}>Образец</span>}</> : sample ? <span className={styles.placeholder}>Выберите характеристику</span> : value.error}</span>;
       });
     const formattedParts = <span className={styles.compositeParts}>{partsContent}</span>;
-    body = <div className={styles.composite}>
+    content = <div className={styles.composite}>
       {renderEditable && !sample && primary && primaryResult ? renderValue!(primary, primaryResult.label, formattedParts) : formattedParts}
     </div>;
   } else if (params?.type === 'resource') {
@@ -104,32 +113,84 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; sam
     const numericMaximum = maximumValue !== undefined && isNumeric(maximumValue) ? Number(String(maximumValue)) : undefined;
     const hasValidMaximum = currentNumeric && maximumNumeric && numericCurrent !== undefined && numericMaximum !== undefined && Number.isFinite(numericCurrent) && Number.isFinite(numericMaximum) && numericMaximum > 0;
     const barWidth = hasValidMaximum && numericCurrent !== undefined && numericMaximum !== undefined ? Math.max(0, Math.min(100, numericCurrent / numericMaximum * 100)) : undefined;
-    body = <div className={styles.resource}>
+    content = <div className={styles.resource}>
       <div className={styles.resourceValues}><div>{current?.status === 'value' && !currentNumeric ? <span className={styles.diagnostic}>Для ресурса нужна числовая характеристика.</span> : currentEditable && params.current && current?.status === 'value' ? renderValue!(params.current, current.label, displayResolved(current, sample)) : current ? displayResolved(current, sample) : <span className={styles.placeholder}>Выберите характеристику</span>}</div>
         {params.maximum ? <><span className={styles.resourceSeparator} aria-hidden="true">/</span><div>{maximum?.status === 'value' && !maximumNumeric ? <span className={styles.diagnostic}>Максимум должен быть числовым.</span> : maximum ? displayResolved(maximum, sample) : <span className={styles.placeholder}>Максимум недоступен</span>}</div></> : null}</div>
       {params.showBar && hasValidMaximum && <div className={styles.progressTrack} role="img" aria-label={sample ? 'Образец соотношения текущего значения и максимума' : 'Соотношение текущего значения и максимума'}><span style={{ width: `${barWidth}%` }} /></div>}
     </div>;
   } else if (params?.type === 'stat-list') {
-    body = <div className={styles.statList} style={{ '--presentation-columns': String(params.columns) } as React.CSSProperties}>{params.entries.map((entry, index) => {
+    content = <div className={styles.statList} style={{ '--presentation-columns': String(params.columns) } as React.CSSProperties}>{params.entries.map((entry, index) => {
       const field = resolveField(sheet, entry.source);
       const label = entry.label || field.label;
       return <div className={styles.statRow} key={`${entry.source.kind}:${entry.source.fieldId}:${index}`}><span>{label}</span>{!sample && entry.source.kind === 'Base' && field.status === 'value' && renderValue ? renderValue(entry.source, label, displayResolved(field, sample)) : displayResolved(field, sample)}</div>;
     })}{sample && params.entries.length === 0 && <span className={styles.placeholder}>Выберите характеристику</span>}</div>;
   }
+  return content;
+  }, [node.params, node.children, sheet, sample, renderValue, onDropNode, onDropMarker, renderNodeActions, read, params]);
   const groupAppearance = params?.type === 'group' && params.appearance === 'panel';
-  const nestedChildren = params?.type !== 'group' && node.children.length > 0 ? <div className={styles.children}>{node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} sample={sample} renderValue={renderValue} selectedKey={selectedKey} onSelect={onSelect} onDropNode={onDropNode} renderNodeActions={renderNodeActions} />)}</div> : null;
-  return <article className={`${styles.node} ${groupAppearance ? styles.panel : ''} ${selectedKey === node.nodeKey ? styles.selected : ''}`} data-drag-active={dropActive || undefined} tabIndex={onSelect ? 0 : undefined} draggable={Boolean(onDropNode)} aria-label={node.title || 'Компонент отображения'} onDragStart={event => { event.stopPropagation(); if (onDropNode) event.dataTransfer.setData('application/x-tdn-presentation', JSON.stringify({ kind: 'node', nodeKey: node.nodeKey })); }} onDragOver={onDropNode ? event => { event.preventDefault(); event.stopPropagation(); setDropActive(true); } : undefined} onDragLeave={onDropNode ? event => { event.stopPropagation(); if (!event.relatedTarget || !event.currentTarget.contains(event.relatedTarget as Node)) setDropActive(false); } : undefined} onClick={onSelect ? select : undefined} onKeyDown={onSelect ? onKeyDown : undefined}>
-    {Boolean(onDropNode) && <>{drop('before')}</>}
-      {selectedKey === node.nodeKey && renderNodeActions && <div className={styles.nodeControls} role="group" aria-label="Действия компонента" onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onPointerUp={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onDragStart={event => { event.preventDefault(); event.stopPropagation(); }} onDrag={event => event.stopPropagation()} onDragEnd={event => event.stopPropagation()} onDragEnter={event => event.stopPropagation()} onDragOver={event => event.stopPropagation()} onDragLeave={event => event.stopPropagation()} onDrop={event => event.stopPropagation()}>{renderNodeActions(node)}</div>}
+  const nestedChildren = params?.type !== 'group' && node.children.length > 0 ? <div className={styles.children}>{node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} sample={sample} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={onDropMarker} renderNodeActions={renderNodeActions} />)}</div> : null;
+  const handleDrop = (event: React.DragEvent<HTMLElement>) => {
+    event.stopPropagation();
+    const ownMime = Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation');
+    if (!onDropNode || !onDropMarker || !ownMime) { onDropMarker?.(event.currentTarget, null); return; }
+    event.preventDefault();
+    onDropNode(node.nodeKey, placementAt(event.currentTarget, event), event);
+    onDropMarker(event.currentTarget, null);
+  };
+  const handleDragLeave = (event: React.DragEvent<HTMLElement>) => {
+    event.stopPropagation();
+    const related = event.relatedTarget;
+    if (!(related instanceof Node) || !event.currentTarget.contains(related)) onDropMarker?.(event.currentTarget, null);
+  };
+  return <article className={`${styles.node} ${groupAppearance ? styles.panel : ''}`} data-drop-axis={orientation === 'row' ? 'x' : 'y'} tabIndex={renderNodeActions ? 0 : undefined} draggable={Boolean(onDropNode)} aria-label={node.title || 'Компонент отображения'} onDragStart={event => { event.stopPropagation(); if (onDropNode) event.dataTransfer.setData('application/x-tdn-presentation', JSON.stringify({ kind: 'node', nodeKey: node.nodeKey })); }} onDragOver={onDropOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+      {renderNodeActions && <div className={styles.nodeControls} role="group" aria-label="Действия компонента" onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onPointerUp={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onDragStart={event => { event.preventDefault(); event.stopPropagation(); }} onDragOver={event => event.stopPropagation()} onDragLeave={event => event.stopPropagation()} onDrop={event => { event.preventDefault(); event.stopPropagation(); const nodeElement = event.currentTarget.parentElement; if (nodeElement instanceof HTMLElement) onDropMarker?.(nodeElement, null); }} onDragEnd={event => event.stopPropagation()}>{renderNodeActions(node)}</div>}
       {node.title && <h3 className={styles.nodeTitle}>{node.title}</h3>}
       {read.status !== 'supported' ? <p className={styles.diagnostic} role="status">{read.message}</p> : <>{body}{nestedChildren}</>}
-    {read.status !== 'supported' && node.children.length > 0 && <div className={styles.children}>{node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} sample={sample} renderValue={renderValue} selectedKey={selectedKey} onSelect={onSelect} onDropNode={onDropNode} renderNodeActions={renderNodeActions} />)}</div>}
-    {Boolean(onDropNode) && <>{drop('after')}{params?.type === 'group' && drop('inside')}</>}
-  </article>;
-};
+      {read.status !== 'supported' && node.children.length > 0 && <div className={styles.children}>{node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} sample={sample} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={onDropMarker} renderNodeActions={renderNodeActions} />)}</div>}
+   </article>;
+});
 
-const PresentationRenderer: React.FC<PresentationRendererProps> = ({ roots, sheet, sample = false, renderValue, selectedKey, onSelect, onDropNode, renderNodeActions }) => <div className={styles.roots}>
-  {roots.map(node => <NodeContent key={node.nodeKey} node={node} sheet={sheet} sample={sample} renderValue={renderValue} selectedKey={selectedKey} onSelect={onSelect} onDropNode={onDropNode} renderNodeActions={renderNodeActions} />)}
-</div>;
+const PresentationRenderer: React.FC<PresentationRendererProps> = React.memo(({ roots, sheet, sample = false, renderValue, onDropNode, renderNodeActions }) => {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const activeTargetRef = useRef<HTMLElement | null>(null);
+  const markDrop = useCallback((element: HTMLElement, placement: PresentationDropPlacement | null) => {
+    if (placement === null) {
+      const active = activeTargetRef.current;
+      if (active && (active === element || element.contains(active))) {
+        active.removeAttribute('data-drop-placement');
+        activeTargetRef.current = null;
+      }
+      return;
+    }
+    if (activeTargetRef.current !== element) {
+      activeTargetRef.current?.removeAttribute('data-drop-placement');
+      activeTargetRef.current = element;
+    }
+    if (element.getAttribute('data-drop-placement') !== placement) element.setAttribute('data-drop-placement', placement);
+  }, []);
+  useEffect(() => {
+    if (!onDropNode) return;
+    const clear = () => { const active = activeTargetRef.current; if (active) markDrop(active, null); };
+    const handleDragOver = (event: DragEvent) => {
+      const target = event.target;
+      const inside = target instanceof Node && Boolean(rootRef.current?.contains(target));
+      const ownMime = Array.from(event.dataTransfer?.types ?? []).includes('application/x-tdn-presentation');
+      if (!inside || !ownMime) clear();
+    };
+    document.addEventListener('dragover', handleDragOver, true);
+    document.addEventListener('drop', clear, true);
+    document.addEventListener('dragend', clear, true);
+    return () => {
+      document.removeEventListener('dragover', handleDragOver, true);
+      document.removeEventListener('drop', clear, true);
+      document.removeEventListener('dragend', clear, true);
+      clear();
+    };
+  }, [onDropNode, markDrop]);
+  const marker = onDropNode ? markDrop : undefined;
+  return <div className={styles.roots} ref={rootRef}>
+    {roots.map(node => <NodeContent key={node.nodeKey} node={node} sheet={sheet} sample={sample} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={marker} renderNodeActions={renderNodeActions} />)}
+  </div>;
+});
 
 export default PresentationRenderer;

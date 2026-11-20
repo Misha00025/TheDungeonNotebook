@@ -166,12 +166,10 @@ const CampaignPagesEditor: React.FC<{ campaignId: number; sessionKey: string; ca
   };
   const patchPage = (key: string, patch: Partial<PresentationPage>) => setPages(current => current.map(page => page.key === key ? { ...page, ...patch } : page));
   const removePage = (key: string) => { setPages(current => current.filter(page => page.key !== key)); if (previewKey === key) setPreviewKey(''); setSaved(false); };
-  const loadingOverlay = <div className={styles.loadingOverlay}><StatePanel kind="loading">Загрузка настроек страниц…</StatePanel></div>;
-
   return <section className={styles.section} aria-label="Страницы кампании" aria-busy={loading}>
     <header className={styles.header}>{!embedded && <h2>Страницы кампании</h2>}<p>Страницы задают общие разделы кампании и назначают сохранённые отображения.</p></header>
     {Boolean(loadError) && <><ApiError error={loadError} /><Button variant="secondary" type="button" onClick={() => setLoadAttempt(value => value + 1)}>Повторить загрузку</Button></>}
-    {loading && loadingOverlay}
+    {!presentation && loading && <StatePanel kind="loading">Загрузка настроек страниц…</StatePanel>}
     {presentation ? <>
       <div className={styles.pageRows}>
         {pages.map((page, index) => <CampaignPageRow key={page.key} page={page} index={index} count={pages.length} views={views} disabled={!writable || saving || checking || blocked} onPatch={(key, patch) => { patchPage(key, patch); setSaved(false); }} onMove={(from, offset) => { setPages(current => reorder(current, from, offset)); setSaved(false); }} onRemove={removePage} />)}

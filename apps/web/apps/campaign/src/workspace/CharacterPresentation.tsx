@@ -49,7 +49,7 @@ const CharacterPresentation: React.FC<Props> = ({ campaignId, characterId, pageK
   useEffect(() => () => { onVisibleFieldsChange?.([]); }, [onVisibleFieldsChange]);
 
   return <section className={styles.section} aria-label="Страница персонажа" aria-busy={resolved.loading}>
-    {resolved.loading && <div className={styles.overlay}><StatePanel kind="loading">Загрузка страницы…</StatePanel></div>}
+    {resolved.loading && !resolved.data && <StatePanel kind="loading">Загрузка страницы…</StatePanel>}
     {Boolean(resolved.error) && <div className={styles.recovery}><ApiError error={resolved.error} /><Button variant="secondary" type="button" onClick={() => setRetry(value => value + 1)}>Повторить загрузку страницы</Button></div>}
     {rendererAvailable && resolved.data ? <>
       {resolved.data.viewContent.data.roots.length === 0 ? <div className={styles.emptyCanvas} aria-label="Пустое отображение" /> : <PresentationRenderer roots={roots} sheet={sheet} renderValue={renderValue} />}

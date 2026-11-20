@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { isLosslessNumber } from 'lossless-json';
 import type { ComputedSheet, FieldReference, JsonValue } from './types';
 import { stringifyJson } from './json';
-import { duplicateNode, findNode, insertNode, makeNode, moveNode, moveSibling, patchNodeParams, readParams, removeTreeNode, updateNode, type FieldPart, type PresentationNode, type PresentationType } from './presentationModel';
+import { duplicateNode, findNode, insertNode, makeNode, moveNode, patchNodeParams, readParams, removeTreeNode, updateNode, type FieldPart, type PresentationNode, type PresentationType } from './presentationModel';
 import PresentationRenderer, { type PresentationDropPlacement } from './PresentationRenderer';
 import styles from './Presentation.module.css';
 import IconButton from '@tdn/shared/ui/Buttons/IconButton/IconButton';
@@ -47,22 +47,33 @@ const eventPayload = (event: React.DragEvent): { kind: 'palette'; type: Presenta
   return null;
 };
 
-const PresentationEditor: React.FC<PresentationEditorProps> = ({ roots, onChange, sheet, choicesSheet, sample = false, disabled = false }) => {
-  const [selectedKey, setSelectedKey] = useState('');
+const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ roots, onChange, sheet, choicesSheet, sample = false, disabled = false }) => {
   const [preview, setPreview] = useState(false);
+  const rootDropRef = useRef<HTMLDivElement>(null);
   const [settingsDraft, setSettingsDraft] = useState<PresentationNode | null>(null);
   const settingsDraftRef = useRef<PresentationNode | null>(null);
-  const selected = selectedKey ? findNode(roots, selectedKey) : undefined;
-  const read = selected ? readParams(selected.params) : undefined;
-  const activeSettings = selected && settingsDraft?.nodeKey === selected.nodeKey ? settingsDraft : undefined;
+  const activeSettings = settingsDraft && findNode(roots, settingsDraft.nodeKey) ? settingsDraft : undefined;
   const settingsRead = activeSettings ? readParams(activeSettings.params) : undefined;
   useEffect(() => {
     const draft = settingsDraftRef.current;
-    if (draft && (preview || selectedKey !== draft.nodeKey || !findNode(roots, draft.nodeKey))) {
+    if (draft && (preview || !findNode(roots, draft.nodeKey))) {
       settingsDraftRef.current = null;
       setSettingsDraft(null);
     }
-  }, [preview, roots, selectedKey]);
+  }, [preview, roots]);
+  const latest = useRef({ roots, onChange, disabled, preview });
+  useLayoutEffect(() => { latest.current = { roots, onChange, disabled, preview }; });
+  useEffect(() => {
+    const clear = () => rootDropRef.current?.removeAttribute('data-active');
+    if (disabled || preview) { clear(); return; }
+    document.addEventListener('drop', clear, true);
+    document.addEventListener('dragend', clear, true);
+    return () => {
+      document.removeEventListener('drop', clear, true);
+      document.removeEventListener('dragend', clear, true);
+      clear();
+    };
+  }, [disabled, preview]);
   const choices = useMemo<FieldOption[]>(() => [
     ...(choicesSheet?.baseFields ?? sheet?.baseFields ?? []).map(field => ({ reference: { kind: 'Base' as const, fieldId: field.id }, value: `Base:${encodeURIComponent(field.id)}`, label: `${field.title || field.key} — характеристика`, numeric: field.valueType === 'Integer' || field.valueType === 'Number' })),
     ...(choicesSheet?.virtualFields ?? sheet?.virtualFields ?? []).map(field => ({ reference: { kind: 'Virtual' as const, fieldId: field.id }, value: `Virtual:${encodeURIComponent(field.id)}`, label: `${field.title || field.key} — вычисляемая`, numeric: true })),
@@ -77,21 +88,17 @@ const PresentationEditor: React.FC<PresentationEditorProps> = ({ roots, onChange
     settingsDraftRef.current = next;
     setSettingsDraft(next);
   };
-  const openSettings = (node: PresentationNode) => {
-    const current = findNode(roots, node.nodeKey);
-    if (!current) return;
-    settingsDraftRef.current = current;
-    setSettingsDraft(current);
-  };
-  const closeSettings = () => {
+  const closeSettings = useCallback(() => {
     const draft = settingsDraftRef.current;
     settingsDraftRef.current = null;
     setSettingsDraft(null);
-    if (!draft || disabled) return;
-    const current = findNode(roots, draft.nodeKey);
+    const latestState = latest.current;
+    if (!draft || latestState.disabled) return;
+    const current = findNode(latestState.roots, draft.nodeKey);
     if (!current || (draft.title === current.title && stringifyJson(draft.params) === stringifyJson(current.params))) return;
-    onChange(updateNode(roots, draft.nodeKey, node => ({ ...node, title: draft.title, params: draft.params })));
-  };
+    const next = updateNode(latestState.roots, draft.nodeKey, node => ({ ...node, title: draft.title, params: draft.params }));
+    if (next !== latestState.roots) latestState.onChange(next);
+  }, []);
   const patch = (changes: Record<string, JsonValue>) => {
     const current = settingsDraftRef.current;
     if (!current) return;
@@ -107,29 +114,35 @@ const PresentationEditor: React.FC<PresentationEditorProps> = ({ roots, onChange
     updateSettingsDraft(node => patchNodeParams(node, changes));
   };
   const patchTitle = (title: string) => updateSettingsDraft(node => ({ ...node, title }));
-  const add = (type: PresentationType, parentKey: string | null = null, index?: number) => {
+  const add = useCallback((type: PresentationType, parentKey: string | null = null, index?: number) => {
+    const current = latest.current;
+    if (current.disabled || current.preview) return;
     const node = makeNode(type);
-    onChange(insertNode(roots, node, parentKey, index)); setSelectedKey(node.nodeKey); settingsDraftRef.current = null; setSettingsDraft(null); setPreview(false);
-  };
-  const moveDrop = (targetKey: string | null, placement: PresentationDropPlacement | 'root', event: React.DragEvent) => {
-    if (disabled || preview) return;
+    const next = insertNode(current.roots, node, parentKey, index);
+    if (next !== current.roots) current.onChange(next);
+    settingsDraftRef.current = null; setSettingsDraft(null); setPreview(false);
+  }, []);
+  const moveDrop = useCallback((targetKey: string | null, placement: PresentationDropPlacement | 'root', event: React.DragEvent) => {
+    const current = latest.current;
+    if (current.disabled || current.preview) return;
+    if (!Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) return;
     event.preventDefault();
     const source = eventPayload(event);
     if (!source) return;
-    const targetPosition = targetKey ? locate(roots, targetKey) : undefined;
+    const targetPosition = targetKey ? locate(current.roots, targetKey) : undefined;
     const parentKey = placement === 'root' ? null : placement === 'inside' ? targetKey : targetPosition?.parentKey ?? null;
-    const index = placement === 'root' ? roots.length : placement === 'inside' ? (findNode(roots, targetKey!)?.children.length ?? 0) : targetPosition ? targetPosition.index + (placement === 'after' ? 1 : 0) : roots.length;
+    const index = placement === 'root' ? current.roots.length : placement === 'inside' ? (findNode(current.roots, targetKey!)?.children.length ?? 0) : targetPosition ? targetPosition.index + (placement === 'after' ? 1 : 0) : current.roots.length;
     if (source.kind === 'palette') add(source.type, parentKey, index);
     else {
-      const next = moveNode(roots, source.nodeKey, parentKey, index);
-      if (next !== roots) { onChange(next); settingsDraftRef.current = null; setSettingsDraft(null); setSelectedKey(source.nodeKey); }
+      const next = moveNode(current.roots, source.nodeKey, parentKey, index);
+      if (next !== current.roots) { current.onChange(next); settingsDraftRef.current = null; setSettingsDraft(null); }
     }
-  };
-  const handleRootDrop = (event: React.DragEvent) => {
+  }, [add]);
+  const handleRootDrop = useCallback((event: React.DragEvent) => {
     event.stopPropagation();
-    if (event.defaultPrevented || disabled || preview) return;
+    if (event.defaultPrevented || latest.current.disabled || latest.current.preview) return;
     moveDrop(null, 'root', event);
-  };
+  }, [moveDrop]);
   const configureAs = (type: PresentationType) => {
     const current = settingsDraftRef.current;
     if (!current || disabled || !window.confirm(`Настроить компонент как «${palette.find(item => item.type === type)?.label}»? Неизвестные параметры и исходные данные сохранятся.`)) return;
@@ -140,23 +153,33 @@ const PresentationEditor: React.FC<PresentationEditorProps> = ({ roots, onChange
     const unknown = Object.fromEntries(Object.entries(source).filter(([key]) => !reserved.has(key)));
     updateSettingsDraft(node => ({ ...node, params: { ...unknown, ...defaults } }));
   };
-  const onDropNode = (targetKey: string, placement: PresentationDropPlacement, event: React.DragEvent) => moveDrop(targetKey, placement, event);
-  const removeNode = (nodeKey: string) => {
-    const node = findNode(roots, nodeKey);
-    if (!node || (node.children.length && !window.confirm('Удалить группу вместе со всеми вложенными компонентами?'))) return;
-    const position = locate(roots, nodeKey);
-    onChange(removeTreeNode(roots, nodeKey)); setSelectedKey(position?.siblings[position.index - 1]?.nodeKey ?? position?.siblings[position.index + 1]?.nodeKey ?? position?.parentKey ?? '');
-  };
-  const renderNodeActions = (node: PresentationNode) => {
-    const position = locate(roots, node.nodeKey);
+  const onDropNode = useCallback((targetKey: string, placement: PresentationDropPlacement, event: React.DragEvent) => moveDrop(targetKey, placement, event), [moveDrop]);
+  const handleAction = useCallback((nodeKey: string, action: 'duplicate' | 'delete' | 'more') => {
+    const current = latest.current;
+    if (current.preview) return;
+    const node = findNode(current.roots, nodeKey);
+    if (!node) return;
+    if (action === 'more') {
+      settingsDraftRef.current = node;
+      setSettingsDraft(node);
+      return;
+    }
+    if (current.disabled) return;
+    let next = current.roots;
+    if (action === 'duplicate') next = duplicateNode(current.roots, nodeKey);
+    if (action === 'delete') {
+      if (node.children.length && !window.confirm('Удалить группу вместе со всеми вложенными компонентами?')) return;
+      next = removeTreeNode(current.roots, nodeKey);
+    }
+    if (next !== current.roots) current.onChange(next);
+  }, []);
+  const renderNodeActions = useCallback((node: PresentationNode) => {
     return <>
-      <IconButton icon="arrow-up" title="Переместить выше" ariaLabel="Переместить выше" size="small" variant="secondary" disabled={disabled || !position || position.index === 0} onClick={() => { const sibling = position?.siblings[position.index - 1]; if (sibling) onChange(moveSibling(roots, node.nodeKey, 'before', sibling.nodeKey)); }} />
-      <IconButton icon="arrow-down" title="Переместить ниже" ariaLabel="Переместить ниже" size="small" variant="secondary" disabled={disabled || !position || position.index >= position.siblings.length - 1} onClick={() => { const sibling = position?.siblings[position.index + 1]; if (sibling) onChange(moveSibling(roots, node.nodeKey, 'after', sibling.nodeKey)); }} />
-      <IconButton icon="copy" title="Дублировать" ariaLabel="Дублировать" size="small" variant="secondary" disabled={disabled} onClick={() => onChange(duplicateNode(roots, node.nodeKey))} />
-      <IconButton icon="delete" title="Удалить" ariaLabel="Удалить" size="small" variant="danger" disabled={disabled} onClick={() => removeNode(node.nodeKey)} />
-      <IconButton icon="more" title="Настройки компонента" ariaLabel="Настройки компонента" size="small" variant="secondary" onClick={() => openSettings(node)} />
+       <IconButton icon="copy" title="Дублировать" ariaLabel="Дублировать" size="small" variant="secondary" disabled={disabled} onClick={() => handleAction(node.nodeKey, 'duplicate')} />
+       <IconButton icon="delete" title="Удалить" ariaLabel="Удалить" size="small" variant="danger" disabled={disabled} onClick={() => handleAction(node.nodeKey, 'delete')} />
+       <IconButton icon="more" title="Настройки компонента" ariaLabel="Настройки компонента" size="small" variant="secondary" onClick={() => handleAction(node.nodeKey, 'more')} />
     </>;
-  };
+  }, [disabled, handleAction]);
   const newPart = (kind: 'text' | 'source'): FieldPart => kind === 'text' ? { text: '' } : { source: asJsonReference(choices[0]?.reference ?? { kind: 'Base', fieldId: '' }) };
   const updateParts = (parts: FieldPart[]) => {
     const currentRead = settingsDraftRef.current ? readParams(settingsDraftRef.current.params) : undefined;
@@ -176,13 +199,13 @@ const PresentationEditor: React.FC<PresentationEditorProps> = ({ roots, onChange
     <header className={styles.editorHeader}><h2>Конструктор отображения</h2><button type="button" disabled={disabled} onClick={() => { setPreview(value => !value); settingsDraftRef.current = null; setSettingsDraft(null); }}>{preview ? 'Редактировать' : 'Предпросмотр'}</button></header>
     {!preview && <div className={styles.palette} role="group" aria-label="Компоненты">
       <h3>Компоненты</h3>
-      {palette.map(item => <button key={item.type} type="button" draggable={!disabled} disabled={disabled} onClick={() => add(item.type, selected && read?.status === 'supported' && read.type === 'group' ? selected.nodeKey : null)} onDragStart={event => event.dataTransfer.setData('application/x-tdn-presentation', JSON.stringify({ kind: 'palette', type: item.type }))}>{item.label}</button>)}
+          {palette.map(item => <button key={item.type} type="button" draggable={!disabled} disabled={disabled} onClick={() => add(item.type)} onDragStart={event => event.dataTransfer.setData('application/x-tdn-presentation', JSON.stringify({ kind: 'palette', type: item.type }))}>{item.label}</button>)}
     </div>}
     <div className={`${styles.editorLayout} ${preview ? styles.previewLayout : ''}`}>
       <main className={styles.canvasColumn}>
-        <div className={`${styles.canvas} ${roots.length === 0 ? styles.emptyCanvas : ''}`} onDragOver={!preview && !disabled ? event => { if (!event.defaultPrevented) event.preventDefault(); } : undefined} onDrop={!preview && !disabled ? handleRootDrop : undefined}>
-          {roots.length === 0 && preview ? <p className={styles.emptyPreview}>Холст пуст</p> : roots.length === 0 ? <div className={styles.emptyState}><p>Холст пока пуст</p><button type="button" disabled={disabled} onClick={() => add('group')}>Добавьте первый компонент</button></div> : <PresentationRenderer roots={roots} sheet={sheet} sample={sample} selectedKey={!preview ? selectedKey : undefined} onSelect={!preview ? key => { if (key !== selectedKey) { settingsDraftRef.current = null; setSettingsDraft(null); } setSelectedKey(key); } : undefined} onDropNode={!preview && !disabled ? onDropNode : undefined} renderNodeActions={!preview ? renderNodeActions : undefined} />}
-          {roots.length > 0 && !preview && <div className={styles.rootDrop} onDragOver={event => { if (!disabled && !event.defaultPrevented) event.preventDefault(); }} onDrop={handleRootDrop}>Переместить в корень</div>}
+        <div className={`${styles.canvas} ${roots.length === 0 ? styles.emptyCanvas : ''}`} onDragOver={!preview && !disabled ? event => { if (!event.defaultPrevented && Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) event.preventDefault(); } : undefined} onDrop={!preview && !disabled ? handleRootDrop : undefined}>
+          {roots.length === 0 && preview ? <p className={styles.emptyPreview}>Холст пуст</p> : roots.length === 0 ? <div className={styles.emptyState}><p>Холст пока пуст</p><button type="button" disabled={disabled} onClick={() => add('group')}>Добавьте первый компонент</button></div> : <PresentationRenderer roots={roots} sheet={sheet} sample={sample} onDropNode={!preview && !disabled ? onDropNode : undefined} renderNodeActions={!preview ? renderNodeActions : undefined} />}
+          {roots.length > 0 && !preview && <div ref={rootDropRef} className={styles.rootDrop} aria-label="Добавить в конец холста" onDragEnter={event => { if (!disabled && !latest.current.preview && Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) event.currentTarget.setAttribute('data-active', 'true'); }} onDragOver={event => { if (!disabled && !event.defaultPrevented && Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) event.preventDefault(); }} onDragLeave={event => event.currentTarget.removeAttribute('data-active')} onDrop={event => { event.currentTarget.removeAttribute('data-active'); handleRootDrop(event); }} />}
         </div>
       </main>
       <ModalPortal isOpen={!preview && Boolean(activeSettings)} title="Настройки компонента" size="wide" onClose={closeSettings}>
@@ -217,6 +240,6 @@ const PresentationEditor: React.FC<PresentationEditorProps> = ({ roots, onChange
       </ModalPortal>
     </div>
   </section>;
-};
+});
 
 export default PresentationEditor;

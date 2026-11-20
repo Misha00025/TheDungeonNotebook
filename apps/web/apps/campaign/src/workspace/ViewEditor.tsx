@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ActionRow, Button, Field, Input, Notification, Select, StatePanel } from '@tdn/shared';
 import type { NotificationKind } from '@tdn/shared';
 import type { ComputedSheet, JsonValue, Revision, TemplateContentEnvelope, ViewContentEnvelope, ViewMetadata, VirtualFieldsEnvelope } from './types';
@@ -37,7 +37,6 @@ function sampleSheet(template: TemplateContentEnvelope, virtuals: VirtualFieldsE
 function SectionLoading({ loading, children }: React.PropsWithChildren<{ loading: boolean }>) {
   return <div className={styles.sectionBody} aria-busy={loading}>
     {children}
-    {loading && <div className={styles.loadingOverlay}><StatePanel kind="loading">Загрузка раздела…</StatePanel></div>}
   </div>;
 }
 
@@ -94,7 +93,7 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
   const scope = useMemo<LocalDraftScope>(() => ({ account: sessionKey, campaign: String(campaignId), view: viewId, schemaVersion: 1 }), [sessionKey, campaignId, viewId]);
   const writable = canWrite && !forbidden;
   const metadataDirty = name !== baselineName;
-  const contentDirty = !sameRoots(roots, baselineRoots);
+  const contentDirty = useMemo(() => !sameRoots(roots, baselineRoots), [roots, baselineRoots]);
   const contentSaveNeeded = contentDirty || legacyConversion;
   const canSaveMetadata = metadataDirty && !metadataBlocked && Boolean(name.trim());
   const canSaveContent = contentSaveNeeded && !contentBlocked;
@@ -275,11 +274,13 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
     api.listCharacters(campaignId).then(items => { if (mounted.current && characterListGeneration.current === generation && scopeRef.current === requestScope) setCharacters(items.map(item => ({ id: item.id, name: item.name }))); }, failure => { if (mounted.current && characterListGeneration.current === generation && scopeRef.current === requestScope) setCharactersError(failure); }).finally(() => { if (characterListGeneration.current === generation && scopeRef.current === requestScope) characterListLock.current = false; });
   };
   const effectiveSheet = characterId ? characterSheet : templateSheet;
+  const handleRootsChange = useCallback((next: PresentationNode[]) => { setRoots(next); setContentSaved(false); }, []);
   const loadErrorAction = <Button variant="secondary" type="button" onClick={() => setAttempt(value => value + 1)}>Повторить загрузку</Button>;
 
   return <section className={styles.section} aria-label="Редактор отображения">
     <SectionLoading loading={loading}>
       {Boolean(loadError) && <><ApiError error={loadError} /><div className={styles.recovery}>{loadErrorAction}</div></>}
+      {!snapshot && loading && <StatePanel kind="loading">Загрузка раздела…</StatePanel>}
       {snapshot ? <>
         {snapshot.legacy && <Notification kind="info" eventKey={`legacy:${viewId}`}>Старый формат виджета будет переведён в текущий при явном сохранении. Исходные настройки сохранены в модели отображения.</Notification>}
         {draftOffer?.status === 'available' && <div className={styles.draftOffer}><p>Найден локальный черновик.</p><ActionRow><Button type="button" disabled={saving} onClick={restoreLocal}>Восстановить локальный черновик</Button><Button variant="secondary" type="button" disabled={saving} onClick={deleteLocal}>Удалить локальный черновик</Button></ActionRow></div>}
@@ -294,8 +295,7 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
            {Boolean(charactersError) && <><ApiError error={charactersError} onRetry={retryCharacters} /><Button variant="secondary" type="button" onClick={retryCharacters}>Повторить загрузку персонажей</Button></>}
         </div>}
         {templateSheet ? <div className={styles.previewCanvasSection} aria-busy={previewLoading}>
-          <PresentationEditor roots={roots} onChange={next => { setRoots(next); setContentSaved(false); }} sheet={effectiveSheet} choicesSheet={templateSheet} sample={!characterId} disabled={!writable || saving} />
-          {previewLoading && <div className={styles.previewOverlay}><StatePanel kind="loading">Загрузка данных выбранного персонажа…</StatePanel></div>}
+          <PresentationEditor roots={roots} onChange={handleRootsChange} sheet={effectiveSheet} choicesSheet={templateSheet} sample={!characterId} disabled={!writable || saving} />
         </div> : null}
         {Boolean(metadataError) && <ApiError error={metadataError} onRetry={!metadataBlocked ? () => void save() : undefined} />}{Boolean(contentError) && <ApiError error={contentError} onRetry={!contentBlocked ? () => void save() : undefined} />}{Boolean(verifyError) && <ApiError error={verifyError} onRetry={() => void verifySave()} />}
         {(metadataBlocked || contentBlocked) && <div className={styles.conflictPanel}>

@@ -31,10 +31,6 @@
   border-color: var(--border-color);
 }
 
-.selected {
-  box-shadow: inset 0 0 0 2px var(--accent-color);
-}
-
 .composite,
 .resource {
   display: grid;
@@ -123,53 +119,55 @@
   font-weight: 400;
 }
 
-.dropZone {
+.node[data-drop-placement='before']::before,
+.node[data-drop-placement='after']::before,
+.node[data-drop-placement='inside']::after {
   position: absolute;
   z-index: 2;
-  display: grid;
-  place-items: center;
-  padding: .25rem;
-  border: 1px dashed var(--accent-color);
-  border-radius: var(--border-radius-sm);
-  background: color-mix(in srgb, var(--accent-color) 12%, var(--bg-primary));
-  color: var(--text-primary);
-  font-size: .75rem;
-  text-align: center;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity .12s ease;
 }
 
-.node[data-drag-active='true'] > .dropZone {
-  opacity: .92;
-  pointer-events: auto;
+.node[data-drop-placement='before']::before,
+.node[data-drop-placement='after']::before {
+  right: .25rem;
+  left: .25rem;
+  height: 2px;
+  background: var(--accent-color);
+  content: '';
 }
 
-.dropZone:hover {
-  background: color-mix(in srgb, var(--accent-color) 22%, var(--bg-primary));
-  border-style: solid;
+.node[data-drop-axis='x'][data-drop-placement='before']::before,
+.node[data-drop-axis='x'][data-drop-placement='after']::before {
+  top: .25rem;
+  bottom: .25rem;
+  width: 2px;
+  height: auto;
 }
 
-.dropBefore {
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 30%;
+.node[data-drop-axis='x'][data-drop-placement='before']::before {
+  right: auto;
+  left: -.1rem;
 }
 
-.dropAfter {
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 30%;
+.node[data-drop-axis='x'][data-drop-placement='after']::before {
+  right: -.1rem;
+  left: auto;
 }
 
-.dropInside {
-  top: 30%;
-  right: 0;
-  bottom: 30%;
-  left: 0;
-  border-style: solid;
+.node[data-drop-placement='before']::before {
+  top: -.1rem;
+}
+
+.node[data-drop-placement='after']::before {
+  bottom: -.1rem;
+}
+
+.node[data-drop-placement='inside']::after {
+  inset: .15rem;
+  border: 2px solid var(--accent-color);
+  border-radius: var(--border-radius-md);
+  background: color-mix(in srgb, var(--accent-color) 9%, transparent);
+  content: '';
 }
 
 .editor {
@@ -279,6 +277,19 @@
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-sm);
   background: var(--bg-primary);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.node:hover:not(:has(.node:hover)) > .nodeControls,
+.node:focus-within:not(:has(.node :focus)) > .nodeControls {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.nodeControls:focus-within {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .emptyCanvas {
@@ -301,11 +312,26 @@
 }
 
 .rootDrop {
-  padding: .5rem;
-  border: 1px dashed var(--border-color);
-  border-radius: var(--border-radius-sm);
-  color: var(--text-secondary);
-  text-align: center;
+  position: relative;
+  min-height: 1rem;
+  pointer-events: auto;
+}
+
+.rootDrop[data-active='true']::before {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: var(--accent-color);
+  content: '';
+}
+
+@media (hover: none) {
+  .nodeControls {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .properties label,

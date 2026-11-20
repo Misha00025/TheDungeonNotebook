@@ -244,13 +244,6 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
     observedInvalidationRef.current = invalidation;
     void refreshAll();
   }, [invalidation, refreshAll]);
-  useEffect(() => {
-    const refreshWhenVisible = () => { if (document.visibilityState === 'visible') void refreshAll(); };
-    window.addEventListener('focus', refreshWhenVisible);
-    document.addEventListener('visibilitychange', refreshWhenVisible);
-    return () => { window.removeEventListener('focus', refreshWhenVisible); document.removeEventListener('visibilitychange', refreshWhenVisible); };
-  }, [refreshAll]);
-
   const metadataMutation = useMutation(async (draft: MetadataDraft) => {
     if (metadataBusyRef.current || snapshotBusyRef.current || metadataBlocked || !canWrite) return undefined;
     metadataBusyRef.current = true;
@@ -519,7 +512,7 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
 
   if (!metadata || !sheet) {
     return <section className={characterStyles.sheetSection} aria-busy={!metadataResource.error && !sheetResource.error}>
-      {(metadataResource.error || sheetResource.error) ? <ApiError error={metadataResource.error ?? sheetResource.error} onRetry={retryInitialLoad} /> : <div className={characterStyles.loadingOverlay}><StatePanel kind="loading">Загрузка листа персонажа…</StatePanel></div>}
+      {(metadataResource.error || sheetResource.error) ? <ApiError error={metadataResource.error ?? sheetResource.error} onRetry={retryInitialLoad} /> : <StatePanel kind="loading">Загрузка листа персонажа…</StatePanel>}
     </section>;
   }
   const ensureMetadataDraft = () => setMetadataDraft(current => current ?? { name: metadata.name, importance: metadata.importance });
@@ -542,7 +535,6 @@ const CharacterSheet: React.FC<{ campaignId: number; characterId: string; pageKe
   const visiblePage = Boolean(displayedPageKey && pages.some(page => page.key === displayedPageKey));
   const shellBusy = presentationPending || snapshotBusy || (permissionResource.loading && !permissionSnapshot);
   return <section className={characterStyles.sheetSection} aria-busy={shellBusy}>
-    {shellBusy && <div className={characterStyles.loadingOverlay}><StatePanel kind="loading">Обновляем лист персонажа…</StatePanel></div>}
     {!readAllowed ? <div className={characterStyles.accessState}>
       {Boolean(permissionError || snapshotError) ? <><ApiError error={permissionError ?? snapshotError} onRetry={() => void refreshAll()} /><Button variant="secondary" type="button" onClick={() => void refreshAll()}>Проверить доступ и данные</Button></> : <Notification kind="warning" eventKey={`${scope}:permission`}>Доступ к актуальным данным персонажа не подтверждён.</Notification>}
       {Boolean(writeError) && <ApiError error={writeError} onRetry={() => void refreshAll()} />}{Boolean(metadataError) && <ApiError error={metadataError} onRetry={() => void refreshAll()} />}

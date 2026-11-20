@@ -100,7 +100,21 @@ export const findNode = (roots: PresentationNode[], nodeKey: string): Presentati
   for (const node of roots) { if (node.nodeKey === nodeKey) return node; const found = findNode(node.children, nodeKey); if (found) return found; }
   return undefined;
 };
-export const updateNode = (roots: PresentationNode[], nodeKey: string, update: (node: PresentationNode) => PresentationNode): PresentationNode[] => roots.map(node => node.nodeKey === nodeKey ? update(node) : { ...node, children: updateNode(node.children, nodeKey, update) });
+export const updateNode = (roots: PresentationNode[], nodeKey: string, update: (node: PresentationNode) => PresentationNode): PresentationNode[] => {
+  let changed = false;
+  const next = roots.map(node => {
+    if (node.nodeKey === nodeKey) {
+      const updated = update(node);
+      changed ||= updated !== node;
+      return updated;
+    }
+    const children = updateNode(node.children, nodeKey, update);
+    if (children === node.children) return node;
+    changed = true;
+    return { ...node, children };
+  });
+  return changed ? next : roots;
+};
 export type NodePosition = { parentKey: string | null; index: number };
 const locate = (roots: PresentationNode[], key: string, parentKey: string | null = null): NodePosition | undefined => {
   for (let index = 0; index < roots.length; index++) { if (roots[index].nodeKey === key) return { parentKey, index }; const found = locate(roots[index].children, key, roots[index].nodeKey); if (found) return found; }
@@ -110,7 +124,9 @@ const removeNode = (roots: PresentationNode[], key: string): { roots: Presentati
   const found = roots.find(node => node.nodeKey === key);
   if (found) return { roots: roots.filter(node => node.nodeKey !== key), node: found };
   let removed: PresentationNode | undefined;
-  return { roots: roots.map(node => { const result = removeNode(node.children, key); removed ??= result.node; return result.node ? { ...node, children: result.roots } : node; }), get node() { return removed; } };
+  let changed = false;
+  const next = roots.map(node => { const result = removeNode(node.children, key); removed ??= result.node; if (!result.node) return node; changed = true; return { ...node, children: result.roots }; });
+  return { roots: changed ? next : roots, get node() { return removed; } };
 };
 export const insertNode = (roots: PresentationNode[], node: PresentationNode, parentKey: string | null = null, index?: number): PresentationNode[] => {
   if (parentKey === null) { const next = [...roots]; next.splice(Math.max(0, Math.min(index ?? next.length, next.length)), 0, node); return next; }
@@ -133,9 +149,12 @@ export const moveNode = (roots: PresentationNode[], nodeKey: string, parentKey: 
     if (parentParams.status !== 'supported' || parentParams.type !== 'group') return roots;
   }
   const old = locate(roots, nodeKey)!;
-  let next = removeTreeNode(roots, nodeKey);
   let targetIndex = index;
   if (old.parentKey === parentKey && old.index < index) targetIndex--;
+  const targetSiblings = parentKey === null ? roots : findNode(roots, parentKey)!.children;
+  const effectiveIndex = Math.max(0, Math.min(targetIndex, targetSiblings.length - (old.parentKey === parentKey ? 1 : 0)));
+  if (old.parentKey === parentKey && effectiveIndex === old.index) return roots;
+  let next = removeTreeNode(roots, nodeKey);
   return insertNode(next, node, parentKey, targetIndex);
 };
 export const moveSibling = (roots: PresentationNode[], nodeKey: string, direction: 'before' | 'after', siblingKey: string): PresentationNode[] => {

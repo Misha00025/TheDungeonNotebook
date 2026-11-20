@@ -12,16 +12,6 @@
   min-width: 0;
 }
 
-.loadingOverlay {
-  position: absolute;
-  z-index: 5;
-  inset: 0;
-  display: grid;
-  align-content: start;
-  padding: 1rem;
-  background: color-mix(in srgb, var(--bg-primary) 82%, transparent);
-}
-
 .header {
   display: grid;
   gap: .35rem;
@@ -60,17 +50,6 @@
   position: relative;
   min-height: 20rem;
   min-width: 0;
-}
-
-.previewOverlay {
-  position: absolute;
-  z-index: 4;
-  inset: 0;
-  display: grid;
-  align-content: start;
-  padding: 1rem;
-  background: color-mix(in srgb, var(--bg-primary) 38%, transparent);
-  pointer-events: none;
 }
 
 .draftOffer,
