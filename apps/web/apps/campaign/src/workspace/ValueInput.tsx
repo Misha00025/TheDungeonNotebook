@@ -44,12 +44,13 @@ export function validateFieldValue(field: Field, value: JsonValue, raw?: string)
   }
 }
 
-export const ValueInput: React.FC<{ field: Field; value: JsonValue; onChange: (value: JsonValue) => void; onValidityChange?: (error: string | undefined) => void; disabled?: boolean; label?: string; compact?: boolean }> = ({ field, value, onChange, onValidityChange, disabled = false, label, compact = false }) => {
+export const ValueInput: React.FC<{ field: Field; value: JsonValue; onChange: (value: JsonValue) => void; onValidityChange?: (error: string | undefined) => void; disabled?: boolean; label?: string; compact?: boolean; controlledNumericDraft?: string; onRawChange?: (raw: string) => void }> = ({ field, value, onChange, onValidityChange, disabled = false, label, compact = false, controlledNumericDraft, onRawChange }) => {
   const numeric = field.valueType === 'Integer' || field.valueType === 'Number';
-  const [draft, setDraft] = useState(() => numeric ? rawNumber(value) : '');
+  const [localDraft, setLocalDraft] = useState(() => numeric ? rawNumber(value) : '');
+  const draft = controlledNumericDraft ?? localDraft;
   const validityCallback = useRef(onValidityChange);
   validityCallback.current = onValidityChange;
-  useEffect(() => { if (numeric) setDraft(rawNumber(value)); }, [numeric, value]);
+  useEffect(() => { if (numeric && controlledNumericDraft === undefined) setLocalDraft(rawNumber(value)); }, [numeric, value, controlledNumericDraft]);
   const error = validateFieldValue(field, value, numeric ? draft : undefined);
   useEffect(() => { validityCallback.current?.(error); }, [error]);
   if (disabled) return <output aria-label={label}>{displayValue(value)}</output>;
@@ -60,5 +61,5 @@ export const ValueInput: React.FC<{ field: Field; value: JsonValue; onChange: (v
     const selected = Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
     return <fieldset aria-label={label}>{field.options.map(option => <label key={option.optionKey}><input type="checkbox" checked={selected.includes(option.optionKey)} onChange={event => onChange(event.target.checked ? [...new Set([...selected, option.optionKey])] : selected.filter(item => item !== option.optionKey))} />{option.title}</label>)}</fieldset>;
   }
-  return <div><Input aria-label={label} inputMode="decimal" value={draft} onChange={event => { const next = event.target.value; setDraft(next); try { const parsed = parseFieldValue(field, next); const issue = validateFieldValue(field, parsed, next); validityCallback.current?.(issue); if (!issue) onChange(parsed); } catch { validityCallback.current?.(field.valueType === 'Integer' ? 'Введите целое число.' : 'Введите конечное число.'); } }} />{error && <span role="alert">{error}</span>}</div>;
+  return <div><Input aria-label={label} inputMode="decimal" value={draft} onChange={event => { const next = event.target.value; if (controlledNumericDraft === undefined) setLocalDraft(next); onRawChange?.(next); try { const parsed = parseFieldValue(field, next); const issue = validateFieldValue(field, parsed, next); validityCallback.current?.(issue); if (!issue) onChange(parsed); } catch { validityCallback.current?.(field.valueType === 'Integer' ? 'Введите целое число.' : 'Введите конечное число.'); } }} />{error && <span role="alert">{error}</span>}</div>;
 };

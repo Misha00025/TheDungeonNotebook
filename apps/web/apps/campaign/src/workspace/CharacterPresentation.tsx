@@ -1,41 +1,60 @@
-import React, { useId, useState } from 'react';
-import { Button, Field, List, Notification, Select, StatePanel } from '@tdn/shared';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Button, StatePanel } from '@tdn/shared';
+import type { ComputedSheet, FieldReference, ResolvedPresentation } from './types';
 import { useWorkspace } from './Workspace';
-import { CampaignApiError } from './api';
 import { useResource } from './hooks';
+import { readParams, normalizeRoots, type PresentationNode } from './presentationModel';
+import PresentationRenderer from './PresentationRenderer';
 import { ApiError } from './Feedback';
-import ViewRenderer from './ViewRenderer';
+import styles from './CharacterPresentation.module.css';
 
-type Props = { campaignId: number; characterId: string; refreshKey?: number };
+type Props = {
+  campaignId: number;
+  characterId: string;
+  pageKey: string;
+  sheet: ComputedSheet;
+  refreshKey?: number;
+  renderValue?: (reference: FieldReference, label: string) => React.ReactNode;
+  onVisibleFieldsChange?: (fieldIds: string[]) => void;
+};
 
-const CharacterPresentation: React.FC<Props> = ({ campaignId, characterId, refreshKey = 0 }) => {
+function editableBaseFields(roots: PresentationNode[], sheet: ComputedSheet): string[] {
+  const ids = new Set<string>();
+  const known = new Set(sheet.baseFields.map(field => field.id));
+  const visit = (nodes: PresentationNode[]) => nodes.forEach(node => {
+    const result = readParams(node.params);
+    if (result.status === 'supported') {
+      if (result.type === 'composite') {
+        const primary = result.params.primary;
+        if (primary?.kind === 'Base' && result.params.parts.some(part => 'source' in part && part.source.kind === 'Base' && part.source.fieldId === primary.fieldId) && known.has(primary.fieldId)) ids.add(primary.fieldId);
+      }
+      if (result.type === 'resource' && result.params.current?.kind === 'Base' && known.has(result.params.current.fieldId)) ids.add(result.params.current.fieldId);
+      if (result.type === 'stat-list') result.params.entries.forEach(entry => { if (entry.source.kind === 'Base' && known.has(entry.source.fieldId)) ids.add(entry.source.fieldId); });
+    }
+    visit(node.children);
+  });
+  visit(roots);
+  return [...ids];
+}
+
+const CharacterPresentation: React.FC<Props> = ({ campaignId, characterId, pageKey, sheet, refreshKey = 0, renderValue, onVisibleFieldsChange }) => {
   const { api, sessionKey } = useWorkspace();
-  const [selectedContext, setSelectedContext] = useState('');
-  const [refreshSequence, setRefreshSequence] = useState(0);
-  const contextId = useId();
-  const logicalKey = `${sessionKey}:${campaignId}:${characterId}:${refreshKey}:${refreshSequence}`;
-  const config = useResource(`${sessionKey}:${campaignId}:presentation:${refreshKey}:${refreshSequence}`, () => api.getPresentation(campaignId));
-  const defaults = config.data?.defaults ?? {};
-  const keys = Object.keys(defaults);
-  const preferred = keys.includes('character.overview') ? 'character.overview' : keys[0] ?? '';
-  const contextKey = keys.includes(selectedContext) ? selectedContext : preferred;
-  const hasAssignment = Boolean(contextKey && defaults[contextKey]);
-  const view = useResource(`${logicalKey}:${contextKey}:view`, () => api.resolvePresentation(campaignId, contextKey), !config.loading && !config.error && hasAssignment);
-  const sources = useResource(`${logicalKey}:${contextKey}:sources:${view.data?.viewMetadata.id ?? ''}`, () => api.getViewSources(campaignId, view.data!.viewMetadata.id, characterId), Boolean(view.data) && !view.loading && !view.error && !config.loading && !config.error);
-  const changedSnapshot = Boolean(view.data && sources.data && String(view.data.viewContent.contentRevision) !== String(sources.data.viewContentRevision));
-  const refresh = () => setRefreshSequence(value => value + 1);
-  if (config.loading) return <section aria-label="Представление персонажа"><StatePanel kind="loading">Загрузка представления…</StatePanel></section>;
-  if (config.error) return <section aria-label="Представление персонажа"><ApiError error={config.error} onRetry={refresh} /></section>;
-  if (!hasAssignment) return <section aria-label="Представление персонажа"><StatePanel kind="empty">Представление не назначено.</StatePanel></section>;
-  return <section aria-label="Представление персонажа"><List layout="vertical" stretch>
-    {keys.length > 1 && <Field label="Представление" htmlFor={contextId}><Select id={contextId} value={contextKey} onChange={event => setSelectedContext(event.target.value)}>{keys.map(key => <option key={key} value={key}>{key}</option>)}</Select></Field>}
-    {view.loading && <StatePanel kind="loading">Загрузка представления…</StatePanel>}
-    {Boolean(view.error) && (view.error instanceof CampaignApiError && view.error.status === 404 && view.error.problem.code === 'view_not_configured' ? <StatePanel kind="empty">Представление не назначено.</StatePanel> : <ApiError error={view.error} onRetry={refresh} />)}
-    {view.data && sources.loading && <StatePanel kind="loading">Загрузка данных представления…</StatePanel>}
-    {Boolean(sources.error) && Boolean(view.data) && <ApiError error={sources.error} onRetry={refresh} />}
-    {changedSnapshot && <><Notification kind="warning" eventKey={`${view.data?.viewContent.contentRevision}:${sources.data?.viewContentRevision}`}>Представление изменилось; обновите данные</Notification><Button type="button" onClick={refresh}>Обновить данные представления</Button></>}
-    {view.data && sources.data && !changedSnapshot && <ViewRenderer roots={view.data.viewContent.data.roots} widgets={sources.data.widgets} />}
-  </List></section>;
+  const [retry, setRetry] = useState(0);
+  const scope = `${sessionKey}:${campaignId}:${characterId}:${pageKey}:${refreshKey}:${retry}`;
+  const resolved = useResource<ResolvedPresentation>(scope, () => api.resolvePresentation(campaignId, pageKey));
+  const rendererAvailable = Boolean(resolved.data && !resolved.loading && !resolved.error);
+  const roots = useMemo(() => rendererAvailable && resolved.data ? normalizeRoots(resolved.data.viewContent.data.roots) : [], [rendererAvailable, resolved.data]);
+  const visibleFields = useMemo(() => rendererAvailable ? editableBaseFields(roots, sheet) : [], [rendererAvailable, roots, sheet]);
+  useEffect(() => { onVisibleFieldsChange?.(visibleFields); }, [onVisibleFieldsChange, visibleFields]);
+  useEffect(() => () => { onVisibleFieldsChange?.([]); }, [onVisibleFieldsChange]);
+
+  return <section className={styles.section} aria-label="Страница персонажа" aria-busy={resolved.loading}>
+    {resolved.loading && <div className={styles.overlay}><StatePanel kind="loading">Загрузка страницы…</StatePanel></div>}
+    {Boolean(resolved.error) && <div className={styles.recovery}><ApiError error={resolved.error} /><Button variant="secondary" type="button" onClick={() => setRetry(value => value + 1)}>Повторить загрузку страницы</Button></div>}
+    {rendererAvailable && resolved.data ? <>
+      {resolved.data.viewContent.data.roots.length === 0 ? <div className={styles.emptyCanvas} aria-label="Пустое отображение" /> : <PresentationRenderer roots={roots} sheet={sheet} renderValue={renderValue} />}
+    </> : null}
+  </section>;
 };
 
 export default CharacterPresentation;

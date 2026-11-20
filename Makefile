@@ -10,7 +10,9 @@ WEB_ENV ?= .env
 BUILD_FLAGS ?=
 IMAGE_TAG ?= latest
 export IMAGE_TAG
-IMAGE_SERVICES := api-gateway users-service account-service campaign-service game-systems-service sync-service web-hub web-campaign web-profile web-login web-game-systems web-proxy bff-web
+BACKEND_SERVICES := api-gateway users-service account-service campaign-service # game-systems-service sync-service
+WEB_SERVICES := web-hub web-campaign web-profile web-login web-proxy # web-game-systems
+IMAGE_SERVICES :=  $(BACKEND_SERVICES) $(WEB_SERVICES) bff-web
 WEB_BUILD_ENV_FILE := $(if $(filter /%,$(WEB_BUILD_ENV)),$(WEB_BUILD_ENV),apps/web/$(WEB_BUILD_ENV))
 
 ifneq ($(strip $(SERVICE)),)
@@ -36,10 +38,10 @@ build-all:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) $(IMAGE_SERVICES)
 
 build-backend:
-	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) api-gateway users-service account-service campaign-service
+	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) $(BACKEND_SERVICES)
 
 build-web:
-	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) web-hub web-campaign web-profile web-login web-proxy
+	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) $(WEB_SERVICES)
 
 build-api-gateway:
 	docker compose --env-file "$(WEB_BUILD_ENV_FILE)" -f docker-compose.build.yaml build $(BUILD_FLAGS) api-gateway

@@ -1,0 +1,141 @@
+.section {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.sectionBody {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.loadingOverlay {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: grid;
+  align-content: start;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--bg-primary) 82%, transparent);
+}
+
+.header {
+  display: grid;
+  gap: .35rem;
+}
+
+.header h2,
+.header p {
+  margin: 0;
+}
+
+.header p,
+.previewControls > p,
+.pagePreview p {
+  color: var(--text-secondary);
+}
+
+.metadataFields {
+  max-width: 32rem;
+}
+
+.previewControls {
+  display: grid;
+  gap: .75rem;
+  max-width: 34rem;
+}
+
+.previewCanvasSection {
+  position: relative;
+  min-height: 20rem;
+  min-width: 0;
+}
+
+.previewOverlay {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: grid;
+  align-content: start;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--bg-primary) 38%, transparent);
+  pointer-events: none;
+}
+
+.previewControls > label,
+.previewControls > div {
+  min-width: 0;
+}
+
+.draftOffer,
+.conflictPanel,
+.serverChoice,
+.pagePreview {
+  display: grid;
+  gap: .75rem;
+  min-width: 0;
+  padding: .85rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  background: var(--bg-secondary);
+}
+
+.draftOffer p,
+.serverChoice p {
+  margin: 0;
+}
+
+.recovery {
+  margin-top: .75rem;
+}
+
+.pageRows {
+  display: grid;
+  gap: .75rem;
+  min-width: 0;
+}
+
+.pageRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: .75rem;
+  min-width: 0;
+  padding: .85rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  background: var(--bg-primary);
+}
+
+.pageRow > label {
+  min-width: 0;
+}
+
+.warningText {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--danger-color);
+}
+
+.pagePreview {
+  background: var(--bg-secondary);
+}
+
+.pagePreview h3 {
+  margin: 0;
+}
+
+.pagePreview nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+@media (max-width: 760px) {
+  .pageRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

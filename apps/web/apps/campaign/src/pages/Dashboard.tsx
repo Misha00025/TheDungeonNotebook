@@ -48,7 +48,7 @@ const RecentCharacter: React.FC<{ visit: CharacterVisit }> = ({ visit }) => {
   if (resource.error) return <div key={cardKey}>{inaccessible(resource.error) && <p>Персонаж или кампания недоступны.</p>}<ApiError error={resource.error} onRetry={resource.reload} /></div>;
   if (!resource.data || !allowed(resource.data.characterPermissions) || !allowed(resource.data.campaignPermissions)) return <div key={cardKey}><p>Персонаж или кампания недоступны.</p></div>;
   const mode = resource.data.campaignPermissions.canWrite ? 'gm' : 'player';
-  const href = path(`/${visit.groupId}/${mode}/characters/${encodeURIComponent(visit.characterId)}/overview`);
+  const href = path(`/${visit.groupId}/${mode}/characters/${encodeURIComponent(visit.characterId)}`);
   return <Link key={cardKey} aria-label={`Открыть персонажа ${resource.data.character.name}`} className={styles.card} to={href}><span className={styles.avatarPlaceholder}>C</span><div className={styles.info}><h3 className={styles.title}>{resource.data.character.name}</h3><p className={styles.subtitle}>{resource.data.campaign.name}</p></div><span className={`${buttonStyles.button} ${styles.action}`}>→</span></Link>;
 };
 

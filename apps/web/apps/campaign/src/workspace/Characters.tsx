@@ -79,7 +79,7 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
     ['Могу просматривать', allowed.filter(item => { const access = accessMap[item.id]; return access && !('error' in access) && !access.canWrite; })]
   ] as const : [['Персонажи', allowed]] as const;
   const emptyText = search ? 'Совпадений нет.' : 'Персонажей пока нет.';
-  const characterHref = (id: string) => path(`/${campaignId}/${mode}/characters/${encodeURIComponent(id)}/overview`);
+  const characterHref = (id: string) => path(`/${campaignId}/${mode}/characters/${encodeURIComponent(id)}`);
   const headingId = React.useId();
   if (resource.loading && !resource.data) return <StatePanel kind="loading">Загрузка персонажей…</StatePanel>;
   if (resource.error && !resource.data) return <ApiError error={resource.error} onRetry={resource.reload} />;

@@ -11,6 +11,7 @@ import { ApiError } from './Feedback';
 export type CampaignWorkspaceValue = { campaign: Campaign; permissions: Permissions; lastKnownPermissions: Permissions; permissionsLoading?: boolean; mode: 'gm' | 'player'; reloadCampaign: () => void };
 const CampaignContext = createContext<CampaignWorkspaceValue | null>(null);
 export const useCampaignWorkspace = () => { const value = useContext(CampaignContext); if (!value) throw new Error('useCampaignWorkspace requires campaign route'); return value; };
+export const useOptionalCampaignWorkspace = () => useContext(CampaignContext);
 const CampaignShell: React.FC = () => {
   const { groupId = '' } = useParams();
   const id = Number(groupId);
@@ -56,14 +57,17 @@ const CampaignShell: React.FC = () => {
   const switchMode = async () => {
     if (busy.current) return;
     const target = mode === 'gm' ? 'player' : 'gm';
-    const sheetRoute = location.pathname.match(/\/(?:gm|player)\/characters\/([^/]+)\/(overview|stats)$/);
+     const sheetRoute = location.pathname.match(/\/(?:gm|player)\/characters\/([^/]+)(?:\/(page_[1-9]\d*|overview|stats))?$/);
     if (!sheetRoute) { navigate(targetMode(target)); return; }
     busy.current = true; const current = ++sequence.current; const pathname = location.pathname; setSwitchBusy(true); setSwitchError(undefined);
     try {
       const access = await api.characterPermissions(id, decodeURIComponent(sheetRoute[1]));
       if (mounted.current && sequence.current === current && route.current === pathname) {
         if (target === 'gm' && !canEnterGm) navigate(targetMode(target));
-        else if (access.canRead || access.canWrite) navigate(path(`/${id}/${target}/characters/${encodeURIComponent(decodeURIComponent(sheetRoute[1]))}/${sheetRoute[2]}`));
+         else if (access.canRead || access.canWrite) {
+           const page = sheetRoute[2]?.startsWith('page_') ? `/${sheetRoute[2]}` : '';
+           navigate(path(`/${id}/${target}/characters/${encodeURIComponent(decodeURIComponent(sheetRoute[1]))}${page}`));
+         }
         else navigate(targetMode(target));
       }
     } catch (error) {
@@ -103,18 +107,14 @@ const CampaignShell: React.FC = () => {
       active: location.pathname === to || location.pathname.startsWith(`${to}/`),
     };
   });
-  const sheetRoute = location.pathname.match(/\/(?:gm|player)\/characters\/([^/]+)\/(overview|stats)$/);
+  const sheetRoute = location.pathname.match(/\/(?:gm|player)\/characters\/([^/]+)(?:\/(page_[1-9]\d*|overview|stats))?$/);
   const sheetCharacterId = sheetRoute?.[1];
   const validSheetCharacter = Boolean(sheetCharacterId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sheetCharacterId));
   const mobileItems: BottomNavigationItem[] = validSheetCharacter && sheetRoute && sheetCharacterId
-    ? [
-      { id: `back-${id}-${mode}-${sheetCharacterId}`, label: 'Назад', icon: <NavigationIcon name="arrow-left" />, to: path(`/${id}/${mode}/characters`) },
-      { id: `overview-${id}-${mode}-${sheetCharacterId}`, label: 'Обзор', icon: <NavigationIcon name="home" />, to: path(`/${id}/${mode}/characters/${sheetCharacterId}/overview`), active: sheetRoute[2] === 'overview' },
-      { id: `stats-${id}-${mode}-${sheetCharacterId}`, label: 'Характеристики', icon: <NavigationIcon name="chart" />, to: path(`/${id}/${mode}/characters/${sheetCharacterId}/stats`), active: sheetRoute[2] === 'stats' },
-    ]
+    ? [{ id: `back-${id}-${mode}-${sheetCharacterId}`, label: 'Назад', icon: <NavigationIcon name="arrow-left" />, to: path(`/${id}/${mode}/characters`) }]
     : campaignNavigation;
   const mobileNavigationKey = validSheetCharacter && sheetRoute && sheetCharacterId
-    ? `${id}:${mode}:${sheetCharacterId}:${sheetRoute[2]}`
+    ? `${id}:${mode}:${sheetCharacterId}:${sheetRoute[2] ?? 'entry'}`
     : `${id}:${mode}:campaign`;
   const campaignItems = campaigns.data ?? [];
   const campaignOptions = campaignItems.some(item => item.id === id)
@@ -137,7 +137,7 @@ const CampaignShell: React.FC = () => {
       })} />
     </>} mobileNavigation={<BottomNavigation key={mobileNavigationKey} aria-label={validSheetCharacter ? 'Лист персонажа на телефоне' : 'Навигация кампании на телефоне'} items={mobileItems} />}>
       <Breadcrumbs items={[{ label: 'Кампании', path: path('/') }, { label: campaign.data.name, path: targetMode(mode) }, { label: title }]} />
-      {permission.loading && <StatePanel kind="loading">Обновление прав кампании…</StatePanel>}{Boolean(permission.error) && <ApiError error={permission.error} onRetry={permission.reload} />}{Boolean(switchError) && <ApiError error={switchError} />}<Outlet />
+       {permission.loading && !location.pathname.endsWith('/gm/views') && <StatePanel kind="loading">Обновление прав кампании…</StatePanel>}{Boolean(permission.error) && <ApiError error={permission.error} onRetry={permission.reload} />}{Boolean(switchError) && <ApiError error={switchError} />}<Outlet />
     </WorkspaceLayout>
   </CampaignContext.Provider>;
 };

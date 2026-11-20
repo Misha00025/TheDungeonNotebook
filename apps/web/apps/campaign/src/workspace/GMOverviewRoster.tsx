@@ -75,7 +75,7 @@ const GMOverviewRoster: React.FC<{ campaignId: number; characters: CharacterMeta
           <strong>{character.name}</strong>
           {names.map((name, index) => <Badge key={index}>{name}</Badge>)}
         </div>
-        <LinkButton size="small" variant="secondary" to={path(`/${campaignId}/gm/characters/${encodeURIComponent(character.id)}/overview`)} aria-label={`Открыть лист ${character.name}`}>Открыть</LinkButton>
+        <LinkButton size="small" variant="secondary" to={path(`/${campaignId}/gm/characters/${encodeURIComponent(character.id)}`)} aria-label={`Открыть лист ${character.name}`}>Открыть</LinkButton>
       </div>
     </ListItem>)}
   </List>;

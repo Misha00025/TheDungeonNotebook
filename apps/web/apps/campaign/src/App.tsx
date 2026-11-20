@@ -1,6 +1,6 @@
 import React from 'react';
-import { Link, Navigate, Route, Routes, useParams } from 'react-router-dom';
-import { useAuth, RemoteAuthProvider } from '@tdn/shared';
+import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { useAuth, RemoteAuthProvider, StatePanel } from '@tdn/shared';
 import type { HubRemoteProps } from '@tdn/shared';
 import { WorkspaceProvider, DirtyProvider, useAcceptedLocation, useWorkspace } from './workspace/Workspace';
 import { useResource } from './workspace/hooks';
@@ -59,13 +59,15 @@ const GuardedRoutes: React.FC = () => {
       <Route path="gm/views" element={<Views />} />
       <Route path="templates" element={<LegacySectionEntry target="templates" />} />
       <Route path="gm/characters" element={<Characters />} />
-      <Route path="gm/characters/:characterId/:tab" element={<CharacterSheetRoute />} />
+      <Route path="gm/characters/:characterId" element={<CharacterSheetRoute />} />
+      <Route path="gm/characters/:characterId/:pageKey" element={<CharacterSheetRoute />} />
       <Route path="gm/members" element={<Members />} />
       <Route path="gm/settings" element={<CampaignSettings />} />
       <Route path="users" element={<LegacySectionEntry target="members" />} />
       <Route path="settings" element={<LegacySectionEntry target="settings" />} />
       <Route path="player/characters" element={<Characters />} />
-      <Route path="player/characters/:characterId/:tab" element={<CharacterSheetRoute />} />
+      <Route path="player/characters/:characterId" element={<CharacterSheetRoute />} />
+      <Route path="player/characters/:characterId/:pageKey" element={<CharacterSheetRoute />} />
       <Route path="character/:characterId" element={<LegacyCharacterRoute />} />
       <Route path="character/:characterId/:legacyTab" element={<LegacyCharacterRoute />} />
       <Route path="characters" element={<LegacyCharactersEntry />} />
@@ -75,19 +77,23 @@ const GuardedRoutes: React.FC = () => {
   </Routes>;
 };
 const CharacterSheetRoute: React.FC = () => {
-  const { groupId = '', characterId = '', tab = '' } = useParams();
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(characterId) || !['overview', 'stats'].includes(tab)) return <NotFound />;
-  return <CharacterSheet key={`${groupId}:${characterId}`} campaignId={Number(groupId)} characterId={characterId} stats={tab === 'stats'} />;
+  const { groupId = '', characterId = '', pageKey } = useParams();
+  const { sessionKey, path } = useWorkspace();
+  const mode = useLocation().pathname.includes('/gm/') ? 'gm' : 'player';
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(characterId)) return <NotFound />;
+  if (pageKey && ['overview', 'stats'].includes(pageKey)) return <Navigate to={path(`/${groupId}/${mode}/characters/${encodeURIComponent(characterId)}`)} replace />;
+  if (pageKey && !/^page_[1-9]\d*$/.test(pageKey)) return <NotFound />;
+  return <CharacterSheet key={`${sessionKey}:${groupId}:${characterId}`} campaignId={Number(groupId)} characterId={characterId} pageKey={pageKey} />;
 };
 const LegacyCharacterRoute: React.FC = () => {
   const { groupId = '', characterId = '', legacyTab } = useParams();
   const { path } = useWorkspace();
-  const { permissions } = useCampaignWorkspace();
+  const { permissions, permissionsLoading } = useCampaignWorkspace();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(characterId)) return <NotFound />;
   if (legacyTab !== undefined && !['base', 'resources', 'stats'].includes(legacyTab)) return <NotFound />;
-  const tab = legacyTab === 'stats' ? 'stats' : 'overview';
+  if (permissionsLoading) return <StatePanel kind="loading">Проверка прав кампании…</StatePanel>;
   const mode = permissions.canWrite ? 'gm' : 'player';
-  return <Navigate to={path(`/${groupId}/${mode}/characters/${encodeURIComponent(characterId)}/${tab}`)} replace />;
+  return <Navigate to={path(`/${groupId}/${mode}/characters/${encodeURIComponent(characterId)}`)} replace />;
 };
 const AppContent: React.FC = () => {
   const { authenticated, userId } = useAuth();

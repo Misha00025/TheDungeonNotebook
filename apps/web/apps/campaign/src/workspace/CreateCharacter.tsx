@@ -33,7 +33,7 @@ const CreateCharacter: React.FC<{ campaignId: number; onClose: () => void }> = (
     clearDirty();
     notifyInvalidation('characters');
     onClose();
-    navigate(path(`/${campaign.id}/gm/characters/${encodeURIComponent(characterId)}/overview`));
+    navigate(path(`/${campaign.id}/gm/characters/${encodeURIComponent(characterId)}`));
   };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
