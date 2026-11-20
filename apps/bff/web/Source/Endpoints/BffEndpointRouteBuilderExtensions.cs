@@ -27,8 +27,8 @@ public static class BffEndpointRouteBuilderExtensions
             await HandleLoginAsync(context, returnUrl, urlHelperFactory, options.Web.PublicOrigin).ConfigureAwait(false);
         });
 
-        endpoints.MapGet(options.Endpoints.Session, async (HttpContext context, IAntiforgery antiforgery, IOptions<AntiforgeryOptions> antiforgeryOptions) =>
-            await HandleSessionAsync(context, antiforgery, antiforgeryOptions.Value.HeaderName ?? "X-CSRF-TOKEN").ConfigureAwait(false));
+        endpoints.MapGet(options.Endpoints.Session, async (HttpContext context, IAntiforgery antiforgery, IOptions<AntiforgeryOptions> antiforgeryOptions, ISessionTokenService sessionTokenService) =>
+            await HandleSessionAsync(context, antiforgery, antiforgeryOptions.Value.HeaderName ?? "X-CSRF-TOKEN", sessionTokenService).ConfigureAwait(false));
 
         endpoints.MapPost(options.Endpoints.Logout, async (HttpContext context, IAntiforgeryRequestValidator antiforgeryValidator, IOptionsMonitor<OpenIdConnectOptions> oidcOptions) =>
             await HandleLogoutAsync(context, antiforgeryValidator, oidcOptions.Get(BffAuthenticationDefaults.Oidc).SignedOutRedirectUri, options.Web.PublicOrigin).ConfigureAwait(false))
@@ -58,7 +58,7 @@ public static class BffEndpointRouteBuilderExtensions
         await context.ChallengeAsync(BffAuthenticationDefaults.Oidc, new AuthenticationProperties { RedirectUri = redirectUri }).ConfigureAwait(false);
     }
 
-    public static async Task HandleSessionAsync(HttpContext context, IAntiforgery antiforgery, string csrfHeaderName)
+    public static async Task HandleSessionAsync(HttpContext context, IAntiforgery antiforgery, string csrfHeaderName, ISessionTokenService sessionTokenService)
     {
         SetNoStore(context.Response);
         var authentication = await context.AuthenticateAsync(BffAuthenticationDefaults.Cookies).ConfigureAwait(false);
@@ -76,6 +76,23 @@ public static class BffEndpointRouteBuilderExtensions
         context.User = authentication.Principal;
         if (context.User.FindFirst(BffAuthenticationDefaults.SessionClaim) is null)
             throw new AuthenticationRequiredException();
+
+        var sessionKey = context.User.FindFirst(BffAuthenticationDefaults.SessionClaim)!.Value;
+        try
+        {
+            await sessionTokenService.GetAccessTokenAsync(sessionKey, context.RequestAborted).ConfigureAwait(false);
+        }
+        catch (AuthenticationRequiredException)
+        {
+            await context.SignOutAsync(BffAuthenticationDefaults.Cookies).ConfigureAwait(false);
+            await context.Response.WriteAsJsonAsync(new
+            {
+                authenticated = false,
+                csrfToken = (string?)null,
+                csrfHeaderName
+            }, context.RequestAborted).ConfigureAwait(false);
+            return;
+        }
 
         var tokens = antiforgery.GetAndStoreTokens(context);
         await context.Response.WriteAsJsonAsync(new

@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Moq;
 using Tdn.Bff.Configuration;
 using Tdn.Bff.Oidc;
 using Tdn.Bff.Sessions;
@@ -46,8 +48,8 @@ public sealed class BffRegistrationAndOptionsTests
         Assert.Equal(BffAuthenticationDefaults.Cookies, authentication.DefaultChallengeScheme);
         Assert.Equal(BffAuthenticationDefaults.Cookies, authentication.DefaultForbidScheme);
         Assert.Same(provider.GetRequiredService<ITicketStore>(), cookie.SessionStore);
-        Assert.False(cookie.SlidingExpiration);
-        Assert.Equal(TimeSpan.FromHours(8), cookie.ExpireTimeSpan);
+        Assert.True(cookie.SlidingExpiration);
+        Assert.Equal(TimeSpan.FromDays(31), cookie.ExpireTimeSpan);
         Assert.True(cookie.Cookie.HttpOnly);
         Assert.Equal("tdn-session", cookie.Cookie.Name);
         Assert.Equal(CookieSecurePolicy.SameAsRequest, cookie.Cookie.SecurePolicy);
@@ -59,6 +61,66 @@ public sealed class BffRegistrationAndOptionsTests
         await cookie.Events.OnRedirectToLogin(redirectContext);
         Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
         Assert.Equal("no-store", context.Response.Headers.CacheControl);
+    }
+
+    [Fact]
+    public async Task CookieEventsMakeTicketsPersistentAndRenewOldTicketsWithConfiguredDuration()
+    {
+        var now = new DateTimeOffset(2031, 4, 5, 6, 7, 8, TimeSpan.Zero);
+        var timeProvider = new FixedTimeProvider(now);
+        var ticketStore = new Mock<ITicketStore>();
+        var options = new CookieAuthenticationOptions();
+        var lifetime = TimeSpan.FromDays(45);
+        new BffCookiePostConfigure(ticketStore.Object, Options.Create(new BffOptions
+        {
+            Session = new SessionOptions { Lifetime = lifetime }
+        }), timeProvider).PostConfigure(BffAuthenticationDefaults.Cookies, options);
+        var scheme = new AuthenticationScheme(BffAuthenticationDefaults.Cookies, BffAuthenticationDefaults.Cookies, typeof(CookieAuthenticationHandler));
+        var context = new DefaultHttpContext();
+        var principal = new ClaimsPrincipal(new ClaimsIdentity("test"));
+        var signingInProperties = new AuthenticationProperties();
+        var signingIn = new CookieSigningInContext(context, scheme, options, principal, signingInProperties, new CookieOptions());
+
+        await options.Events.OnSigningIn(signingIn);
+
+        Assert.True(signingInProperties.IsPersistent);
+        Assert.Equal(now, signingInProperties.IssuedUtc);
+        Assert.Equal(now + lifetime, signingInProperties.ExpiresUtc);
+
+        var oldIssued = now.AddHours(-1);
+        var oldProperties = new AuthenticationProperties { IssuedUtc = oldIssued, ExpiresUtc = oldIssued.AddHours(8) };
+        var ticket = new AuthenticationTicket(principal, oldProperties, BffAuthenticationDefaults.Cookies);
+        var sliding = new CookieSlidingExpirationContext(context, scheme, options, ticket, TimeSpan.FromHours(1), TimeSpan.FromHours(7));
+
+        await options.Events.OnCheckSlidingExpiration(sliding);
+
+        Assert.True(sliding.ShouldRenew);
+        Assert.True(sliding.Properties.IsPersistent);
+        Assert.Equal(oldIssued + lifetime, sliding.Properties.ExpiresUtc);
+    }
+
+    [Fact]
+    public async Task CookieSignInUsesConfiguredIssuedTimeForPersistentExpiry()
+    {
+        var now = new DateTimeOffset(2031, 4, 5, 6, 7, 8, TimeSpan.Zero);
+        var timeProvider = new FixedTimeProvider(now);
+        var ticketStore = new Mock<ITicketStore>();
+        var options = new CookieAuthenticationOptions();
+        var issued = now.AddMinutes(-3);
+        var lifetime = TimeSpan.FromDays(12);
+        new BffCookiePostConfigure(ticketStore.Object, Options.Create(new BffOptions
+        {
+            Session = new SessionOptions { Lifetime = lifetime }
+        }), timeProvider).PostConfigure(BffAuthenticationDefaults.Cookies, options);
+        var scheme = new AuthenticationScheme(BffAuthenticationDefaults.Cookies, BffAuthenticationDefaults.Cookies, typeof(CookieAuthenticationHandler));
+        var properties = new AuthenticationProperties { IssuedUtc = issued };
+
+        await options.Events.OnSigningIn(new CookieSigningInContext(new DefaultHttpContext(), scheme, options,
+            new ClaimsPrincipal(new ClaimsIdentity("test")), properties, new CookieOptions()));
+
+        Assert.True(properties.IsPersistent);
+        Assert.Equal(issued, properties.IssuedUtc);
+        Assert.Equal(issued + lifetime, properties.ExpiresUtc);
     }
 
     [Fact]

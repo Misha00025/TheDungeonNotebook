@@ -3,6 +3,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
 using Tdn.Accounts.Configuration;
 using Tdn.Accounts.Security;
@@ -10,10 +11,14 @@ using Xunit;
 
 namespace Tdn.Accounts.Tests.Security;
 
-public sealed class OidcTokenValidatorTests
+public sealed class OidcTokenValidatorTests : IDisposable
 {
+    private readonly MemoryCache cache = new(new MemoryCacheOptions());
+
+    public void Dispose() => cache.Dispose();
+
     [Fact]
-    public async Task Valid_token_returns_only_verified_identity_and_fetches_fresh_documents_each_time()
+    public async Task Valid_token_returns_only_verified_identity_and_reuses_cached_result()
     {
         using var rsa = RSA.Create(2048);
         var key = Key(rsa, "key1");
@@ -25,8 +30,198 @@ public sealed class OidcTokenValidatorTests
         Assert.Equal(new VerifiedIdentity("https://id.test", "subject"), result.Identity);
         Assert.Equal(TokenValidationStatus.Valid, result.Status);
         Assert.Equal(result, repeated);
+        Assert.Equal(2, handler.Count);
+        Assert.Equal(new[] { "https://id.test/.well-known/openid-configuration", "https://id.test/jwks" }, handler.RequestedUris.Select(x => x.AbsoluteUri));
+    }
+
+    [Fact]
+    public async Task Cache_expiration_is_absolute_and_not_extended_by_hits()
+    {
+        using var rsa = RSA.Create(2048);
+        var key = Key(rsa, "key1");
+        var handler = StandardHandler("https://id.test", key);
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var validator = NewValidator(handler, new OidcOptions { Providers = [Provider()] }, clock);
+        var token = Token(key, "https://id.test", Claims());
+
+        await validator.ValidateAsync(token, default);
+        clock.Advance(TimeSpan.FromSeconds(29));
+        Assert.Equal(TokenValidationStatus.Valid, (await validator.ValidateAsync(token, default)).Status);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal(TokenValidationStatus.Valid, (await validator.ValidateAsync(token, default)).Status);
         Assert.Equal(4, handler.Count);
-        Assert.Equal(new[] { "https://id.test/.well-known/openid-configuration", "https://id.test/jwks", "https://id.test/.well-known/openid-configuration", "https://id.test/jwks" }, handler.RequestedUris.Select(x => x.AbsoluteUri));
+    }
+
+    [Fact]
+    public async Task Short_cache_duration_and_zero_duration_behave_as_configured()
+    {
+        using var rsa = RSA.Create(2048);
+        var key = Key(rsa, "key1");
+        var token = Token(key, "https://id.test", Claims());
+        var shortHandler = StandardHandler("https://id.test", key);
+        var shortClock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var shortValidator = NewValidator(shortHandler, new OidcOptions { ValidationCacheDuration = TimeSpan.FromSeconds(5), Providers = [Provider()] }, shortClock);
+        await shortValidator.ValidateAsync(token, default);
+        shortClock.Advance(TimeSpan.FromSeconds(5));
+        await shortValidator.ValidateAsync(token, default);
+        Assert.Equal(4, shortHandler.Count);
+
+        var uncachedHandler = StandardHandler("https://id.test", key);
+        var uncached = NewValidator(uncachedHandler, new OidcOptions { ValidationCacheDuration = TimeSpan.Zero, Providers = [Provider()] });
+        await uncached.ValidateAsync(token, default);
+        await uncached.ValidateAsync(token, default);
+        Assert.Equal(4, uncachedHandler.Count);
+    }
+
+    [Fact]
+    public async Task Token_expiration_caps_cache_and_real_expired_token_is_not_accepted()
+    {
+        using var rsa = RSA.Create(2048);
+        var key = Key(rsa, "key1");
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var handler = StandardHandler("https://id.test", key);
+        var validator = NewValidator(handler, new OidcOptions { Providers = [Provider()] }, clock);
+        var claims = Claims();
+        claims["exp"] = clock.GetUtcNow().AddSeconds(10).ToUnixTimeSeconds();
+        var token = Token(key, "https://id.test", claims);
+        Assert.Equal(TokenValidationStatus.Valid, (await validator.ValidateAsync(token, default)).Status);
+        clock.Advance(TimeSpan.FromSeconds(11));
+        Assert.Equal(TokenValidationStatus.Valid, (await validator.ValidateAsync(token, default)).Status);
+        Assert.Equal(4, handler.Count);
+
+        var expiredHandler = StandardHandler("https://id.test", key);
+        var expiredClaims = Claims();
+        expiredClaims["exp"] = DateTimeOffset.UtcNow.AddMinutes(-4).ToUnixTimeSeconds();
+        var expiredValidator = NewValidator(expiredHandler, Provider());
+        var expiredToken = Token(key, "https://id.test", expiredClaims);
+        Assert.Equal(TokenValidationStatus.Invalid, (await expiredValidator.ValidateAsync(expiredToken, default)).Status);
+        Assert.Equal(TokenValidationStatus.Invalid, (await expiredValidator.ValidateAsync(expiredToken, default)).Status);
+        Assert.Equal(4, expiredHandler.Count);
+    }
+
+    [Fact]
+    public async Task Mutated_raw_token_and_validator_with_different_options_do_not_reuse_cached_identity()
+    {
+        using var rsa = RSA.Create(2048);
+        var key = Key(rsa, "key1");
+        var handler = StandardHandler("https://id.test", key);
+        var options = new OidcOptions { Providers = [Provider()] };
+        var validator = NewValidator(handler, options);
+        var token = Token(key, "https://id.test", Claims());
+        Assert.Equal(TokenValidationStatus.Valid, (await validator.ValidateAsync(token, default)).Status);
+        var alternateClaims = Claims();
+        alternateClaims["nonce"] = "different-payload";
+        Assert.Equal(TokenValidationStatus.Valid, (await validator.ValidateAsync(Token(key, "https://id.test", alternateClaims), default)).Status);
+        var parts = token.Split('.');
+        parts[2] = (parts[2][0] == 'A' ? "B" : "A") + parts[2][1..];
+        Assert.Equal(TokenValidationStatus.Invalid, (await validator.ValidateAsync(string.Join('.', parts), default)).Status);
+        Assert.Equal(TokenValidationStatus.Invalid, (await validator.ValidateAsync(Token(key, "https://other.test", Claims()), default)).Status);
+
+        var stricter = NewValidator(handler, new OidcOptions { Providers = [new OidcProviderOptions { Issuer = "https://id.test", Audiences = ["other"] }] });
+        Assert.Equal(TokenValidationStatus.Invalid, (await stricter.ValidateAsync(token, default)).Status);
+        Assert.Equal(8, handler.Count);
+    }
+
+    [Fact]
+    public async Task Invalid_and_insufficient_scope_results_are_not_cached()
+    {
+        using var rsa = RSA.Create(2048);
+        var key = Key(rsa, "key1");
+        var handler = StandardHandler("https://id.test", key);
+        var provider = Provider();
+        provider.RequiredScopes = ["read"];
+        var validator = NewValidator(handler, provider);
+        var claims = Claims();
+        claims["scope"] = "write";
+        var token = Token(key, "https://id.test", claims);
+        Assert.Equal(TokenValidationStatus.InsufficientScope, (await validator.ValidateAsync(token, default)).Status);
+        Assert.Equal(TokenValidationStatus.InsufficientScope, (await validator.ValidateAsync(token, default)).Status);
+        Assert.Equal(4, handler.Count);
+
+        var invalidHandler = StandardHandler("https://id.test", key);
+        var unknownKid = Token(key, "https://id.test", Claims(), kid: "unknown");
+        var invalidValidator = NewValidator(invalidHandler, Provider());
+        Assert.Equal(TokenValidationStatus.Invalid, (await invalidValidator.ValidateAsync(unknownKid, default)).Status);
+        Assert.Equal(TokenValidationStatus.Invalid, (await invalidValidator.ValidateAsync(unknownKid, default)).Status);
+        Assert.Equal(4, invalidHandler.Count);
+    }
+
+    [Fact]
+    public async Task Unavailable_result_is_not_cached_and_recovery_is_immediate()
+    {
+        using var rsa = RSA.Create(2048);
+        var key = Key(rsa, "key1");
+        var available = false;
+        var handler = new StubHandler((uri, _) => Task.FromResult(available
+            ? JsonResponse(uri.AbsolutePath.EndsWith("jwks", StringComparison.Ordinal) ? Jwks(key) : Metadata("https://id.test", "https://id.test/jwks"))
+            : new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)));
+        var validator = NewValidator(handler, Provider());
+        var token = Token(key, "https://id.test", Claims());
+        Assert.Equal(TokenValidationStatus.Unavailable, (await validator.ValidateAsync(token, default)).Status);
+        available = true;
+        Assert.Equal(TokenValidationStatus.Valid, (await validator.ValidateAsync(token, default)).Status);
+        Assert.Equal(3, handler.Count);
+    }
+
+    [Fact]
+    public async Task Same_token_misses_are_coalesced_and_cancelled_waiter_does_not_cancel_shared_validation()
+    {
+        using var rsa = RSA.Create(2048);
+        var key = Key(rsa, "key1");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new StubHandler(async (uri, _) =>
+        {
+            started.TrySetResult();
+            await release.Task;
+            return JsonResponse(uri.AbsolutePath.EndsWith("jwks", StringComparison.Ordinal) ? Jwks(key) : Metadata("https://id.test", "https://id.test/jwks"));
+        });
+        var validator = NewValidator(handler, Provider());
+        var token = Token(key, "https://id.test", Claims());
+        var first = validator.ValidateAsync(token, default);
+        await started.Task;
+        using var cancellation = new CancellationTokenSource();
+        var cancelledWaiter = validator.ValidateAsync(token, cancellation.Token);
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancelledWaiter);
+        release.TrySetResult();
+        Assert.Equal(TokenValidationStatus.Valid, (await first).Status);
+        Assert.Equal(TokenValidationStatus.Valid, (await validator.ValidateAsync(token, default)).Status);
+        Assert.Equal(2, handler.Count);
+    }
+
+    [Fact]
+    public async Task Different_tokens_are_not_serialized_and_pre_cancelled_or_overlarge_inputs_do_not_request_http()
+    {
+        using var rsa = RSA.Create(2048);
+        var key = Key(rsa, "key1");
+        var entered = 0;
+        var bothEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new StubHandler(async (uri, _) =>
+        {
+            if (Interlocked.Increment(ref entered) == 2) bothEntered.TrySetResult();
+            await release.Task;
+            return JsonResponse(uri.AbsolutePath.EndsWith("jwks", StringComparison.Ordinal) ? Jwks(key) : Metadata("https://id.test", "https://id.test/jwks"));
+        });
+        var validator = NewValidator(handler, Provider());
+        var firstClaims = Claims();
+        var secondClaims = Claims();
+        secondClaims["sub"] = "different";
+        var first = validator.ValidateAsync(Token(key, "https://id.test", firstClaims), default);
+        var second = validator.ValidateAsync(Token(key, "https://id.test", secondClaims), default);
+        await bothEntered.Task;
+        release.TrySetResult();
+        Assert.Equal(TokenValidationStatus.Valid, (await first).Status);
+        Assert.Equal(TokenValidationStatus.Valid, (await second).Status);
+        Assert.Equal(4, handler.Count);
+
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => validator.ValidateAsync("", cancelled.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => validator.ValidateAsync(Token(key, "https://id.test", firstClaims), cancelled.Token));
+        Assert.Equal(TokenValidationStatus.Invalid, (await validator.ValidateAsync(new string('x', 16385), default)).Status);
+        Assert.Equal(4, handler.Count);
     }
 
     [Fact]
@@ -114,7 +309,7 @@ public sealed class OidcTokenValidatorTests
     }
 
     [Fact]
-    public async Task Rotated_jwks_is_used_on_next_validation_without_restart_or_cache()
+    public async Task Rotated_jwks_is_used_for_new_tokens_without_restart_or_stale_fallback()
     {
         using var rsa1 = RSA.Create(2048);
         using var rsa2 = RSA.Create(2048);
@@ -132,6 +327,28 @@ public sealed class OidcTokenValidatorTests
         Assert.Equal(new VerifiedIdentity("https://id.test", "subject"), firstNew.Identity);
         Assert.Equal(TokenValidationStatus.Invalid, (await validator.ValidateAsync(oldToken, default)).Status);
         Assert.Equal(6, handler.Count);
+    }
+
+    [Fact]
+    public async Task Removed_key_may_hit_until_cache_expiry_but_never_uses_stale_result_afterward()
+    {
+        using var rsa = RSA.Create(2048);
+        var key = Key(rsa, "old");
+        var active = true;
+        var handler = new StubHandler((uri, _) => Task.FromResult(JsonResponse(uri.AbsolutePath.EndsWith("jwks", StringComparison.Ordinal)
+            ? active ? Jwks(key) : "{\"keys\":[]}"
+            : Metadata("https://id.test", "https://id.test/jwks"))));
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var validator = NewValidator(handler, new OidcOptions { Providers = [Provider()] }, clock);
+        var token = Token(key, "https://id.test", Claims());
+
+        Assert.Equal(TokenValidationStatus.Valid, (await validator.ValidateAsync(token, default)).Status);
+        active = false;
+        Assert.Equal(TokenValidationStatus.Valid, (await validator.ValidateAsync(token, default)).Status);
+        Assert.Equal(2, handler.Count);
+        clock.Advance(TimeSpan.FromSeconds(30));
+        Assert.Equal(TokenValidationStatus.Invalid, (await validator.ValidateAsync(token, default)).Status);
+        Assert.Equal(4, handler.Count);
     }
 
     [Fact]
@@ -282,8 +499,8 @@ public sealed class OidcTokenValidatorTests
 
     private static Dictionary<string, object> Claims() => new() { ["sub"] = "subject", ["aud"] = "account", ["exp"] = DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds() };
     private static OidcProviderOptions Provider(string issuer = "https://id.test") => new() { Issuer = issuer, MetadataAddress = issuer + "/.well-known/openid-configuration", Audiences = ["account"] };
-    private static OidcTokenValidator NewValidator(StubHandler handler, OidcProviderOptions provider) => NewValidator(handler, new OidcOptions { Providers = [provider] });
-    private static OidcTokenValidator NewValidator(StubHandler handler, OidcOptions options) => new(options, new StubFactory(handler));
+    private OidcTokenValidator NewValidator(StubHandler handler, OidcProviderOptions provider) => NewValidator(handler, new OidcOptions { Providers = [provider] });
+    private OidcTokenValidator NewValidator(StubHandler handler, OidcOptions options, TimeProvider? timeProvider = null) => new(options, new StubFactory(handler), cache, timeProvider ?? TimeProvider.System);
     private static RsaSecurityKey Key(RSA rsa, string id) => new(rsa) { KeyId = id };
     private static StubHandler StandardHandler(string issuer, SecurityKey key) => new((uri, _) => Task.FromResult(JsonResponse(uri.AbsolutePath.EndsWith("jwks", StringComparison.Ordinal) ? Jwks(key) : Metadata(issuer, issuer + "/jwks"))));
     private static string Metadata(string issuer, string jwks) => JsonSerializer.Serialize(new { issuer, jwks_uri = jwks });
@@ -317,16 +534,25 @@ public sealed class OidcTokenValidatorTests
 
     private sealed class StubHandler(Func<Uri, CancellationToken, Task<HttpResponseMessage>> response) : HttpMessageHandler
     {
-        public List<Uri> RequestedUris { get; } = [];
-        public int Count => RequestedUris.Count;
+        private readonly object gate = new();
+        private readonly List<Uri> requestedUris = [];
+        public Uri[] RequestedUris { get { lock (gate) return requestedUris.ToArray(); } }
+        public int Count { get { lock (gate) return requestedUris.Count; } }
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            RequestedUris.Add(request.RequestUri!);
+            lock (gate) requestedUris.Add(request.RequestUri!);
             return response(request.RequestUri!, cancellationToken);
         }
     }
     private sealed class StubFactory(HttpMessageHandler handler) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new(handler, false);
+    }
+
+    private sealed class FakeTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        private DateTimeOffset current = now;
+        public override DateTimeOffset GetUtcNow() => current;
+        public void Advance(TimeSpan duration) => current += duration;
     }
 }

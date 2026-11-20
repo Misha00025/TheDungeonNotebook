@@ -14,12 +14,14 @@ public sealed class RedisSessionRepository : ISessionRepository
     private readonly IDatabase _database;
     private readonly IDataProtector _protector;
     private readonly string _keyPrefix;
+    private readonly TimeProvider _timeProvider;
 
-    public RedisSessionRepository(IConnectionMultiplexer connection, IDataProtectionProvider dataProtectionProvider, IOptions<BffOptions> options)
+    public RedisSessionRepository(IConnectionMultiplexer connection, IDataProtectionProvider dataProtectionProvider, IOptions<BffOptions> options, TimeProvider timeProvider)
     {
         _database = connection.GetDatabase();
         _protector = dataProtectionProvider.CreateProtector("Tdn.Bff.SessionTicket");
         _keyPrefix = options.Value.Redis.KeyPrefix;
+        _timeProvider = timeProvider;
     }
 
     public async Task<SessionSnapshot?> GetAsync(string key, CancellationToken cancellationToken)
@@ -33,7 +35,7 @@ public sealed class RedisSessionRepository : ISessionRepository
         {
             var bytes = (byte[])protectedPayload!;
             var ticket = TicketSerializer.Default.Deserialize(_protector.Unprotect(bytes));
-            if (ticket?.Properties.ExpiresUtc is not { } expiresUtc || expiresUtc <= DateTimeOffset.UtcNow)
+            if (ticket?.Properties.ExpiresUtc is not { } expiresUtc || expiresUtc <= _timeProvider.GetUtcNow())
                 return null;
             return new SessionSnapshot(ticket, bytes);
         }
@@ -55,7 +57,7 @@ public sealed class RedisSessionRepository : ISessionRepository
     {
         cancellationToken.ThrowIfCancellationRequested();
         var expiry = GetExpiry(ticket);
-        var remaining = expiry - DateTimeOffset.UtcNow;
+        var remaining = expiry - _timeProvider.GetUtcNow();
         if (remaining <= TimeSpan.Zero)
             throw new ArgumentException("An unexpired ticket is required.", nameof(ticket));
 
@@ -67,7 +69,7 @@ public sealed class RedisSessionRepository : ISessionRepository
     {
         cancellationToken.ThrowIfCancellationRequested();
         var expiry = GetExpiry(replacementTicket);
-        var remaining = expiry - DateTimeOffset.UtcNow;
+        var remaining = expiry - _timeProvider.GetUtcNow();
         if (remaining <= TimeSpan.Zero)
             return false;
 

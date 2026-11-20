@@ -4,6 +4,7 @@
   },
   "Oidc": {
     "TimeoutSeconds": 10,
+    "ValidationCacheDuration": "00:00:30",
     "Providers": [
       {
         "Issuer": "",

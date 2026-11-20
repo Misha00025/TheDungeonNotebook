@@ -23,7 +23,7 @@ public sealed class SessionTokenServiceTests
     }
 
     [Fact]
-    public async Task RefreshRotatesTokensAndPreservesAbsoluteSessionExpiry()
+    public async Task RefreshRotatesTokensAndPreservesSessionExpiry()
     {
         var (service, repository, _, client, timeProvider) = CreateSystem();
         var sessionExpiry = Now.AddHours(7);
@@ -44,6 +44,66 @@ public sealed class SessionTokenServiceTests
         Assert.Equal("access-new", stored.Ticket.Properties.GetTokenValue("access_token"));
         Assert.Equal(Now.AddSeconds(320).ToString("O"), stored.Ticket.Properties.GetTokenValue("expires_at"));
         Assert.Equal(1, client.RefreshCount);
+    }
+
+    [Fact]
+    public async Task RefreshCompletesBeforeQueuedCookieRenewalAndRenewalPreservesRotatedTokens()
+    {
+        var (service, repository, sessionLock, client, timeProvider) = CreateSystem();
+        await SaveAsync(repository, TicketFactory.Create(Now.AddDays(31), Now.AddSeconds(5)));
+        var refreshStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishRefresh = new TaskCompletionSource<OidcTokenResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.RefreshHandler = async cancellationToken =>
+        {
+            refreshStarted.TrySetResult(true);
+            timeProvider.Now = Now.AddSeconds(20);
+            return await finishRefresh.Task.WaitAsync(cancellationToken);
+        };
+        var ticketStore = new RedisTicketStore(repository, sessionLock, timeProvider);
+        var refresh = service.GetAccessTokenAsync("session", CancellationToken.None);
+        await refreshStarted.Task;
+        var renewalTicket = TicketFactory.Create(Now.AddDays(31).AddSeconds(20), Now.AddMinutes(5), "stale-access", "stale-refresh");
+        renewalTicket.Properties.IssuedUtc = Now.AddSeconds(20);
+        var renewal = ticketStore.RenewAsync("session", renewalTicket);
+        await sessionLock.SecondAcquireAttempted.Task;
+        finishRefresh.SetResult(new OidcTokenResponse(true, false, null, "rotated-access", "rotated-refresh", 300, null));
+
+        Assert.Equal("rotated-access", await refresh);
+        await renewal;
+
+        var stored = await repository.GetAsync("session", CancellationToken.None);
+        Assert.Equal(Now.AddDays(31).AddSeconds(20), stored?.Ticket.Properties.ExpiresUtc);
+        Assert.Equal(Now.AddSeconds(20), stored?.Ticket.Properties.IssuedUtc);
+        Assert.Equal("rotated-access", stored?.Ticket.Properties.GetTokenValue("access_token"));
+        Assert.Equal("rotated-refresh", stored?.Ticket.Properties.GetTokenValue("refresh_token"));
+    }
+
+    [Fact]
+    public async Task LogoutDuringRefreshAndQueuedRenewalDoesNotRestoreSession()
+    {
+        var (service, repository, sessionLock, client, timeProvider) = CreateSystem();
+        await SaveAsync(repository, TicketFactory.Create(Now.AddDays(31), Now.AddSeconds(5)));
+        var refreshStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishRefresh = new TaskCompletionSource<OidcTokenResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.RefreshHandler = async cancellationToken =>
+        {
+            refreshStarted.TrySetResult(true);
+            return await finishRefresh.Task.WaitAsync(cancellationToken);
+        };
+        var ticketStore = new RedisTicketStore(repository, sessionLock, timeProvider);
+        var refresh = service.GetAccessTokenAsync("session", CancellationToken.None);
+        await refreshStarted.Task;
+        var renewalTicket = TicketFactory.Create(Now.AddDays(31), Now.AddMinutes(5), "stale-access", "stale-refresh");
+        renewalTicket.Properties.IssuedUtc = Now;
+        var renewal = ticketStore.RenewAsync("session", renewalTicket);
+        await sessionLock.SecondAcquireAttempted.Task;
+        await repository.DeleteAsync("session", CancellationToken.None);
+        finishRefresh.SetResult(new OidcTokenResponse(true, false, null, "rotated-access", "rotated-refresh", 300, null));
+
+        await Assert.ThrowsAsync<AuthenticationRequiredException>(() => refresh);
+        await renewal;
+
+        Assert.Null(await repository.GetAsync("session", CancellationToken.None));
     }
 
     [Fact]

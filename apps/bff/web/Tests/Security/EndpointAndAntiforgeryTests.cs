@@ -8,6 +8,8 @@ using Moq;
 using Tdn.Bff.Endpoints;
 using Tdn.Bff.Security;
 using Tdn.Bff.Sessions;
+using Tdn.Bff.Errors;
+using Tdn.Bff.Oidc;
 using bff_web.Tests.Support;
 
 namespace bff_web.Tests.Security;
@@ -20,8 +22,9 @@ public sealed class EndpointAndAntiforgeryTests
         var (context, authentication) = CreateContext();
         authentication.Setup(service => service.AuthenticateAsync(context, BffAuthenticationDefaults.Cookies)).ReturnsAsync(AuthenticateResult.NoResult());
         var antiforgery = new Mock<IAntiforgery>();
+        var tokenService = new Mock<ISessionTokenService>();
 
-        await BffEndpointRouteBuilderExtensions.HandleSessionAsync(context, antiforgery.Object, "X-CSRF-TOKEN");
+        await BffEndpointRouteBuilderExtensions.HandleSessionAsync(context, antiforgery.Object, "X-CSRF-TOKEN", tokenService.Object);
 
         using var document = await ReadJsonAsync(context);
         Assert.Equal(new[] { "authenticated", "csrfHeaderName", "csrfToken" }, document.RootElement.EnumerateObject().Select(property => property.Name).OrderBy(name => name).ToArray());
@@ -30,6 +33,7 @@ public sealed class EndpointAndAntiforgeryTests
         Assert.Equal("X-CSRF-TOKEN", document.RootElement.GetProperty("csrfHeaderName").GetString());
         Assert.Equal("no-store", context.Response.Headers.CacheControl);
         antiforgery.Verify(service => service.GetAndStoreTokens(It.IsAny<HttpContext>()), Times.Never);
+        tokenService.Verify(service => service.GetAccessTokenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -40,10 +44,12 @@ public sealed class EndpointAndAntiforgeryTests
         authentication.Setup(service => service.AuthenticateAsync(context, BffAuthenticationDefaults.Cookies))
             .ReturnsAsync(AuthenticateResult.Success(new AuthenticationTicket(principal, new AuthenticationProperties(), BffAuthenticationDefaults.Cookies)));
         var antiforgery = new Mock<IAntiforgery>();
+        var tokenService = new Mock<ISessionTokenService>();
+        tokenService.Setup(service => service.GetAccessTokenAsync("server-key", It.IsAny<CancellationToken>())).ReturnsAsync("server-access-token");
         antiforgery.Setup(service => service.GetAndStoreTokens(context))
             .Returns(new AntiforgeryTokenSet("csrf-token-value", "cookie-token", "field", "X-CSRF-TOKEN"));
 
-        await BffEndpointRouteBuilderExtensions.HandleSessionAsync(context, antiforgery.Object, "X-CSRF-TOKEN");
+        await BffEndpointRouteBuilderExtensions.HandleSessionAsync(context, antiforgery.Object, "X-CSRF-TOKEN", tokenService.Object);
 
         using var document = await ReadJsonAsync(context);
         var names = document.RootElement.EnumerateObject().Select(property => property.Name).OrderBy(name => name).ToArray();
@@ -52,9 +58,90 @@ public sealed class EndpointAndAntiforgeryTests
         Assert.DoesNotContain("access_token", json);
         Assert.DoesNotContain("server-key", json);
         Assert.DoesNotContain("subject", json);
+        Assert.DoesNotContain("server-access-token", json);
         Assert.Equal("csrf-token-value", document.RootElement.GetProperty("csrfToken").GetString());
         Assert.Equal("no-store", context.Response.Headers.CacheControl);
+        tokenService.Verify(service => service.GetAccessTokenAsync("server-key", context.RequestAborted), Times.Once);
     }
+
+    [Fact]
+    public async Task SessionRefreshesExpiredAccessAndReturnsOnlySessionContractFields()
+    {
+        var now = new DateTimeOffset(2032, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        var timeProvider = new FixedTimeProvider(now);
+        var repository = new FakeSessionRepository(timeProvider);
+        var sessionLock = new FakeSessionLock();
+        var client = new FakeOidcTokenClient
+        {
+            RefreshHandler = _ => Task.FromResult(new OidcTokenResponse(true, false, null, "rotated-secret-access", "rotated-secret-refresh", 300, null))
+        };
+        var service = TestOptions.TokenService(repository, sessionLock, client, timeProvider);
+        await repository.CreateAsync("exact-session", TicketFactory.Create(now.AddDays(31), now.AddSeconds(-1)), CancellationToken.None);
+        var (context, authentication) = CreateContext();
+        var principal = PrincipalWithSession("exact-session");
+        authentication.Setup(authenticationService => authenticationService.AuthenticateAsync(context, BffAuthenticationDefaults.Cookies))
+            .ReturnsAsync(AuthenticateResult.Success(new AuthenticationTicket(principal, new AuthenticationProperties(), BffAuthenticationDefaults.Cookies)));
+        var antiforgery = new Mock<IAntiforgery>();
+        antiforgery.Setup(provider => provider.GetAndStoreTokens(context)).Returns(new AntiforgeryTokenSet("csrf-value", "cookie", "field", "X-CSRF-TOKEN"));
+
+        await BffEndpointRouteBuilderExtensions.HandleSessionAsync(context, antiforgery.Object, "X-CSRF-TOKEN", service);
+
+        using var document = await ReadJsonAsync(context);
+        Assert.Equal(new[] { "authenticated", "csrfHeaderName", "csrfToken" }, document.RootElement.EnumerateObject().Select(property => property.Name).OrderBy(name => name).ToArray());
+        Assert.True(document.RootElement.GetProperty("authenticated").GetBoolean());
+        var json = document.RootElement.GetRawText();
+        Assert.DoesNotContain("rotated-secret-access", json);
+        Assert.DoesNotContain("rotated-secret-refresh", json);
+        Assert.Equal("rotated-secret-access", (await repository.GetAsync("exact-session", CancellationToken.None))?.Ticket.Properties.GetTokenValue("access_token"));
+    }
+
+    [Fact]
+    public async Task SessionAuthenticationRequiredSignsOutCookieAndReturnsAnonymousContractWithoutAntiforgery()
+    {
+        var (context, authentication) = CreateContext();
+        authentication.Setup(service => service.AuthenticateAsync(context, BffAuthenticationDefaults.Cookies))
+            .ReturnsAsync(AuthenticateResult.Success(new AuthenticationTicket(PrincipalWithSession("session"), new AuthenticationProperties(), BffAuthenticationDefaults.Cookies)));
+        authentication.Setup(service => service.SignOutAsync(context, BffAuthenticationDefaults.Cookies, It.IsAny<AuthenticationProperties?>())).Returns(Task.CompletedTask);
+        var antiforgery = new Mock<IAntiforgery>();
+        var tokenService = new Mock<ISessionTokenService>();
+        tokenService.Setup(service => service.GetAccessTokenAsync("session", It.IsAny<CancellationToken>())).ThrowsAsync(new AuthenticationRequiredException());
+
+        await BffEndpointRouteBuilderExtensions.HandleSessionAsync(context, antiforgery.Object, "X-CSRF-TOKEN", tokenService.Object);
+
+        using var document = await ReadJsonAsync(context);
+        Assert.False(document.RootElement.GetProperty("authenticated").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, document.RootElement.GetProperty("csrfToken").ValueKind);
+        Assert.Equal(new[] { "authenticated", "csrfHeaderName", "csrfToken" }, document.RootElement.EnumerateObject().Select(property => property.Name).OrderBy(name => name).ToArray());
+        authentication.Verify(service => service.SignOutAsync(context, BffAuthenticationDefaults.Cookies, It.IsAny<AuthenticationProperties?>()), Times.Once);
+        antiforgery.Verify(service => service.GetAndStoreTokens(It.IsAny<HttpContext>()), Times.Never);
+    }
+
+    [Theory]
+    [MemberData(nameof(SessionDependencyFailures))]
+    public async Task SessionDependencyFailuresPropagateWithoutSigningOut(Exception exception)
+    {
+        var (context, authentication) = CreateContext();
+        authentication.Setup(service => service.AuthenticateAsync(context, BffAuthenticationDefaults.Cookies))
+            .ReturnsAsync(AuthenticateResult.Success(new AuthenticationTicket(PrincipalWithSession("session"), new AuthenticationProperties(), BffAuthenticationDefaults.Cookies)));
+        var antiforgery = new Mock<IAntiforgery>();
+        var tokenService = new Mock<ISessionTokenService>();
+        tokenService.Setup(service => service.GetAccessTokenAsync("session", It.IsAny<CancellationToken>())).ThrowsAsync(exception);
+
+        if (exception is DependencyUnavailableException)
+            await Assert.ThrowsAsync<DependencyUnavailableException>(() => BffEndpointRouteBuilderExtensions.HandleSessionAsync(context, antiforgery.Object, "X-CSRF-TOKEN", tokenService.Object));
+        else
+            await Assert.ThrowsAsync<IdentityProviderUnavailableException>(() => BffEndpointRouteBuilderExtensions.HandleSessionAsync(context, antiforgery.Object, "X-CSRF-TOKEN", tokenService.Object));
+
+        authentication.Verify(service => service.SignOutAsync(It.IsAny<HttpContext>(), It.IsAny<string?>(), It.IsAny<AuthenticationProperties?>()), Times.Never);
+        antiforgery.Verify(service => service.GetAndStoreTokens(It.IsAny<HttpContext>()), Times.Never);
+        Assert.Equal(0, context.Response.Body.Length);
+    }
+
+    public static IEnumerable<object[]> SessionDependencyFailures =>
+    [
+        [new DependencyUnavailableException()],
+        [new IdentityProviderUnavailableException()]
+    ];
 
     [Theory]
     [InlineData("/campaigns?tab=active#notes", "/campaigns?tab=active#notes")]

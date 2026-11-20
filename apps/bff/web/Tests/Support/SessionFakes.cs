@@ -32,6 +32,15 @@ internal sealed class FakeSessionRepository : ISessionRepository
         _timeProvider = timeProvider;
     }
 
+    public IReadOnlyCollection<string> Keys
+    {
+        get
+        {
+            lock (_gate)
+                return _records.Keys.ToArray();
+        }
+    }
+
     public Task<SessionSnapshot?> GetAsync(string key, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -92,10 +101,13 @@ internal sealed class FakeSessionRepository : ISessionRepository
     }
 
     private SessionSnapshot NewSnapshot(AuthenticationTicket ticket) =>
-        new(ticket, BitConverter.GetBytes(Interlocked.Increment(ref _version)));
+        new(CloneTicket(ticket), BitConverter.GetBytes(Interlocked.Increment(ref _version)));
 
     private static SessionSnapshot CopySnapshot(SessionSnapshot snapshot) =>
-        new(snapshot.Ticket, snapshot.ProtectedPayload.ToArray());
+        new(CloneTicket(snapshot.Ticket), snapshot.ProtectedPayload.ToArray());
+
+    private static AuthenticationTicket CloneTicket(AuthenticationTicket ticket) =>
+        new(ticket.Principal.Clone(), ticket.Properties.Clone(), ticket.AuthenticationScheme);
 }
 
 internal sealed class FakeSessionLock : ISessionLock

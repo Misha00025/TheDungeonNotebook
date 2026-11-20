@@ -2,16 +2,22 @@ using System.Security.Cryptography;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http;
+using Tdn.Bff.Errors;
 
 namespace Tdn.Bff.Sessions;
 
 public sealed class RedisTicketStore : ITicketStore
 {
     private readonly ISessionRepository _repository;
+    private readonly ISessionLock _sessionLock;
+    private readonly TimeProvider _timeProvider;
 
-    public RedisTicketStore(ISessionRepository repository)
+    public RedisTicketStore(ISessionRepository repository, ISessionLock sessionLock, TimeProvider timeProvider)
     {
         _repository = repository;
+        _sessionLock = sessionLock;
+        _timeProvider = timeProvider;
     }
 
     public async Task<string> StoreAsync(AuthenticationTicket ticket)
@@ -22,7 +28,62 @@ public sealed class RedisTicketStore : ITicketStore
         return key;
     }
 
-    public Task RenewAsync(string key, AuthenticationTicket ticket) => Task.CompletedTask;
+    public Task RenewAsync(string key, AuthenticationTicket ticket) => RenewCoreAsync(key, ticket, CancellationToken.None);
+
+    public Task RenewAsync(string key, AuthenticationTicket ticket, HttpContext httpContext, CancellationToken cancellationToken) =>
+        RenewCoreAsync(key, ticket, cancellationToken);
+
+    private async Task RenewCoreAsync(string key, AuthenticationTicket ticket, CancellationToken cancellationToken)
+    {
+        ISessionLockLease lease;
+        try
+        {
+            lease = await _sessionLock.AcquireAsync(key, cancellationToken).ConfigureAwait(false);
+        }
+        catch (TimeoutException exception)
+        {
+            throw new DependencyUnavailableException(exception);
+        }
+
+        await using (lease.ConfigureAwait(false))
+        using (var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lease.HandleLostToken))
+        {
+            try
+            {
+                while (true)
+                {
+                    linkedCancellation.Token.ThrowIfCancellationRequested();
+                    var snapshot = await _repository.GetAsync(key, linkedCancellation.Token).ConfigureAwait(false);
+                    var now = _timeProvider.GetUtcNow();
+                    if (snapshot is null || snapshot.Ticket.Properties.ExpiresUtc is not { } storedExpiry || storedExpiry <= now)
+                        return;
+
+                    var incomingExpiry = ticket.Properties.ExpiresUtc;
+                    var shouldExtend = incomingExpiry is { } expiry && expiry > storedExpiry;
+                    if (!shouldExtend && snapshot.Ticket.Properties.IsPersistent == true)
+                        return;
+
+                    var replacement = CloneTicket(snapshot.Ticket);
+                    if (shouldExtend)
+                    {
+                        replacement.Properties.IssuedUtc = ticket.Properties.IssuedUtc;
+                        replacement.Properties.ExpiresUtc = incomingExpiry;
+                    }
+                    replacement.Properties.IsPersistent = true;
+                    if (await _repository.ReplaceAsync(key, snapshot, replacement, linkedCancellation.Token).ConfigureAwait(false))
+                        return;
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (OperationCanceledException exception)
+            {
+                throw new DependencyUnavailableException(exception);
+            }
+        }
+    }
 
     public async Task<AuthenticationTicket?> RetrieveAsync(string key)
     {
@@ -46,6 +107,9 @@ public sealed class RedisTicketStore : ITicketStore
         var properties = ticket.Properties.Clone();
         return new AuthenticationTicket(principal, properties, ticket.AuthenticationScheme);
     }
+
+    private static AuthenticationTicket CloneTicket(AuthenticationTicket ticket) =>
+        new(ticket.Principal.Clone(), ticket.Properties.Clone(), ticket.AuthenticationScheme);
 
     private static string Base64UrlEncode(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 }

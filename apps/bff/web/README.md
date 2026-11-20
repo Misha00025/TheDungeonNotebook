@@ -101,6 +101,10 @@ Account service проверяет issuer и audience access token соглас�
 
 ## Сессия и запросы
 
+Cookie BFF и серверная сессия имеют persistent sliding lifetime 31 день по умолчанию. Каждый успешный HTTP-запрос с действующей cookie продлевает срок; возраст сессии при регулярной активности абсолютным лимитом не ограничен. При первом обращении к `GET /bff/session` BFF также проверяет access token и при необходимости выполняет refresh на сервере, но OAuth-токены клиенту не возвращает. Для offline refresh настройте в Keycloak idle timeout offline-сессии больше окна BFF; не задавайте offline absolute maximum, если сессия должна оставаться живой при активности.
+
+Значение настраивается через `Bff:Session:Lifetime` в host config `apps/bff/web/data/config/appsettings.json`. Конфиги существующих установок не перезаписываются при обновлении: если там сохранено прежнее `08:00:00`, измените его вручную на `31.00:00:00` и перезапустите BFF. Это касается только BFF-сессии и не увеличивает срок жизни access token. Локальный logout удаляет cookie и BFF-сессию, затем инициирует OIDC logout; завершение внешней SSO-сессии, logout на других устройствах/приложениях и отзыв уже выданных JWT по-прежнему зависят от IdP и не гарантируются BFF.
+
 Транспортные ошибки token exchange/refresh и обработанные OIDC remote failures используют `504 identity_provider_unavailable`. Ошибки logout обрабатываются общим middleware и могут завершиться, например, `503 dependency_unavailable` или `500 internal_error`; нельзя считать, что любой сбой discovery во время logout вернёт именно `504`.
 
 ### Прямой Web с другого origin

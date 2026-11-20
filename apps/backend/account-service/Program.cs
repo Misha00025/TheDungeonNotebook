@@ -13,6 +13,8 @@ try
     builder.Services.Configure<AccountOptions>(builder.Configuration.GetSection("Accounts"));
     builder.Services.Configure<OidcOptions>(builder.Configuration.GetSection("Oidc"));
     builder.Services.Configure<LegacyGroupsOptions>(builder.Configuration.GetSection("LegacyGroups"));
+    builder.Services.AddMemoryCache();
+    builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton(sp => sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<LegacyGroupsOptions>>().Value);
     builder.Services.AddSingleton(sp =>
     {
@@ -23,7 +25,7 @@ try
     builder.Services.AddSingleton(sp => new InternalServiceKey(sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<InternalAuthOptions>>().Value.ResolveKey()));
     builder.Services.AddDbContext<AccountsDbContext>(o => o.UseMySql(connection, new MySqlServerVersion(new Version(8, 0, 0))));
     builder.Services.AddScoped<IAccountStore, AccountStore>();
-    builder.Services.AddScoped<OidcTokenValidator>(sp => new(sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OidcOptions>>().Value, sp.GetRequiredService<IHttpClientFactory>()));
+    builder.Services.AddSingleton<OidcTokenValidator>(sp => new(sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OidcOptions>>().Value, sp.GetRequiredService<IHttpClientFactory>(), sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(), sp.GetRequiredService<TimeProvider>()));
     builder.Services.AddScoped<AuthenticationService>();
     builder.Services.AddHttpClient("oidc", (sp, client) => { client.Timeout = TimeSpan.FromSeconds(sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OidcOptions>>().Value.TimeoutSeconds); client.MaxResponseContentBufferSize = 1024 * 1024; })
         .ConfigurePrimaryHttpMessageHandler(sp => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });

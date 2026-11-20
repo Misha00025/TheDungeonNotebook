@@ -6,12 +6,14 @@ using Moq;
 using StackExchange.Redis;
 using Tdn.Bff.Configuration;
 using Tdn.Bff.Sessions;
+using bff_web.Tests.Support;
 
 namespace bff_web.Tests.Sessions;
 
 public sealed class RedisSessionRepositoryTests
 {
-    private static readonly DateTimeOffset SessionExpiry = DateTimeOffset.UtcNow.AddHours(2);
+    private static readonly DateTimeOffset Now = new(2030, 2, 3, 4, 5, 6, TimeSpan.Zero);
+    private static readonly DateTimeOffset SessionExpiry = Now.AddDays(31);
 
     [Fact]
     public async Task CreateStoresProtectedPayloadAndRemainingTtl()
@@ -35,14 +37,14 @@ public sealed class RedisSessionRepositoryTests
         Assert.DoesNotContain("synthetic-access-secret", serializedPayload);
         Assert.DoesNotContain("synthetic-refresh-secret", serializedPayload);
         Assert.NotNull(storedTtl);
-        Assert.InRange(storedTtl.Value, TimeSpan.FromHours(1), TimeSpan.FromHours(2));
+        Assert.Equal(TimeSpan.FromDays(31), storedTtl.Value);
         database.Verify(db => db.StringSetAsync(It.IsAny<RedisKey>(), It.IsAny<RedisValue>(), It.IsAny<TimeSpan?>(), When.NotExists), Times.Once);
     }
 
     [Fact]
     public async Task GetRoundTripsTicketAndReturnsNullForCorruptOrExpiredPayload()
     {
-        var (repository, database, provider) = CreateRepositoryWithProvider();
+        var (repository, database, provider, timeProvider) = CreateRepositoryWithProvider();
         RedisValue wire = RedisValue.Null;
         database.Setup(db => db.StringSetAsync(It.IsAny<RedisKey>(), It.IsAny<RedisValue>(), It.IsAny<TimeSpan?>(), It.IsAny<When>()))
             .Callback<RedisKey, RedisValue, TimeSpan?, When>((_, value, _, _) => wire = value)
@@ -60,7 +62,7 @@ public sealed class RedisSessionRepositoryTests
         Assert.Null(await repository.GetAsync("session", CancellationToken.None));
 
         var protector = provider.CreateProtector("Tdn.Bff.SessionTicket");
-        wire = protector.Protect(TicketSerializer.Default.Serialize(CreateTicket(DateTimeOffset.UtcNow.AddSeconds(-1), "expired", "expired-refresh")));
+        wire = protector.Protect(TicketSerializer.Default.Serialize(CreateTicket(timeProvider.GetUtcNow().AddSeconds(-1), "expired", "expired-refresh")));
         Assert.Null(await repository.GetAsync("session", CancellationToken.None));
     }
 
@@ -126,23 +128,52 @@ public sealed class RedisSessionRepositoryTests
         Assert.Equal(wire, (byte[])scriptValues![0]!);
     }
 
+    [Fact]
+    public async Task ReplaceUsesInjectedClockForAtomicRenewedTtl()
+    {
+        var (repository, database, _, timeProvider) = CreateRepositoryWithProvider();
+        RedisValue[]? scriptValues = null;
+        database.Setup(db => db.ScriptEvaluateAsync(It.IsAny<string>(), It.IsAny<RedisKey[]?>(), It.IsAny<RedisValue[]?>(), It.IsAny<CommandFlags>()))
+            .Callback<string, RedisKey[]?, RedisValue[]?, CommandFlags>((_, _, values, _) => scriptValues = values)
+            .ReturnsAsync(RedisResult.Create(1));
+        var expected = new SessionSnapshot(CreateTicket(SessionExpiry, "old", "refresh"), Encoding.UTF8.GetBytes("expected"));
+        var renewedExpiry = timeProvider.GetUtcNow().AddDays(31);
+
+        var replaced = await repository.ReplaceAsync("session", expected, CreateTicket(renewedExpiry, "new", "refresh"), CancellationToken.None);
+
+        Assert.True(replaced);
+        Assert.Equal((long)TimeSpan.FromDays(31).TotalMilliseconds, (long)scriptValues![2]!);
+    }
+
+    [Fact]
+    public async Task GetRejectsPayloadWhoseTicketExpiryHasPassedAccordingToInjectedClock()
+    {
+        var (repository, database, provider, timeProvider) = CreateRepositoryWithProvider();
+        var protector = provider.CreateProtector("Tdn.Bff.SessionTicket");
+        var wire = protector.Protect(TicketSerializer.Default.Serialize(CreateTicket(timeProvider.GetUtcNow().AddTicks(-1), "expired", "refresh")));
+        database.Setup(db => db.StringGetAsync(It.IsAny<RedisKey>(), It.IsAny<CommandFlags>())).ReturnsAsync((RedisValue)wire);
+
+        Assert.Null(await repository.GetAsync("session", CancellationToken.None));
+    }
+
     private static (RedisSessionRepository Repository, Mock<IDatabase> Database) CreateRepository()
     {
-        var (repository, database, _) = CreateRepositoryWithProvider();
+        var (repository, database, _, _) = CreateRepositoryWithProvider();
         return (repository, database);
     }
 
-    private static (RedisSessionRepository Repository, Mock<IDatabase> Database, IDataProtectionProvider Provider) CreateRepositoryWithProvider()
+    private static (RedisSessionRepository Repository, Mock<IDatabase> Database, IDataProtectionProvider Provider, FixedTimeProvider TimeProvider) CreateRepositoryWithProvider()
     {
         var database = new Mock<IDatabase>();
         var connection = new Mock<IConnectionMultiplexer>();
         connection.Setup(client => client.GetDatabase(It.IsAny<int>(), It.IsAny<object?>())).Returns(database.Object);
         var provider = new EphemeralDataProtectionProvider();
+        var timeProvider = new FixedTimeProvider(Now);
         var repository = new RedisSessionRepository(connection.Object, provider, Options.Create(new BffOptions
         {
             Redis = new RedisOptions { ConnectionString = "unused", KeyPrefix = "tdn:bff:" }
-        }));
-        return (repository, database, provider);
+        }), timeProvider);
+        return (repository, database, provider, timeProvider);
     }
 
     private static AuthenticationTicket CreateTicket(DateTimeOffset expiry, string accessToken, string refreshToken)

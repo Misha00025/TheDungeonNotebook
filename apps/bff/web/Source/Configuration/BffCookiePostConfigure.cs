@@ -8,11 +8,13 @@ public sealed class BffCookiePostConfigure : IPostConfigureOptions<CookieAuthent
 {
     private readonly ITicketStore _ticketStore;
     private readonly IOptions<BffOptions> _bffOptions;
+    private readonly TimeProvider _timeProvider;
 
-    public BffCookiePostConfigure(ITicketStore ticketStore, IOptions<BffOptions> bffOptions)
+    public BffCookiePostConfigure(ITicketStore ticketStore, IOptions<BffOptions> bffOptions, TimeProvider timeProvider)
     {
         _ticketStore = ticketStore;
         _bffOptions = bffOptions;
+        _timeProvider = timeProvider;
     }
 
     public void PostConfigure(string? name, CookieAuthenticationOptions options)
@@ -21,10 +23,27 @@ public sealed class BffCookiePostConfigure : IPostConfigureOptions<CookieAuthent
             return;
 
         options.SessionStore = _ticketStore;
-        options.SlidingExpiration = false;
+        options.SlidingExpiration = true;
         options.ExpireTimeSpan = _bffOptions.Value.Session.Lifetime;
         options.Cookie.HttpOnly = true;
         options.Events ??= new CookieAuthenticationEvents();
+        options.Events.OnSigningIn = context =>
+        {
+            var issuedUtc = context.Properties.IssuedUtc ?? _timeProvider.GetUtcNow();
+            context.Properties.IssuedUtc = issuedUtc;
+            context.Properties.ExpiresUtc = issuedUtc + _bffOptions.Value.Session.Lifetime;
+            context.Properties.IsPersistent = true;
+            return Task.CompletedTask;
+        };
+        options.Events.OnCheckSlidingExpiration = context =>
+        {
+            context.ShouldRenew = true;
+            context.Properties.IsPersistent = true;
+            var issuedUtc = context.Properties.IssuedUtc ?? _timeProvider.GetUtcNow();
+            context.Properties.IssuedUtc = issuedUtc;
+            context.Properties.ExpiresUtc = issuedUtc + _bffOptions.Value.Session.Lifetime;
+            return Task.CompletedTask;
+        };
         options.Events.OnRedirectToLogin = context =>
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;

@@ -68,6 +68,27 @@ public sealed class AccountOptionsTests
     }
 
     [Fact]
+    public void Validation_cache_duration_defaults_binds_and_accepts_zero_but_rejects_negative()
+    {
+        var defaults = new OidcOptions { Providers = [Provider()] };
+        defaults.Validate();
+        Assert.Equal(TimeSpan.FromSeconds(30), defaults.ValidationCacheDuration);
+
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Oidc:ValidationCacheDuration"] = "00:00:07",
+            ["Oidc:Providers:0:Issuer"] = "https://issuer.test",
+            ["Oidc:Providers:0:Audiences:0"] = "account"
+        }).Build();
+        Assert.Equal(TimeSpan.FromSeconds(7), config.GetSection("Oidc").Get<OidcOptions>()!.ValidationCacheDuration);
+
+        defaults.ValidationCacheDuration = TimeSpan.Zero;
+        defaults.Validate();
+        defaults.ValidationCacheDuration = TimeSpan.FromSeconds(-1);
+        Assert.Throws<InvalidOperationException>(defaults.Validate);
+    }
+
+    [Fact]
     public void Internal_auth_configuration_rejects_both_key_sources()
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>

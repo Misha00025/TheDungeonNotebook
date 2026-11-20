@@ -42,10 +42,11 @@ public sealed class InternalAuthOptions
 public sealed class OidcOptions
 {
     public int TimeoutSeconds { get; set; } = 10;
+    public TimeSpan ValidationCacheDuration { get; set; } = TimeSpan.FromSeconds(30);
     public List<OidcProviderOptions> Providers { get; set; } = [];
     public void Validate()
     {
-        if (TimeoutSeconds is < 1 or > 60 || Providers is null || Providers.Count == 0) throw new InvalidOperationException("Invalid OIDC configuration");
+        if (TimeoutSeconds is < 1 or > 60 || ValidationCacheDuration < TimeSpan.Zero || Providers is null || Providers.Count == 0) throw new InvalidOperationException("Invalid OIDC configuration");
         if (Providers.Any(p => p.Issuer.Length > 512 || string.IsNullOrWhiteSpace(p.Issuer))) throw new InvalidOperationException("Invalid OIDC issuer");
         if (Providers.Select(p => p.Issuer).Distinct(StringComparer.Ordinal).Count() != Providers.Count) throw new InvalidOperationException("OIDC issuers must be unique");
         foreach (var p in Providers)

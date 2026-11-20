@@ -37,7 +37,7 @@ public sealed class RedisOptions
 
 public sealed class SessionOptions
 {
-    public TimeSpan Lifetime { get; set; } = TimeSpan.FromHours(8);
+    public TimeSpan Lifetime { get; set; } = TimeSpan.FromDays(31);
     public TimeSpan RefreshBeforeExpiry { get; set; } = TimeSpan.FromSeconds(30);
     public TimeSpan AccessTokenLifetimeWhenMissing { get; set; } = TimeSpan.FromMinutes(5);
     public TimeSpan LockWaitTimeout { get; set; } = TimeSpan.FromSeconds(10);
