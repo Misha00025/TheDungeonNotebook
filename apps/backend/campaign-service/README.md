@@ -4,12 +4,15 @@
 
 Campaign Service is a .NET 10 ASP.NET Core service for campaigns, templates, characters, assignments, character sheets, and saved Views/presentation configuration. Requests use the `X-Subject` JSON header. The [current API index](docs/README.md), including the separate [current permissions contract](docs/permissions.md), links the host contracts. The public [HTML API documentation](../../../docs/api/index.html) describes legacy routes, not this host.
 
+The shared item/skill catalog and typed attribute contracts are documented in [`docs/catalog.md`](docs/catalog.md).
+
 ## Structure
 
 - `CampaignService.csproj` and `CampaignService.sln` — project and solution files
 - `Source/` — host, HTTP, domain, access, configuration, and persistence code
 - `Source/Persistence/Migrations/` — EF Core migration and model snapshot
 - `Source/Sheets/` — template and character-sheet domain and application code
+- `Source/Catalog/` — campaign-scoped item/skill catalog and typed attribute validation
 - `Source/Computation/` — formula and virtual-field calculation services
 - `Source/Views/` — saved view trees, declared-source projection, and presentation contexts
 - `Source/Persistence/MongoContentStore.cs` — document storage for template, character, formula, view, and presentation content
@@ -45,7 +48,7 @@ Views store a typed Layout/Widget tree and opaque native JSON parameters. The ba
 
 ## Data storage and publication boundaries
 
-SQL stores campaign and member records, one shared-primary-key `CampaignTemplates` metadata row per campaign, other resource metadata, and character assignments. MongoDB stores content in `campaignTemplates` (one document per campaign, created by the first content update), `characterSheets`, `formulaContents`, `viewContents`, and `campaignPresentationConfigs`. Current point reads use MongoDB's standard unique `_id` index, whose value combines campaign ID and the internal resource key; the template has no public resource selector. The service does not rely on user-created indexes or full collection scans to establish publication. Mongo `contentRevision` and SQL `metadataRevision` are independent. View `params` and context parameters remain native JSON values. This service slice has no filesystem-backed content bodies.
+SQL stores campaign and member records, one shared-primary-key `CampaignTemplates` metadata row per campaign, catalog entry metadata, other resource metadata, and character assignments. MongoDB stores content in `campaignTemplates` (one document per campaign, created by the first content update), `characterSheets`, `formulaContents`, `viewContents`, `campaignPresentationConfigs`, `catalogAttributeDefinitions`, and `catalogContents`. Current point reads use MongoDB's standard unique `_id` index, whose value combines campaign ID and the internal resource key; singleton documents use `Guid.Empty` as their resource ID. The template has no public resource selector. The service does not rely on user-created indexes or full collection scans to establish publication. Mongo `contentRevision` and SQL `metadataRevision` are independent. View `params` and context parameters remain native JSON values. This service slice has no filesystem-backed content bodies.
 
 Breaking migration `20261118000100_CampaignTemplate` drops the former `TemplateMetadata` table and `CharacterMetadata.TemplateId`, creates shared-primary-key `CampaignTemplates`, and seeds one empty template using the campaign name for each campaign. Old many-template SQL rows are lost; `templateContents` documents are not migrated or read. The migration cannot restore discarded old template data and downgrade is unsupported. This documents the migration behavior; no statement is made about the state of a particular database.
 

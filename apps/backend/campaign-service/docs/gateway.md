@@ -2,7 +2,9 @@
 
 Gateway exposes the campaign-service API one-to-one: the external path and upstream path are both `/api/campaigns/...`. The active route list is maintained in [`routes.yaml`](../../api-gateway/configs/routes.yaml); the domain methods and request contracts are documented in [the service API index](README.md) and its linked endpoint pages. The old `/groups/...` and `/polices/...` campaign proxy routes are not served by this Gateway configuration. Updating BFF or Web clients is separate from this Gateway routing contract.
 
-Template routes are singleton paths: `GET`/`PUT /api/campaigns/{campaignId}/template`, `GET`/`PUT .../template/content`, and `GET`/`PUT .../template/virtual-fields`. No plural catalog, create POST, or template-GUID route is proxied. This is a route-contract change only; Gateway/BFF authentication, verified identity forwarding, request/response passthrough, and body/query transport are unchanged.
+Template routes are singleton paths: `GET`/`PUT /api/campaigns/{campaignId}/template`, `GET`/`PUT .../template/content`, and `GET`/`PUT .../template/virtual-fields`. No plural template catalog, create POST, or template-GUID route is proxied. This is a route-contract change only; Gateway/BFF authentication, verified identity forwarding, request/response passthrough, and body/query transport are unchanged.
+
+Catalog endpoints have explicit one-to-one routes and are listed in the [catalog contract](catalog.md). They use the same verified subject and response forwarding.
 
 Virtual-field inputs use ordinary `bindings` only; the separate parent-field properties are not part of the service contract. Existing template/custom virtual-field and override proxy routes pass their request bodies through without rewrites.
 

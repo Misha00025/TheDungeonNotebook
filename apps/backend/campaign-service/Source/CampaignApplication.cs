@@ -11,6 +11,7 @@ using Tdn.Campaigns.Persistence;
 using Tdn.Campaigns.Sheets;
 using Tdn.Campaigns.Computation;
 using Tdn.Campaigns.Views;
+using Tdn.Campaigns.Catalog;
 using MongoDB.Driver;
 
 namespace Tdn.Campaigns;
@@ -90,7 +91,9 @@ public static class CampaignApplication
         builder.Services.AddSingleton<IMongoClient>(services => new MongoClient(services.GetRequiredService<IOptions<MongoOptions>>().Value.ConnectionString));
         builder.Services.AddSingleton<IMongoDatabase>(services => services.GetRequiredService<IMongoClient>().GetDatabase(services.GetRequiredService<IOptions<MongoOptions>>().Value.Database));
         builder.Services.AddScoped<IResourceStore, EfResourceStore>();
+        builder.Services.AddScoped<ICatalogStore, EfCatalogStore>();
         builder.Services.AddScoped<IContentStore, MongoContentStore>();
+        builder.Services.AddScoped<CatalogService>();
         builder.Services.AddScoped<SheetService>();
         builder.Services.AddScoped<FormulaService>();
         builder.Services.AddScoped<VirtualFieldService>();

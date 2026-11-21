@@ -319,6 +319,50 @@ routes:
     auth: required
     methods: [GET, POST]
 
+  - path: /api/campaigns/{campaignId}/catalog/attributes
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/catalog/attributes
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, PUT]
+
+  - path: /api/campaigns/{campaignId}/catalog/{entryId}/content
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/catalog/{entryId}/content
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, PUT]
+
+  - path: /api/campaigns/{campaignId}/catalog/{entryId}
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/catalog/{entryId}
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, PUT]
+
+  - path: /api/campaigns/{campaignId}/catalog
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/catalog
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, POST]
+
   - path: /api/campaigns/{campaignId}/formulas/{formulaId}/content
     proxy:
       service: campaign

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Tdn.Campaigns.Campaigns;
 using Tdn.Campaigns.Sheets;
+using Tdn.Campaigns.Catalog;
 
 namespace Tdn.Campaigns.Persistence;
 
@@ -13,6 +14,7 @@ public sealed class CampaignDbContext(DbContextOptions<CampaignDbContext> option
     public DbSet<CharacterAssignment> CharacterAssignments => Set<CharacterAssignment>();
     public DbSet<FormulaMetadata> FormulaMetadata => Set<FormulaMetadata>();
     public DbSet<ViewMetadata> ViewMetadata => Set<ViewMetadata>();
+    public DbSet<CatalogEntry> CatalogEntries => Set<CatalogEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -73,5 +75,20 @@ public sealed class CampaignDbContext(DbContextOptions<CampaignDbContext> option
         view.Property(x => x.Name).IsRequired().HasColumnType("longtext");
         view.Property(x => x.MetadataRevision).IsRequired().IsConcurrencyToken();
         view.HasOne(x => x.Campaign).WithMany().HasForeignKey(x => x.CampaignId).OnDelete(DeleteBehavior.Restrict);
+
+        var catalog = modelBuilder.Entity<CatalogEntry>();
+        catalog.ToTable("CatalogEntries", table => table.HasCheckConstraint("CK_CatalogEntries_MetadataRevision", "MetadataRevision >= 1"));
+        catalog.HasKey(x => x.Id);
+        catalog.HasAlternateKey(x => new { x.CampaignId, x.Id });
+        catalog.Property(x => x.Id).ValueGeneratedNever();
+        catalog.Property(x => x.Name).IsRequired().HasColumnType("longtext");
+        catalog.Property(x => x.Kind).IsRequired();
+        catalog.Property(x => x.CreatorUserId).IsRequired(false);
+        catalog.Property(x => x.IsHidden).IsRequired();
+        catalog.Property(x => x.QuantityUnit).IsRequired(false);
+        catalog.Property(x => x.AllowNegative).IsRequired();
+        catalog.Property(x => x.MetadataRevision).IsRequired().IsConcurrencyToken();
+        catalog.HasIndex(x => new { x.CampaignId, x.Kind });
+        catalog.HasOne(x => x.Campaign).WithMany().HasForeignKey(x => x.CampaignId).OnDelete(DeleteBehavior.Restrict);
     }
 }

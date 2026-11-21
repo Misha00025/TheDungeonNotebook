@@ -8,6 +8,7 @@ Current API contracts:
 - [Characters, assignments, and sheets](characters.md)
 - [Formulas, virtual fields, and computed sheets](formulas.md)
 - [Views and presentation contexts](views.md)
+- [Catalog entries, attribute schemas, and content](catalog.md)
 - [API Gateway routing](gateway.md)
 - [Singleton-template Web handoff](singleton-template-web.md)
 

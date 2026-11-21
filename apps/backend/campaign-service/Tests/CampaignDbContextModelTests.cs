@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
 using Tdn.Campaigns.Campaigns;
+using Tdn.Campaigns.Catalog;
 using Tdn.Campaigns.Persistence;
 using Tdn.Campaigns.Sheets;
 
@@ -29,6 +30,7 @@ public class CampaignDbContextModelTests
         Assert.Contains("CREATE TABLE `CharacterAssignments`", script);
         Assert.Contains("CREATE TABLE `FormulaMetadata`", script);
         Assert.Contains("CREATE TABLE `ViewMetadata`", script);
+        Assert.Contains("CREATE TABLE `CatalogEntries`", script);
 
         var forward = context.Database.GetService<IMigrator>().GenerateScript("20261117000500_Views", "20261118000100_CampaignTemplate");
         Assert.Contains("DROP COLUMN `TemplateId`", forward);
@@ -36,6 +38,11 @@ public class CampaignDbContextModelTests
         Assert.Contains("CREATE TABLE `CampaignTemplates`", forward);
         Assert.Contains("PRIMARY KEY (`CampaignId`)", forward);
         Assert.Contains("INSERT INTO `CampaignTemplates` (`CampaignId`, `Name`, `MetadataRevision`) SELECT `Id`, `Name`, 1 FROM `Campaigns`", forward);
+
+        var catalogForward = context.Database.GetService<IMigrator>().GenerateScript("20261118000100_CampaignTemplate", "20261121000100_Catalog");
+        Assert.Contains("CREATE TABLE `CatalogEntries`", catalogForward);
+        Assert.DoesNotContain("DROP TABLE", catalogForward);
+        Assert.DoesNotContain("DROP COLUMN", catalogForward);
     }
 
     [Fact]
@@ -53,6 +60,7 @@ public class CampaignDbContextModelTests
         var assignment = model.FindEntityType(typeof(CharacterAssignment))!;
         var formula = model.FindEntityType(typeof(FormulaMetadata))!;
         var view = model.FindEntityType(typeof(ViewMetadata))!;
+        var catalogEntry = model.FindEntityType(typeof(CatalogEntry))!;
 
         Assert.Equal(new[] { "Id" }, campaign.FindPrimaryKey()!.Properties.Select(x => x.Name));
         Assert.Contains(campaign.GetIndexes(), index => index.IsUnique && index.Properties.Select(x => x.Name).SequenceEqual(new[] { "CreationRequestId" }));
@@ -101,5 +109,16 @@ public class CampaignDbContextModelTests
         Assert.Contains(view.GetKeys(), key => key.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }));
         Assert.True(view.FindProperty(nameof(ViewMetadata.MetadataRevision))!.IsConcurrencyToken);
         Assert.Equal(DeleteBehavior.Restrict, Assert.Single(view.GetForeignKeys()).DeleteBehavior);
+
+        Assert.Equal(new[] { "Id" }, catalogEntry.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Contains(catalogEntry.GetKeys(), key => key.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }));
+        Assert.True(catalogEntry.FindProperty(nameof(CatalogEntry.MetadataRevision))!.IsConcurrencyToken);
+        Assert.True(catalogEntry.FindProperty(nameof(CatalogEntry.CreatorUserId))!.IsNullable);
+        Assert.True(catalogEntry.FindProperty(nameof(CatalogEntry.QuantityUnit))!.IsNullable);
+        Assert.Contains(catalogEntry.GetIndexes(), index => index.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Kind" }));
+        var catalogCampaign = Assert.Single(catalogEntry.GetForeignKeys());
+        Assert.Equal(typeof(Campaign), catalogCampaign.PrincipalEntityType.ClrType);
+        Assert.Equal(new[] { "CampaignId" }, catalogCampaign.Properties.Select(x => x.Name));
+        Assert.Equal(DeleteBehavior.Restrict, catalogCampaign.DeleteBehavior);
     }
 }

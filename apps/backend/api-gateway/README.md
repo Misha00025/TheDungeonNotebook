@@ -18,6 +18,8 @@ Campaign Service routes are forwarded one-to-one under `/api/campaigns/...`; the
 
 The template proxy exposes only GET/PUT on `/api/campaigns/{campaignId}/template`, `/template/content`, and `/template/virtual-fields`. Plural template catalog/create routes and template-GUID routes are not active. Gateway/BFF transport and verified `X-Subject` forwarding are unchanged; see the [singleton-template Web handoff](../campaign-service/docs/singleton-template-web.md) for client contract changes.
 
+The shared item/skill catalog routes are described in the campaign-service [catalog contract](../campaign-service/docs/catalog.md).
+
 Virtual-field requests use ordinary `bindings` only; separate parent-field properties are not part of the service contract. Existing template/custom virtual-field and override routes pass bodies through without rewrites.
 
 **Внимание:** root-команда `make test` очищает тестовые данные баз данных перед запуском интеграционных тестов.

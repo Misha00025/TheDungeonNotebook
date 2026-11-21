@@ -105,6 +105,23 @@ public sealed class CampaignDbContextModelSnapshot : ModelSnapshot
             entity.ToTable("ViewMetadata", table => table.HasCheckConstraint("CK_ViewMetadata_MetadataRevision", "MetadataRevision >= 1"));
         });
 
+        modelBuilder.Entity("Tdn.Campaigns.Catalog.CatalogEntry", entity =>
+        {
+            entity.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("char(36)");
+            entity.Property<int>("CampaignId").HasColumnType("int");
+            entity.Property<string>("Name").IsRequired().HasColumnType("longtext");
+            entity.Property<int>("Kind").HasColumnType("int");
+            entity.Property<int?>("CreatorUserId").HasColumnType("int");
+            entity.Property<bool>("IsHidden").HasColumnType("tinyint(1)");
+            entity.Property<int?>("QuantityUnit").HasColumnType("int");
+            entity.Property<bool>("AllowNegative").HasColumnType("tinyint(1)");
+            entity.Property<long>("MetadataRevision").IsConcurrencyToken().HasColumnType("bigint");
+            entity.HasKey("Id");
+            entity.HasAlternateKey("CampaignId", "Id");
+            entity.HasIndex("CampaignId", "Kind");
+            entity.ToTable("CatalogEntries", table => table.HasCheckConstraint("CK_CatalogEntries_MetadataRevision", "MetadataRevision >= 1"));
+        });
+
         modelBuilder.Entity("Tdn.Campaigns.Sheets.TemplateMetadata", entity =>
         {
             entity.HasOne("Tdn.Campaigns.Campaigns.Campaign", "Campaign")
@@ -137,6 +154,11 @@ public sealed class CampaignDbContextModelSnapshot : ModelSnapshot
         {
             entity.HasOne("Tdn.Campaigns.Campaigns.Campaign", "Campaign")
                 .WithMany().HasForeignKey("CampaignId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+        });
+
+        modelBuilder.Entity("Tdn.Campaigns.Catalog.CatalogEntry", entity =>
+        {
+            entity.HasOne("Tdn.Campaigns.Campaigns.Campaign", "Campaign").WithMany().HasForeignKey("CampaignId").OnDelete(DeleteBehavior.Restrict).IsRequired();
         });
     }
 }
