@@ -18,6 +18,11 @@
   max-width: 100%;
 }
 
+.roots[data-surface='header'] > .node[data-node-type='group'] {
+  flex: 1 1 0;
+  width: auto;
+}
+
 .node {
   position: relative;
   box-sizing: border-box;
@@ -634,8 +639,8 @@
   grid-template-columns: repeat(var(--presentation-columns, 1), minmax(0, 1fr));
 }
 
-.rowChildren > * {
-  flex: 1 1 12rem;
+.rowChildren {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 @media (max-width: 520px) {
@@ -669,10 +674,6 @@
 }
 
 @media (max-width: 600px) {
-  .groupChildren {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .statList {
     --stat-column-count: 1;
   }
@@ -684,11 +685,6 @@
 }
 
 @container (max-width: 40rem) {
-  .roots[data-surface='header'] .groupChildren,
-  .roots[data-surface='card'] .groupChildren {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .roots[data-surface='header'] .statList,
   .roots[data-surface='card'] .statList {
     --stat-column-count: 1;

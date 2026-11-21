@@ -91,8 +91,9 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; con
   let content: React.ReactNode = null;
   if (params?.type === 'group') {
     const groupGap = surface === 'page' ? params.gap === 'small' ? '.5rem' : params.gap === 'large' ? '1.5rem' : '1rem' : params.gap === 'small' ? '.25rem' : params.gap === 'large' ? '.75rem' : '.5rem';
-    content = <div className={`${styles.children} ${params.direction === 'row' ? styles.rowChildren : styles.groupChildren}`} style={{ '--presentation-columns': String(params.columns), display: params.direction === 'row' ? 'flex' : 'grid', flexDirection: params.direction === 'row' ? 'row' : undefined, flexWrap: params.direction === 'row' ? 'wrap' : undefined, gap: groupGap } as React.CSSProperties}>
-      {node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} conditionSheet={conditionSheet} sample={sample} surface={surface} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={onDropMarker} renderNodeActions={renderNodeActions} orientation={params.direction} />)}
+    const childOrientation = params.direction === 'row' || params.columns === 1 ? 'column' : 'row';
+    content = <div className={`${styles.children} ${params.direction === 'row' ? styles.rowChildren : styles.groupChildren}`} style={{ '--presentation-columns': String(params.columns), gap: groupGap } as React.CSSProperties}>
+      {node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} conditionSheet={conditionSheet} sample={sample} surface={surface} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={onDropMarker} renderNodeActions={renderNodeActions} orientation={childOrientation} />)}
     </div>;
   } else if (params?.type === 'composite') {
     const primary = params.primary && params.primary.kind === 'Base' && params.parts.some(part => 'source' in part && part.source.kind === 'Base' && part.source.fieldId === params.primary?.fieldId) ? params.primary : null;
