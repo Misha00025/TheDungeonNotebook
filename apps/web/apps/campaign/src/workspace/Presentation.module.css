@@ -225,6 +225,21 @@
   grid-template-columns: minmax(0, auto) minmax(0, 1fr);
 }
 
+.sizeCompact[data-node-type='composite'],
+.sizeMedium[data-node-type='composite'] {
+  align-items: baseline;
+  align-content: start;
+}
+
+.sizeCompact[data-node-type='composite'] > .composite > *,
+.sizeMedium[data-node-type='composite'] > .composite > * {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  height: auto;
+  align-self: baseline;
+}
+
 .sizeMedium .composite {
   font-size: 1rem;
 }
