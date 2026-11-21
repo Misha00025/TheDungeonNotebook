@@ -8,6 +8,8 @@ import type { LegacyDiscovery, LegacyField, LegacyObject, LegacySection } from '
 import { useWorkspace } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 import styles from './Workspace.module.css';
+import HeroImportWizard, { HeroImportSummary } from './HeroImportWizard';
+import type { HeroImportPlan, HeroImportRun } from './heroImport';
 
 const readValue = (data: Record<string, JsonValue>, key: string) => Object.prototype.hasOwnProperty.call(data, key) ? formatValue(data[key]) : 'Не задано';
 const formatValue = (value: JsonValue) => value === '' ? 'Пустая строка' : value === null ? 'null' : displayValue(value);
@@ -40,11 +42,11 @@ const SectionDetails: React.FC<{ section: LegacySection; sectionIndex: number }>
   {section.objects.map((object, objectIndex) => <ObjectDetails key={`${sectionIndex}:${objectIndex}`} object={object} sectionKey={section.key} />)}
 </details>;
 
-const Report: React.FC<{ report: LegacyDiscovery }> = ({ report }) => <>
+const Report: React.FC<{ report: LegacyDiscovery; attempted?: boolean }> = ({ report, attempted = false }) => <>
   <Panel>
     <p>Версия: {report.version}</p>
     {report.exportedAt !== undefined && <p>Дата экспорта: {report.exportedAt}</p>}
-    <p>Показано только содержимое файла. Ничего не импортировано.</p>
+    <p>{attempted ? 'Показано содержимое файла. Результаты импорта приведены отдельно.' : 'Показано только содержимое файла. Ничего не импортировано.'}</p>
   </Panel>
   <Panel>
     {report.sections.map((section, index) => <SectionDetails key={`${section.key}:${index}`} section={section} sectionIndex={index} />)}
@@ -53,11 +55,13 @@ const Report: React.FC<{ report: LegacyDiscovery }> = ({ report }) => <>
   {report.diagnostics.length > 0 && <Panel title="Замечания к файлу"><ul>{report.diagnostics.map((diagnostic, index) => <li key={index}>{diagnostic}</li>)}</ul></Panel>}
 </>;
 
-const ScopedLegacyExportDiscovery: React.FC<{ canAnalyze: boolean }> = ({ canAnalyze }) => {
+const ScopedLegacyExportDiscovery: React.FC<{ canAnalyze: boolean; campaignId: number }> = ({ canAnalyze, campaignId }) => {
   const [report, setReport] = useState<LegacyDiscovery>();
   const [error, setError] = useState<string>();
   const [fileName, setFileName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [lastImport, setLastImport] = useState<{ plan: HeroImportPlan; run: HeroImportRun }>();
   const input = useRef<HTMLInputElement>(null);
   const sequence = useRef(0);
   const mounted = useRef(true);
@@ -74,10 +78,12 @@ const ScopedLegacyExportDiscovery: React.FC<{ canAnalyze: boolean }> = ({ canAna
     setError(undefined);
     setFileName('');
     setBusy(false);
+    setImportOpen(false);
     if (input.current) input.current.value = '';
   }, [canAnalyze]);
 
   const clear = () => {
+    if (importOpen) return;
     sequence.current += 1;
     setReport(undefined);
     setError(undefined);
@@ -87,7 +93,7 @@ const ScopedLegacyExportDiscovery: React.FC<{ canAnalyze: boolean }> = ({ canAna
   };
 
   const selectFile = async (file?: File) => {
-    if (!canAnalyze) return;
+    if (!canAnalyze || importOpen) return;
     const current = ++sequence.current;
     setReport(undefined);
     setError(undefined);
@@ -111,17 +117,20 @@ const ScopedLegacyExportDiscovery: React.FC<{ canAnalyze: boolean }> = ({ canAna
   };
 
   return <section className={styles.page}>
-    <p>Файл анализируется только в браузере. Данные кампании не изменяются.</p>
+    <p>Файл разбирается в браузере. Данные кампании изменяются только после подтверждения выбранного импорта.</p>
     <Field label="JSON старого экспорта" htmlFor="legacy-export-file">
-      <FileInput ref={input} id="legacy-export-file" accept=".json,application/json" disabled={!canAnalyze} onChange={event => { void selectFile(event.currentTarget.files?.[0]); }} />
+      <FileInput ref={input} id="legacy-export-file" accept=".json,application/json" disabled={!canAnalyze || importOpen} onChange={event => { void selectFile(event.currentTarget.files?.[0]); }} />
     </Field>
     <ActionRow>
-      <Button type="button" variant="secondary" disabled={!canAnalyze} onClick={clear}>Очистить</Button>
+      <Button type="button" variant="secondary" disabled={!canAnalyze || importOpen} onClick={clear}>Очистить</Button>
     </ActionRow>
     {fileName && <p>Файл: {fileName}</p>}
     {busy && <p role="status">Анализ файла…</p>}
     {error && <p role="alert">{error}</p>}
-    {report && <Report report={report} />}
+    {report && <Report report={report} attempted={Boolean(lastImport && (lastImport.run.attempted || Object.values(lastImport.run.statuses).includes('unknown')))} />}
+    {report && (report.sections.find(section => section.key === 'characters')?.objects.length ?? 0) > 0 && <Button type="button" disabled={!canAnalyze || importOpen} onClick={() => setImportOpen(true)}>Импортировать персонажа</Button>}
+    {lastImport && !importOpen && <Panel title="Последний импорт"><HeroImportSummary plan={lastImport.plan} run={lastImport.run} campaignId={campaignId} /></Panel>}
+    {importOpen && report && canAnalyze && <HeroImportWizard sources={report.sections.find(section => section.key === 'characters')?.objects ?? []} campaignId={campaignId} onClose={() => setImportOpen(false)} onResult={(plan, run) => setLastImport({ plan, run })} />}
   </section>;
 };
 
@@ -130,7 +139,7 @@ const LegacyExportDiscovery: React.FC = () => {
   const { sessionKey } = useWorkspace();
   const { mode, permissions, permissionsLoading } = useCampaignWorkspace();
   const canAnalyze = mode === 'gm' && permissions.canWrite && !permissionsLoading;
-  return <ScopedLegacyExportDiscovery key={`${sessionKey}:${groupId}`} canAnalyze={canAnalyze} />;
+  return <ScopedLegacyExportDiscovery key={`${sessionKey}:${groupId}`} canAnalyze={canAnalyze} campaignId={Number(groupId)} />;
 };
 
 export default LegacyExportDiscovery;
