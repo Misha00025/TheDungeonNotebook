@@ -21,11 +21,6 @@ import type { HeroDraft, HeroImportPlan, HeroImportRun, HeroPartAction, HeroTarg
 type WizardProps = { sources: LegacyObject[]; campaignId: number; onClose: () => void; onResult?: (plan: HeroImportPlan, run: HeroImportRun) => void };
 type SummaryProps = { plan: HeroImportPlan; run: HeroImportRun; campaignId: number };
 
-const actionOptions = (skipLabel: string) => [
-  { value: '', label: 'Выберите действие' },
-  { value: 'replace', label: 'Заменить' },
-  { value: 'skip', label: skipLabel }
-];
 const importanceOptions = [
   { value: '', label: 'По умолчанию' },
   { value: 'Background', label: 'Фоновый' },
@@ -86,19 +81,20 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
   const busyRef = useRef(false);
   const stopRef = useRef(false);
   const selected = drafts.filter(draft => draft.selected);
-  const selectedSourceValue = selected[0] ? String(selected[0].sourceIndex) : '';
+  const selectedDraft = selected[0];
+  const selectedSourceValue = selectedDraft ? String(selectedDraft.sourceIndex) : '';
   const selectedExistingIds = Array.from(new Set(selected.filter(draft => draft.targetMode === 'existing' && draft.targetId).map(draft => draft.targetId))).sort();
-  const resourcesEnabled = (step === 3 || step === 4) && canWrite;
+  const resourcesEnabled = canWrite;
   const definitions = useResource(`${sessionKey}:${campaignId}:hero-import-base`, async () => {
     const [template, characters] = await Promise.all([api.getTemplateContent(campaignId), api.listCharacters(campaignId)]);
     return { template, characters };
   }, resourcesEnabled);
-  const targetResources = useResource(`${sessionKey}:${campaignId}:hero-import-targets:${selectedExistingIds.join('|')}`, () => Promise.all(selectedExistingIds.map(async id => [id, await readHeroTarget(api, campaignId, id)] as const)), resourcesEnabled && selectedExistingIds.length > 0);
+  const targetResources = useResource(`${sessionKey}:${campaignId}:hero-import-targets:${selectedExistingIds.join('|')}`, () => Promise.all(selectedExistingIds.map(async id => [id, await readHeroTarget(api, campaignId, id)] as const)), canWrite && selectedExistingIds.length > 0);
   const locked = Boolean(run?.attempted);
   const complete = completeRun(run, plan);
   const dirty = busy || (selected.length > 0 && !complete);
   const clearDirty = useDirtyDraft(`hero-import-${sessionKey}-${campaignId}`, dirty);
-  const resourceBusy = resourcesEnabled && (definitions.loading || (selectedExistingIds.length > 0 && targetResources.loading));
+  const resourceBusy = canWrite && (definitions.loading || (selectedExistingIds.length > 0 && targetResources.loading));
   const targetMap = useMemo(() => Object.fromEntries(targetResources.data ?? []), [targetResources.data]);
   const snapshots: Record<string, HeroTargetSnapshot> = { ...targetMap, ...(run?.targets ?? {}) };
   const currentTemplate = run?.template ?? definitions.data?.template;
@@ -223,17 +219,30 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
     const sourceIndex = value === '' ? -1 : Number(value);
     setDrafts(current => current.map(draft => ({ ...draft, selected: draft.sourceIndex === sourceIndex })));
   };
-  const setTarget = (draft: HeroDraft, targetMode: HeroDraft['targetMode'], targetId = '') => updateDraft(draft.sourceIndex, current => ({
-    ...current,
-    targetMode,
-    targetId,
-    newName: targetMode === 'new' && current.selectName ? (typeof sources[current.sourceIndex]?.data.name === 'string' ? sources[current.sourceIndex].data.name as string : '') : targetMode === 'new' ? current.newName : '',
-    importance: targetMode === 'new' ? current.importance : '',
-    nameAction: '',
-    descriptionAction: '',
-    mappingTargetKey: undefined,
-    fields: Object.fromEntries(Object.entries(current.fields).map(([key, choice]) => [key, { ...choice, targetId: '', action: '' }]))
-  }));
+  const setTarget = (draft: HeroDraft, targetMode: HeroDraft['targetMode'], targetId = '') => updateDraft(draft.sourceIndex, current => {
+    const source = sources[current.sourceIndex];
+    const modeChanged = current.targetMode !== targetMode;
+    const nameValid = Boolean(source && hasOwnString(source, 'name') && (source.data.name as string).trim().length > 0);
+    const selectName = targetMode === 'new' ? nameValid : modeChanged ? false : current.selectName;
+    const selectDescription = targetMode === 'new' ? Boolean(source && typeof source.data.description === 'string') : modeChanged ? false : current.selectDescription;
+    const fields = Object.fromEntries(Object.entries(current.fields).map(([key, choice]) => {
+      const selected = targetMode === 'new' ? true : modeChanged ? false : choice.selected;
+      return [key, { ...choice, selected, targetId: '', action: 'skip' as HeroPartAction }];
+    }));
+    return {
+      ...current,
+      targetMode,
+      targetId,
+      newName: targetMode === 'new' ? (nameValid ? source!.data.name as string : '') : '',
+      importance: targetMode === 'new' ? current.importance : '',
+      selectName,
+      selectDescription,
+      nameAction: selectName ? 'replace' : 'skip',
+      descriptionAction: selectDescription ? 'replace' : 'skip',
+      mappingTargetKey: undefined,
+      fields
+    };
+  });
 
   const currentValue = (targetKey: string, fieldId: string) => {
     const snapshot = snapshots[targetKey];
@@ -244,12 +253,13 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
     return templateField ? importValueDisplay(templateField.value) : 'Не задано';
   };
 
-  const stepDescription = step === 1 ? 'выберите персонажа' : step === 2 ? 'выберите данные' : step === 3 ? 'задайте действия' : 'итог';
+  const stepDescription = step === 1 ? 'выберите персонажа и цель' : step === 2 ? 'выберите данные' : step === 3 ? 'задайте сопоставление полей' : 'итог';
   const allComplete = !busy && completeRun(run, plan);
   const existingTargets = definitions.data?.characters ?? [];
   const runIncomplete = Boolean(run?.attempted && !allComplete);
   const frozenPlan = step === 4 ? plan ?? reportPlan : undefined;
   const confirmDisabled = !plan || !canWrite || busy || resourceBusy || Boolean(resourceError) || !definitions.data || Boolean(genericError) || Boolean(run?.error) || Boolean(run?.needsCheck) || allComplete;
+  const targetNextDisabled = !selectedDraft || !selectedDraft.targetMode || !definitions.data || resourceBusy || Boolean(resourceError) || (selectedDraft.targetMode === 'new' ? !selectedDraft.newName.trim() : !selectedDraft.targetId || !snapshots[selectedDraft.targetId]);
   const statusLabel = (key: string) => run?.statuses[key] === 'applied' ? 'Уже сохранено' : run?.statuses[key] === 'verified' ? 'Создание подтверждено' : run?.statuses[key] === 'unknown' ? 'Результат неизвестен' : run?.statuses[key] === 'failed' ? 'Не сохранено' : 'Будет выполнено после подтверждения';
   const beforeFieldValue = (targetKey: string, fieldId: string) => {
     const snapshot = frozenPlan?.targets[targetKey];
@@ -271,11 +281,26 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
   };
   const sourceLabel = (sourceIndex: number) => sources[sourceIndex]?.name ?? `Персонаж ${sourceIndex + 1}`;
   const proceed = () => setStep(value => Math.min(3, value + 1));
+  const proceedFromTarget = () => {
+    const draft = selected[0];
+    if (!draft || !definitions.data || controlsDisabled || resourceBusy || resourceError || !draft.targetMode) return;
+    if (draft.targetMode === 'new') {
+      if (!draft.newName.trim()) return;
+      setStep(3);
+      return;
+    }
+    if (!draft.targetId || !snapshots[draft.targetId]) return;
+    setStep(2);
+  };
   const goBack = () => {
     if (step === 4) {
       setPlan(undefined);
       setPlanErrors([]);
       setStep(3);
+      return;
+    }
+    if (step === 3) {
+      setStep(selected[0]?.targetMode === 'new' ? 1 : 2);
       return;
     }
     setStep(value => Math.max(1, value - 1));
@@ -292,19 +317,48 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
           <option value="">Выберите персонажа</option>{sources.map((source, index) => <option key={index} value={String(index)}>{source.name}</option>)}
         </Select>
       </Field>
+      {selected.map(draft => {
+        const source = sources[draft.sourceIndex];
+        if (!source) return null;
+        const identityDisabled = locked || busy || !canWrite || controlsDisabled;
+        return <Panel key={draft.sourceIndex} title={source.name}>
+          <Field label={`Цель для ${source.name}`} htmlFor={`hero-target-mode-${draft.sourceIndex}`}>
+            <Select id={`hero-target-mode-${draft.sourceIndex}`} value={draft.targetMode ?? ''} disabled={identityDisabled} onChange={event => setTarget(draft, event.target.value as HeroDraft['targetMode'])}>
+              <option value="">Выберите цель</option><option value="new">Создать нового персонажа</option><option value="existing">Существующий персонаж</option>
+            </Select>
+          </Field>
+          {draft.targetMode === 'existing' && <Field label={`Существующий персонаж для ${source.name}`} htmlFor={`hero-target-id-${draft.sourceIndex}`}>
+            <Select id={`hero-target-id-${draft.sourceIndex}`} value={draft.targetId} disabled={identityDisabled} onChange={event => setTarget(draft, 'existing', event.target.value)}>
+              <option value="">Выберите персонажа</option>{existingTargets.map(target => <option key={target.id} value={target.id}>{target.name}</option>)}
+            </Select>
+          </Field>}
+          {draft.targetMode === 'new' && <>
+            <Field label={`Имя нового персонажа ${source.name}`} htmlFor={`hero-new-name-${draft.sourceIndex}`}>
+              <Input id={`hero-new-name-${draft.sourceIndex}`} value={draft.newName} disabled={identityDisabled} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, newName: event.target.value }))} />
+            </Field>
+            <Field label={`Важность персонажа ${source.name}`} htmlFor={`hero-importance-${draft.sourceIndex}`}>
+              <Select id={`hero-importance-${draft.sourceIndex}`} value={draft.importance} disabled={identityDisabled} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, importance: event.target.value as HeroDraft['importance'] }))}>
+                {importanceOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </Select>
+            </Field>
+          </>}
+        </Panel>;
+      })}
       {sources.length === 0 && <p>В файле нет персонажей для импорта.</p>}
+      {resourceBusy && <p role="status">Загрузка шаблона и персонажей…</p>}
+      {Boolean(resourceError) && <ApiError error={resourceError} onRetry={() => { if (definitions.error) definitions.reload(); else targetResources.reload(); }} />}
     </section>}
 
-    {step === 2 && <section aria-label="Выбор данных">
+    {step === 2 && selected.some(draft => draft.targetMode === 'existing') && <section aria-label="Выбор данных">
       {selected.map(draft => {
         const source = sources[draft.sourceIndex];
         if (!source) return null;
         const nameValid = hasOwnString(source, 'name') && (source.data.name as string).trim().length > 0;
         const descriptionValid = hasOwnString(source, 'description');
         return <Panel key={draft.sourceIndex} title={source.name}>
-          <label><Checkbox aria-label={`Имя ${source.name}`} checked={draft.selectName} disabled={locked || busy || !canWrite || !nameValid} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, selectName: event.target.checked }))} /> Имя</label>
+          <label><Checkbox aria-label={`Имя ${source.name}`} checked={draft.selectName} disabled={locked || busy || !canWrite || !nameValid} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, selectName: event.target.checked, nameAction: event.target.checked ? 'replace' : 'skip' }))} /> Имя</label>
           {!nameValid && <p>Имя в исходных данных отсутствует или некорректно.</p>}
-          <label><Checkbox aria-label={`Описание ${source.name}`} checked={draft.selectDescription} disabled={locked || busy || !canWrite || !descriptionValid} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, selectDescription: event.target.checked }))} /> Описание</label>
+          <label><Checkbox aria-label={`Описание ${source.name}`} checked={draft.selectDescription} disabled={locked || busy || !canWrite || !descriptionValid} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, selectDescription: event.target.checked, descriptionAction: event.target.checked ? 'replace' : 'skip' }))} /> Описание</label>
           {!descriptionValid && <p>Описание в исходных данных отсутствует или некорректно.</p>}
           <label><Checkbox aria-label={`Поля ${source.name}`} checked={source.fields.length > 0 && source.fields.every(field => draft.fields[field.key]?.selected)} disabled={locked || busy || !canWrite || source.fields.length === 0} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, fields: Object.fromEntries(Object.entries(value.fields).map(([key, choice]) => [key, { ...choice, selected: event.target.checked }])) }))} /> Поля ({source.fields.length})</label>
           {source.fields.length === 0 && <p>В файле нет полей.</p>}
@@ -324,62 +378,27 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
         if (!source) return null;
         const targetKey = draft.targetMode === 'new' ? requestIds[draft.sourceIndex] : draft.targetMode === 'existing' ? draft.targetId : '';
         const snapshot = targetKey ? snapshots[targetKey] : undefined;
-        const identityDisabled = locked || busy || !canWrite;
         const mapDisabled = controlsDisabled || !targetKey || (draft.targetMode === 'existing' && !snapshot) || Boolean(run?.needsCheck);
         return <Panel key={draft.sourceIndex} title={source.name}>
-          <Field label={`Цель для ${source.name}`} htmlFor={`hero-target-mode-${draft.sourceIndex}`}>
-            <Select id={`hero-target-mode-${draft.sourceIndex}`} value={draft.targetMode === 'new' ? 'new' : draft.targetMode === 'existing' ? 'existing' : ''} disabled={identityDisabled || controlsDisabled} onChange={event => setTarget(draft, event.target.value as HeroDraft['targetMode'])}>
-              <option value="">Выберите цель</option><option value="new">Создать нового персонажа</option><option value="existing">Существующий персонаж</option>
-            </Select>
-          </Field>
-          {draft.targetMode === 'new' && <>
-            <Field label={`Имя нового персонажа ${source.name}`} htmlFor={`hero-new-name-${draft.sourceIndex}`}>
-              <Input id={`hero-new-name-${draft.sourceIndex}`} value={draft.newName} disabled={identityDisabled || controlsDisabled} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, newName: event.target.value }))} />
-            </Field>
-            <Field label={`Важность персонажа ${source.name}`} htmlFor={`hero-importance-${draft.sourceIndex}`}>
-              <Select id={`hero-importance-${draft.sourceIndex}`} value={draft.importance} disabled={identityDisabled || controlsDisabled} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, importance: event.target.value as HeroDraft['importance'] }))}>
-                {importanceOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </Select>
-            </Field>
-          </>}
-          {draft.targetMode === 'existing' && <Field label={`Существующий персонаж для ${source.name}`} htmlFor={`hero-target-id-${draft.sourceIndex}`}>
-            <Select id={`hero-target-id-${draft.sourceIndex}`} value={draft.targetId} disabled={identityDisabled || controlsDisabled} onChange={event => setTarget(draft, 'existing', event.target.value)}>
-              <option value="">Выберите персонажа</option>{existingTargets.map(target => <option key={target.id} value={target.id}>{target.name}</option>)}
-            </Select>
-          </Field>}
-          {draft.targetMode === 'existing' && snapshot && <p>Текущее имя: {snapshot.metadata.name}</p>}
-          {draft.targetMode === 'existing' && draft.selectName && <div>
-            <p>Имя: {snapshot?.metadata.name ?? '—'} → {String(source.data.name ?? '')}</p>
-            <Field label={`Действие для имени ${source.name}`} htmlFor={`hero-name-action-${draft.sourceIndex}`}>
-              <Select id={`hero-name-action-${draft.sourceIndex}`} value={draft.nameAction} disabled={controlsDisabled || Boolean(run?.needsCheck) || ['applied', 'verified'].includes(run?.statuses[`${draft.sourceIndex}:name`] ?? '')} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, nameAction: event.target.value as HeroPartAction }))}>{actionOptions('Оставить текущее').map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select>
-            </Field>
-          </div>}
-          {draft.selectDescription && <div>
-            <p>Описание: {draft.targetMode === 'existing' ? snapshot?.sheet.description ?? '—' : ''} → {String(source.data.description ?? '')}</p>
-            <Field label={`Действие для описания ${source.name}`} htmlFor={`hero-description-action-${draft.sourceIndex}`}>
-              <Select id={`hero-description-action-${draft.sourceIndex}`} value={draft.descriptionAction} disabled={controlsDisabled || Boolean(run?.needsCheck) || ['applied', 'verified'].includes(run?.statuses[`${draft.sourceIndex}:description`] ?? '')} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, descriptionAction: event.target.value as HeroPartAction }))}>{actionOptions(draft.targetMode === 'existing' ? 'Оставить текущее' : 'Не импортировать').map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select>
-            </Field>
-          </div>}
-          <DataTable aria-label={`Сопоставление полей ${source.name}`} minWidth="55rem"><thead><tr><th>Исходное поле</th><th>Ключ</th><th>Значение</th><th>Поле назначения</th><th>Действие</th><th>Текущее значение</th></tr></thead><tbody>
+          {draft.targetMode === 'existing' && snapshot && <p>Существующий персонаж: {snapshot.metadata.name}</p>}
+          {draft.targetMode === 'existing' && draft.selectName && <p>Имя: {snapshot?.metadata.name ?? '—'} → {String(source.data.name ?? '')}</p>}
+          {draft.targetMode === 'existing' && draft.selectDescription && <p>Описание: {snapshot?.sheet.description ?? '—'} → {String(source.data.description ?? '')}</p>}
+          {source.fields.some(field => draft.fields[field.key]?.selected) ? <DataTable aria-label={`Сопоставление полей ${source.name}`} minWidth="55rem"><thead><tr><th>Исходное поле</th><th>Ключ</th><th>Значение</th><th>Поле назначения</th><th>Текущее значение</th></tr></thead><tbody>
             {source.fields.filter(field => draft.fields[field.key]?.selected).map((field, index) => {
               const choice = draft.fields[field.key];
               const candidates = compatibleHeroFields(field, snapshot ? snapshot.sheet.baseFields : currentTemplate?.data.baseFields ?? []);
               const targetField = candidates.find(candidate => candidate.id === choice.targetId);
               return <tr key={`${field.key}:${index}`}><th scope="row">{field.name}</th><td>{field.key}</td><td>{sourceFieldValue(field)}</td><td>
                 <Field label={`Поле назначения ${source.name}: ${field.name}`} htmlFor={`hero-field-target-${draft.sourceIndex}-${index}`}>
-                  <Select id={`hero-field-target-${draft.sourceIndex}-${index}`} value={choice.targetId} disabled={mapDisabled || candidates.length === 0 || ['applied', 'verified'].includes(run?.statuses[`${draft.sourceIndex}:value:${field.key}`] ?? '')} onChange={event => updateField(draft.sourceIndex, field.key, current => ({ ...current, targetId: event.target.value }))}>
-                    <option value="">Выберите поле</option>{candidates.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.title}</option>)}
+                  <Select id={`hero-field-target-${draft.sourceIndex}-${index}`} value={choice.targetId} disabled={mapDisabled || candidates.length === 0 || ['applied', 'verified'].includes(run?.statuses[`${draft.sourceIndex}:value:${field.key}`] ?? '')} onChange={event => updateField(draft.sourceIndex, field.key, current => ({ ...current, targetId: event.target.value, action: event.target.value ? 'replace' : 'skip' }))}>
+                    <option value="">Не импортировать</option>{candidates.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.title}</option>)}
                   </Select>
                 </Field>
                 {candidates.length === 0 && <p>{Object.prototype.hasOwnProperty.call(field.data, 'value') ? 'Нет подходящего поля — поле не импортируется.' : 'Нет явного значения — поле не импортируется.'}</p>}
-                {candidates.length > 0 && !choice.targetId && <p>Нет однозначного совпадения. Выберите поле вручную или не импортируйте.</p>}
-              </td><td>
-                <Field label={`Действие ${source.name}: ${field.name}`} htmlFor={`hero-field-action-${draft.sourceIndex}-${index}`}>
-                  <Select id={`hero-field-action-${draft.sourceIndex}-${index}`} value={choice.action} disabled={controlsDisabled || Boolean(run?.needsCheck) || ['applied', 'verified'].includes(run?.statuses[`${draft.sourceIndex}:value:${field.key}`] ?? '')} onChange={event => updateField(draft.sourceIndex, field.key, current => ({ ...current, action: event.target.value as HeroPartAction }))}>{actionOptions(choice.targetId ? 'Оставить текущее' : 'Не импортировать').map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select>
-                </Field>
+                {candidates.length > 0 && !choice.targetId && <p>По умолчанию не импортируется. Выберите существующее поле для переноса.</p>}
               </td><td>{targetField ? currentValue(targetKey, targetField.id) : '—'}</td></tr>;
             })}
-          </tbody></DataTable>
+          </tbody></DataTable> : <p>Поля не выбраны.</p>}
         </Panel>;
       })}
 
@@ -431,7 +450,8 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
 
     <ActionRow>
       <Button type="button" variant="secondary" disabled={busy || step === 1 || (locked && step !== 4)} onClick={goBack}>Назад</Button>
-      {step < 3 && <Button type="button" disabled={busy || !canWrite || (step === 1 && selected.length === 0) || (locked && step < 3)} onClick={proceed}>Далее</Button>}
+      {step === 1 && <Button type="button" disabled={busy || !canWrite || targetNextDisabled || locked} onClick={proceedFromTarget}>Далее</Button>}
+      {step === 2 && <Button type="button" disabled={busy || !canWrite || locked} onClick={proceed}>Далее</Button>}
       {step === 3 && <Button type="button" disabled={controlsDisabled || Boolean(run?.needsCheck) || Boolean(genericError) || Boolean(run?.error) || allComplete} onClick={prepare}>Далее</Button>}
     </ActionRow>
   </ModalPortal>;
