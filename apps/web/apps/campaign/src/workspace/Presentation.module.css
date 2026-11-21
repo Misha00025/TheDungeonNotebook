@@ -20,7 +20,9 @@
 
 .node {
   position: relative;
-  min-width: 0;
+  box-sizing: border-box;
+  min-inline-size: min(100%, 8rem);
+  min-block-size: 3rem;
   padding: .85rem;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-md);
@@ -222,10 +224,6 @@
   font-size: 1rem;
 }
 
-.sizeLarge {
-  min-width: 0;
-}
-
 .sizeCompact[data-node-type='resource'] .resource,
 .sizeMedium[data-node-type='resource'] .resource,
 .sizeCompact[data-node-type='composite'] .composite,
@@ -372,6 +370,10 @@
   align-items: center;
   flex-wrap: wrap;
   gap: .5rem;
+}
+
+.widthField {
+  width: 8rem;
 }
 
 .editorHeader {
@@ -595,8 +597,7 @@
   overflow-wrap: anywhere;
 }
 
-.properties input:not([type='checkbox']),
-.properties select {
+.properties input:not([type='checkbox']) {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
