@@ -1,0 +1,61 @@
+.frame {
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.card {
+  width: 100%;
+  max-width: 24rem;
+  height: auto;
+  box-sizing: border-box;
+}
+
+.header {
+  width: 100%;
+}
+
+.headerLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.identity,
+.content {
+  min-width: 0;
+}
+
+.cardDescription {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.identity :global(header) {
+  margin: 0;
+}
+
+.desktop.card {
+  width: 24rem;
+  max-width: 24rem;
+}
+
+.desktop.header {
+  width: 64rem;
+}
+
+.mobile.card {
+  width: 20rem;
+}
+
+.mobile.header {
+  width: 20rem;
+}
+
+@container (max-width: 40rem) {
+  .headerLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

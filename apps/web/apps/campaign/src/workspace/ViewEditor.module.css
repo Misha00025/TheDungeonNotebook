@@ -80,6 +80,37 @@
   min-width: 0;
 }
 
+.pageRows h3 {
+  margin: 0;
+}
+
+.surfaceAssignments {
+  display: grid;
+  gap: .75rem;
+  min-width: 0;
+}
+
+.surfaceAssignment {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: .75rem;
+  min-width: 0;
+}
+
+.surfaceAssignment > label {
+  min-width: 0;
+}
+
+.surfaceAssignment .warningText {
+  grid-column: 1 / -1;
+}
+
+.surfaceUsage {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
 .pageRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
@@ -122,6 +153,10 @@
   }
 
   .pageRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .surfaceAssignment {
     grid-template-columns: minmax(0, 1fr);
   }
 }

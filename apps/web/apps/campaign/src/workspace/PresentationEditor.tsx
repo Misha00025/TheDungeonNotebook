@@ -9,8 +9,10 @@ import IconButton from '@tdn/shared/ui/Buttons/IconButton/IconButton';
 import ModalPortal from '@tdn/shared/ui/ModalPortal/ModalPortal';
 import Checkbox from '@tdn/shared/ui/Form/Checkbox';
 import { compileStatListCondition, compileStatListFormat } from './statListFormat';
+import PresentationSurfaceFrame from './PresentationSurfaceFrame';
+import type { PresentationSurface } from './presentationModel';
 
-export type PresentationEditorProps = { roots: PresentationNode[]; onChange: (roots: PresentationNode[]) => void; sheet?: ComputedSheet; choicesSheet?: ComputedSheet; sample?: boolean; disabled?: boolean };
+export type PresentationEditorProps = { roots: PresentationNode[]; onChange: (roots: PresentationNode[]) => void; sheet?: ComputedSheet; choicesSheet?: ComputedSheet; sample?: boolean; disabled?: boolean; surface?: PresentationSurface; previewName?: string; previewDescription?: string };
 type FieldOption = { reference: FieldReference; value: string; label: string; numeric: boolean };
 const palette: { type: PresentationType; label: string }[] = [
   { type: 'group', label: 'Группа' },
@@ -49,8 +51,9 @@ const eventPayload = (event: React.DragEvent): { kind: 'palette'; type: Presenta
   return null;
 };
 
-const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ roots, onChange, sheet, choicesSheet, sample = false, disabled = false }) => {
+const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ roots, onChange, sheet, choicesSheet, sample = false, disabled = false, surface = 'page', previewName = 'Имя персонажа', previewDescription = 'Описание персонажа' }) => {
   const [preview, setPreview] = useState(false);
+  const [widthMode, setWidthMode] = useState<'desktop' | 'mobile'>('desktop');
   const rootDropRef = useRef<HTMLDivElement>(null);
   const [settingsDraft, setSettingsDraft] = useState<PresentationNode | null>(null);
   const [statSearch, setStatSearch] = useState('');
@@ -75,8 +78,8 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
       setSettingsDraft(null);
     }
   }, [preview, roots]);
-  const latest = useRef({ roots, onChange, disabled, preview });
-  useLayoutEffect(() => { latest.current = { roots, onChange, disabled, preview }; });
+  const latest = useRef({ roots, onChange, disabled, preview, surface });
+  useLayoutEffect(() => { latest.current = { roots, onChange, disabled, preview, surface }; });
   useEffect(() => {
     const clear = () => rootDropRef.current?.removeAttribute('data-active');
     if (disabled || preview) { clear(); return; }
@@ -143,6 +146,7 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
     const current = latest.current;
     if (current.disabled || current.preview) return;
     const node = makeNode(type);
+    if ((type === 'composite' || type === 'resource') && current.surface !== 'page') node.params = { ...(node.params as Record<string, JsonValue>), size: 'compact' };
     const next = insertNode(current.roots, node, parentKey, index);
     if (next !== current.roots) current.onChange(next);
     settingsDraftRef.current = null; setSettingsDraft(null); setPreview(false);
@@ -171,12 +175,13 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
   const configureAs = (type: PresentationType) => {
     const current = settingsDraftRef.current;
     if (!current || disabled || !window.confirm(`Настроить компонент как «${palette.find(item => item.type === type)?.label}»? Неизвестные параметры и исходные данные сохранятся.`)) return;
-    const defaultsValue = makeNode(type).params;
-    const defaults = isJsonObject(defaultsValue) ? defaultsValue : {};
-    const source = isJsonObject(current.params) ? current.params : { legacyParams: current.params };
-    const reserved = new Set(['version', 'type', 'direction', 'columns', 'gap', 'appearance', 'parts', 'primary', 'current', 'maximum', 'showBar', 'entries', 'format', 'expressions', 'condition', 'legacyFormatError']);
-    const unknown = Object.fromEntries(Object.entries(source).filter(([key]) => !reserved.has(key)));
-    updateSettingsDraft(node => ({ ...node, params: { ...unknown, ...defaults } }));
+     const defaultsValue = makeNode(type).params;
+     const defaults = isJsonObject(defaultsValue) ? defaultsValue : {};
+     const source = isJsonObject(current.params) ? current.params : { legacyParams: current.params };
+     const reserved = new Set(['version', 'type', 'direction', 'columns', 'gap', 'appearance', 'parts', 'primary', 'current', 'maximum', 'showBar', 'size', 'entries', 'format', 'expressions', 'condition', 'legacyFormatError']);
+      const unknown = Object.fromEntries(Object.entries(source).filter(([key]) => !reserved.has(key)));
+     const size = source.size === 'compact' || source.size === 'medium' || source.size === 'large' ? source.size : undefined;
+     updateSettingsDraft(node => ({ ...node, params: { ...unknown, ...defaults, ...((type === 'resource' || type === 'composite') && size ? { size } : {}) } }));
   };
   const onDropNode = useCallback((targetKey: string, placement: PresentationDropPlacement, event: React.DragEvent) => moveDrop(targetKey, placement, event), [moveDrop]);
   const handleAction = useCallback((nodeKey: string, action: 'duplicate' | 'delete' | 'more') => {
@@ -221,34 +226,45 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
   const updateEntries = (entries: { source: JsonFieldReference; label: string; [key: string]: JsonValue }[]) => patch({ entries });
 
   return <section className={styles.editor}>
-    <header className={styles.editorHeader}><h2>Конструктор отображения</h2><button type="button" disabled={disabled} onClick={() => { setPreview(value => !value); settingsDraftRef.current = null; setSettingsDraft(null); }}>{preview ? 'Редактировать' : 'Предпросмотр'}</button></header>
+     <header className={styles.editorHeader}><h2>Конструктор отображения</h2><div className={styles.inlineActions}>{!preview && <label>Ширина <select value={widthMode} onChange={event => setWidthMode(event.target.value as 'desktop' | 'mobile')}><option value="desktop">ПК</option><option value="mobile">Мобильный</option></select></label>}<button type="button" disabled={disabled} onClick={() => { setPreview(value => !value); settingsDraftRef.current = null; setSettingsDraft(null); }}>{preview ? 'Редактировать' : 'Предпросмотр'}</button></div></header>
     {!preview && <div className={styles.palette} role="group" aria-label="Компоненты">
       <h3>Компоненты</h3>
           {palette.map(item => <button key={item.type} type="button" draggable={!disabled} disabled={disabled} onClick={() => add(item.type)} onDragStart={event => event.dataTransfer.setData('application/x-tdn-presentation', JSON.stringify({ kind: 'palette', type: item.type }))}>{item.label}</button>)}
     </div>}
     <div className={`${styles.editorLayout} ${preview ? styles.previewLayout : ''}`}>
       <main className={styles.canvasColumn}>
-        <div className={`${styles.canvas} ${roots.length === 0 ? styles.emptyCanvas : ''}`} onDragOver={!preview && !disabled ? event => { if (!event.defaultPrevented && Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) event.preventDefault(); } : undefined} onDrop={!preview && !disabled ? handleRootDrop : undefined}>
-          {roots.length === 0 && preview ? <p className={styles.emptyPreview}>Холст пуст</p> : roots.length === 0 ? <div className={styles.emptyState}><p>Холст пока пуст</p><button type="button" disabled={disabled} onClick={() => add('group')}>Добавьте первый компонент</button></div> : <PresentationRenderer roots={roots} sheet={sheet} sample={sample} onDropNode={!preview && !disabled ? onDropNode : undefined} renderNodeActions={!preview ? renderNodeActions : undefined} />}
-          {roots.length > 0 && !preview && <div ref={rootDropRef} className={styles.rootDrop} aria-label="Добавить в конец холста" onDragEnter={event => { if (!disabled && !latest.current.preview && Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) event.currentTarget.setAttribute('data-active', 'true'); }} onDragOver={event => { if (!disabled && !event.defaultPrevented && Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) event.preventDefault(); }} onDragLeave={event => event.currentTarget.removeAttribute('data-active')} onDrop={event => { event.currentTarget.removeAttribute('data-active'); handleRootDrop(event); }} />}
+        <div className={`${styles.canvas} ${roots.length === 0 ? styles.emptyCanvas : ''} ${surface !== 'page' ? styles.surfaceCanvas : ''}`} onDragOver={surface === 'page' && !preview && !disabled ? event => { if (!event.defaultPrevented && Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) event.preventDefault(); } : undefined} onDrop={surface === 'page' && !preview && !disabled ? handleRootDrop : undefined}>
+          {surface === 'page' ? <>
+            {roots.length === 0 && preview ? <p className={styles.emptyPreview}>Холст пуст</p> : roots.length === 0 ? <div className={styles.emptyState}><p>Холст пока пуст</p><button type="button" disabled={disabled} onClick={() => add('group')}>Добавьте первый компонент</button></div> : <PresentationRenderer roots={roots} sheet={sheet} sample={sample} surface={surface} onDropNode={!preview && !disabled ? onDropNode : undefined} renderNodeActions={!preview ? renderNodeActions : undefined} />}
+          </> : <div className={styles.surfacePreview}>
+            <PresentationSurfaceFrame surface={surface} widthMode={widthMode} title={previewName} description={previewDescription} actions={surface === 'card' ? <button type="button" disabled>Открыть лист</button> : undefined}>
+              <div className={styles.surfaceEditArea} data-empty={roots.length === 0 ? 'true' : undefined} onDragOver={!preview && !disabled ? event => { if (!event.defaultPrevented && Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) event.preventDefault(); } : undefined} onDrop={!preview && !disabled ? handleRootDrop : undefined}>
+                {roots.length === 0 ? <div className={styles.surfaceEmptyEditor}>{!preview && <button type="button" disabled={disabled} onClick={() => add('group')}>Добавить первый компонент</button>}</div> : <PresentationRenderer roots={roots} sheet={sheet} sample={sample} surface={surface} onDropNode={!preview && !disabled ? onDropNode : undefined} renderNodeActions={!preview ? renderNodeActions : undefined} />}
+                {roots.length > 0 && !preview && <div ref={rootDropRef} className={styles.rootDrop} aria-label="Добавить в конец области" onDragEnter={event => { if (!disabled && !latest.current.preview && Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) event.currentTarget.setAttribute('data-active', 'true'); }} onDragOver={event => { if (!disabled && !event.defaultPrevented && Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) event.preventDefault(); }} onDragLeave={event => event.currentTarget.removeAttribute('data-active')} onDrop={event => { event.currentTarget.removeAttribute('data-active'); handleRootDrop(event); }} />}
+              </div>
+            </PresentationSurfaceFrame>
+          </div>}
+          {surface === 'page' && roots.length > 0 && !preview && <div ref={rootDropRef} className={styles.rootDrop} aria-label="Добавить в конец холста" onDragEnter={event => { if (!disabled && !latest.current.preview && Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) event.currentTarget.setAttribute('data-active', 'true'); }} onDragOver={event => { if (!disabled && !event.defaultPrevented && Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) event.preventDefault(); }} onDragLeave={event => event.currentTarget.removeAttribute('data-active')} onDrop={event => { event.currentTarget.removeAttribute('data-active'); handleRootDrop(event); }} />}
         </div>
       </main>
       <ModalPortal isOpen={!preview && Boolean(activeSettings)} title="Настройки компонента" size="wide" onClose={closeSettings}>
         {activeSettings && settingsRead && <div className={styles.properties}>
           <label>Название<input value={activeSettings.title} disabled={disabled} onChange={event => patchTitle(event.target.value)} /></label>
-          {settingsRead.status !== 'supported' ? <div className={styles.unsupported} role="status"><p>{settingsRead.message}</p><span>Настроить как:</span>{palette.map(item => <button key={item.type} type="button" disabled={disabled} onClick={() => configureAs(item.type)}>{item.label}</button>)}</div> : settingsRead.type === 'group' ? <>
+           {settingsRead.status !== 'supported' ? <div className={styles.unsupported} role="status"><p>{settingsRead.message}</p><span>Настроить как:</span>{palette.map(item => <button key={item.type} type="button" disabled={disabled} onClick={() => configureAs(item.type)}>{item.label}</button>)}</div> : settingsRead.type === 'group' ? <>
             <label>Направление<select disabled={disabled} value={settingsRead.params.direction} onChange={event => patch({ direction: event.target.value })}><option value="row">По строке</option><option value="column">По колонкам</option></select></label>
             <label>Колонки<select disabled={disabled} value={settingsRead.params.columns} onChange={event => patch({ columns: Number(event.target.value) })}>{[1, 2, 3, 4].map(value => <option key={value}>{value}</option>)}</select></label>
             <label>Интервал<select disabled={disabled} value={settingsRead.params.gap} onChange={event => patch({ gap: event.target.value })}><option value="small">Маленький</option><option value="medium">Средний</option><option value="large">Большой</option></select></label>
             <label>Оформление<select disabled={disabled} value={settingsRead.params.appearance} onChange={event => patch({ appearance: event.target.value })}><option value="plain">Простое</option><option value="panel">Панель</option></select></label>
-          </> : settingsRead.type === 'composite' ? <>
+           </> : settingsRead.type === 'composite' ? <>
+             <label>Размер<select disabled={disabled} value={settingsRead.params.size} onChange={event => patch({ size: event.target.value })}><option value="compact">Компактный</option><option value="medium">Средний</option><option value="large">Большой</option></select></label>
             <h4>Состав</h4>{settingsRead.params.parts.map((part, index) => <div className={styles.partEditor} key={index}>
                {'text' in part ? <><span>Текст</span><input aria-label={`Текст, часть ${index + 1}`} disabled={disabled} value={part.text} onChange={event => { const parts = [...settingsRead.params.parts]; parts[index] = { text: event.target.value }; updateParts(parts); }} /></> : <><span>Характеристика</span><select aria-label={`Характеристика, часть ${index + 1}`} disabled={disabled} value={referenceValue(part.source)} onChange={event => { const reference = parseReference(event.target.value); if (!reference) return; const parts = [...settingsRead.params.parts]; parts[index] = { source: asJsonReference(reference), ...(part.signed ? { signed: true } : {}) }; updateParts(parts); }}><option value="">Выберите характеристику</option>{choices.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select><label><Checkbox disabled={disabled} checked={Boolean(part.signed)} onChange={event => { const parts = [...settingsRead.params.parts]; parts[index] = { source: part.source, ...(event.target.checked ? { signed: true } : {}) }; updateParts(parts); }} />Со знаком</label></>}
               <div className={styles.partActions}><button type="button" disabled={disabled || index === 0} onClick={() => updateParts(reorder(settingsRead.params.parts, index, -1))}>Выше</button><button type="button" disabled={disabled || index === settingsRead.params.parts.length - 1} onClick={() => updateParts(reorder(settingsRead.params.parts, index, 1))}>Ниже</button><button type="button" disabled={disabled} onClick={() => updateParts(settingsRead.params.parts.filter((_, partIndex) => partIndex !== index))}>Удалить</button></div>
             </div>)}
             <div className={styles.inlineActions}><button type="button" disabled={disabled} onClick={() => updateParts([...settingsRead.params.parts, newPart('text')])}>Добавить текст</button><button type="button" disabled={disabled || choices.length === 0} onClick={() => updateParts([...settingsRead.params.parts, newPart('source')])}>Добавить характеристику</button></div>
             <label>Основное значение<select disabled={disabled} value={referenceValue(settingsRead.params.primary ?? undefined)} onChange={event => { const reference = parseReference(event.target.value); patch({ primary: reference?.kind === 'Base' && partBaseChoices.some(option => option.reference.fieldId === reference.fieldId) ? asJsonReference(reference) : null }); }}><option value="">Только чтение</option>{partBaseChoices.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-          </> : settingsRead.type === 'resource' ? <>
+           </> : settingsRead.type === 'resource' ? <>
+             <label>Размер<select disabled={disabled} value={settingsRead.params.size} onChange={event => patch({ size: event.target.value })}><option value="compact">Компактный</option><option value="medium">Средний</option><option value="large">Большой</option></select></label>
             <label>Текущее значение<select disabled={disabled} value={referenceValue(settingsRead.params.current ?? undefined)} onChange={event => { const reference = parseReference(event.target.value); patch({ current: reference ? asJsonReference(reference) : null }); }}><option value="">Выберите характеристику</option>{settingsRead.params.current && !choices.some(option => option.numeric && option.value === referenceValue(settingsRead.params.current!)) && <option value={referenceValue(settingsRead.params.current)}>Сохранённый источник недоступен или имеет другой тип</option>}{choices.filter(option => option.numeric).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
             <label>Максимум<select disabled={disabled} value={referenceValue(settingsRead.params.maximum ?? undefined)} onChange={event => patch({ maximum: event.target.value ? asJsonReference(parseReference(event.target.value)!) : null })}><option value="">Не задан</option>{settingsRead.params.maximum && !choices.some(option => option.numeric && option.value === referenceValue(settingsRead.params.maximum!)) && <option value={referenceValue(settingsRead.params.maximum)}>Сохранённый максимум недоступен</option>}{choices.filter(option => option.numeric).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
              <label><Checkbox disabled={disabled} checked={settingsRead.params.showBar} onChange={event => patch({ showBar: event.target.checked })} />Показывать шкалу</label>

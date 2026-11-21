@@ -5,6 +5,19 @@
   min-width: 0;
 }
 
+.compactRoots {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: .5rem;
+}
+
+.compactRoots > .node {
+  flex: 0 1 auto;
+  width: fit-content;
+  max-width: 100%;
+}
+
 .node {
   position: relative;
   min-width: 0;
@@ -162,6 +175,139 @@
   font-weight: 400;
 }
 
+.compactSurface {
+  padding: .5rem;
+}
+
+.compactSurface .nodeTitle {
+  margin-bottom: .35rem;
+}
+
+.compactSurface .children {
+  gap: .5rem;
+}
+
+.compactSurface .composite,
+.compactSurface .resource {
+  gap: .35rem;
+}
+
+.compactSurface .statRow {
+  padding: .3rem .45rem;
+}
+
+.compactSurface .statList {
+  column-gap: .45rem;
+  row-gap: .3rem;
+}
+
+.compactSurface .nodeControls {
+  top: .2rem;
+  right: .2rem;
+}
+
+.sizeCompact .composite {
+  font-size: .9rem;
+}
+
+.sizeCompact[data-node-type='resource'],
+.sizeMedium[data-node-type='resource'],
+.sizeCompact[data-node-type='composite'],
+.sizeMedium[data-node-type='composite'] {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+}
+
+.sizeMedium .composite {
+  font-size: 1rem;
+}
+
+.sizeLarge {
+  min-width: 0;
+}
+
+.sizeCompact[data-node-type='resource'] .resource,
+.sizeMedium[data-node-type='resource'] .resource,
+.sizeCompact[data-node-type='composite'] .composite,
+.sizeMedium[data-node-type='composite'] .composite {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: .5rem;
+}
+
+.sizeCompact[data-node-type='resource'] .nodeTitle,
+.sizeMedium[data-node-type='resource'] .nodeTitle,
+.sizeCompact[data-node-type='composite'] .nodeTitle,
+.sizeMedium[data-node-type='composite'] .nodeTitle {
+  grid-column: 1;
+  grid-row: 1;
+  margin: 0;
+}
+
+.sizeCompact[data-node-type='resource'] .resource,
+.sizeMedium[data-node-type='resource'] .resource,
+.sizeCompact[data-node-type='composite'] .composite,
+.sizeMedium[data-node-type='composite'] .composite {
+  display: contents;
+}
+
+.sizeCompact[data-node-type='resource'] .resourceValues,
+.sizeMedium[data-node-type='resource'] .resourceValues,
+.sizeCompact[data-node-type='composite'] .compositeParts,
+.sizeMedium[data-node-type='composite'] .compositeParts {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sizeCompact[data-node-type='resource'] .progressTrack,
+.sizeMedium[data-node-type='resource'] .progressTrack {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.sizeMedium .resource,
+.sizeMedium .composite {
+  font-size: 1rem;
+}
+
+.sizeCompact .resource,
+.sizeCompact .composite {
+  font-size: .9rem;
+}
+
+.sizeCompact[data-node-type='resource'],
+.sizeCompact[data-node-type='composite'] {
+  column-gap: .35rem;
+  padding: .35rem;
+}
+
+.sizeMedium[data-node-type='resource'],
+.sizeMedium[data-node-type='composite'] {
+  column-gap: .6rem;
+  padding: .55rem;
+}
+
+.sizeCompact[data-node-type='resource'] .nodeTitle,
+.sizeCompact[data-node-type='composite'] .nodeTitle {
+  font-size: .75rem;
+}
+
+.sizeMedium[data-node-type='resource'] .nodeTitle,
+.sizeMedium[data-node-type='composite'] .nodeTitle {
+  font-size: .85rem;
+}
+
+.sizeCompact .resourceValues {
+  gap: .35rem;
+}
+
+.sizeMedium .resourceValues {
+  gap: .6rem;
+}
+
 .node[data-drop-placement='before']::before,
 .node[data-drop-placement='after']::before,
 .node[data-drop-placement='inside']::after {
@@ -304,6 +450,68 @@
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-md);
   background: var(--bg-secondary);
+}
+
+.surfaceCanvas {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.surfacePreview {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  padding: .45rem;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--border-radius-md);
+  background: var(--bg-secondary);
+}
+
+.surfaceEditArea {
+  position: relative;
+  display: grid;
+  gap: .5rem;
+  min-width: 0;
+}
+
+.surfaceEditArea[data-empty='true'] {
+  min-height: 1.25rem;
+}
+
+.surfaceEmptyEditor {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.surfaceEmptyEditor::before {
+  color: var(--text-secondary);
+  content: 'Область пока пуста';
+}
+
+.surfaceEmptyEditor button {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  max-width: 100%;
+  min-height: 2.4rem;
+  padding: .35rem .55rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  pointer-events: auto;
+}
+
+.previewLayout .surfaceEmptyEditor::before {
+  content: '';
 }
 
 .nodeControls {
@@ -465,6 +673,23 @@
   }
 
   .statList {
+    --stat-column-count: 1;
+  }
+}
+
+.roots[data-surface='header'],
+.roots[data-surface='card'] {
+  container-type: inline-size;
+}
+
+@container (max-width: 40rem) {
+  .roots[data-surface='header'] .groupChildren,
+  .roots[data-surface='card'] .groupChildren {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .roots[data-surface='header'] .statList,
+  .roots[data-surface='card'] .statList {
     --stat-column-count: 1;
   }
 }

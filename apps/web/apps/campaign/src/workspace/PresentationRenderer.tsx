@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { isLosslessNumber } from 'lossless-json';
 import type { ComputedSheet, FieldReference, JsonValue } from './types';
 import { displayValue } from './json';
-import { readParams, type FieldPart, type PresentationNode } from './presentationModel';
+import { readParams, type FieldPart, type PresentationNode, type PresentationSurface } from './presentationModel';
 import styles from './Presentation.module.css';
 import { compileStatListCondition, compileStatListFormat } from './statListFormat';
 
@@ -20,6 +20,7 @@ export type PresentationRendererProps = {
   renderValue?: (reference: FieldReference, label: string, display?: React.ReactNode) => React.ReactNode;
   onDropNode?: (targetKey: string, placement: PresentationDropPlacement, event: React.DragEvent) => void;
   renderNodeActions?: (node: PresentationNode) => React.ReactNode;
+  surface?: PresentationSurface;
 };
 
 const isNumeric = (value: JsonValue): boolean => typeof value === 'number' ? Number.isFinite(value) : isLosslessNumber(value) && /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/.test(String(value));
@@ -68,7 +69,7 @@ function valueForPart(part: FieldPart, sheet: ComputedSheet | undefined, sample:
   return { label: result.label, text: result.value === '' ? "''" : displayValue(result.value) };
 }
 
-const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; conditionSheet?: ComputedSheet; sample: boolean; renderValue?: PresentationRendererProps['renderValue']; onDropNode?: PresentationRendererProps['onDropNode']; onDropMarker?: DropMarker; renderNodeActions?: PresentationRendererProps['renderNodeActions']; orientation?: 'row' | 'column' }> = React.memo(({ node, sheet, conditionSheet, sample, renderValue, onDropNode, onDropMarker, renderNodeActions, orientation }) => {
+const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; conditionSheet?: ComputedSheet; sample: boolean; surface: PresentationSurface; renderValue?: PresentationRendererProps['renderValue']; onDropNode?: PresentationRendererProps['onDropNode']; onDropMarker?: DropMarker; renderNodeActions?: PresentationRendererProps['renderNodeActions']; orientation?: 'row' | 'column' }> = React.memo(({ node, sheet, conditionSheet, sample, surface, renderValue, onDropNode, onDropMarker, renderNodeActions, orientation }) => {
   const read = useMemo(() => readParams(node.params), [node.params]);
   const params = read.status === 'supported' ? read.params : undefined;
   const statFormat = useMemo(() => params?.type === 'stat-list' ? compileStatListFormat(params.format, params.expressions) : undefined, [node.params]);
@@ -89,8 +90,9 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; con
   const body = useMemo(() => {
   let content: React.ReactNode = null;
   if (params?.type === 'group') {
-    content = <div className={`${styles.children} ${params.direction === 'row' ? styles.rowChildren : styles.groupChildren}`} style={{ '--presentation-columns': String(params.columns), display: params.direction === 'row' ? 'flex' : 'grid', flexDirection: params.direction === 'row' ? 'row' : undefined, flexWrap: params.direction === 'row' ? 'wrap' : undefined, gap: params.gap === 'small' ? '.5rem' : params.gap === 'large' ? '1.5rem' : '1rem' } as React.CSSProperties}>
-      {node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} conditionSheet={conditionSheet} sample={sample} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={onDropMarker} renderNodeActions={renderNodeActions} orientation={params.direction} />)}
+    const groupGap = surface === 'page' ? params.gap === 'small' ? '.5rem' : params.gap === 'large' ? '1.5rem' : '1rem' : params.gap === 'small' ? '.25rem' : params.gap === 'large' ? '.75rem' : '.5rem';
+    content = <div className={`${styles.children} ${params.direction === 'row' ? styles.rowChildren : styles.groupChildren}`} style={{ '--presentation-columns': String(params.columns), display: params.direction === 'row' ? 'flex' : 'grid', flexDirection: params.direction === 'row' ? 'row' : undefined, flexWrap: params.direction === 'row' ? 'wrap' : undefined, gap: groupGap } as React.CSSProperties}>
+      {node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} conditionSheet={conditionSheet} sample={sample} surface={surface} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={onDropMarker} renderNodeActions={renderNodeActions} orientation={params.direction} />)}
     </div>;
   } else if (params?.type === 'composite') {
     const primary = params.primary && params.primary.kind === 'Base' && params.parts.some(part => 'source' in part && part.source.kind === 'Base' && part.source.fieldId === params.primary?.fieldId) ? params.primary : null;
@@ -153,9 +155,9 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; con
     </>;
   }
   return content;
-  }, [node.params, node.children, sheet, conditionSheet, sample, renderValue, onDropNode, onDropMarker, renderNodeActions, read, params, statFormat, statCondition]);
+   }, [node.params, node.children, sheet, conditionSheet, sample, surface, renderValue, onDropNode, onDropMarker, renderNodeActions, read, params, statFormat, statCondition]);
   const groupAppearance = params?.type === 'group' && params.appearance === 'panel';
-  const nestedChildren = params?.type !== 'group' && node.children.length > 0 ? <div className={styles.children}>{node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} conditionSheet={conditionSheet} sample={sample} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={onDropMarker} renderNodeActions={renderNodeActions} />)}</div> : null;
+  const nestedChildren = params?.type !== 'group' && node.children.length > 0 ? <div className={styles.children}>{node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} conditionSheet={conditionSheet} sample={sample} surface={surface} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={onDropMarker} renderNodeActions={renderNodeActions} />)}</div> : null;
   const handleDrop = (event: React.DragEvent<HTMLElement>) => {
     event.stopPropagation();
     const ownMime = Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation');
@@ -169,15 +171,16 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; con
     const related = event.relatedTarget;
     if (!(related instanceof Node) || !event.currentTarget.contains(related)) onDropMarker?.(event.currentTarget, null);
   };
-  return <article className={`${styles.node} ${groupAppearance ? styles.panel : ''}`} data-drop-axis={orientation === 'row' ? 'x' : 'y'} tabIndex={renderNodeActions ? 0 : undefined} draggable={Boolean(onDropNode)} aria-label={node.title || 'Компонент отображения'} onDragStart={event => { event.stopPropagation(); if (onDropNode) event.dataTransfer.setData('application/x-tdn-presentation', JSON.stringify({ kind: 'node', nodeKey: node.nodeKey })); }} onDragOver={onDropOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+  const sizeClass = params && (params.type === 'resource' || params.type === 'composite') ? params.size === 'compact' ? styles.sizeCompact : params.size === 'medium' ? styles.sizeMedium : styles.sizeLarge : '';
+  return <article className={`${styles.node} ${groupAppearance ? styles.panel : ''} ${surface !== 'page' ? styles.compactSurface : ''} ${sizeClass}`} data-node-type={params?.type} data-drop-axis={orientation === 'row' ? 'x' : 'y'} tabIndex={renderNodeActions ? 0 : undefined} draggable={Boolean(onDropNode)} aria-label={node.title || 'Компонент отображения'} onDragStart={event => { event.stopPropagation(); if (onDropNode) event.dataTransfer.setData('application/x-tdn-presentation', JSON.stringify({ kind: 'node', nodeKey: node.nodeKey })); }} onDragOver={onDropOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
       {renderNodeActions && <div className={styles.nodeControls} role="group" aria-label="Действия компонента" onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onPointerUp={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onDragStart={event => { event.preventDefault(); event.stopPropagation(); }} onDragOver={event => event.stopPropagation()} onDragLeave={event => event.stopPropagation()} onDrop={event => { event.preventDefault(); event.stopPropagation(); const nodeElement = event.currentTarget.parentElement; if (nodeElement instanceof HTMLElement) onDropMarker?.(nodeElement, null); }} onDragEnd={event => event.stopPropagation()}>{renderNodeActions(node)}</div>}
       {node.title && <h3 className={styles.nodeTitle}>{node.title}</h3>}
       {read.status !== 'supported' ? <p className={styles.diagnostic} role="status">{read.message}</p> : <>{body}{nestedChildren}</>}
-       {read.status !== 'supported' && node.children.length > 0 && <div className={styles.children}>{node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} conditionSheet={conditionSheet} sample={sample} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={onDropMarker} renderNodeActions={renderNodeActions} />)}</div>}
+        {read.status !== 'supported' && node.children.length > 0 && <div className={styles.children}>{node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} conditionSheet={conditionSheet} sample={sample} surface={surface} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={onDropMarker} renderNodeActions={renderNodeActions} />)}</div>}
    </article>;
 });
 
-const PresentationRenderer: React.FC<PresentationRendererProps> = React.memo(({ roots, sheet, conditionSheet, sample = false, renderValue, onDropNode, renderNodeActions }) => {
+const PresentationRenderer: React.FC<PresentationRendererProps> = React.memo(({ roots, sheet, conditionSheet, sample = false, surface = 'page', renderValue, onDropNode, renderNodeActions }) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const activeTargetRef = useRef<HTMLElement | null>(null);
   const markDrop = useCallback((element: HTMLElement, placement: PresentationDropPlacement | null) => {
@@ -215,8 +218,8 @@ const PresentationRenderer: React.FC<PresentationRendererProps> = React.memo(({ 
     };
   }, [onDropNode, markDrop]);
   const marker = onDropNode ? markDrop : undefined;
-  return <div className={styles.roots} ref={rootRef}>
-     {roots.map(node => <NodeContent key={node.nodeKey} node={node} sheet={sheet} conditionSheet={conditionSheet} sample={sample} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={marker} renderNodeActions={renderNodeActions} />)}
+   return <div className={`${styles.roots} ${surface !== 'page' ? styles.compactRoots : ''}`} data-surface={surface} ref={rootRef}>
+      {roots.map(node => <NodeContent key={node.nodeKey} node={node} sheet={sheet} conditionSheet={conditionSheet} sample={sample} surface={surface} orientation={surface === 'page' ? 'column' : 'row'} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={marker} renderNodeActions={renderNodeActions} />)}
   </div>;
 });
 

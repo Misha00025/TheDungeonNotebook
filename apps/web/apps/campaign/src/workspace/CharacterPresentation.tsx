@@ -3,7 +3,7 @@ import { Button, StatePanel } from '@tdn/shared';
 import type { ComputedSheet, FieldReference, ResolvedPresentation } from './types';
 import { useWorkspace } from './Workspace';
 import { useResource } from './hooks';
-import { readParams, normalizeRoots, type PresentationNode } from './presentationModel';
+import { readParams, normalizeRoots, type PresentationNode, type PresentationSurface } from './presentationModel';
 import PresentationRenderer from './PresentationRenderer';
 import { ApiError } from './Feedback';
 import styles from './CharacterPresentation.module.css';
@@ -12,6 +12,7 @@ type Props = {
   campaignId: number;
   characterId: string;
   pageKey: string;
+  surface?: PresentationSurface;
   sheet: ComputedSheet;
   conditionSheet?: ComputedSheet;
   refreshKey?: number;
@@ -19,7 +20,7 @@ type Props = {
   onVisibleFieldsChange?: (fieldIds: string[]) => void;
 };
 
-function editableBaseFields(roots: PresentationNode[], sheet: ComputedSheet): string[] {
+export function editableBaseFields(roots: PresentationNode[], sheet: ComputedSheet): string[] {
   const ids = new Set<string>();
   const known = new Set(sheet.baseFields.map(field => field.id));
   const visit = (nodes: PresentationNode[]) => nodes.forEach(node => {
@@ -38,7 +39,7 @@ function editableBaseFields(roots: PresentationNode[], sheet: ComputedSheet): st
   return [...ids];
 }
 
-const CharacterPresentation: React.FC<Props> = ({ campaignId, characterId, pageKey, sheet, conditionSheet, refreshKey = 0, renderValue, onVisibleFieldsChange }) => {
+const CharacterPresentation: React.FC<Props> = ({ campaignId, characterId, pageKey, surface = 'page', sheet, conditionSheet, refreshKey = 0, renderValue, onVisibleFieldsChange }) => {
   const { api, sessionKey } = useWorkspace();
   const scope = `${sessionKey}:${campaignId}:${characterId}:${pageKey}`;
   const resolved = useResource<ResolvedPresentation>(scope, () => api.resolvePresentation(campaignId, pageKey));
@@ -56,11 +57,12 @@ const CharacterPresentation: React.FC<Props> = ({ campaignId, characterId, pageK
   useEffect(() => { onVisibleFieldsChange?.(visibleFields); }, [onVisibleFieldsChange, visibleFields]);
   useEffect(() => () => { onVisibleFieldsChange?.([]); }, [onVisibleFieldsChange]);
 
-  return <section className={styles.section} aria-label="Страница персонажа" aria-busy={resolved.loading}>
-    {resolved.loading && !resolved.data && <StatePanel kind="loading">Загрузка страницы…</StatePanel>}
-    {Boolean(resolved.error) && <div className={styles.recovery}><ApiError error={resolved.error} /><Button variant="secondary" type="button" onClick={() => resolved.reload()}>Повторить загрузку страницы</Button></div>}
+  const surfaceLabel = surface === 'header' ? 'Шапка персонажа' : surface === 'card' ? 'Карточка персонажа' : 'Страница персонажа';
+  return <section className={styles.section} aria-label={surfaceLabel} aria-busy={resolved.loading}>
+    {resolved.loading && !resolved.data && <StatePanel kind="loading">Загрузка: {surfaceLabel.toLocaleLowerCase()}…</StatePanel>}
+    {Boolean(resolved.error) && <div className={styles.recovery}><ApiError error={resolved.error} /><Button variant="secondary" type="button" onClick={() => resolved.reload()}>Повторить загрузку</Button></div>}
     {rendererAvailable && resolved.data ? <>
-      {resolved.data.viewContent.data.roots.length === 0 ? <div className={styles.emptyCanvas} aria-label="Пустое отображение" /> : <PresentationRenderer roots={roots} sheet={sheet} conditionSheet={conditionSheet} renderValue={renderValue} />}
+      {resolved.data.viewContent.data.roots.length === 0 ? <div className={styles.emptyCanvas} aria-label={`Пустое отображение: ${surfaceLabel}`} /> : <PresentationRenderer roots={roots} sheet={sheet} conditionSheet={conditionSheet} surface={surface} renderValue={renderValue} />}
     </> : null}
   </section>;
 };

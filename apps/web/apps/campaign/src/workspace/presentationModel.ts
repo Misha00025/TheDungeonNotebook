@@ -4,17 +4,20 @@ import { isLosslessNumber } from 'lossless-json';
 
 export type PresentationNode = { kind: 'layout'; nodeKey: string; title: string; params: JsonValue; children: PresentationNode[] };
 export type PresentationType = 'group' | 'composite' | 'resource' | 'stat-list';
+export type PresentationSurface = 'page' | 'header' | 'card';
+export type PresentationSize = 'compact' | 'medium' | 'large';
 export type JsonFieldReference = { kind: FieldReference['kind']; fieldId: string; [key: string]: JsonValue };
 export type FieldPart = { text: string } | { source: JsonFieldReference; signed?: boolean };
 export type PresentationParams =
   | { version: 1; type: 'group'; direction: 'row' | 'column'; columns: number; gap: 'small' | 'medium' | 'large'; appearance: 'plain' | 'panel'; [key: string]: JsonValue }
-  | { version: 1; type: 'composite'; parts: FieldPart[]; primary: JsonFieldReference | null; [key: string]: JsonValue }
-  | { version: 1; type: 'resource'; current: JsonFieldReference | null; maximum: JsonFieldReference | null; showBar: boolean; [key: string]: JsonValue }
+  | { version: 1; type: 'composite'; parts: FieldPart[]; primary: JsonFieldReference | null; size: PresentationSize; [key: string]: JsonValue }
+  | { version: 1; type: 'resource'; current: JsonFieldReference | null; maximum: JsonFieldReference | null; showBar: boolean; size: PresentationSize; [key: string]: JsonValue }
   | { version: 1; type: 'stat-list'; entries: { source: JsonFieldReference; label: string; [key: string]: JsonValue }[]; columns: number; format: string; expressions: (string | null)[]; condition: string; [key: string]: JsonValue };
 export type ParamsRead = { [T in PresentationType]: { status: 'supported'; type: T; params: Extract<PresentationParams, { type: T }> } }[PresentationType] | { status: 'unsupported' | 'invalid'; message: string; params: JsonValue };
 
 const isRecord = (value: unknown): value is Record<string, JsonValue> => typeof value === 'object' && value !== null && !Array.isArray(value) && !isLosslessNumber(value);
 const positiveInteger = (value: JsonValue | undefined): value is number => typeof value === 'number' && Number.isInteger(value) && value > 0;
+const validSize = (value: JsonValue | undefined): value is PresentationSize => value === 'compact' || value === 'medium' || value === 'large';
 type ReferenceShape = { kind: FieldReference['kind']; fieldId: string };
 const validRef = (value: unknown): value is ReferenceShape => isRecord(value) && (value.kind === 'Base' || value.kind === 'Virtual') && typeof value.fieldId === 'string';
 const validPart = (value: JsonValue): value is FieldPart => isRecord(value) && (typeof value.text === 'string' || validRef(value.source) && (value.signed === undefined || typeof value.signed === 'boolean'));
@@ -40,11 +43,11 @@ export function readParams(params: JsonValue): ParamsRead {
   const valid = type === 'group'
     ? (params.direction === 'row' || params.direction === 'column') && positiveInteger(params.columns) && (params.gap === 'small' || params.gap === 'medium' || params.gap === 'large') && (params.appearance === 'plain' || params.appearance === 'panel')
     : type === 'composite'
-      ? Array.isArray(params.parts) && params.parts.every(validPart) && (params.primary === null || validRef(params.primary) && params.primary.kind === 'Base')
-      : type === 'resource'
-        ? (params.current === null || validRef(params.current)) && (params.maximum === null || validRef(params.maximum)) && typeof params.showBar === 'boolean'
+       ? Array.isArray(params.parts) && params.parts.every(validPart) && (params.primary === null || validRef(params.primary) && params.primary.kind === 'Base') && (params.size === undefined || validSize(params.size))
+       : type === 'resource'
+         ? (params.current === null || validRef(params.current)) && (params.maximum === null || validRef(params.maximum)) && typeof params.showBar === 'boolean' && (params.size === undefined || validSize(params.size))
         : Array.isArray(params.entries) && params.entries.every(entry => isRecord(entry) && validRef(entry.source) && typeof entry.label === 'string') && positiveInteger(params.columns) && (params.format === undefined || typeof params.format === 'string') && (params.condition === undefined || typeof params.condition === 'string') && (params.expressions === undefined || Array.isArray(params.expressions) && params.expressions.every(expression => expression === null || typeof expression === 'string'));
-  return valid ? { status: 'supported', type, params: { ...params, version: 1, type, ...(type === 'stat-list' ? { format: typeof params.format === 'string' ? params.format : '$0', expressions: Array.isArray(params.expressions) ? params.expressions as (string | null)[] : [], condition: typeof params.condition === 'string' ? params.condition : '' } : {}) } as PresentationParams } as ParamsRead : { status: 'invalid', message: 'Настройки отображения заполнены некорректно.', params };
+  return valid ? { status: 'supported', type, params: { ...params, version: 1, type, ...((type === 'composite' || type === 'resource') ? { size: validSize(params.size) ? params.size : 'large' } : {}), ...(type === 'stat-list' ? { format: typeof params.format === 'string' ? params.format : '$0', expressions: Array.isArray(params.expressions) ? params.expressions as (string | null)[] : [], condition: typeof params.condition === 'string' ? params.condition : '' } : {}) } as PresentationParams } as ParamsRead : { status: 'invalid', message: 'Настройки отображения заполнены некорректно.', params };
 }
 
 const stringParam = (value: JsonValue | undefined, fallback: string): string => typeof value === 'string' ? value : fallback;
@@ -52,8 +55,8 @@ export const makeNode = (type: PresentationType, title = ''): PresentationNode =
   kind: 'layout', nodeKey: crypto.randomUUID(), title, children: [],
   params: type === 'group'
     ? { version: 1, type, direction: 'column', columns: 1, gap: 'medium', appearance: 'plain' }
-    : type === 'composite' ? { version: 1, type, parts: [], primary: null }
-      : type === 'resource' ? { version: 1, type, current: null, maximum: null, showBar: true }
+     : type === 'composite' ? { version: 1, type, parts: [], primary: null, size: 'large' }
+       : type === 'resource' ? { version: 1, type, current: null, maximum: null, showBar: true, size: 'large' }
           : { version: 1, type, entries: [], columns: 1, format: '$0', expressions: [], condition: '' },
 });
 
@@ -193,8 +196,36 @@ export function writePages(original: Presentation, pages: PresentationPage[]): P
   return { ...original, defaults, contextParams };
 }
 
+export const surfaceContextKeys = { header: 'character_header', card: 'character_card' } as const;
+export function readSurfaceAssignment(presentation: Presentation, surface: Exclude<PresentationSurface, 'page'>): string {
+  return presentation.defaults[surfaceContextKeys[surface]] ?? '';
+}
+export function writeSurfaceAssignments(original: Presentation, assignments: { header: string; card: string }): Presentation {
+  const defaults = { ...original.defaults };
+  for (const surface of ['header', 'card'] as const) {
+    const key = surfaceContextKeys[surface];
+    if (assignments[surface]) defaults[key] = assignments[surface];
+    else delete defaults[key];
+  }
+  return { ...original, defaults };
+}
+export function readViewSurface(presentation: Presentation, viewKey: string): PresentationSurface {
+  const raw = presentation.contextParams[`view_${viewKey}`];
+  const stored = isRecord(raw) ? raw.editorSurface : undefined;
+  if (stored === 'page' || stored === 'header' || stored === 'card') return stored;
+  if (readSurfaceAssignment(presentation, 'header') === viewKey) return 'header';
+  if (readSurfaceAssignment(presentation, 'card') === viewKey) return 'card';
+  return 'page';
+}
+export function writeViewSurface(original: Presentation, viewKey: string, surface: PresentationSurface): Presentation {
+  const key = `view_${viewKey}`;
+  const raw = original.contextParams[key];
+  const existing = isRecord(raw) ? raw : raw === undefined ? {} : { legacyParams: raw };
+  return { ...original, contextParams: { ...original.contextParams, [key]: { ...existing, editorSurface: surface } } };
+}
+
 export type LocalDraftScope = { account: string; campaign: string; view: string; schemaVersion: number };
-export type LocalDraft = LocalDraftScope & { roots: PresentationNode[]; name: string; baseContentRevision: Revision; baseMetadataRevision: Revision };
+export type LocalDraft = LocalDraftScope & { roots: PresentationNode[]; name: string; surface?: PresentationSurface; baseContentRevision: Revision; baseMetadataRevision: Revision };
 export type DraftRead = { status: 'ok'; draft: LocalDraft } | { status: 'error'; message: string };
 export const localDraftKey = (scope: LocalDraftScope): string => `tdn:presentation-draft:${encodeURIComponent(scope.account)}:${encodeURIComponent(scope.campaign)}:${encodeURIComponent(scope.view)}:${scope.schemaVersion}`;
 export const stringifyDraft = (draft: LocalDraft): string => stringifyJson({
@@ -204,6 +235,7 @@ export const stringifyDraft = (draft: LocalDraft): string => stringifyJson({
   schemaVersion: draft.schemaVersion,
   roots: draft.roots,
   name: draft.name,
+  ...(draft.surface !== undefined ? { surface: draft.surface } : {}),
   baseContentRevision: draft.baseContentRevision,
   baseMetadataRevision: draft.baseMetadataRevision,
 });
@@ -221,6 +253,7 @@ export function parseDraft(text: string, scope: LocalDraftScope): DraftRead {
       schemaVersion: 1,
       roots: roots as PresentationNode[],
       name: value.name,
+      ...(value.surface === 'page' || value.surface === 'header' || value.surface === 'card' ? { surface: value.surface } : {}),
       baseContentRevision: value.baseContentRevision,
       baseMetadataRevision: value.baseMetadataRevision,
     };

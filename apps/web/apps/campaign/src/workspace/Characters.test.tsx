@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Characters from './Characters';
 
-const api = vi.hoisted(() => ({ listCharacters: vi.fn(), characterPermissions: vi.fn(), getSheet: vi.fn() }));
+const api = vi.hoisted(() => ({ listCharacters: vi.fn(), characterPermissions: vi.fn(), getSheet: vi.fn(), getPresentation: vi.fn() }));
 const navigate = vi.hoisted(() => vi.fn());
 const characters = [
   { id: 'key-id', campaignId: 12, name: 'Key hero', importance: 'Key', metadataRevision: 1 },
@@ -24,6 +24,7 @@ describe('GM Characters', () => {
     api.listCharacters.mockResolvedValue(characters);
     api.characterPermissions.mockResolvedValue({ canRead: true, canWrite: true, canManageAccess: false });
     api.getSheet.mockImplementation(async (_campaignId: number, id: string) => ({ description: `${id} description` }));
+    api.getPresentation.mockResolvedValue({ contentRevision: 1, defaults: {}, contextParams: {} });
   });
 
   it('groups visible characters by importance and loads descriptions from basic sheets', async () => {

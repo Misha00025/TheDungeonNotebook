@@ -5,6 +5,7 @@ import type { DefinitionCreate, ViewMetadata } from './types';
 import { useWorkspace, useDirtyDraft, useDirtyState } from './Workspace';
 import { CampaignApiError, runCreation } from './api';
 import { useCampaignWorkspace } from './Shell';
+import type { PresentationSurface } from './presentationModel';
 import { useResource, useMutation } from './hooks';
 import { ApiError } from './Feedback';
 import ViewEditor from './ViewEditor';
@@ -15,10 +16,12 @@ import styles from './Workspace.module.css';
 
 const uncertain = (error: unknown) => error instanceof CampaignApiError && (error.conflict || error.unknownOutcome);
 
-const CreateView: React.FC<{ campaignId: number; canWrite: boolean; onCancel: () => void; onCreated: (view: DefinitionCreate) => void }> = ({ campaignId, canWrite, onCancel, onCreated }) => {
+const CreateView: React.FC<{ campaignId: number; canWrite: boolean; onCancel: () => void; onCreated: (view: DefinitionCreate, surface: PresentationSurface) => void }> = ({ campaignId, canWrite, onCancel, onCreated }) => {
   const { api } = useWorkspace();
   const [name, setName] = useState('');
   const nameId = useId();
+  const surfaceId = useId();
+  const [surface, setSurface] = useState<PresentationSurface>('page');
   const [requestId] = useState(() => crypto.randomUUID());
   const [error, setError] = useState<unknown>();
   const [blocked, setBlocked] = useState(false);
@@ -26,23 +29,24 @@ const CreateView: React.FC<{ campaignId: number; canWrite: boolean; onCancel: ()
   const [checkError, setCheckError] = useState<unknown>();
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  const clearDirty = useDirtyDraft(`view-create-${campaignId}-${requestId}`, Boolean(name));
+  const clearDirty = useDirtyDraft(`view-create-${campaignId}-${requestId}`, Boolean(name) || surface !== 'page');
   const lookup = async () => {
     const metadata = await api.getView(campaignId, requestId);
     const content = await api.getViewContent(campaignId, requestId);
     return { ...metadata, contentRevision: content.contentRevision } as DefinitionCreate;
   };
   const mutation = useMutation(() => runCreation(() => api.createView(campaignId, { requestId, name: name.trim(), roots: [] }), lookup));
-  const check = async () => { if (!canWrite || forbidden || mutation.busy || !blocked) return; setCheckError(undefined); try { const created = await lookup(); if (mounted.current) { clearDirty(); onCreated(created); } } catch (failure) { if (mounted.current) { setCheckError(failure); if (failure instanceof CampaignApiError && failure.status === 403) setForbidden(true); } } };
+  const check = async () => { if (!canWrite || forbidden || mutation.busy || !blocked) return; setCheckError(undefined); try { const created = await lookup(); if (mounted.current) { clearDirty(); onCreated(created, surface); } } catch (failure) { if (mounted.current) { setCheckError(failure); if (failure instanceof CampaignApiError && failure.status === 403) setForbidden(true); } } };
   const cancel = () => {
     if (mutation.busy) return;
-    if (!name || window.confirm(blocked ? 'Результат создания неизвестен. Отказаться от проверки и оставить созданное отображение в списке?' : 'Отказаться от черновика отображения?')) { clearDirty(); onCancel(); }
+    if ((!name && surface === 'page') || window.confirm(blocked ? 'Результат создания неизвестен. Отказаться от проверки и оставить созданное отображение в списке?' : 'Отказаться от черновика отображения?')) { clearDirty(); onCancel(); }
   };
   return <ModalPortal isOpen title="Создать отображение" onClose={cancel} dismissDisabled={mutation.busy}><form className={commonStyles.form} onSubmit={event => {
     event.preventDefault(); if (!canWrite || forbidden || !name.trim() || blocked || mutation.busy) return;
-    void mutation.run().then(result => { if (result && mounted.current) { clearDirty(); onCreated(result); } }).catch(failure => { if (mounted.current) { setError(failure); setBlocked(uncertain(failure)); if (failure instanceof CampaignApiError && failure.status === 403) setForbidden(true); } });
+     void mutation.run().then(result => { if (result && mounted.current) { clearDirty(); onCreated(result, surface); } }).catch(failure => { if (mounted.current) { setError(failure); setBlocked(uncertain(failure)); if (failure instanceof CampaignApiError && failure.status === 403) setForbidden(true); } });
   }}>
     <Field label="Название" htmlFor={nameId}><Input id={nameId} autoFocus value={name} disabled={!canWrite || forbidden || blocked || mutation.busy} onChange={event => setName(event.target.value)} /></Field>
+    <Field label="Назначение" htmlFor={surfaceId}><Select id={surfaceId} value={surface} disabled={!canWrite || forbidden || blocked || mutation.busy} onChange={event => setSurface(event.target.value as PresentationSurface)}><option value="page">Страница персонажа</option><option value="header">Шапка персонажа</option><option value="card">Карточка персонажа</option></Select></Field>
     {Boolean(error) && <ApiError error={error} />}{Boolean(checkError) && <ApiError error={checkError} />}
     <ActionRow>{blocked ? <Button type="button" disabled={!canWrite || forbidden || mutation.busy} onClick={() => void check()}>Проверить создание</Button> : <Button type="submit" disabled={!canWrite || forbidden || !name.trim() || mutation.busy}>Создать</Button>}
       <Button variant="secondary" type="button" disabled={mutation.busy} onClick={cancel}>{blocked ? 'Отказаться от проверки' : 'Отмена'}</Button></ActionRow>
@@ -76,6 +80,8 @@ const Views: React.FC = () => {
     return [...merged.values()];
   }, [viewsResource.data, confirmedViews, scope]);
   const [selectedId, setSelectedId] = useState('');
+  const [editorInitialSurface, setEditorInitialSurface] = useState<PresentationSurface>();
+  const [editorFocusSurface, setEditorFocusSurface] = useState<Exclude<PresentationSurface, 'page'>>();
   const [creating, setCreating] = useState(false);
   const [showPages, setShowPages] = useState(false);
   const [pageState, setPageState] = useState({ dirty: false, busy: false });
@@ -83,21 +89,22 @@ const Views: React.FC = () => {
   const pagesStateRef = useRef(pageState);
   pagesStateRef.current = pageState;
   const onPagesStateChange = useCallback((state: { dirty: boolean; busy: boolean }) => setPageState(current => current.dirty === state.dirty && current.busy === state.busy ? current : state), []);
-  const changeSelection = (id: string) => {
-    if (id === selectedId) return;
+  const changeSelection = (id: string, focusSurface?: Exclude<PresentationSurface, 'page'>) => {
+    if (id === selectedId) { setEditorFocusSurface(focusSurface); return; }
     if (dirty && !window.confirm('Есть несохранённые изменения. Переключить раздел?')) return;
-    setSelectedId(id); setCreating(false);
+    setSelectedId(id); setCreating(false); setEditorInitialSurface(undefined); setEditorFocusSurface(focusSurface);
   };
   const openPages = () => { setPageState({ dirty: false, busy: false }); setShowPages(true); };
   const closePages = () => {
-    if (pagesStateRef.current.busy) return;
-    if (pagesStateRef.current.dirty && !window.confirm('Отменить несохранённые назначения страниц?')) return;
+    if (pagesStateRef.current.busy) return false;
+    if (pagesStateRef.current.dirty && !window.confirm('Отменить несохранённые назначения?')) return false;
     setShowPages(false);
+    return true;
   };
   const openCreate = () => {
     if (creating) return;
     if (dirty && !window.confirm('Есть несохранённые изменения. Открыть создание отображения?')) return;
-    setCreating(true); setSelectedId(''); setShowPages(false);
+    setCreating(true); setSelectedId(''); setEditorInitialSurface(undefined); setEditorFocusSurface(undefined); setShowPages(false);
   };
   const initialLoading = !viewsResource.data && viewsResource.loading;
   return <main className={styles.page}>
@@ -107,14 +114,14 @@ const Views: React.FC = () => {
     {initialLoading && <StatePanel kind="loading">Загрузка отображений кампании…</StatePanel>}
     <div className={styles.actions}>
       <Button type="button" disabled={!canWrite || creating || initialLoading} onClick={openCreate}>Создать отображение</Button>
-      <Button variant="secondary" type="button" disabled={!canWrite || permissionsLoading || initialLoading} onClick={openPages}>Страницы кампании</Button>
+       <Button variant="secondary" type="button" disabled={!canWrite || permissionsLoading || initialLoading} onClick={openPages}>Назначение</Button>
     </div>
     <Field label="Сохранённое отображение" htmlFor={viewSelectId}><Select id={viewSelectId} value={selectedId} disabled={!viewsResource.data} onChange={event => changeSelection(event.target.value)}><option value="">Выберите отображение</option>{views.map(view => <option key={view.id} value={view.id}>{view.name}</option>)}</Select></Field>
     {viewsResource.data && views.length === 0 && <StatePanel kind="empty">Сохранённых отображений пока нет.</StatePanel>}
-    {creating && <CreateView key={`${sessionKey}:${campaignId}:create`} campaignId={campaignId} canWrite={canWrite} onCancel={() => setCreating(false)} onCreated={created => { onMetadataChange(created); setSelectedId(created.id); setCreating(false); }} />}
-    {selectedId && !creating && <ViewEditor key={`${sessionKey}:${campaignId}:${selectedId}`} sessionKey={sessionKey} campaignId={campaignId} viewId={selectedId} canWrite={canWrite} permissionsLoading={Boolean(permissionsLoading)} onMetadataChange={onMetadataChange} />}
-    <ModalPortal isOpen={showPages} title="Страницы кампании" size="wide" onClose={closePages} dismissDisabled={pageState.busy}>
-      <CampaignPagesEditor key={`${sessionKey}:${campaignId}:pages`} campaignId={campaignId} sessionKey={sessionKey} canWrite={canWrite} permissionsLoading={Boolean(permissionsLoading)} views={views} onStateChange={onPagesStateChange} embedded />
+    {creating && <CreateView key={`${sessionKey}:${campaignId}:create`} campaignId={campaignId} canWrite={canWrite} onCancel={() => setCreating(false)} onCreated={(created, surface) => { onMetadataChange(created); setSelectedId(created.id); setEditorInitialSurface(surface); setEditorFocusSurface(undefined); setCreating(false); }} />}
+    {selectedId && !creating && <ViewEditor key={`${sessionKey}:${campaignId}:${selectedId}`} sessionKey={sessionKey} campaignId={campaignId} viewId={selectedId} initialSurface={editorInitialSurface} focusSurface={editorFocusSurface} canWrite={canWrite} permissionsLoading={Boolean(permissionsLoading)} onMetadataChange={onMetadataChange} />}
+    <ModalPortal isOpen={showPages} title="Назначение" size="wide" onClose={closePages} dismissDisabled={pageState.busy}>
+      <CampaignPagesEditor key={`${sessionKey}:${campaignId}:pages`} campaignId={campaignId} sessionKey={sessionKey} canWrite={canWrite} permissionsLoading={Boolean(permissionsLoading)} views={views} onStateChange={onPagesStateChange} onEditView={(viewId, surface) => { if (!closePages()) return; const view = views.find(item => item.key === viewId); if (view) changeSelection(view.id, surface); }} embedded />
     </ModalPortal>
     </div>
   </main>;

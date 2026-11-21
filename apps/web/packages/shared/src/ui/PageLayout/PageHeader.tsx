@@ -8,7 +8,7 @@ export interface PageHeaderProps {
   imageUrl?: string;
   imageAlt?: string;
   actions?: React.ReactNode;
-  headingLevel?: 1 | 2 | 3;
+  headingLevel?: 1 | 2 | 3 | 4;
   id?: string;
 }
 

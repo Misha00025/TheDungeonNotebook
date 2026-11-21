@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ActionRow, Button, Field, Input, Notification, Select, StatePanel } from '@tdn/shared';
 import type { NotificationKind } from '@tdn/shared';
-import type { ComputedSheet, JsonValue, Revision, TemplateContentEnvelope, ViewContentEnvelope, ViewMetadata, VirtualFieldsEnvelope } from './types';
+import type { ComputedSheet, JsonValue, PresentationEnvelope, Revision, TemplateContentEnvelope, ViewContentEnvelope, ViewMetadata, VirtualFieldsEnvelope } from './types';
 import { useWorkspace, useDirtyDraft } from './Workspace';
 import { CampaignApiError } from './api';
-import { normalizeRoots, readLocalDraft, removeLocalDraft, writeLocalDraft } from './presentationModel';
-import type { LocalDraft, LocalDraftScope, PresentationNode } from './presentationModel';
+import { normalizeRoots, readLocalDraft, readPages, readSurfaceAssignment, readViewSurface, removeLocalDraft, writeLocalDraft, writeViewSurface } from './presentationModel';
+import type { LocalDraft, LocalDraftScope, PresentationNode, PresentationSurface } from './presentationModel';
 import PresentationEditor from './PresentationEditor';
 import { stringifyJson } from './json';
 import { ApiError } from './Feedback';
@@ -14,6 +14,7 @@ import styles from './ViewEditor.module.css';
 type ViewSnapshot = { metadata: ViewMetadata; content: ViewContentEnvelope; roots: PresentationNode[]; legacy: boolean };
 type ContentAttempt = { roots: PresentationNode[] };
 type MetaAttempt = { name: string };
+type SurfaceAttempt = { surface: PresentationSurface };
 type DraftOffer = { status: 'available'; draft: LocalDraft } | { status: 'error'; message: string };
 
 const sameRevision = (left: unknown, right: unknown) => String(left) === String(right);
@@ -40,10 +41,11 @@ function SectionLoading({ loading, children }: React.PropsWithChildren<{ loading
   </div>;
 }
 
-const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boolean; permissionsLoading: boolean; sessionKey: string; onMetadataChange?: (metadata: ViewMetadata) => void }> = ({ campaignId, viewId, canWrite, sessionKey, onMetadataChange }) => {
+const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boolean; permissionsLoading: boolean; sessionKey: string; initialSurface?: PresentationSurface; focusSurface?: Exclude<PresentationSurface, 'page'>; onMetadataChange?: (metadata: ViewMetadata) => void }> = ({ campaignId, viewId, canWrite, sessionKey, initialSurface, focusSurface, onMetadataChange }) => {
   const { api } = useWorkspace();
   const nameInputId = useId();
   const previewSelectId = useId();
+  const surfaceSelectId = useId();
   const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>();
@@ -53,19 +55,28 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
   const [metadataRevision, setMetadataRevision] = useState<Revision>(0);
   const [roots, setRoots] = useState<PresentationNode[]>([]);
   const [baselineRoots, setBaselineRoots] = useState<PresentationNode[]>([]);
+  const [surface, setSurface] = useState<PresentationSurface>('page');
+  const [surfaceFocus, setSurfaceFocus] = useState<Exclude<PresentationSurface, 'page'> | undefined>(focusSurface);
+  const [baselineSurface, setBaselineSurface] = useState<PresentationSurface>('page');
+  const [presentation, setPresentation] = useState<PresentationEnvelope>();
   const [contentRevision, setContentRevision] = useState<Revision>(0);
   const [legacyConversion, setLegacyConversion] = useState(false);
   const [metadataBlocked, setMetadataBlocked] = useState(false);
   const [contentBlocked, setContentBlocked] = useState(false);
+  const [surfaceBlocked, setSurfaceBlocked] = useState(false);
   const [metadataAttempt, setMetadataAttempt] = useState<MetaAttempt>();
   const [contentAttempt, setContentAttempt] = useState<ContentAttempt>();
+  const [surfaceAttempt, setSurfaceAttempt] = useState<SurfaceAttempt>();
   const [metadataServer, setMetadataServer] = useState<ViewMetadata>();
   const [contentServer, setContentServer] = useState<ViewSnapshot>();
+  const [surfaceServer, setSurfaceServer] = useState<PresentationEnvelope>();
   const [metadataError, setMetadataError] = useState<unknown>();
   const [contentError, setContentError] = useState<unknown>();
+  const [surfaceError, setSurfaceError] = useState<unknown>();
   const [verifyError, setVerifyError] = useState<unknown>();
   const [metadataSaved, setMetadataSaved] = useState(false);
   const [contentSaved, setContentSaved] = useState(false);
+  const [surfaceSaved, setSurfaceSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [checking, setChecking] = useState(false);
   const [forbidden, setForbidden] = useState(false);
@@ -93,15 +104,18 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
   const writable = canWrite && !forbidden;
   const metadataDirty = name !== baselineName;
   const contentDirty = useMemo(() => !sameRoots(roots, baselineRoots), [roots, baselineRoots]);
+  const surfaceDirty = surface !== baselineSurface;
   const contentSaveNeeded = contentDirty || legacyConversion;
   const canSaveMetadata = metadataDirty && !metadataBlocked && Boolean(name.trim());
   const canSaveContent = contentSaveNeeded && !contentBlocked;
-  const hasSaveableChanges = canSaveMetadata || canSaveContent;
-  const dirty = metadataDirty || contentDirty;
+  const canSaveSurface = surfaceDirty && !surfaceBlocked;
+  const hasSaveableChanges = canSaveMetadata || canSaveContent || canSaveSurface;
+  const dirty = metadataDirty || contentDirty || surfaceDirty;
   useDirtyDraft(`view-editor-${activeScope}`, dirty);
 
   const isCurrent = (scopeAtRequest: string, generation: number) => mounted.current && scopeRef.current === scopeAtRequest && loadGeneration.current === generation;
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; loadGeneration.current += 1; previewGeneration.current += 1; characterListGeneration.current += 1; }; }, []);
+  useEffect(() => { setSurfaceFocus(focusSurface); }, [focusSurface]);
 
   useEffect(() => {
     let active = true;
@@ -109,9 +123,10 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
     const requestScope = activeScope;
     setLoading(true); setLoadError(undefined); setSnapshot(undefined); setDraftOffer(undefined);
     const readInitial = async () => {
-      const [metadata, content, template, charactersResult] = await Promise.all([
+      const [metadata, content, presentationResult, template, charactersResult] = await Promise.all([
         api.getView(campaignId, viewId),
         api.getViewContent(campaignId, viewId),
+        api.getPresentation(campaignId),
         api.getTemplateContent(campaignId),
         api.listCharacters(campaignId).then(value => ({ value }), error => ({ error })),
       ]);
@@ -120,9 +135,12 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
       if (!active || !isCurrent(requestScope, generation)) return;
       const normalized = normalizeRoots(content.data.roots);
       const nextSnapshot = { metadata, content, roots: normalized, legacy: hasWidget(content.data.roots) };
+      const serverSurface = readViewSurface(presentationResult, metadata.key);
+      const initial = initialSurface ?? serverSurface;
+      setPresentation(presentationResult); setSurface(initial); setBaselineSurface(serverSurface);
       setSnapshot(nextSnapshot); setName(metadata.name); setBaselineName(metadata.name); setMetadataRevision(metadata.metadataRevision);
       setRoots(normalized); setBaselineRoots(normalized); setContentRevision(content.contentRevision); setLegacyConversion(nextSnapshot.legacy);
-      setMetadataBlocked(false); setContentBlocked(false); setMetadataAttempt(undefined); setContentAttempt(undefined); setMetadataServer(undefined); setContentServer(undefined);
+       setMetadataBlocked(false); setContentBlocked(false); setSurfaceBlocked(false); setMetadataAttempt(undefined); setContentAttempt(undefined); setSurfaceAttempt(undefined); setMetadataServer(undefined); setContentServer(undefined); setSurfaceServer(undefined);
       setTemplateSheet(sampleSheet(template, virtuals));
       if ('value' in charactersResult) { setCharacters(charactersResult.value.map(item => ({ id: item.id, name: item.name }))); setCharactersError(undefined); }
       else { setCharacters([]); setCharactersError(charactersResult.error); }
@@ -145,9 +163,10 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
     writeLock.current = true;
     const requestScope = activeScope;
     const generation = loadGeneration.current;
-    setSaving(true); setMetadataError(undefined); setContentError(undefined); setMetadataSaved(false); setContentSaved(false);
+    setSaving(true); setMetadataError(undefined); setContentError(undefined); setSurfaceError(undefined); setMetadataSaved(false); setContentSaved(false); setSurfaceSaved(false);
     const submittedName = name.trim();
     const submittedRoots = roots;
+    const submittedSurface = surface;
     let writeRevoked = false;
     try {
       if (canSaveMetadata && writable) {
@@ -173,6 +192,18 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
           if (!isCurrent(requestScope, generation)) return;
           setContentError(failure); writeRevoked = recordForbidden(failure);
           if (uncertain(failure)) { setContentBlocked(true); setContentAttempt({ roots: submittedRoots }); }
+        }
+      }
+      if (canSaveSurface && writable && !writeRevoked && presentation) {
+        try {
+          const body = writeViewSurface(presentation, snapshot!.metadata.key, submittedSurface);
+          const result = await api.putPresentation(campaignId, { expectedRevision: presentation.contentRevision, defaults: body.defaults, contextParams: body.contextParams });
+          if (!isCurrent(requestScope, generation)) return;
+          setPresentation(result); setBaselineSurface(submittedSurface); setSurface(current => current === submittedSurface ? submittedSurface : current); setSurfaceBlocked(false); setSurfaceAttempt(undefined); setSurfaceServer(undefined); setSurfaceSaved(true);
+        } catch (failure) {
+          if (!isCurrent(requestScope, generation)) return;
+          setSurfaceError(failure); writeRevoked = recordForbidden(failure);
+          if (uncertain(failure)) { setSurfaceBlocked(true); setSurfaceAttempt({ surface: submittedSurface }); }
         }
       }
     } finally { writeLock.current = false; if (isCurrent(requestScope, generation)) setSaving(false); }
@@ -202,6 +233,19 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
       } else setContentServer(latestSnapshot);
     } catch (failure) { if (isCurrent(requestScope, generation)) { setVerifyError(failure); recordForbidden(failure); } }
   };
+  const readLatestSurface = async (requestScope: string, generation: number) => {
+    try {
+      const latest = await api.getPresentation(campaignId);
+      if (!isCurrent(requestScope, generation)) return;
+      setPresentation(latest);
+      const attempted = surfaceAttempt;
+      const raw = latest.contextParams[`view_${snapshot!.metadata.key}`];
+      const descriptor = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, JsonValue>).editorSurface : undefined;
+      if (attempted && descriptor === attempted.surface) {
+        setBaselineSurface(attempted.surface); setSurface(current => current === attempted.surface ? attempted.surface : current); setSurfaceBlocked(false); setSurfaceAttempt(undefined); setSurfaceServer(undefined); setSurfaceError(undefined); setSurfaceSaved(true);
+      } else setSurfaceServer(latest);
+    } catch (failure) { if (isCurrent(requestScope, generation)) { setVerifyError(failure); recordForbidden(failure); } }
+  };
   const verifySave = async () => {
     if (verifyLock.current || writeLock.current || saving || checking) return;
     verifyLock.current = true;
@@ -209,7 +253,7 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
     const generation = loadGeneration.current;
     setChecking(true);
     setVerifyError(undefined);
-    try { await Promise.all([metadataBlocked ? readLatestMetadata(requestScope, generation) : Promise.resolve(), contentBlocked ? readLatestContent(requestScope, generation) : Promise.resolve()]); }
+    try { await Promise.all([metadataBlocked ? readLatestMetadata(requestScope, generation) : Promise.resolve(), contentBlocked ? readLatestContent(requestScope, generation) : Promise.resolve(), surfaceBlocked ? readLatestSurface(requestScope, generation) : Promise.resolve()]); }
     finally { verifyLock.current = false; if (isCurrent(requestScope, generation)) setChecking(false); }
   };
   const loadServerMetadata = () => {
@@ -228,10 +272,20 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
     if (!contentServer || !window.confirm('Сохранить дерево и использовать актуальную серверную ревизию как основу? Следующее сохранение сможет заменить серверное дерево.')) return;
     setBaselineRoots(contentServer.roots); setContentRevision(contentServer.content.contentRevision); setLegacyConversion(contentServer.legacy); setSnapshot(current => current ? { ...current, content: contentServer.content, roots: contentServer.roots, legacy: contentServer.legacy } : contentServer); setContentBlocked(false); setContentAttempt(undefined); setContentServer(undefined); setContentError(undefined); setContentSaved(false);
   };
+  const loadServerSurface = () => {
+    if (!surfaceServer || !snapshot) return;
+    const serverSurface = readViewSurface(surfaceServer, snapshot.metadata.key);
+    if (surfaceDirty && !window.confirm('Заменить несохранённый формат серверной версией?')) return;
+    setPresentation(surfaceServer); setSurface(serverSurface); setBaselineSurface(serverSurface); setSurfaceBlocked(false); setSurfaceAttempt(undefined); setSurfaceServer(undefined); setSurfaceError(undefined); setSurfaceSaved(false);
+  };
+  const useSurfaceAsBase = () => {
+    if (!surfaceServer || !snapshot || !window.confirm('Оставить выбранный формат и использовать актуальную серверную версию как основу? Следующее сохранение сможет заменить серверный формат.')) return;
+    setPresentation(surfaceServer); setBaselineSurface(readViewSurface(surfaceServer, snapshot.metadata.key)); setSurfaceBlocked(false); setSurfaceAttempt(undefined); setSurfaceServer(undefined); setSurfaceError(undefined); setSurfaceSaved(false);
+  };
 
   const saveLocal = () => {
     try {
-      const draft: LocalDraft = { ...scope, roots, name, baseContentRevision: contentRevision, baseMetadataRevision: metadataRevision };
+      const draft: LocalDraft = { ...scope, roots, name, surface, baseContentRevision: contentRevision, baseMetadataRevision: metadataRevision };
       writeLocalDraft(window.localStorage, draft); setDraftOffer({ status: 'available', draft }); setDraftMessage('Локальный черновик сохранён.'); setDraftMessageKind('success');
     } catch { setDraftMessage('Не удалось сохранить локальный черновик.'); setDraftMessageKind('warning'); }
   };
@@ -244,7 +298,7 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
     setMetadataAttempt(undefined); setContentAttempt(undefined);
     setMetadataServer(metadataMismatch ? snapshot.metadata : undefined); setContentServer(contentMismatch ? snapshot : undefined);
     setMetadataBlocked(metadataMismatch); setContentBlocked(contentMismatch); setMetadataError(undefined); setContentError(undefined); setVerifyError(undefined);
-    setRoots(draftOffer.draft.roots); setName(draftOffer.draft.name); setContentSaved(false); setMetadataSaved(false); setDraftMessage('Локальный черновик восстановлен; на сервер ничего не отправлено.');
+     setRoots(draftOffer.draft.roots); setName(draftOffer.draft.name); setSurface(draftOffer.draft.surface ?? baselineSurface); setContentSaved(false); setMetadataSaved(false); setSurfaceSaved(false); setDraftMessage('Локальный черновик восстановлен; на сервер ничего не отправлено.');
     setDraftMessageKind('info');
   };
   const deleteLocal = () => {
@@ -267,6 +321,12 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
     api.listCharacters(campaignId).then(items => { if (mounted.current && characterListGeneration.current === generation && scopeRef.current === requestScope) setCharacters(items.map(item => ({ id: item.id, name: item.name }))); }, failure => { if (mounted.current && characterListGeneration.current === generation && scopeRef.current === requestScope) setCharactersError(failure); }).finally(() => { if (characterListGeneration.current === generation && scopeRef.current === requestScope) characterListLock.current = false; });
   };
   const effectiveSheet = characterId ? characterSheet : templateSheet;
+  const previewName = characterId ? characters.find(character => character.id === characterId)?.name ?? 'Имя персонажа' : 'Имя персонажа';
+  const previewDescription = characterId ? effectiveSheet?.description ?? 'Описание персонажа' : 'Описание персонажа';
+  const activeUses = snapshot && presentation ? [
+    ...(['header', 'card'] as const).filter(item => readSurfaceAssignment(presentation, item) === snapshot.metadata.key).map(item => item === 'header' ? 'Шапка персонажа' : 'Карточка персонажа'),
+    ...readPages(presentation).filter(page => page.viewKey === snapshot.metadata.key).map(page => `Страница персонажа «${page.title}»`),
+  ] : [];
   const handleRootsChange = useCallback((next: PresentationNode[]) => { setRoots(next); setContentSaved(false); }, []);
   const loadErrorAction = <Button variant="secondary" type="button" onClick={() => setAttempt(value => value + 1)}>Повторить загрузку</Button>;
 
@@ -280,30 +340,35 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
         {draftOffer?.status === 'error' && <Notification kind="warning" eventKey={draftOffer.message}>{draftOffer.message}</Notification>}
         {draftMessage && <Notification kind={draftMessageKind} eventKey={draftMessage}>{draftMessage}</Notification>}
         <div className={styles.editorControls}>
-          <Field label="Название" htmlFor={nameInputId}><Input id={nameInputId} value={name} disabled={!writable || saving} onChange={event => { setName(event.target.value); setMetadataSaved(false); }} /></Field>
-          <Field label="Предпросмотр" htmlFor={previewSelectId}><Select id={previewSelectId} value={characterId} disabled={!templateSheet} onChange={event => selectCharacter(event.target.value)}><option value="">Образец на основе шаблона</option>{characters.map(character => <option key={character.id} value={character.id}>{character.name}</option>)}</Select></Field>
+           <Field label="Название" htmlFor={nameInputId}><Input id={nameInputId} value={name} disabled={!writable || saving} onChange={event => { setName(event.target.value); setMetadataSaved(false); }} /></Field>
+           <Field label="Предпросмотр" htmlFor={previewSelectId}><Select id={previewSelectId} value={characterId} disabled={!templateSheet} onChange={event => selectCharacter(event.target.value)}><option value="">Образец на основе шаблона</option>{characters.map(character => <option key={character.id} value={character.id}>{character.name}</option>)}</Select></Field>
+            <Field label="Назначение" htmlFor={surfaceSelectId}><Select id={surfaceSelectId} value={surface} disabled={!writable || saving} onChange={event => { setSurface(event.target.value as PresentationSurface); setSurfaceFocus(undefined); setSurfaceSaved(false); }}><option value="page">Страница персонажа</option><option value="header">Шапка персонажа</option><option value="card">Карточка персонажа</option></Select></Field>
         </div>
         {(Boolean(characterId && previewError) || Boolean(charactersError)) && <div className={styles.previewDiagnostics}>
            {Boolean(characterId && previewError) && <><ApiError error={previewError} /><Button variant="secondary" type="button" disabled={previewLoading} onClick={() => selectCharacter(characterId)}>Повторить предпросмотр</Button></>}
            {Boolean(charactersError) && <><ApiError error={charactersError} onRetry={retryCharacters} /><Button variant="secondary" type="button" onClick={retryCharacters}>Повторить загрузку персонажей</Button></>}
         </div>}
-        {templateSheet ? <div className={styles.previewCanvasSection} aria-busy={previewLoading}>
-          <PresentationEditor roots={roots} onChange={handleRootsChange} sheet={effectiveSheet} choicesSheet={templateSheet} sample={!characterId} disabled={!writable || saving} />
+          {activeUses.length > 0 && <p className={styles.surfaceUsage}>Используется в: {activeUses.join(', ')}. Сохранение содержимого отображения изменит все эти места.</p>}
+         {focusSurface && <p className={styles.surfaceUsage}>Открыто из назначения «{focusSurface === 'header' ? 'Шапка персонажа' : 'Карточка персонажа'}». Формат рабочего макета настраивается отдельно от самого назначения.</p>}
+         {templateSheet ? <div className={styles.previewCanvasSection} aria-busy={previewLoading}>
+            <PresentationEditor roots={roots} onChange={handleRootsChange} sheet={effectiveSheet} choicesSheet={templateSheet} sample={!characterId} disabled={!writable || saving} surface={surfaceFocus ?? surface} previewName={previewName} previewDescription={previewDescription} />
         </div> : null}
-        {Boolean(metadataError) && <ApiError error={metadataError} onRetry={!metadataBlocked ? () => void save() : undefined} />}{Boolean(contentError) && <ApiError error={contentError} onRetry={!contentBlocked ? () => void save() : undefined} />}{Boolean(verifyError) && <ApiError error={verifyError} onRetry={() => void verifySave()} />}
-        {(metadataBlocked || contentBlocked) && <div className={styles.conflictPanel}>
-          <Notification kind="warning" eventKey={`${metadataBlocked}:${contentBlocked}:${String(metadataServer?.metadataRevision ?? contentServer?.content.contentRevision ?? '')}`}>Запись заблокирована до проверки версии. Черновая работа сохранена.</Notification>
+         {Boolean(metadataError) && <ApiError error={metadataError} onRetry={!metadataBlocked ? () => void save() : undefined} />}{Boolean(contentError) && <ApiError error={contentError} onRetry={!contentBlocked ? () => void save() : undefined} />}{Boolean(surfaceError) && <ApiError error={surfaceError} onRetry={!surfaceBlocked ? () => void save() : undefined} />}{Boolean(verifyError) && <ApiError error={verifyError} onRetry={() => void verifySave()} />}
+         {(metadataBlocked || contentBlocked || surfaceBlocked) && <div className={styles.conflictPanel}>
+           <Notification kind="warning" eventKey={`${metadataBlocked}:${contentBlocked}:${surfaceBlocked}:${String(metadataServer?.metadataRevision ?? contentServer?.content.contentRevision ?? surfaceServer?.contentRevision ?? '')}`}>Запись заблокирована до проверки версии. Черновая работа сохранена.</Notification>
           <Button variant="secondary" type="button" disabled={saving || checking} onClick={() => void verifySave()}>Проверить сохранение</Button>
           {metadataServer ? <div className={styles.serverChoice}><p>Серверное название: {metadataServer.name}</p><ActionRow><Button type="button" disabled={saving || checking} onClick={loadServerMetadata}>Загрузить серверную версию</Button><Button variant="secondary" type="button" disabled={saving || checking} onClick={useMetadataAsBase}>Использовать актуальную версию как основу</Button></ActionRow></div> : null}
-          {contentServer ? <div className={styles.serverChoice}><p>Серверное дерево содержит {contentServer.roots.length} корневых компонентов.</p><ActionRow><Button type="button" disabled={saving || checking} onClick={loadServerContent}>Загрузить серверную версию</Button><Button variant="secondary" type="button" disabled={saving || checking} onClick={useContentAsBase}>Использовать актуальную версию как основу</Button></ActionRow></div> : null}
+           {contentServer ? <div className={styles.serverChoice}><p>Серверное дерево содержит {contentServer.roots.length} корневых компонентов.</p><ActionRow><Button type="button" disabled={saving || checking} onClick={loadServerContent}>Загрузить серверную версию</Button><Button variant="secondary" type="button" disabled={saving || checking} onClick={useContentAsBase}>Использовать актуальную версию как основу</Button></ActionRow></div> : null}
+           {surfaceServer ? <div className={styles.serverChoice}><p>Серверный формат: {readViewSurface(surfaceServer, snapshot.metadata.key) === 'page' ? 'Страница персонажа' : readViewSurface(surfaceServer, snapshot.metadata.key) === 'header' ? 'Шапка персонажа' : 'Карточка персонажа'}.</p><ActionRow><Button type="button" disabled={saving || checking} onClick={loadServerSurface}>Загрузить серверную версию</Button><Button variant="secondary" type="button" disabled={saving || checking} onClick={useSurfaceAsBase}>Использовать актуальную версию как основу</Button></ActionRow></div> : null}
         </div>}
         <ActionRow>
           <Button type="button" busy={saving} disabled={!writable || saving || checking || !hasSaveableChanges} onClick={() => void save()}>Сохранить</Button>
-          <Button variant="secondary" type="button" disabled={saving || checking || !dirty} onClick={() => { if (window.confirm('Отменить только ещё не сохранённые изменения?')) { setName(baselineName); setRoots(baselineRoots); setMetadataSaved(false); setContentSaved(false); } }}>Отменить изменения</Button>
+           <Button variant="secondary" type="button" disabled={saving || checking || !dirty} onClick={() => { if (window.confirm('Отменить только ещё не сохранённые изменения?')) { setName(baselineName); setRoots(baselineRoots); setSurface(baselineSurface); setMetadataSaved(false); setContentSaved(false); setSurfaceSaved(false); } }}>Отменить изменения</Button>
           <Button variant="secondary" type="button" disabled={saving} onClick={saveLocal}>Сохранить локальный черновик</Button>
         </ActionRow>
-        {metadataSaved && <Notification kind="success" eventKey={`meta:${String(metadataRevision)}`}>Название сохранено отдельно.</Notification>}
-        {contentSaved && <Notification kind="success" eventKey={`content:${String(contentRevision)}`}>Содержимое сохранено отдельно.</Notification>}
+         {metadataSaved && <Notification kind="success" eventKey={`meta:${String(metadataRevision)}`}>Название сохранено отдельно.</Notification>}
+         {contentSaved && <Notification kind="success" eventKey={`content:${String(contentRevision)}`}>Содержимое сохранено отдельно.</Notification>}
+         {surfaceSaved && <Notification kind="success" eventKey={`surface:${surface}`}>Формат рабочего макета сохранён отдельно.</Notification>}
       </> : null}
     </SectionLoading>
   </section>;

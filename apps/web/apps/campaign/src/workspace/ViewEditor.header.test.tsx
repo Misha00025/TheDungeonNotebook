@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   getTemplateVirtualFields: vi.fn(),
   listCharacters: vi.fn(),
   getComputedSheet: vi.fn(),
+  getPresentation: vi.fn(),
   renameView: vi.fn(),
   putViewContent: vi.fn(),
   putPresentation: vi.fn(),
@@ -25,7 +26,7 @@ vi.mock('./Workspace', () => ({
 }));
 
 vi.mock('./PresentationEditor', () => ({
-  default: ({ roots, onChange }: { roots: PresentationNode[]; onChange: (next: PresentationNode[]) => void }) => <div><span>{roots.map(root => root.title).join(',')}</span><button type="button" onClick={() => onChange([...roots, { kind: 'layout', nodeKey: 'draft-root', title: 'Draft root', params: null, children: [] }])}>Change roots</button></div>,
+  default: ({ roots, onChange, surface }: { roots: PresentationNode[]; onChange: (next: PresentationNode[]) => void; surface?: 'page' | 'header' | 'card' }) => <div><span>{roots.map(root => root.title).join(',')}</span><span>Working surface: {surface ?? 'page'}</span><button type="button" onClick={() => onChange([...roots, { kind: 'layout', nodeKey: 'draft-root', title: 'Draft root', params: null, children: [] }])}>Change roots</button></div>,
 }));
 
 const campaignId = 4;
@@ -43,8 +44,9 @@ const computedSheet = {
   formulaContentRevisions: [],
   virtualFields: [],
 };
+const presentation = { contentRevision: 11, defaults: {}, contextParams: {} };
 
-const renderEditor = (onMetadataChange?: (metadata: ViewMetadata) => void) => render(<ViewEditor campaignId={campaignId} viewId={viewId} canWrite permissionsLoading={false} sessionKey="session" onMetadataChange={onMetadataChange} />);
+const renderEditor = (onMetadataChange?: (metadata: ViewMetadata) => void, initialSurface?: 'page' | 'header' | 'card') => render(<ViewEditor campaignId={campaignId} viewId={viewId} canWrite permissionsLoading={false} sessionKey="session" initialSurface={initialSurface} onMetadataChange={onMetadataChange} />);
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -55,6 +57,7 @@ beforeEach(() => {
   api.getTemplateVirtualFields.mockResolvedValue(virtualFields);
   api.listCharacters.mockResolvedValue([{ id: characterId, name: 'Hero' }]);
   api.getComputedSheet.mockResolvedValue(computedSheet);
+  api.getPresentation.mockResolvedValue(presentation);
   api.renameView.mockResolvedValue({ ...view, name: 'Renamed', metadataRevision: 8 });
 });
 
@@ -145,5 +148,46 @@ describe('ViewEditor controls and preview diagnostics', () => {
     expect(screen.getByText('Серверное дерево содержит 0 корневых компонентов.')).toBeInTheDocument();
     expect(screen.getByText('Draft root')).toBeInTheDocument();
     expect(api.putViewContent).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves the selected surface separately and restores it from the view descriptor', async () => {
+    const original = { contentRevision: 11, defaults: { future: 'unchanged' }, contextParams: { unrelated: { keep: false } } };
+    const stored = { contentRevision: 12, defaults: { future: 'unchanged' }, contextParams: { unrelated: { keep: false }, [`view_${view.key}`]: { editorSurface: 'card' } } };
+    api.getPresentation.mockResolvedValueOnce(original);
+    api.putPresentation.mockResolvedValue(stored);
+    const first = renderEditor(undefined, 'card');
+
+    const assignment = await screen.findByLabelText('Назначение');
+    expect(assignment).toHaveValue('card');
+    expect(screen.getByText('Working surface: card')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+    await waitFor(() => expect(api.putPresentation).toHaveBeenCalledWith(campaignId, {
+      expectedRevision: 11,
+      defaults: { future: 'unchanged' },
+      contextParams: { unrelated: { keep: false }, [`view_${view.key}`]: { editorSurface: 'card' } },
+    }));
+    expect(api.putViewContent).not.toHaveBeenCalled();
+    expect(api.renameView).not.toHaveBeenCalled();
+
+    api.getPresentation.mockResolvedValue(stored);
+    first.unmount();
+    renderEditor();
+    expect(await screen.findByLabelText('Назначение')).toHaveValue('card');
+  });
+
+  it('keeps a conflicted surface draft and never repeats its write before explicit verification', async () => {
+    const server = { contentRevision: 14, defaults: { unchanged: 'view' }, contextParams: { [`view_${view.key}`]: { editorSurface: 'page', keep: 'yes' } } };
+    api.getPresentation.mockResolvedValueOnce(presentation).mockResolvedValueOnce(server);
+    api.putPresentation.mockRejectedValueOnce(new CampaignApiError(502, { code: 'write_outcome_unknown', title: 'Unknown', detail: 'Unknown' }, true));
+    renderEditor(undefined, 'card');
+
+    expect(await screen.findByText('Working surface: card')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Проверить сохранение' }));
+    expect(await screen.findByText('Серверный формат: Страница персонажа.')).toBeInTheDocument();
+    expect(screen.getByText('Working surface: card')).toBeInTheDocument();
+    expect(api.putPresentation).toHaveBeenCalledTimes(1);
+    expect(api.putViewContent).not.toHaveBeenCalled();
   });
 });

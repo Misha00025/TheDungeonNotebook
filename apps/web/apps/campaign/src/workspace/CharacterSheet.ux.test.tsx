@@ -21,6 +21,7 @@ const fields = [
 ];
 const computedSheet = { contentRevision: 7, templateContentRevision: 2, description: '', baseFields: fields, virtualFields: [], formulaContentRevisions: [] };
 const presentation = { contentRevision: 4, defaults: { page_1: 'view-key' }, contextParams: { page_1: { title: 'Страница' } } };
+const headerViewKey = '44444444-4444-4444-8444-444444444444';
 const roots = [
   { kind: 'layout', nodeKey: 'composite', title: 'Защита', params: { version: 1, type: 'composite', parts: [{ source: { kind: 'Base', fieldId: firstId } }, { text: ' (' }, { source: { kind: 'Base', fieldId: primaryId }, signed: true }, { text: ')' }], primary: { kind: 'Base', fieldId: primaryId } }, children: [] },
   { kind: 'layout', nodeKey: 'resource', title: 'Запас', params: { version: 1, type: 'resource', current: { kind: 'Base', fieldId: primaryId }, maximum: { kind: 'Base', fieldId: maximumId }, showBar: false }, children: [] },
@@ -29,14 +30,20 @@ const roots = [
 const resolved = { contextKey: 'page_1', viewMetadata: { id: 'view-id', key: 'view-key', campaignId: 12, name: 'View', metadataRevision: 1 }, viewContent: { campaignId: 12, resourceId: 'view-id', contentRevision: 3, data: { roots } }, contextParams: null, contentRevision: 3 };
 const auth = (request: (url: string, options?: RequestInit) => Promise<Response>) => ({ status: 'authenticated', authenticated: true, userId: 4, error: null, config: { BFF_BASE: '/bff', API_BASE: '/bff/api' }, request, login: vi.fn(), logout: vi.fn(), refreshSession: vi.fn() }) as unknown as HubRemoteProps['auth'];
 const renderSheet = (request: (url: string, options?: RequestInit) => Promise<Response>) => render(<MemoryRouter initialEntries={[`/12/player/characters/${characterId}/page_1`]}><RemoteAuthProvider auth={auth(request)}><WorkspaceProvider mountPath="/"><DirtyProvider><CharacterSheet campaignId={12} characterId={characterId} pageKey="page_1" /></DirtyProvider></WorkspaceProvider></RemoteAuthProvider></MemoryRouter>);
-const requestFixture = (permission: { canRead: boolean; canWrite: boolean }, put: (url: string, options?: RequestInit) => Promise<Response> = async () => response({ ...computedSheet, contentRevision: 8 })) => {
+const requestFixture = (permission: { canRead: boolean; canWrite: boolean }, put: (url: string, options?: RequestInit) => Promise<Response> = async () => response({ ...computedSheet, contentRevision: 8 }), withHeader = false) => {
   let currentSheet = computedSheet;
+  const configuredPresentation = withHeader ? { ...presentation, defaults: { ...presentation.defaults, character_header: headerViewKey } } : presentation;
+  const headerResolved = { ...resolved, contextKey: 'character_header', viewMetadata: { ...resolved.viewMetadata, key: headerViewKey } };
   return vi.fn(async (url: string, options?: RequestInit) => {
     if (url.endsWith(`/characters/${characterId}/permissions`)) return response({ ...permission, canManageAccess: false });
     if (url.endsWith(`/characters/${characterId}/computed-sheet`)) return response(currentSheet);
     if (url.endsWith(`/characters/${characterId}`)) return response({ id: characterId, campaignId: 12, name: 'Hero', importance: 'Key', metadataRevision: 1 });
-    if (url.endsWith('/presentation/resolve?contextKey=page_1')) return response(resolved);
-      if (url.endsWith('/presentation')) return response(presentation);
+    if (url.includes('/presentation/resolve?')) {
+      const contextKey = new URL(url, 'http://localhost').searchParams.get('contextKey');
+      if (contextKey === 'character_header' && withHeader) return response(headerResolved);
+      if (contextKey === 'page_1') return response(resolved);
+    }
+      if (url.endsWith('/presentation')) return response(configuredPresentation);
       if (options?.method === 'PUT') {
         const result = await put(url, options);
         if (result.ok && url.includes('/base-values/')) {
@@ -97,6 +104,26 @@ describe('CharacterSheet presentation UX', () => {
     const [url, options] = request.mock.calls.find(([, requestOptions]) => requestOptions?.method === 'PUT')!;
     expect(url).toBe(`/api/campaigns/12/characters/${characterId}/base-values/${maximumId}`);
     expect(String(options?.body)).toBe('{"value":25,"expectedRevision":7}');
+  });
+
+  it('resolves the header by context key and shares one field draft and revision with the page', async () => {
+    const request = requestFixture({ canRead: true, canWrite: true }, undefined, true);
+    renderSheet(request);
+    const header = await screen.findByRole('region', { name: 'Шапка персонажа' });
+    const page = await screen.findByRole('region', { name: 'Страница персонажа' });
+    await waitFor(() => expect(request.mock.calls.some(([url]) => url.endsWith('/presentation/resolve?contextKey=character_header'))).toBe(true));
+    expect(request.mock.calls.some(([url]) => url.endsWith(`/presentation/resolve?contextKey=${headerViewKey}`))).toBe(false);
+
+    fireEvent.click((await within(header).findAllByRole('button', { name: 'Изменить показатель Primary source secret' }))[0]!);
+    const input = await within(header).findByRole('textbox', { name: 'Primary source secret' });
+    fireEvent.change(input, { target: { value: '5' } });
+    fireEvent.blur(input, { relatedTarget: document.body });
+
+    await waitFor(() => expect(request.mock.calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1));
+    await waitFor(() => expect(within(page).getAllByRole('button', { name: 'Изменить показатель Primary source secret' }).some(button => button.textContent?.includes('16 (+5)'))).toBe(true));
+    const [url, options] = request.mock.calls.find(([, requestOptions]) => requestOptions?.method === 'PUT')!;
+    expect(url).toBe(`/api/campaigns/12/characters/${characterId}/base-values/${primaryId}`);
+    expect(String(options?.body)).toBe('{"value":5,"expectedRevision":7}');
   });
 
   it('keeps an invalid raw draft across blur and reopen without writing it', async () => {

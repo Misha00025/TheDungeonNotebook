@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { RemoteAuthProvider } from '@tdn/shared';
 import type { HubRemoteProps } from '@tdn/shared';
@@ -37,7 +37,7 @@ describe('CharacterPresentation', () => {
     view.rerender(tree(request, 'page_1', 2));
     expect(await screen.findByText('Зависимый сервис временно недоступен.')).toBeInTheDocument();
     expect(screen.getByRole('article', { name: 'Updated page' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Повторить загрузку страницы' }));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Страница персонажа' })).getByRole('button', { name: 'Повторить загрузку' }));
     expect(await screen.findByRole('article', { name: 'Updated page' })).toBeInTheDocument();
   });
 

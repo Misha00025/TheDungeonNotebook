@@ -58,6 +58,19 @@
   min-width: 0;
 }
 
+.cardSection {
+  display: grid;
+  gap: .5rem;
+  min-width: 0;
+}
+
+.cardFeedback {
+  display: grid;
+  justify-items: start;
+  gap: .5rem;
+  min-width: 0;
+}
+
 .accessState,
 .recoveryTray,
 .pageConflict {

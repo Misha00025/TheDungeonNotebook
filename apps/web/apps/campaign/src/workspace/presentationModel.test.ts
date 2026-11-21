@@ -23,6 +23,11 @@ import {
   updateNode,
   writeLocalDraft,
   writePages,
+  readSurfaceAssignment,
+  readViewSurface,
+  surfaceContextKeys,
+  writeSurfaceAssignments,
+  writeViewSurface,
   type LocalDraft,
   type LocalDraftScope,
   type PresentationNode,
@@ -152,6 +157,29 @@ describe('presentation model normalization', () => {
     expect(invalid.status).toBe('invalid');
     expect(invalid.params).toBe(malformed);
     expect(object(invalid.params).opaque).toBe(false);
+  });
+
+  it('round-trips resource and composite sizes, defaults missing size to large, and preserves opaque lossless params', () => {
+    const opaque = lossless('9007199254740993');
+    for (const type of ['resource', 'composite'] as const) {
+      for (const size of ['compact', 'medium', 'large'] as const) {
+        const node = makeNode(type);
+        const params = { ...object(node.params), size, opaque } as JsonValue;
+        const read = readParams(params);
+        if (read.status !== 'supported' || (read.type !== 'resource' && read.type !== 'composite')) throw new Error('Expected supported sized params');
+        expect(read.params.size).toBe(size);
+        expect(object(read.params).opaque).toBe(opaque);
+        expect(stringifyJson(params)).toContain('9007199254740993');
+      }
+      const params = { ...object(makeNode(type).params), opaque } as Record<string, JsonValue>;
+      delete params.size;
+      const original = stringifyJson(params);
+      const read = readParams(params);
+      if (read.status !== 'supported' || (read.type !== 'resource' && read.type !== 'composite')) throw new Error('Expected supported sized params');
+      expect(read.params.size).toBe('large');
+      expect(stringifyJson(params)).toBe(original);
+      expect(object(params).opaque).toBe(opaque);
+    }
   });
 });
 
@@ -289,6 +317,36 @@ describe('campaign page model', () => {
     expect(updated.contextParams.page_10).toEqual({ title: 'Страница 10', order: 2 });
     expect(Object.keys(updated.defaults).filter(isPageKey)).toEqual(['page_2', 'page_10']);
   });
+
+  it('keeps surface slots, pages, unknown contexts, and per-view editor surfaces independent', () => {
+    const exact = lossless('9223372036854775807');
+    const viewKey = 'view-a';
+    const original: Presentation = {
+      contentRevision: 12,
+      defaults: { page_1: viewKey, [surfaceContextKeys.header]: 'header-view', [surfaceContextKeys.card]: 'card-view', future: 'future-view' },
+      contextParams: { page_1: { title: 'Page' }, future: { opaque: exact }, [`view_${viewKey}`]: { editorSurface: 'page', extra: false } },
+    };
+    const slots = writeSurfaceAssignments(original, { header: '', card: viewKey });
+    expect(slots.defaults).toEqual({ page_1: viewKey, [surfaceContextKeys.card]: viewKey, future: 'future-view' });
+    expect(readSurfaceAssignment(slots, 'header')).toBe('');
+    expect(readSurfaceAssignment(slots, 'card')).toBe(viewKey);
+    expect(slots.contextParams).toEqual(original.contextParams);
+
+    const updatedView = writeViewSurface(slots, viewKey, 'card');
+    expect(readViewSurface(updatedView, viewKey)).toBe('card');
+    expect(updatedView.defaults).toEqual(slots.defaults);
+    expect(object(updatedView.contextParams[`view_${viewKey}`]!).extra).toBe(false);
+    expect(object(updatedView.contextParams.future!).opaque).toBe(exact);
+    expect(readPages(updatedView)).toMatchObject([{ key: 'page_1', viewKey, title: 'Page' }]);
+
+    const removed = writeSurfaceAssignments(updatedView, { header: 'header-view', card: '' });
+    expect(readSurfaceAssignment(removed, 'header')).toBe('header-view');
+    expect(readSurfaceAssignment(removed, 'card')).toBe('');
+    expect(readViewSurface(removed, viewKey)).toBe('card');
+    expect(removed.defaults.page_1).toBe(viewKey);
+    expect(removed.defaults.future).toBe('future-view');
+    expect(removed.contextParams.future).toEqual({ opaque: exact });
+  });
 });
 
 describe('presentation local draft model', () => {
@@ -301,7 +359,7 @@ describe('presentation local draft model', () => {
     const params: JsonValue = { version: 1, type: 'group', direction: 'row', columns: 1, gap: 'small', appearance: 'plain', opaque: exactParam };
     const roots = [{ ...root, params }];
     const largeMetadataRevision = lossless('9007199254740993');
-    const draft: LocalDraft = { ...scope, roots, name: 'Unsaved name', baseContentRevision: largeRevision, baseMetadataRevision: largeMetadataRevision };
+    const draft: LocalDraft = { ...scope, roots, name: 'Unsaved name', surface: 'card', baseContentRevision: largeRevision, baseMetadataRevision: largeMetadataRevision };
     const serialized = stringifyDraft(draft);
     expect(serialized).toContain('9223372036854775807');
     expect(serialized).toContain('9007199254740993');
@@ -314,6 +372,7 @@ describe('presentation local draft model', () => {
     if (parsed.status !== 'ok') return;
     expect(parsed.draft).not.toHaveProperty('characterId');
     expect(parsed.draft).not.toHaveProperty('gameplayValue');
+    expect(parsed.draft.surface).toBe('card');
     expect(parsed.draft.roots[0]!).not.toHaveProperty('gameplayValue');
     expect(isLosslessNumber(parsed.draft.baseContentRevision)).toBe(true);
     expect(isLosslessNumber(parsed.draft.baseMetadataRevision)).toBe(true);
@@ -321,6 +380,9 @@ describe('presentation local draft model', () => {
     expect(isLosslessNumber(object(restoredRoot.params).opaque)).toBe(true);
     expect(stringifyJson(restoredRoot.params)).toContain('9007199254740993');
     expect(stringifyJson(parsed.draft)).not.toContain('game-character');
+    const oldRead = parseDraft(stringifyDraft({ ...draft, surface: undefined }), scope);
+    expect(oldRead.status).toBe('ok');
+    if (oldRead.status === 'ok') expect(oldRead.draft.surface).toBeUndefined();
   });
 
   it('rejects a different scope, malformed payload, and duplicate keys across the tree', () => {
