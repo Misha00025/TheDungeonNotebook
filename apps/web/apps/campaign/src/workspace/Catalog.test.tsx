@@ -33,7 +33,7 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('./Workspace', () => ({
-  useWorkspace: () => ({ api: state.api, sessionKey: state.sessionKey }),
+  useWorkspace: () => ({ api: state.api, sessionKey: state.sessionKey, path: (relative = '') => `/groups${relative}` }),
   useDirtyDraft: () => vi.fn(),
 }));
 
@@ -60,12 +60,14 @@ const responseAuth = (userId = state.userId) => ({
   refreshSession: vi.fn(),
 }) as unknown as HubRemoteProps['auth'];
 
-const renderCatalog = (path = '/12/player/catalog') => render(
+const renderCatalog = (path = '/groups/12/player/catalog') => render(
   <RemoteAuthProvider auth={responseAuth()}>
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/:groupId/player/catalog" element={<Catalog />} />
-        <Route path="/:groupId/gm/catalog" element={<Catalog />} />
+        <Route path="/groups/:groupId/player/catalog" element={<Catalog kind="Item" />} />
+        <Route path="/groups/:groupId/player/catalog/skills" element={<Catalog kind="Skill" />} />
+        <Route path="/groups/:groupId/gm/catalog" element={<Catalog kind="Item" />} />
+        <Route path="/groups/:groupId/gm/catalog/skills" element={<Catalog kind="Skill" />} />
       </Routes>
     </MemoryRouter>
   </RemoteAuthProvider>,
@@ -79,6 +81,18 @@ const metadata: CatalogMetadata = {
   creatorUserId: 23,
   isHidden: false,
   quantityUnit: 'Whole',
+  allowNegative: false,
+  metadataRevision: 1,
+};
+
+const skillMetadata: CatalogMetadata = {
+  id: 'entry-skill',
+  campaignId: 12,
+  name: 'Arcana',
+  kind: 'Skill',
+  creatorUserId: null,
+  isHidden: false,
+  quantityUnit: null,
   allowNegative: false,
   metadataRevision: 1,
 };
@@ -99,7 +113,7 @@ function resetApi() {
   state.mode = 'player';
   state.permissionsLoading = false;
   state.permissions = { canRead: true, canWrite: false, canManageAccess: false };
-  state.api.listCatalog.mockResolvedValue([metadata]);
+  state.api.listCatalog.mockResolvedValue([metadata, skillMetadata]);
   state.api.getCatalogGroups.mockResolvedValue({ campaignId: 12, contentRevision: 0, groups: [] });
   state.api.getCatalogAttributes.mockResolvedValue({ campaignId: 12, contentRevision: 0, data: { definitions: [] } });
   state.api.getCatalogGroupEntries.mockResolvedValue({ entries: [], diagnostics: [] });
@@ -163,14 +177,42 @@ describe('campaign catalog', () => {
     expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
   });
 
-  it('shows GM management actions and initializes a new definition from the active kind filter', async () => {
+  it('switches item/skill tabs, filters group entries and search locally, and creates the selected kind', async () => {
     state.mode = 'gm';
     state.permissions = { canRead: true, canWrite: true, canManageAccess: false };
-    renderCatalog('/12/gm/catalog');
+    state.api.getCatalogGroups.mockResolvedValue({
+      campaignId: 12,
+      contentRevision: 1,
+      groups: [
+        { id: 'group-root', title: 'Collections', parentId: null },
+        { id: 'group-magic', title: 'Magic shelf', parentId: 'group-root' },
+      ],
+    });
+    state.api.getCatalogGroupEntries.mockResolvedValue({ entries: [metadata, skillMetadata], diagnostics: [] });
+    renderCatalog('/groups/12/gm/catalog');
 
     expect(await screen.findByRole('button', { name: 'Атрибуты каталога' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Группы каталога' })).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('combobox', { name: 'Тип' }), { target: { value: 'Skill' } });
+    expect(screen.getByRole('button', { name: /Public tonic/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Arcana/ })).not.toBeInTheDocument();
+
+    const itemTab = screen.getByRole('navigation', { name: 'Разделы каталога' });
+    expect(within(itemTab).getByRole('link', { name: 'Предметы' })).toHaveAttribute('href', '/groups/12/gm/catalog/');
+    expect(within(itemTab).getByRole('link', { name: 'Навыки' })).toHaveAttribute('href', '/groups/12/gm/catalog/skills');
+    fireEvent.click(within(itemTab).getByRole('link', { name: 'Навыки' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Arcana/ })).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /Public tonic/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Magic shelf' }));
+    await waitFor(() => expect(state.api.getCatalogGroupEntries).toHaveBeenCalledWith(12, 'group-magic'));
+    expect(await screen.findByRole('button', { name: /Arcana/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Public tonic/ })).not.toBeInTheDocument();
+    const search = screen.getByRole('textbox', { name: 'Поиск по названию' });
+    fireEvent.change(search, { target: { value: 'Public' } });
+    expect(await screen.findByText('Нет определений, соответствующих фильтру.')).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: 'Arcana' } });
+    expect(await screen.findByRole('button', { name: /Arcana/ })).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: 'Создать определение' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Новое определение' });

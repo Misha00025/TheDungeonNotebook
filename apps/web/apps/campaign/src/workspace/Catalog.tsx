@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Button, Field, Input, PageHeader, Select, StatePanel } from '@tdn/shared';
+import { Button, Field, Input, PageHeader, StatePanel, TabBar } from '@tdn/shared';
 import { useWorkspace } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 import { useResource } from './hooks';
@@ -54,16 +54,15 @@ const CatalogGroupTree: React.FC<{
   return <nav aria-label="Группы каталога"><ul>{tree}</ul></nav>;
 };
 
-const Catalog: React.FC = () => {
+const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
   const { groupId = '' } = useParams();
   const campaignId = Number(groupId);
-  const { api, sessionKey } = useWorkspace();
+  const { api, path, sessionKey } = useWorkspace();
   const { permissions, permissionsLoading, mode, reloadPermissions } = useCampaignWorkspace();
   const identity = `${sessionKey}:${campaignId}`;
   const canManage = mode === 'gm' && !permissionsLoading && permissions.canWrite;
   const canKeepManagementDialogs = mode === 'gm' && (permissionsLoading || permissions.canWrite);
 
-  const [kind, setKind] = useState<'all' | CatalogKind>('all');
   const [search, setSearch] = useState('');
   const [groupIdSelected, setGroupIdSelected] = useState('');
   const [definitionDialog, setDefinitionDialog] = useState<DefinitionDialogState>();
@@ -71,7 +70,7 @@ const Catalog: React.FC = () => {
   const [groupsOpen, setGroupsOpen] = useState(false);
 
   const entries = useResource<CatalogBrowseData>(
-    `${identity}:catalog-browse:${groupIdSelected || 'all'}`,
+    `${identity}:catalog-browse:${groupIdSelected || 'ungrouped'}`,
     () => groupIdSelected
       ? api.getCatalogGroupEntries(campaignId, groupIdSelected).then(({ entries: groupEntries, diagnostics }) => ({ entries: groupEntries, diagnostics }))
       : api.listCatalog(campaignId).then(catalogEntries => ({ entries: catalogEntries, diagnostics: [] })),
@@ -87,7 +86,7 @@ const Catalog: React.FC = () => {
   }, [canKeepManagementDialogs]);
 
   const filteredEntries = useMemo(() => (entries.data?.entries ?? []).filter(entry => {
-    const kindMatches = kind === 'all' || entry.kind === kind;
+    const kindMatches = entry.kind === kind;
     const nameMatches = entry.name.toLocaleLowerCase().includes(search.toLocaleLowerCase());
     return kindMatches && nameMatches;
   }), [entries.data, kind, search]);
@@ -95,7 +94,7 @@ const Catalog: React.FC = () => {
   const openDefinition = (entry: CatalogMetadata) => setDefinitionDialog({ entryId: entry.id, initialKind: entry.kind });
   const startCreate = () => {
     if (!canManage) return;
-    setDefinitionDialog({ initialKind: kind === 'all' ? 'Item' : kind });
+    setDefinitionDialog({ initialKind: kind });
   };
 
   const acceptSavedMetadata = (saved: CatalogMetadata) => {
@@ -117,14 +116,15 @@ const Catalog: React.FC = () => {
 
   return <>
     <PageHeader title="Каталог" subtitle="Общие определения предметов и навыков кампании" />
+    <TabBar
+      aria-label="Разделы каталога"
+      basePath={path(`/${campaignId}/${mode}/catalog`)}
+      tabs={[
+        { id: 'items', label: 'Предметы', path: '' },
+        { id: 'skills', label: 'Навыки', path: 'skills' },
+      ]}
+    />
     <div>
-      <Field label="Тип" htmlFor="catalog-kind">
-        <Select id="catalog-kind" value={kind} onChange={event => setKind(event.target.value as typeof kind)}>
-          <option value="all">Все</option>
-          <option value="Item">Предметы</option>
-          <option value="Skill">Навыки</option>
-        </Select>
-      </Field>
       <Field label="Поиск по названию" htmlFor="catalog-search">
         <Input id="catalog-search" value={search} onChange={event => setSearch(event.target.value)} />
       </Field>
@@ -137,7 +137,7 @@ const Catalog: React.FC = () => {
       selectedId={groupIdSelected}
       onSelect={setGroupIdSelected}
     />}
-    {groupIdSelected && <Button variant="secondary" onClick={() => setGroupIdSelected('')}>Все определения</Button>}
+    {groupIdSelected && <Button variant="secondary" onClick={() => setGroupIdSelected('')}>Сбросить группу</Button>}
 
     {schema.error && <ApiError error={schema.error} onRetry={schema.reload} />}
     {canManage && <div>
