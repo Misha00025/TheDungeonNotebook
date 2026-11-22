@@ -19,6 +19,8 @@ import { normalizeRoots, readPages, surfaceContextKeys } from './presentationMod
 import { editableBaseFields } from './CharacterPresentation';
 import InlineValueEditor from './InlineValueEditor';
 import CharacterStatsTable from './CharacterStatsTable';
+import { CharacterCatalogProvider } from './CharacterCatalogContext';
+import CharacterCatalogPanel from './CharacterCatalogPanel';
 
 const importanceLabel: Record<string, string> = { Background: 'Фоновый', Secondary: 'Второстепенный', Key: 'Ключевой' };
 type MetadataDraft = { name: string; importance: CharacterMetadata['importance'] };
@@ -47,11 +49,13 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
   const { visitCharacter } = useVisitHistory();
   const mode = useLocation().pathname.includes('/gm/') ? 'gm' : 'player';
   const gmStatsPage = variant === 'sheet' && mode === 'gm' && pageKey === 'all-stats';
+  const gmCatalogPage = variant === 'sheet' && mode === 'gm' && (pageKey === 'inventory' || pageKey === 'skills');
+  const gmServicePage = gmStatsPage || gmCatalogPage;
   const scope = `${sessionKey}:${campaignId}:${characterId}`;
   const metadataResource = useResource<CharacterMetadata>(`${scope}:metadata`, () => api.getCharacter(campaignId, characterId), variant === 'sheet' || !initialMetadata);
   const permissionResource = useResource<Permissions>(`${scope}:character-permissions`, () => api.characterPermissions(campaignId, characterId));
-  const sheetResource = useResource<ComputedSheet>(`${scope}:computed-sheet`, () => api.getComputedSheet(campaignId, characterId));
-  const presentationResource = useResource<PresentationEnvelope>(`${scope}:presentation`, () => api.getPresentation(campaignId), variant === 'sheet');
+  const sheetResource = useResource<ComputedSheet>(`${scope}:computed-sheet`, () => api.getComputedSheet(campaignId, characterId), !gmCatalogPage);
+  const presentationResource = useResource<PresentationEnvelope>(`${scope}:presentation`, () => api.getPresentation(campaignId), variant === 'sheet' && !gmCatalogPage);
   const [metadata, setMetadata] = useState<CharacterMetadata | undefined>(initialMetadata);
   const [metadataDraft, setMetadataDraft] = useState<MetadataDraft>();
   const [sheet, setSheet] = useState<ComputedSheet>();
@@ -563,7 +567,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
   const pageNavigable = Boolean(presentation && !presentationPending && !presentationUnavailable && readAllowed);
   useEffect(() => {
     if (variant === 'card') return;
-    if (gmStatsPage) { setPageRefreshConflict(false); return; }
+    if (gmServicePage) { setPageRefreshConflict(false); return; }
     if (!pageNavigable) return;
     const first = pages[0];
     if (!pageKey) {
@@ -576,8 +580,8 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
     if (routeDirty || hasUnconfirmedDrafts()) { setPageRefreshConflict(true); setPageVisibleFieldIds([]); return; }
     setPageRefreshConflict(false);
     navigate(first ? `${pageBase}/${first.key}` : mode === 'gm' ? `${pageBase}/all-stats` : pageBase, { replace: true });
-  }, [variant, gmStatsPage, mode, pageNavigable, pages, pageKey, routeDirty, navigate, pageBase]);
-  useEffect(() => { if (!gmStatsPage) setPageVisibleFieldIds([]); }, [pageKey, gmStatsPage]);
+  }, [variant, gmServicePage, mode, pageNavigable, pages, pageKey, routeDirty, navigate, pageBase]);
+  useEffect(() => { if (!gmStatsPage && !gmCatalogPage) setPageVisibleFieldIds([]); }, [pageKey, gmStatsPage, gmCatalogPage]);
   const goToPage = (key: string) => navigate(`${pageBase}/${key}`);
   const loadedRecovery = recoveryFields.map(fieldId => {
     const field = sheetRef.current?.baseFields.find(item => item.id === fieldId);
@@ -622,6 +626,50 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
     </section>;
   }
 
+  if (gmCatalogPage) {
+    const metadataStatus = metadataResource.error && typeof metadataResource.error === 'object' && 'status' in metadataResource.error
+      ? Number(metadataResource.error.status)
+      : undefined;
+    const metadataInaccessible = metadataStatus === 403 || metadataStatus === 404;
+    const metadataConfirmed = Boolean(metadata && !metadataInaccessible);
+    const characterPermissionsPending = !currentPermissions || permissionResource.loading || Boolean(permissionError);
+    const characterCanRead = Boolean(metadataConfirmed && currentPermissions && !permissionError && (currentPermissions.canRead || currentPermissions.canWrite));
+    const characterCanWrite = Boolean(metadataConfirmed && currentPermissions?.canWrite && !characterPermissionsPending);
+    const catalogPermissionsPending = characterPermissionsPending || !metadataConfirmed;
+    const canPublishDefinition = Boolean(campaignWorkspace?.permissions.canWrite && !campaignWorkspace.permissionsLoading);
+    const retryCatalogAccess = () => { metadataResource.reload(); permissionResource.reload(); };
+    return <section className={characterStyles.sheetSection} aria-busy={metadataResource.loading || permissionResource.loading}>
+      {metadataConfirmed && metadata && <PageHeader title={metadata.name} headingLevel={2} />}
+      {metadataResource.loading && !metadata && <StatePanel kind="loading">Загрузка персонажа…</StatePanel>}
+      {Boolean(metadataResource.error) && <ApiError error={metadataResource.error} onRetry={metadataResource.reload} />}
+      {permissionResource.loading && !currentPermissions && <StatePanel kind="loading">Проверка доступа к персонажу…</StatePanel>}
+      {Boolean(permissionError) && <ApiError error={permissionError} onRetry={permissionResource.reload} />}
+      {metadataConfirmed && <>
+        {pages.length > 0 && <TabBar basePath={pageBase} aria-label="Страницы персонажа" tabs={pages.map(page => ({ id: page.key, label: page.title, path: page.key }))} />}
+        <div className={characterStyles.toolTabs}>
+          <TabBar basePath={pageBase} aria-label="Инструменты мастера" tabs={[
+            { id: 'all-stats', label: 'Все характеристики', path: 'all-stats' },
+            { id: 'inventory', label: 'Инвентарь', path: 'inventory' },
+            { id: 'skills', label: 'Навыки', path: 'skills' },
+          ]} />
+        </div>
+        {catalogPermissionsPending && !permissionError && <StatePanel kind="loading">Проверка доступа к персонажу…</StatePanel>}
+        {!catalogPermissionsPending && !characterCanRead && <StatePanel kind="error">Доступ к персонажу не подтверждён.</StatePanel>}
+      </>}
+      <CharacterCatalogProvider
+        campaignId={campaignId}
+        characterId={characterId}
+        canRead={characterCanRead}
+        canWrite={characterCanWrite}
+        permissionsPending={catalogPermissionsPending}
+        onForbidden={() => { permissionResource.reload(); campaignWorkspace?.reloadPermissions(); }}
+      >
+        <CharacterCatalogPanel kind={pageKey === 'inventory' ? 'Item' : 'Skill'} canPublishDefinition={canPublishDefinition} />
+      </CharacterCatalogProvider>
+      {!metadata && !metadataResource.loading && !metadataResource.error && <Button type="button" variant="secondary" onClick={retryCatalogAccess}>Повторить загрузку</Button>}
+    </section>;
+  }
+
   if (!metadata || !sheet) {
     return <section className={characterStyles.sheetSection} aria-busy={!metadataResource.error && !sheetResource.error}>
       {(metadataResource.error || sheetResource.error) ? <ApiError error={metadataResource.error ?? sheetResource.error} onRetry={retryInitialLoad} /> : <StatePanel kind="loading">Загрузка листа персонажа…</StatePanel>}
@@ -662,10 +710,10 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
       </PresentationSurfaceFrame>
     : <PageHeader title={identityTitle} headingLevel={2} titleAside={identityAside} subtitle={identityDescription} actions={identityActions} />;
   const openCurrentPage = () => { if (pages[0]) goToPage(pages[0].key); };
-  const baseEntryWithDraft = Boolean(!gmStatsPage && !pageKey && pages[0] && (routeDirty || hasUnconfirmedDrafts()));
+  const baseEntryWithDraft = Boolean(!gmStatsPage && !gmCatalogPage && !pageKey && pages[0] && (routeDirty || hasUnconfirmedDrafts()));
   const displayedPageKey = pageKey ?? (baseEntryWithDraft ? pages[0]?.key : undefined);
   const visiblePage = Boolean(displayedPageKey && pages.some(page => page.key === displayedPageKey));
-   const shellBusy = (!gmStatsPage && presentationPending) || snapshotBusy || computedReadBusy || (permissionResource.loading && !permissionSnapshot);
+    const shellBusy = (!gmStatsPage && !gmCatalogPage && presentationPending) || snapshotBusy || computedReadBusy || (permissionResource.loading && !permissionSnapshot);
   return <section className={characterStyles.sheetSection} aria-busy={shellBusy}>
     {!readAllowed ? <div className={characterStyles.accessState}>
       {Boolean(permissionError || snapshotError) ? <><ApiError error={permissionError ?? snapshotError} onRetry={() => void refreshAll()} /><Button variant="secondary" type="button" onClick={() => void refreshAll()}>Проверить доступ и данные</Button></> : <Notification kind="warning" eventKey={`${scope}:permission`}>Доступ к актуальным данным персонажа не подтверждён.</Notification>}
@@ -675,7 +723,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
        {presentationUnavailable && <ApiError error={presentationError ?? presentationResource.error} onRetry={() => void refreshAll()} />}
       <div className={characterStyles.tabNavigation}>
         <TabBar basePath={pageBase} aria-label="Страницы персонажа" tabs={pages.map(page => ({ id: page.key, label: page.title, path: page.key }))} />
-        {mode === 'gm' && <div className={characterStyles.toolTabs}><TabBar basePath={pageBase} aria-label="Инструменты мастера" tabs={[{ id: 'all-stats', label: 'Все характеристики', path: 'all-stats' }]} /></div>}
+         {mode === 'gm' && <div className={characterStyles.toolTabs}><TabBar basePath={pageBase} aria-label="Инструменты мастера" tabs={[{ id: 'all-stats', label: 'Все характеристики', path: 'all-stats' }, { id: 'inventory', label: 'Инвентарь', path: 'inventory' }, { id: 'skills', label: 'Навыки', path: 'skills' }]} /></div>}
       </div>
       {baseEntryWithDraft && pages.length > 0 && <div className={characterStyles.pageConflict}><Notification kind="info" eventKey={`${scope}:base-entry`}>Черновые значения сохранены. Сейчас показана первая доступная страница без смены адреса.</Notification><Button variant="secondary" type="button" onClick={() => goToPage(pages[0].key)}>Открыть страницу «{pages[0].title}»</Button></div>}
       {!gmStatsPage && !presentationUnavailable && pages.length === 0 && <StatePanel kind="empty" title="Страницы кампании">Для кампании ещё не настроены страницы.{canManageViews && <LinkButton to={path(`/${campaignId}/gm/views`)}>Настроить страницы</LinkButton>}</StatePanel>}

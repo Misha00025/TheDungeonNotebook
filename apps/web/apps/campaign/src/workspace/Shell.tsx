@@ -60,7 +60,7 @@ const CampaignShell: React.FC = () => {
   const targetMode = (next: 'gm' | 'player') => path(`/${id}/${next === 'gm' ? 'gm/overview' : 'player/characters'}`);
   const switchMode = async (target: 'gm' | 'player') => {
     if (target === mode || busy.current || permission.loading || permission.error) return;
-     const sheetRoute = location.pathname.match(/\/(?:gm|player)\/characters\/([^/]+)(?:\/(page_[1-9]\d*|overview|stats|all-stats))?$/);
+      const sheetRoute = location.pathname.match(/\/(?:gm|player)\/characters\/([^/]+)(?:\/(page_[1-9]\d*|overview|stats|all-stats|inventory|skills))?$/);
     if (!sheetRoute) { navigate(targetMode(target)); return; }
     busy.current = true; const current = ++sequence.current; const pathname = location.pathname; setSwitchBusy(true); setSwitchError(undefined);
     try {
@@ -111,7 +111,7 @@ const CampaignShell: React.FC = () => {
       active: location.pathname === to || location.pathname.startsWith(`${to}/`),
     };
   });
-   const sheetRoute = location.pathname.match(/\/(?:gm|player)\/characters\/([^/]+)(?:\/(page_[1-9]\d*|overview|stats|all-stats))?$/);
+   const sheetRoute = location.pathname.match(/\/(?:gm|player)\/characters\/([^/]+)(?:\/(page_[1-9]\d*|overview|stats|all-stats|inventory|skills))?$/);
   const sheetCharacterId = sheetRoute?.[1];
   const validSheetCharacter = Boolean(sheetCharacterId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sheetCharacterId));
   const mobileItems: BottomNavigationItem[] = validSheetCharacter && sheetRoute && sheetCharacterId

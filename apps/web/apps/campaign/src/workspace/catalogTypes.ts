@@ -1,4 +1,4 @@
-import type { JsonValue, Revision } from './types';
+import type { JsonNumber, JsonValue, Revision } from './types';
 
 export type CatalogKind = 'Item' | 'Skill';
 export type QuantityUnit = 'Whole' | 'Fractional' | 'Single';
@@ -7,8 +7,9 @@ export type CatalogAttributeType = 'integer' | 'number' | 'string' | 'boolean' |
 export type CatalogAttributeDefinition = { id: string; title: string; typeKey: CatalogAttributeType; typeRevision: Revision; options: { optionKey: string; title: string }[]; isActive: boolean };
 export type CatalogAttributeInput = { id?: string; title: string; typeKey: CatalogAttributeType; options: { optionKey: string; title: string }[]; isActive: boolean };
 export type CatalogAttributeOccurrence = { id: string; attributeId: string; typeKey: CatalogAttributeType | string; typeRevision: Revision; value: JsonValue; editLevel: CatalogEditLevel };
+export type CatalogDiagnostic = { occurrenceId: string; code: string };
 export type CatalogMetadata = { id: string; campaignId: number; name: string; kind: CatalogKind; creatorUserId: number | null; isHidden: boolean; quantityUnit: QuantityUnit | null; allowNegative: boolean; metadataRevision: Revision };
-export type CatalogContentEnvelope = { campaignId: number; resourceId: string; contentRevision: Revision; attributeSchemaRevision: Revision; data: { description: string; attributes: CatalogAttributeOccurrence[] }; diagnostics: { occurrenceId: string; code: string }[] };
+export type CatalogContentEnvelope = { campaignId: number; resourceId: string; contentRevision: Revision; attributeSchemaRevision: Revision; data: { description: string; attributes: CatalogAttributeOccurrence[] }; diagnostics: CatalogDiagnostic[] };
 export type CatalogCreateRequest = { requestId: string; name: string; kind: CatalogKind; isHidden: boolean; quantityUnit?: QuantityUnit | null; allowNegative: boolean; description: string; attributes: CatalogAttributeOccurrence[] };
 export type CatalogCreateResult = { entry: CatalogMetadata; content: CatalogContentEnvelope };
 export type CatalogAttributeSchemaEnvelope = { campaignId: number; contentRevision: Revision; data: { definitions: CatalogAttributeDefinition[] } };
@@ -19,3 +20,46 @@ export type CatalogGroupSummary = { id: string; title: string; parentId: string 
 export type CatalogGroupsEnvelope = { campaignId: number; contentRevision: Revision; groups: CatalogGroupSummary[] };
 export type CatalogGroupConfigurationEnvelope = { campaignId: number; contentRevision: Revision; data: { groups: CatalogGroup[] }; attributeSchemaRevision: Revision; diagnostics: { groupId: string; entryId: string | null; code: string }[] };
 export type CatalogGroupEntriesEnvelope = { campaignId: number; groupId: string; configurationRevision: Revision; attributeSchemaRevision: Revision; entries: CatalogMetadata[]; diagnostics: { groupId: string; entryId: string | null; code: string }[] };
+export type CharacterCatalogRecord = { id: string; campaignId: number; characterId: string; catalogEntryId: string; quantity: JsonNumber | null; metadataRevision: Revision };
+export type CharacterCatalogEntryEnvelope = {
+  record: CharacterCatalogRecord;
+  definition: CatalogMetadata;
+  definitionDescription: string;
+  effectiveAttributes: CatalogAttributeOccurrence[];
+  explicitAttributes: CatalogAttributeOccurrence[];
+  diagnostics: CatalogDiagnostic[];
+  schemaRevision: Revision;
+  definitionContentRevision: Revision;
+  localContentRevision: Revision;
+};
+export type CharacterCatalogAdditionDto = {
+  campaignId: number;
+  characterId: string;
+  requestId: string;
+  entryId: string;
+  catalogEntryId: string;
+};
+export type CharacterCatalogAddResponse = { requestId: string; entry: CharacterCatalogEntryEnvelope };
+export type CharacterCatalogAddRequest = {
+  requestId: string;
+  catalogEntryId: string;
+  quantity?: JsonNumber | null;
+  attributes: CatalogAttributeOccurrence[];
+};
+export type CharacterCatalogDefinitionInput = {
+  name: string;
+  kind: CatalogKind;
+  isHidden: boolean;
+  quantityUnit?: QuantityUnit | null;
+  allowNegative: boolean;
+  description: string;
+  attributes: CatalogAttributeOccurrence[];
+};
+export type CharacterCatalogCreateRequest = {
+  requestId: string;
+  definition: CharacterCatalogDefinitionInput;
+  quantity?: JsonNumber | null;
+  attributes: CatalogAttributeOccurrence[];
+};
+export type CharacterCatalogQuantityUpdateRequest = { expectedRevision: Revision; quantity: JsonNumber };
+export type CharacterCatalogAttributesUpdateRequest = { expectedRevision: Revision; attributes: CatalogAttributeOccurrence[] };

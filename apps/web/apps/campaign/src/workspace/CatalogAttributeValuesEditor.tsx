@@ -16,12 +16,16 @@ export type CatalogAttributeValuesEditorProps = {
   mode?: 'definition' | 'character';
   sourceValues?: CatalogAttributeOccurrence[];
   diagnostics?: CatalogAttributeDiagnostic[];
+  immutableBindingIds?: string[];
+  lockedOccurrenceIds?: string[];
 };
 
 const diagnosticLabels: Record<string, string> = {
   unknown_attribute: 'Атрибут отсутствует в текущей схеме.',
   incompatible_attribute_type: 'Тип атрибута отличается от текущей схемы.',
   invalid_attribute_value: 'Значение не соответствует текущей схеме.',
+  attribute_binding_changed: 'Связь собственного значения с атрибутом изменилась; оно не применяется.',
+  edit_level_changed: 'Уровень редактирования значения изменился; оно не применяется.',
 };
 
 export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditorProps> = ({
@@ -34,6 +38,8 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
   mode = 'definition',
   sourceValues = [],
   diagnostics = [],
+  immutableBindingIds = [],
+  lockedOccurrenceIds = [],
 }) => {
   const idPrefix = useId();
   const [inputErrors, setInputErrors] = useState<Record<string, boolean>>({});
@@ -44,6 +50,8 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
 
   const definitionById = useMemo(() => new Map(definitions.map(item => [item.id, item])), [definitions]);
   const diagnosticById = useMemo(() => new Map(diagnostics.map(item => [item.occurrenceId, item.code])), [diagnostics]);
+  const immutableBindings = useMemo(() => new Set(immutableBindingIds), [immutableBindingIds]);
+  const lockedOccurrences = useMemo(() => new Set(lockedOccurrenceIds), [lockedOccurrenceIds]);
   const activeIds = useMemo(() => new Set(values.map(row => row.id)), [values]);
   const editableIds = useMemo(() => new Set(values.filter(row => mode === 'definition' || row.editLevel === 'Character').map(row => row.id)), [values, mode]);
   const changedValueInvalid = values.some(row => {
@@ -110,11 +118,12 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
     const controlId = `${idPrefix}-attribute-${row.id}`;
     const definition = definitionById.get(row.attributeId);
     const mappedType = catalogValueType(row.typeKey);
+    const characterLocked = mode === 'character' && (row.editLevel !== 'Character' || lockedOccurrences.has(row.id));
     const stale = !definition
       || definition.typeKey !== row.typeKey
       || String(definition.typeRevision) !== String(row.typeRevision)
       || !mappedType;
-    const rowReadOnly = readOnly || source || disabled || (mode === 'character' && row.editLevel !== 'Character');
+    const rowReadOnly = readOnly || source || disabled || characterLocked;
     const canEdit = !rowReadOnly && !stale;
     const errorCode = diagnosticById.get(row.id);
     const errorMessage = errorCode ? diagnosticLabels[errorCode] ?? 'Сервер обнаружил проблему в этой записи.' : undefined;
@@ -142,12 +151,18 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
       {rowReadOnly ? <>
         <p>{catalogValueLabel(row.value, definition)}</p>
         <p>{row.editLevel === 'Character' ? 'Можно менять у персонажа' : 'Только в каталоге'}</p>
+        {mode === 'character' && !readOnly && !source && <Button
+          type="button"
+          variant="secondary"
+          disabled={disabled}
+          onClick={() => removeRow(row.id)}
+        >{immutableBindings.has(row.id) ? 'Сбросить к каталогу' : 'Убрать собственное значение'}</Button>}
       </> : <>
         <Field label="Атрибут" htmlFor={`${controlId}-binding`}>
           <Select
             id={`${controlId}-binding`}
             value={row.attributeId}
-            disabled={disabled || stale}
+            disabled={disabled || stale || immutableBindings.has(row.id)}
             onChange={event => {
               const nextDefinition = definitionById.get(event.target.value);
               if (!nextDefinition) return;
@@ -195,7 +210,11 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
             <option value="Character">Можно менять у персонажа</option>
           </Select>
         </Field>}
-        <Button type="button" variant="secondary" disabled={disabled} onClick={() => removeRow(row.id)}>Убрать</Button>
+        <Button type="button" variant="secondary" disabled={disabled} onClick={() => removeRow(row.id)}>
+          {mode === 'character'
+            ? (immutableBindings.has(row.id) ? 'Сбросить к каталогу' : 'Убрать собственное значение')
+            : 'Убрать'}
+        </Button>
       </>}
     </fieldset>;
   };

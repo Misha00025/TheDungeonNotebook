@@ -2,7 +2,7 @@ import { makeAuthenticatedRequest } from '@tdn/shared';
 import type { AuthenticatedRequest } from '@tdn/shared';
 import { parseJson, stringifyJson } from './json';
 import type { Assignment, BaseFieldInput, Campaign, CharacterMetadata, CharacterSheetEnvelope, ComputedSheet, ContentRevisionDto, DefinitionCreate, DefinitionMetadata, FormulaContent, FormulaContentEnvelope, FormulaMetadata, Importance, JsonValue, Member, OverridesEnvelope, Permissions, PresentationEnvelope, ResolvedPresentation, TemplateContentEnvelope, TemplateMetadata, User, ViewContentEnvelope, ViewMetadata, ViewNode, ViewSourcesResponse, VirtualFieldInput, VirtualFieldsEnvelope } from './types';
-import type { CatalogAttributeSchemaEnvelope, CatalogContentEnvelope, CatalogCreateRequest, CatalogCreateResult, CatalogGroupConfigurationEnvelope, CatalogGroupEntriesEnvelope, CatalogGroupInput, CatalogGroupsEnvelope, CatalogKind, CatalogMetadata } from './catalogTypes';
+import type { CatalogAttributeSchemaEnvelope, CatalogContentEnvelope, CatalogCreateRequest, CatalogCreateResult, CatalogGroupConfigurationEnvelope, CatalogGroupEntriesEnvelope, CatalogGroupInput, CatalogGroupsEnvelope, CatalogKind, CatalogMetadata, CharacterCatalogAddRequest, CharacterCatalogAddResponse, CharacterCatalogAdditionDto, CharacterCatalogAttributesUpdateRequest, CharacterCatalogCreateRequest, CharacterCatalogEntryEnvelope, CharacterCatalogQuantityUpdateRequest } from './catalogTypes';
 
 export interface Problem { code: string; title: string; detail: string; errors?: Record<string, string[]>; resourceId?: string; requestId?: string }
 export class CampaignApiError extends Error {
@@ -60,6 +60,7 @@ export function createCampaignApi(request: AuthenticatedRequest) {
   const formulas = (id: number) => `${c(id)}/formulas`;
   const views = (id: number) => `${c(id)}/views`;
   const catalog = (id: number) => `${c(id)}/catalog`;
+  const characterEntries = (id: number, characterId: Id) => `${characters(id)}/${enc(characterId)}/entries`;
   const put = <T>(path: string, body: unknown) => send<T>(path, 'PUT', body);
   const create = <T>(path: string, body: unknown) => send<T>(path, 'POST', body);
   const revQuery = (expectedRevision: RevisionPayload['expectedRevision']) => ({ expectedRevision: String(expectedRevision) });
@@ -125,6 +126,14 @@ export function createCampaignApi(request: AuthenticatedRequest) {
     getCatalogGroupConfiguration: (id: number) => send<CatalogGroupConfigurationEnvelope>(`${catalog(id)}/groups/configuration`),
     putCatalogGroups: (id: number, body: { expectedRevision: RevisionPayload['expectedRevision']; groups: CatalogGroupInput[] }) => put<CatalogGroupConfigurationEnvelope>(`${catalog(id)}/groups`, body),
     getCatalogGroupEntries: (id: number, groupId: Id) => send<CatalogGroupEntriesEnvelope>(`${catalog(id)}/groups/${enc(groupId)}/entries`),
+    listCharacterEntries: (id: number, characterId: Id, kind?: CatalogKind) => send<CharacterCatalogEntryEnvelope[]>(characterEntries(id, characterId), 'GET', undefined, kind ? { kind } : undefined),
+    getCharacterEntry: (id: number, characterId: Id, entryId: Id) => send<CharacterCatalogEntryEnvelope>(`${characterEntries(id, characterId)}/${enc(entryId)}`),
+    addCharacterEntry: (id: number, characterId: Id, body: CharacterCatalogAddRequest) => create<CharacterCatalogAddResponse>(characterEntries(id, characterId), body),
+    createOwnCharacterEntry: (id: number, characterId: Id, body: CharacterCatalogCreateRequest) => create<CharacterCatalogAddResponse>(`${characterEntries(id, characterId)}/create`, body),
+    getCharacterAddition: (id: number, characterId: Id, requestId: Id) => send<CharacterCatalogAdditionDto>(`${characterEntries(id, characterId)}/additions/${enc(requestId)}`),
+    putCharacterEntryQuantity: (id: number, characterId: Id, entryId: Id, body: CharacterCatalogQuantityUpdateRequest) => put<CharacterCatalogEntryEnvelope>(`${characterEntries(id, characterId)}/${enc(entryId)}/quantity`, body),
+    putCharacterEntryAttributes: (id: number, characterId: Id, entryId: Id, body: CharacterCatalogAttributesUpdateRequest) => put<CharacterCatalogEntryEnvelope>(`${characterEntries(id, characterId)}/${enc(entryId)}/attributes`, body),
+    deleteCharacterEntry: (id: number, characterId: Id, entryId: Id, expectedRevision: RevisionPayload['expectedRevision']) => send<void>(`${characterEntries(id, characterId)}/${enc(entryId)}`, 'DELETE', undefined, revQuery(expectedRevision)),
     searchUsers: async (nickname: string) => {
       const r = await request(`/users?nickname=${encodeURIComponent(nickname)}`);
       if (!r.ok) throw new CampaignApiError(r.status, { code: 'http_error', title: r.statusText, detail: r.statusText });

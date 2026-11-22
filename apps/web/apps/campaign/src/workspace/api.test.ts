@@ -211,6 +211,41 @@ describe('campaign typed client', () => {
     expect(request).toHaveBeenCalledTimes(2);
   });
 
+  it('uses personal-entry routes and keeps add wrappers and independent revisions lossless', async () => {
+    const recordId = 'character-record';
+    const sourceId = 'hidden-catalog-definition';
+    const entry = `{"record":{"id":"${recordId}","campaignId":7,"characterId":"character-guid","catalogEntryId":"${sourceId}","quantity":9007199254740993.125,"metadataRevision":9223372036854775806},"definition":{"id":"${sourceId}","campaignId":7,"name":"Hidden ration","kind":"Item","creatorUserId":null,"isHidden":true,"quantityUnit":"Fractional","allowNegative":false,"metadataRevision":2},"definitionDescription":"","effectiveAttributes":[],"explicitAttributes":[],"diagnostics":[],"schemaRevision":1,"definitionContentRevision":3,"localContentRevision":9223372036854775805}`;
+    const { api, calls } = harness([
+      new Response(`[${entry}]`),
+      new Response(`{"requestId":"request-add","entry":${entry}}`),
+      new Response(null, { status: 204 }),
+    ]);
+
+    const listed = await api.listCharacterEntries(7, 'character-guid');
+    const added = await api.addCharacterEntry(7, 'character-guid', {
+      requestId: 'request-add',
+      catalogEntryId: sourceId,
+      quantity: parseJson('0.125') as any,
+      attributes: [],
+    });
+    await api.deleteCharacterEntry(7, 'character-guid', recordId, parseJson('9223372036854775806') as any);
+
+    expect(String(listed[0].record.quantity)).toBe('9007199254740993.125');
+    expect(String(listed[0].record.metadataRevision)).toBe('9223372036854775806');
+    expect(String(listed[0].localContentRevision)).toBe('9223372036854775805');
+    expect(added.requestId).toBe('request-add');
+    expect(added.entry.record.id).toBe(recordId);
+    expect(calls.map(([url]) => url)).toEqual([
+      '/api/campaigns/7/characters/character-guid/entries',
+      '/api/campaigns/7/characters/character-guid/entries',
+      `/api/campaigns/7/characters/character-guid/entries/${recordId}?expectedRevision=9223372036854775806`,
+    ]);
+    expect(String(calls[1][1]?.body)).toContain('"quantity":0.125');
+    expect(String(calls[1][1]?.body)).not.toContain('"quantity":"0.125"');
+    expect(JSON.parse(String(calls[1][1]?.body))).toEqual({ requestId: 'request-add', catalogEntryId: sourceId, quantity: 0.125, attributes: [] });
+    expect(calls[2][0]).not.toContain(sourceId);
+  });
+
   it('distinguishes authorization errors and conflicts', async () => {
     const { api } = harness([json({ code: 'unauthorized', title: 'Unauthorized', detail: 'no' }, 401)]);
     await expect(api.getCampaign(1)).rejects.toMatchObject({ status: 401 });

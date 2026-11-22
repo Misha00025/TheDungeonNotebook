@@ -20,6 +20,7 @@ export type CatalogDefinitionFieldsProps = {
   definitions: CatalogAttributeDefinition[];
   canPublish: boolean;
   creating: boolean;
+  kindEditable?: boolean;
   readOnly?: boolean;
   disabled?: boolean;
   diagnostics?: CatalogAttributeDiagnostic[];
@@ -44,6 +45,7 @@ export const CatalogDefinitionFields: React.FC<CatalogDefinitionFieldsProps> = (
   definitions,
   canPublish,
   creating,
+  kindEditable = true,
   readOnly = false,
   disabled = false,
   diagnostics = [],
@@ -73,7 +75,7 @@ export const CatalogDefinitionFields: React.FC<CatalogDefinitionFieldsProps> = (
         : <Input id={`${idPrefix}-name`} value={draft.name} disabled={disabled} aria-invalid={invalidName || undefined} aria-describedby={invalidName ? `${idPrefix}-name-error` : undefined} onChange={event => update({ name: event.target.value })} />}
     </Field>
     <Field label="Тип определения" htmlFor={`${idPrefix}-kind`}>
-      {creating && !readOnly
+      {creating && kindEditable && !readOnly
         ? <Select id={`${idPrefix}-kind`} value={draft.kind} disabled={disabled} onChange={event => setKind(event.target.value as CatalogKind)}>
           <option value="Item">Предмет</option>
           <option value="Skill">Навык</option>
