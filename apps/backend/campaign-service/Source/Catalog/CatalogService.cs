@@ -1,5 +1,4 @@
 using System.Data.Common;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Tdn.Campaigns.Access;
 using Tdn.Campaigns.Campaigns;
@@ -8,7 +7,7 @@ using Tdn.Campaigns.Sheets;
 
 namespace Tdn.Campaigns.Catalog;
 
-public sealed class CatalogService(CampaignService campaigns, ICatalogStore store, IContentStore content)
+public sealed class CatalogService(CampaignService campaigns, ICatalogStore store, IContentStore content, ICharacterCatalogStore characterCatalog)
 {
     private const string SchemaCollection = "catalogAttributeDefinitions";
     private const string ContentCollection = "catalogContents";
@@ -65,7 +64,7 @@ public sealed class CatalogService(CampaignService campaigns, ICatalogStore stor
         if (request.Description is null || request.Attributes is null) throw BadRequest("invalid_content", "description and attributes are required.");
         if (await store.GetAsync(campaignId, id, ct) is not null) throw AlreadyPublished(id);
         var schema = await ReadSchema(campaignId, ct);
-        var data = ValidateContent(new CatalogContent(request.Description, request.Attributes), schema.Data, null);
+        var data = CatalogAttributeValues.ValidateContent(new CatalogContent(request.Description, request.Attributes), schema.Data, null);
         ContentEnvelope<CatalogContent> prepared;
         try { prepared = await content.CreateAsync(ContentCollection, campaignId, id, data, ct); }
         catch (ContentAlreadyPreparedException) { throw new DomainException(409, "content_already_prepared", "Content is already prepared for this resource.", id, id); }
@@ -92,12 +91,30 @@ public sealed class CatalogService(CampaignService campaigns, ICatalogStore stor
         var unit = request.QuantityUnit ?? entry.QuantityUnit;
         var negative = request.AllowNegative ?? entry.AllowNegative;
         ValidateMetadata(request.Name, entry.Kind, unit, negative);
-        if (!await store.UpdateAsync(campaignId, id, request.Name!, hidden, unit, negative, expected.Value, ct))
+        return await characterCatalog.WithDefinitionLockAsync(campaignId, id, async () =>
         {
-            if (await store.GetAsync(campaignId, id, ct) is null) throw NotFound();
-            throw Conflict(id, "revision_conflict");
-        }
-        return new(id, campaignId, request.Name!, entry.Kind, entry.CreatorUserId, hidden, unit, negative, expected.Value + 1);
+            var current = await RequireEntry(campaignId, id, ct);
+            if (!CanRead(access, current)) throw NotFound();
+            if (!access.IsAdmin && (access.Subject.Type != SubjectType.User || current.CreatorUserId != access.Subject.Id)) throw Forbidden();
+            var currentHidden = request.IsHidden ?? current.IsHidden;
+            if (!access.IsAdmin && currentHidden != current.IsHidden) throw Forbidden();
+            var currentUnit = request.QuantityUnit ?? current.QuantityUnit;
+            var currentNegative = request.AllowNegative ?? current.AllowNegative;
+            ValidateMetadata(request.Name, current.Kind, currentUnit, currentNegative);
+            if (current.MetadataRevision != expected.Value) throw Conflict(id, "revision_conflict");
+            if (current.QuantityUnit != currentUnit || current.AllowNegative != currentNegative)
+            {
+                var attached = await characterCatalog.ListByCatalogEntryAsync(campaignId, id, ct);
+                if (attached.Any(x => !QuantityMatchesPolicy(x.Quantity, current.Kind, currentUnit, currentNegative)))
+                    throw new DomainException(409, "quantity_policy_conflict", "The requested quantity policy would invalidate attached character records.", id);
+            }
+            if (!await store.UpdateAsync(campaignId, id, request.Name!, currentHidden, currentUnit, currentNegative, expected.Value, ct))
+            {
+                if (await store.GetAsync(campaignId, id, ct) is null) throw NotFound();
+                throw Conflict(id, "revision_conflict");
+            }
+            return new CatalogEntryDto(id, campaignId, request.Name!, current.Kind, current.CreatorUserId, currentHidden, currentUnit, currentNegative, expected.Value + 1);
+        }, ct);
     }
 
     public async Task<CatalogContentEnvelope> GetContentAsync(Subject? subject, int campaignId, Guid id, CancellationToken ct)
@@ -108,7 +125,7 @@ public sealed class CatalogService(CampaignService campaigns, ICatalogStore stor
         var raw = await content.GetAsync<CatalogContent>(ContentCollection, campaignId, id, ct)
             ?? throw new DomainException(503, "content_unavailable", "The published content is unavailable.", id);
         var schema = await ReadSchema(campaignId, ct);
-        return ToEnvelope(raw, schema.ContentRevision, Diagnose(raw.Data, schema.Data));
+        return ToEnvelope(raw, schema.ContentRevision, CatalogAttributeValues.Diagnose(raw.Data, schema.Data));
     }
 
     public async Task<CatalogContentEnvelope> UpdateContentAsync(Subject? subject, int campaignId, Guid id, CatalogContentUpdateRequest request, CancellationToken ct)
@@ -120,10 +137,47 @@ public sealed class CatalogService(CampaignService campaigns, ICatalogStore stor
             ?? throw new DomainException(503, "content_unavailable", "The published content is unavailable.", id);
         if (current.ContentRevision != request.ExpectedRevision) throw Conflict(id, "content_revision_conflict");
         var schema = await ReadSchema(campaignId, ct);
-        var data = ValidateContent(new CatalogContent(request.Description, request.Attributes), schema.Data, current.Data.Attributes);
+        var data = CatalogAttributeValues.ValidateContent(new CatalogContent(request.Description, request.Attributes), schema.Data, current.Data.Attributes);
         var result = await content.ReplaceAsync(ContentCollection, campaignId, id, request.ExpectedRevision.Value, data, ct);
-        return result is null ? throw Conflict(id, "content_revision_conflict") : ToEnvelope(result, schema.ContentRevision, Diagnose(result.Data, schema.Data));
+        return result is null ? throw Conflict(id, "content_revision_conflict") : ToEnvelope(result, schema.ContentRevision, CatalogAttributeValues.Diagnose(result.Data, schema.Data));
     }
+
+    public async Task<CatalogEntry> GetVisibleEntryForCharacterAddAsync(Subject? subject, int campaignId, Guid id, CancellationToken ct)
+    {
+        var access = await campaigns.GetAccessAsync(subject, campaignId, ct);
+        var entry = await RequireEntry(campaignId, id, ct);
+        return CanRead(access, entry) ? entry : throw NotFound();
+    }
+
+    public async Task<CatalogDefinitionPreparation> PrepareCharacterOwnedEntryAsync(Subject? subject, int campaignId, CatalogCreateRequest request, CancellationToken ct)
+    {
+        var access = await campaigns.GetAccessAsync(subject, campaignId, ct);
+        var id = request.RequestId is { } requestId && requestId != Guid.Empty ? requestId : throw BadRequest("invalid_request_id", "A non-empty requestId is required.");
+        ValidateMetadata(request.Name, request.Kind, request.QuantityUnit, request.AllowNegative);
+        if (request.IsHidden is null) throw BadRequest("invalid_metadata", "isHidden is required.");
+        if (!access.IsAdmin && !request.IsHidden.Value) throw Forbidden();
+        if (request.Description is null || request.Attributes is null) throw BadRequest("invalid_content", "description and attributes are required.");
+        if (await store.GetAsync(campaignId, id, ct) is not null) throw AlreadyPublished(id);
+        var schema = await ReadSchema(campaignId, ct);
+        var data = CatalogAttributeValues.ValidateContent(new CatalogContent(request.Description, request.Attributes), schema.Data, null);
+        return new CatalogDefinitionPreparation(new CatalogEntry
+        {
+            Id = id,
+            CampaignId = campaignId,
+            Name = request.Name!,
+            Kind = request.Kind!.Value,
+            CreatorUserId = access.Subject.Type == SubjectType.User ? access.Subject.Id : null,
+            IsHidden = request.IsHidden.Value,
+            QuantityUnit = request.QuantityUnit,
+            AllowNegative = request.AllowNegative!.Value
+        }, data, schema);
+    }
+
+    public async Task<CatalogAttributeSchemaEnvelope> GetSchemaForCharacterAsync(int campaignId, CancellationToken ct) => await ReadSchema(campaignId, ct);
+
+    public async Task<ContentEnvelope<CatalogContent>> GetDefinitionContentForCharacterAsync(int campaignId, Guid id, CancellationToken ct) =>
+        await content.GetAsync<CatalogContent>(ContentCollection, campaignId, id, ct)
+        ?? throw new DomainException(503, "content_unavailable", "The published content is unavailable.", id);
 
     private async Task<CatalogEntry> RequireWritable(CampaignAccess access, int campaignId, Guid id, CancellationToken ct)
     {
@@ -176,66 +230,6 @@ public sealed class CatalogService(CampaignService campaigns, ICatalogStore stor
         return options.ToArray();
     }
 
-    private static CatalogContent ValidateContent(CatalogContent data, CatalogAttributeSchema schema, CatalogAttributeValue[]? oldValues)
-    {
-        var byId = schema.Definitions.ToDictionary(x => x.Id);
-        var prior = (oldValues ?? []).ToDictionary(x => x.Id);
-        var ids = new HashSet<Guid>();
-        foreach (var value in data.Attributes)
-        {
-            if (value is null || value.Id == Guid.Empty || value.AttributeId == Guid.Empty || string.IsNullOrWhiteSpace(value.TypeKey) || value.TypeRevision < 1 || value.Value.ValueKind == JsonValueKind.Undefined || !Enum.IsDefined(value.EditLevel) || !ids.Add(value.Id)) throw BadRequest("invalid_attribute_value", "Occurrence IDs, type, revision, value, and edit level must be valid and unique.");
-            if (prior.TryGetValue(value.Id, out var old) && IsExactlySame(old, value)) continue;
-            if (!byId.TryGetValue(value.AttributeId, out var definition)) throw BadRequest("unknown_attribute", "The attribute is unknown.");
-            var existingBinding = prior.TryGetValue(value.Id, out old) && old.AttributeId == value.AttributeId;
-            if (!definition.IsActive && !existingBinding) throw BadRequest("inactive_attribute", "A new occurrence cannot use an inactive attribute.");
-            if (value.TypeKey != definition.TypeKey || value.TypeRevision != definition.TypeRevision) throw BadRequest("incompatible_attribute_type", "The occurrence type does not match the current definition.");
-            if (!IsValueValid(definition, value.Value)) throw BadRequest("invalid_attribute_value", "The value is incompatible with the attribute type.");
-        }
-        return data with { Attributes = data.Attributes.Select(x => x with { Value = x.Value.Clone() }).ToArray() };
-    }
-
-    private static bool IsExactlySame(CatalogAttributeValue old, CatalogAttributeValue current) => old.Id == current.Id && old.AttributeId == current.AttributeId && old.TypeKey == current.TypeKey && old.TypeRevision == current.TypeRevision && old.EditLevel == current.EditLevel && JsonElement.DeepEquals(old.Value, current.Value);
-    private static bool IsValueValid(CatalogAttributeDefinition definition, JsonElement value)
-    {
-        try
-        {
-            return definition.TypeKey switch
-            {
-                "integer" => value.ValueKind == JsonValueKind.Number && (value.TryGetInt64(out _) || value.TryGetDecimal(out var d) && decimal.Truncate(d) == d && d >= long.MinValue && d <= long.MaxValue),
-                "number" => value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var n) && double.IsFinite(n),
-                "string" => value.ValueKind == JsonValueKind.String,
-                "boolean" => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
-                "singleChoice" => value.ValueKind == JsonValueKind.String && definition.Options.Any(o => o.OptionKey == value.GetString()),
-                "multiChoice" => IsMultiChoiceValid(definition, value),
-                _ => false
-            };
-        }
-        catch (InvalidOperationException) { return false; }
-    }
-
-    private static bool IsMultiChoiceValid(CatalogAttributeDefinition definition, JsonElement value)
-    {
-        if (value.ValueKind != JsonValueKind.Array) return false;
-        var allowed = definition.Options.Select(x => x.OptionKey).ToHashSet(StringComparer.Ordinal);
-        var selected = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var item in value.EnumerateArray())
-            if (item.ValueKind != JsonValueKind.String || item.GetString() is not { } key || !allowed.Contains(key) || !selected.Add(key)) return false;
-        return true;
-    }
-
-    private static CatalogDiagnostic[] Diagnose(CatalogContent data, CatalogAttributeSchema schema)
-    {
-        var definitions = schema.Definitions.ToDictionary(x => x.Id);
-        var output = new List<CatalogDiagnostic>();
-        foreach (var value in data.Attributes)
-        {
-            if (!definitions.TryGetValue(value.AttributeId, out var definition)) output.Add(new(value.Id, "unknown_attribute"));
-            else if (value.TypeKey != definition.TypeKey || value.TypeRevision != definition.TypeRevision) output.Add(new(value.Id, "incompatible_attribute_type"));
-            else if (!IsValueValid(definition, value.Value)) output.Add(new(value.Id, "invalid_attribute_value"));
-        }
-        return output.ToArray();
-    }
-
     private static CatalogContentEnvelope ToEnvelope(ContentEnvelope<CatalogContent> content, long schemaRevision, CatalogDiagnostic[]? diagnostics = null) => new(content.CampaignId, content.ResourceId, content.ContentRevision, schemaRevision, content.Data, diagnostics ?? []);
     private static CatalogEntryDto ToDto(CatalogEntry x) => new(x.Id, x.CampaignId, x.Name, x.Kind, x.CreatorUserId, x.IsHidden, x.QuantityUnit, x.AllowNegative, x.MetadataRevision);
     private static bool CanRead(CampaignAccess access, CatalogEntry entry) => !entry.IsHidden || access.IsAdmin || access.Subject.Type == SubjectType.User && entry.CreatorUserId == access.Subject.Id;
@@ -246,6 +240,19 @@ public sealed class CatalogService(CampaignService campaigns, ICatalogStore stor
         if (negative is null) throw BadRequest("invalid_metadata", "allowNegative is required.");
         if (kind == CatalogKind.Item && (unit is null || !Enum.IsDefined(unit.Value))) throw BadRequest("invalid_quantity_unit", "Items require a known quantityUnit.");
         if (kind == CatalogKind.Skill && (unit is not null || negative.Value)) throw BadRequest("invalid_quantity_unit", "Skills require quantityUnit=null and allowNegative=false.");
+    }
+    private static bool QuantityMatchesPolicy(decimal? quantity, CatalogKind kind, QuantityUnit? unit, bool allowNegative)
+    {
+        if (kind == CatalogKind.Skill) return quantity is null;
+        if (quantity is null) return false;
+        if (!allowNegative && quantity.Value < 0) return false;
+        return unit switch
+        {
+            QuantityUnit.Whole => decimal.Truncate(quantity.Value) == quantity.Value,
+            QuantityUnit.Single => quantity.Value == 1,
+            QuantityUnit.Fractional => true,
+            _ => false
+        };
     }
     private static void EnsureAdmin(CampaignAccess access) { if (!access.IsAdmin) throw Forbidden(); }
     private static DomainException BadRequest(string code, string message) => new(400, code, message);

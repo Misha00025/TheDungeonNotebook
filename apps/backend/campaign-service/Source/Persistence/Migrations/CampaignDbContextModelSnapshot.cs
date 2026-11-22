@@ -122,6 +122,31 @@ public sealed class CampaignDbContextModelSnapshot : ModelSnapshot
             entity.ToTable("CatalogEntries", table => table.HasCheckConstraint("CK_CatalogEntries_MetadataRevision", "MetadataRevision >= 1"));
         });
 
+        modelBuilder.Entity("Tdn.Campaigns.Catalog.CharacterCatalogEntry", entity =>
+        {
+            entity.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("char(36)");
+            entity.Property<int>("CampaignId").HasColumnType("int");
+            entity.Property<Guid>("CharacterId").HasColumnType("char(36)");
+            entity.Property<Guid>("CatalogEntryId").HasColumnType("char(36)");
+            entity.Property<decimal?>("Quantity").HasColumnType("decimal(65,28)");
+            entity.Property<long>("MetadataRevision").IsConcurrencyToken().HasColumnType("bigint");
+            entity.HasKey("Id");
+            entity.HasIndex("CampaignId", "CharacterId", "CatalogEntryId");
+            entity.HasIndex("CampaignId", "CatalogEntryId");
+            entity.ToTable("CharacterCatalogEntries", table => table.HasCheckConstraint("CK_CharacterCatalogEntries_MetadataRevision", "MetadataRevision >= 1"));
+        });
+
+        modelBuilder.Entity("Tdn.Campaigns.Catalog.CatalogAdditionReceipt", entity =>
+        {
+            entity.Property<int>("CampaignId").HasColumnType("int");
+            entity.Property<Guid>("CharacterId").HasColumnType("char(36)");
+            entity.Property<Guid>("RequestId").HasColumnType("char(36)");
+            entity.Property<Guid>("EntryId").HasColumnType("char(36)");
+            entity.Property<Guid>("CatalogEntryId").HasColumnType("char(36)");
+            entity.HasKey("CampaignId", "CharacterId", "RequestId");
+            entity.ToTable("CatalogAdditionReceipts");
+        });
+
         modelBuilder.Entity("Tdn.Campaigns.Sheets.TemplateMetadata", entity =>
         {
             entity.HasOne("Tdn.Campaigns.Campaigns.Campaign", "Campaign")
@@ -159,6 +184,17 @@ public sealed class CampaignDbContextModelSnapshot : ModelSnapshot
         modelBuilder.Entity("Tdn.Campaigns.Catalog.CatalogEntry", entity =>
         {
             entity.HasOne("Tdn.Campaigns.Campaigns.Campaign", "Campaign").WithMany().HasForeignKey("CampaignId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+        });
+
+        modelBuilder.Entity("Tdn.Campaigns.Catalog.CharacterCatalogEntry", entity =>
+        {
+            entity.HasOne("Tdn.Campaigns.Sheets.CharacterMetadata", "Character").WithMany().HasForeignKey("CampaignId", "CharacterId").HasPrincipalKey("CampaignId", "Id").OnDelete(DeleteBehavior.Restrict).IsRequired();
+            entity.HasOne("Tdn.Campaigns.Catalog.CatalogEntry", "CatalogEntry").WithMany().HasForeignKey("CampaignId", "CatalogEntryId").HasPrincipalKey("CampaignId", "Id").OnDelete(DeleteBehavior.Restrict).IsRequired();
+        });
+
+        modelBuilder.Entity("Tdn.Campaigns.Catalog.CatalogAdditionReceipt", entity =>
+        {
+            entity.HasOne("Tdn.Campaigns.Sheets.CharacterMetadata", null).WithMany().HasForeignKey("CampaignId", "CharacterId").HasPrincipalKey("CampaignId", "Id").OnDelete(DeleteBehavior.Restrict).IsRequired();
         });
     }
 }

@@ -6,6 +6,8 @@ Template routes are singleton paths: `GET`/`PUT /api/campaigns/{campaignId}/temp
 
 Catalog endpoints have explicit one-to-one routes and are listed in the [catalog contract](catalog.md). They use the same verified subject and response forwarding.
 
+Character catalog endpoints are also explicit one-to-one routes under `/api/campaigns/{campaignId}/characters/{characterId}/entries`; exact methods and request contracts are in [character-catalog.md](character-catalog.md). The receipt check, `create`, `quantity`, `attributes`, and explicit record deletion paths use the same verified subject and response forwarding.
+
 Virtual-field inputs use ordinary `bindings` only; the separate parent-field properties are not part of the service contract. Existing template/custom virtual-field and override proxy routes pass their request bodies through without rewrites.
 
 ## Authentication and identity
@@ -20,4 +22,4 @@ The campaign response hook uses the PyApiGate response builder's `passthrough` c
 
 The two current-permissions reads are `GET /api/campaigns/{campaignId}/permissions` and `GET /api/campaigns/{campaignId}/characters/{characterId}/permissions`; each is an authenticated one-to-one proxy with the verified `X-Subject` and no parameter injection. See the [permissions contract](permissions.md).
 
-For the supported methods and domain contracts, see [campaigns and members](campaigns.md), [templates](templates.md), [characters](characters.md), [formulas and virtual fields](formulas.md), and [views and presentation contexts](views.md).
+For the supported methods and domain contracts, see [campaigns and members](campaigns.md), [templates](templates.md), [characters](characters.md), [catalog](catalog.md), [character catalog entries](character-catalog.md), [formulas and virtual fields](formulas.md), and [views and presentation contexts](views.md).

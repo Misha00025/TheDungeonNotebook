@@ -138,6 +138,35 @@ class CampaignRouteTests(unittest.TestCase):
             self.assertNotIn("body", route)
             self.assertNotIn("DELETE", methods)
 
+    def test_character_catalog_routes_are_explicit_and_delete_only_character_entries(self):
+        config = yaml.safe_load((GATEWAY / "configs" / "routes.yaml").read_text())
+        routes = {route["path"]: route for route in config["routes"] if isinstance(route, dict)}
+        prefix = "/api/campaigns/{campaignId}/characters/{characterId}/entries"
+        expected = {
+            prefix: ["GET", "POST"],
+            f"{prefix}/create": ["POST"],
+            f"{prefix}/additions/{{requestId}}": ["GET"],
+            f"{prefix}/{{entryId}}": ["GET", "DELETE"],
+            f"{prefix}/{{entryId}}/quantity": ["PUT"],
+            f"{prefix}/{{entryId}}/attributes": ["PUT"],
+        }
+        entries_routes = {path: route for path, route in routes.items() if "/entries" in path}
+        self.assertEqual(set(expected), set(entries_routes))
+        for path, methods in expected.items():
+            route = entries_routes[path]
+            self.assertEqual(methods, route["methods"])
+            self.assertEqual(path, route["proxy"]["path"])
+            self.assertEqual({"X-Subject": "{state.x_subject}"}, route["proxy"]["headers"])
+            self.assertEqual("campaign_upstream", route["pre_request_handler"])
+            self.assertEqual("campaign_response", route["response_handler"])
+            self.assertEqual("required", route["auth"])
+            for key in ("params", "query", "body", "access"):
+                self.assertNotIn(key, route)
+                self.assertNotIn(key, route["proxy"])
+        self.assertEqual({( "DELETE", f"{prefix}/{{entryId}}")}, {
+            (method, path) for path, methods in expected.items() for method in methods if method == "DELETE"
+        })
+
     def test_app_configs_include_routes_without_game_systems(self):
         for filename in ("app.json", "app.test.json"):
             config = json.loads((GATEWAY / "configs" / filename).read_text())

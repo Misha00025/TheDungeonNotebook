@@ -426,7 +426,8 @@ public sealed class CatalogServiceTests
         var baseFixture = SheetServiceTests.CreateFixture();
         var store = new FakeCatalogStore();
         var content = new FakeCatalogContentStore();
-        var service = new CatalogService(new Tdn.Campaigns.Campaigns.CampaignService(baseFixture.Campaigns), store, content);
+        var characterCatalog = new FakeCharacterCatalogStore(store, (_, _) => true);
+        var service = new CatalogService(new Tdn.Campaigns.Campaigns.CampaignService(baseFixture.Campaigns), store, content, characterCatalog);
         return new Fixture(baseFixture.Campaigns, store, content, service);
     }
 

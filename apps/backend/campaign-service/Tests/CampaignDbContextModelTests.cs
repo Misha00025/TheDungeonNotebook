@@ -31,6 +31,8 @@ public class CampaignDbContextModelTests
         Assert.Contains("CREATE TABLE `FormulaMetadata`", script);
         Assert.Contains("CREATE TABLE `ViewMetadata`", script);
         Assert.Contains("CREATE TABLE `CatalogEntries`", script);
+        Assert.Contains("CREATE TABLE `CharacterCatalogEntries`", script);
+        Assert.Contains("CREATE TABLE `CatalogAdditionReceipts`", script);
 
         var forward = context.Database.GetService<IMigrator>().GenerateScript("20261117000500_Views", "20261118000100_CampaignTemplate");
         Assert.Contains("DROP COLUMN `TemplateId`", forward);
@@ -43,6 +45,14 @@ public class CampaignDbContextModelTests
         Assert.Contains("CREATE TABLE `CatalogEntries`", catalogForward);
         Assert.DoesNotContain("DROP TABLE", catalogForward);
         Assert.DoesNotContain("DROP COLUMN", catalogForward);
+
+        var characterCatalogForward = context.Database.GetService<IMigrator>().GenerateScript("20261121000100_Catalog", "20261121000200_CharacterCatalog");
+        Assert.Contains("CREATE TABLE `CharacterCatalogEntries`", characterCatalogForward);
+        Assert.Contains("CREATE TABLE `CatalogAdditionReceipts`", characterCatalogForward);
+        Assert.DoesNotContain("DROP TABLE", characterCatalogForward);
+        Assert.DoesNotContain("DROP COLUMN", characterCatalogForward);
+        Assert.Contains("decimal(65,28)", characterCatalogForward);
+        Assert.Contains("CK_CharacterCatalogEntries_MetadataRevision", characterCatalogForward);
     }
 
     [Fact]
@@ -61,6 +71,8 @@ public class CampaignDbContextModelTests
         var formula = model.FindEntityType(typeof(FormulaMetadata))!;
         var view = model.FindEntityType(typeof(ViewMetadata))!;
         var catalogEntry = model.FindEntityType(typeof(CatalogEntry))!;
+        var characterCatalogEntry = model.FindEntityType(typeof(CharacterCatalogEntry))!;
+        var additionReceipt = model.FindEntityType(typeof(CatalogAdditionReceipt))!;
 
         Assert.Equal(new[] { "Id" }, campaign.FindPrimaryKey()!.Properties.Select(x => x.Name));
         Assert.Contains(campaign.GetIndexes(), index => index.IsUnique && index.Properties.Select(x => x.Name).SequenceEqual(new[] { "CreationRequestId" }));
@@ -120,5 +132,30 @@ public class CampaignDbContextModelTests
         Assert.Equal(typeof(Campaign), catalogCampaign.PrincipalEntityType.ClrType);
         Assert.Equal(new[] { "CampaignId" }, catalogCampaign.Properties.Select(x => x.Name));
         Assert.Equal(DeleteBehavior.Restrict, catalogCampaign.DeleteBehavior);
+
+        Assert.Equal(new[] { "Id" }, characterCatalogEntry.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Equal(ValueGenerated.Never, characterCatalogEntry.FindProperty(nameof(CharacterCatalogEntry.Id))!.ValueGenerated);
+        Assert.True(characterCatalogEntry.FindProperty(nameof(CharacterCatalogEntry.MetadataRevision))!.IsConcurrencyToken);
+        var designTimeCharacterCatalogEntry = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(CharacterCatalogEntry))!;
+        Assert.Contains(designTimeCharacterCatalogEntry.GetCheckConstraints(), check => check.Name == "CK_CharacterCatalogEntries_MetadataRevision" && check.Sql == "MetadataRevision >= 1");
+        Assert.True(characterCatalogEntry.FindProperty(nameof(CharacterCatalogEntry.Quantity))!.IsNullable);
+        Assert.Equal("decimal(65,28)", characterCatalogEntry.FindProperty(nameof(CharacterCatalogEntry.Quantity))!.GetColumnType());
+        Assert.Contains(characterCatalogEntry.GetIndexes(), index => index.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "CharacterId", "CatalogEntryId" }));
+        Assert.Contains(characterCatalogEntry.GetIndexes(), index => index.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "CatalogEntryId" }));
+        Assert.Contains(characterCatalogEntry.GetForeignKeys(), foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(CharacterMetadata) &&
+            foreignKey.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "CharacterId" }) &&
+            foreignKey.PrincipalKey.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }) && foreignKey.DeleteBehavior == DeleteBehavior.Restrict);
+        Assert.Contains(characterCatalogEntry.GetForeignKeys(), foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(CatalogEntry) &&
+            foreignKey.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "CatalogEntryId" }) &&
+            foreignKey.PrincipalKey.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }) && foreignKey.DeleteBehavior == DeleteBehavior.Restrict);
+
+        Assert.Equal(new[] { "CampaignId", "CharacterId", "RequestId" }, additionReceipt.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        var receiptCharacter = Assert.Single(additionReceipt.GetForeignKeys());
+        Assert.Equal(typeof(CharacterMetadata), receiptCharacter.PrincipalEntityType.ClrType);
+        Assert.Equal(new[] { "CampaignId", "CharacterId" }, receiptCharacter.Properties.Select(x => x.Name));
+        Assert.Equal(new[] { "CampaignId", "Id" }, receiptCharacter.PrincipalKey.Properties.Select(x => x.Name));
+        Assert.Equal(DeleteBehavior.Restrict, receiptCharacter.DeleteBehavior);
+        Assert.DoesNotContain(additionReceipt.GetForeignKeys(), foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(CatalogEntry));
+        Assert.DoesNotContain(additionReceipt.GetForeignKeys(), foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(CharacterCatalogEntry));
     }
 }

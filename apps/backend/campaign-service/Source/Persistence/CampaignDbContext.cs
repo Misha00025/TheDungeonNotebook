@@ -15,6 +15,8 @@ public sealed class CampaignDbContext(DbContextOptions<CampaignDbContext> option
     public DbSet<FormulaMetadata> FormulaMetadata => Set<FormulaMetadata>();
     public DbSet<ViewMetadata> ViewMetadata => Set<ViewMetadata>();
     public DbSet<CatalogEntry> CatalogEntries => Set<CatalogEntry>();
+    public DbSet<CharacterCatalogEntry> CharacterCatalogEntries => Set<CharacterCatalogEntry>();
+    public DbSet<CatalogAdditionReceipt> CatalogAdditionReceipts => Set<CatalogAdditionReceipt>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -90,5 +92,29 @@ public sealed class CampaignDbContext(DbContextOptions<CampaignDbContext> option
         catalog.Property(x => x.MetadataRevision).IsRequired().IsConcurrencyToken();
         catalog.HasIndex(x => new { x.CampaignId, x.Kind });
         catalog.HasOne(x => x.Campaign).WithMany().HasForeignKey(x => x.CampaignId).OnDelete(DeleteBehavior.Restrict);
+
+        var characterCatalog = modelBuilder.Entity<CharacterCatalogEntry>();
+        characterCatalog.ToTable("CharacterCatalogEntries", table => table.HasCheckConstraint("CK_CharacterCatalogEntries_MetadataRevision", "MetadataRevision >= 1"));
+        characterCatalog.HasKey(x => x.Id);
+        characterCatalog.Property(x => x.Id).ValueGeneratedNever();
+        characterCatalog.Property(x => x.CampaignId).IsRequired();
+        characterCatalog.Property(x => x.CharacterId).IsRequired();
+        characterCatalog.Property(x => x.CatalogEntryId).IsRequired();
+        characterCatalog.Property(x => x.Quantity).HasColumnType("decimal(65,28)").IsRequired(false);
+        characterCatalog.Property(x => x.MetadataRevision).IsRequired().IsConcurrencyToken();
+        characterCatalog.HasIndex(x => new { x.CampaignId, x.CharacterId, x.CatalogEntryId });
+        characterCatalog.HasIndex(x => new { x.CampaignId, x.CatalogEntryId });
+        characterCatalog.HasOne(x => x.Character).WithMany().HasForeignKey(x => new { x.CampaignId, x.CharacterId }).HasPrincipalKey(x => new { x.CampaignId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        characterCatalog.HasOne(x => x.CatalogEntry).WithMany().HasForeignKey(x => new { x.CampaignId, x.CatalogEntryId }).HasPrincipalKey(x => new { x.CampaignId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+
+        var receipt = modelBuilder.Entity<CatalogAdditionReceipt>();
+        receipt.ToTable("CatalogAdditionReceipts");
+        receipt.HasKey(x => new { x.CampaignId, x.CharacterId, x.RequestId });
+        receipt.Property(x => x.CampaignId).IsRequired();
+        receipt.Property(x => x.CharacterId).IsRequired();
+        receipt.Property(x => x.RequestId).IsRequired();
+        receipt.Property(x => x.EntryId).IsRequired();
+        receipt.Property(x => x.CatalogEntryId).IsRequired();
+        receipt.HasOne<Tdn.Campaigns.Sheets.CharacterMetadata>().WithMany().HasForeignKey(x => new { x.CampaignId, x.CharacterId }).HasPrincipalKey(x => new { x.CampaignId, x.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -297,6 +297,72 @@ routes:
     auth: required
     methods: [GET]
 
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/entries/additions/{requestId}
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/characters/{characterId}/entries/additions/{requestId}
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET]
+
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/entries/{entryId}/attributes
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/characters/{characterId}/entries/{entryId}/attributes
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [PUT]
+
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/entries/{entryId}/quantity
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/characters/{characterId}/entries/{entryId}/quantity
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [PUT]
+
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/entries/{entryId}
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/characters/{characterId}/entries/{entryId}
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, DELETE]
+
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/entries/create
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/characters/{characterId}/entries/create
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [POST]
+
+  - path: /api/campaigns/{campaignId}/characters/{characterId}/entries
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/characters/{characterId}/entries
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, POST]
+
   - path: /api/campaigns/{campaignId}/characters/{characterId}
     proxy:
       service: campaign

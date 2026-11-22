@@ -20,6 +20,8 @@ The template proxy exposes only GET/PUT on `/api/campaigns/{campaignId}/template
 
 The shared item/skill catalog routes are described in the campaign-service [catalog contract](../campaign-service/docs/catalog.md).
 
+Character-attached catalog entries, add receipts, quantities, and local attributes use explicit routes under `/api/campaigns/{campaignId}/characters/{characterId}/entries`; see the campaign-service [character catalog contract](../campaign-service/docs/character-catalog.md). These routes forward the verified `X-Subject` one-to-one and do not add policy hooks or parameter injection.
+
 Virtual-field requests use ordinary `bindings` only; separate parent-field properties are not part of the service contract. Existing template/custom virtual-field and override routes pass bodies through without rewrites.
 
 **Внимание:** root-команда `make test` очищает тестовые данные баз данных перед запуском интеграционных тестов.

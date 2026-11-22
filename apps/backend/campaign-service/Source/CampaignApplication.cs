@@ -92,8 +92,10 @@ public static class CampaignApplication
         builder.Services.AddSingleton<IMongoDatabase>(services => services.GetRequiredService<IMongoClient>().GetDatabase(services.GetRequiredService<IOptions<MongoOptions>>().Value.Database));
         builder.Services.AddScoped<IResourceStore, EfResourceStore>();
         builder.Services.AddScoped<ICatalogStore, EfCatalogStore>();
+        builder.Services.AddScoped<ICharacterCatalogStore, EfCharacterCatalogStore>();
         builder.Services.AddScoped<IContentStore, MongoContentStore>();
         builder.Services.AddScoped<CatalogService>();
+        builder.Services.AddScoped<CharacterCatalogService>();
         builder.Services.AddScoped<SheetService>();
         builder.Services.AddScoped<FormulaService>();
         builder.Services.AddScoped<VirtualFieldService>();
