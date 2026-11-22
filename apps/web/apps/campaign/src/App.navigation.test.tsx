@@ -21,6 +21,9 @@ describe('campaign navigation under the Hub route', () => {
       if (url === '/api/campaigns/12') return response(campaign(12));
       if (url === '/api/campaigns/13') return response(campaign(13));
       if (/^\/api\/campaigns\/(12|13)\/permissions$/.test(url)) return response({ canRead: true, canWrite: true, canManageAccess: true });
+      if (/^\/api\/campaigns\/(12|13)\/catalog$/.test(url)) return response([{ id: 'catalog-entry', campaignId: Number(url.split('/')[3]), name: 'Navigation item', kind: 'Item', creatorUserId: null, isHidden: false, quantityUnit: 'Whole', allowNegative: false, metadataRevision: 1 }]);
+      if (/^\/api\/campaigns\/(12|13)\/catalog\/groups$/.test(url)) return response({ campaignId: Number(url.split('/')[3]), contentRevision: 0, groups: [] });
+      if (/^\/api\/campaigns\/(12|13)\/catalog\/attributes$/.test(url)) return response({ campaignId: Number(url.split('/')[3]), contentRevision: 0, data: { definitions: [] } });
       if (/^\/api\/campaigns\/\d+\/presentation$/.test(url)) return response(presentation);
       if (url.includes('/presentation/resolve?')) return response(resolved(new URL(url, 'http://localhost').searchParams.get('contextKey') ?? ''));
       if (url.endsWith('/template')) return response({ campaignId: 12, name: 'Template', metadataRevision: 1 });
@@ -31,14 +34,15 @@ describe('campaign navigation under the Hub route', () => {
     render(<MemoryRouter basename={basename || undefined} initialEntries={[initial]}><Routes><Route path="/groups/*" element={<App auth={makeAuth(request)} />} /></Routes><Pathname /></MemoryRouter>);
 
     const navigation = await screen.findByRole('navigation', { name: 'Разделы кампании' });
-    const labels = ['Обзор', 'Персонажи', 'Шаблон', 'Формулы', 'Представления', 'Управление'];
-    const suffixes = ['gm/overview', 'gm/characters', 'gm/templates', 'gm/formulas', 'gm/views', 'gm/settings'];
+    const labels = ['Обзор', 'Персонажи', 'Шаблон', 'Формулы', 'Представления', 'Каталог', 'Управление'];
+    const suffixes = ['gm/overview', 'gm/characters', 'gm/templates', 'gm/formulas', 'gm/views', 'gm/catalog', 'gm/settings'];
     for (const [index, label] of labels.entries()) expect(within(navigation).getByRole('link', { name: label })).toHaveAttribute('href', `${prefix}/12/${suffixes[index]}`);
 
     for (const [index, label] of labels.entries()) {
       fireEvent.click(within(navigation).getByRole('link', { name: label }));
       await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe(`/groups/12/${suffixes[index]}`));
       expect(screen.queryByRole('heading', { name: 'Страница не найдена' })).not.toBeInTheDocument();
+      if (suffixes[index] === 'gm/catalog') expect(await screen.findByRole('heading', { name: 'Каталог' })).toBeInTheDocument();
     }
     expect(request.mock.calls.filter(([url]) => url.startsWith('/api/')).some(([url]) => url.includes('/templates'))).toBe(false);
     const managementNavigation = within(screen.getByRole('navigation', { name: 'Управление кампанией' }));
@@ -60,6 +64,11 @@ describe('campaign navigation under the Hub route', () => {
     await screen.findByRole('navigation', { name: 'Разделы кампании' });
     fireEvent.change(screen.getByRole('combobox', { name: 'Окружение' }), { target: { value: 'player' } });
     await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/13/player/characters'));
+    const playerNavigation = await screen.findByRole('navigation', { name: 'Разделы кампании' });
+    expect(within(playerNavigation).getByRole('link', { name: 'Каталог' })).toHaveAttribute('href', `${prefix}/13/player/catalog`);
+    fireEvent.click(within(playerNavigation).getByRole('link', { name: 'Каталог' }));
+    await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/13/player/catalog'));
+    expect(await screen.findByRole('heading', { name: 'Каталог' })).toBeInTheDocument();
     expect(request).toHaveBeenCalled();
   });
 
@@ -83,10 +92,11 @@ describe('campaign navigation under the Hub route', () => {
     expect(within(sheetNavigation).getByRole('link', { name: 'Дополнительно' })).toHaveAttribute('href', `${prefix}/12/gm/characters/${characterId}/page_2`);
     fireEvent.click(within(sheetNavigation).getByRole('link', { name: 'Основное' }));
     await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe(`/groups/12/gm/characters/${characterId}/page_1`));
-    expect(await screen.findByRole('link', { name: 'К персонажам' })).toHaveAttribute('href', `${prefix}/12/gm/characters`);
+    const campaignNavigation = within(screen.getByRole('navigation', { name: 'Разделы кампании' }));
+    expect(campaignNavigation.getByRole('link', { name: 'Персонажи' })).toHaveAttribute('href', `${prefix}/12/gm/characters`);
     fireEvent.click(screen.getByRole('link', { name: 'Дополнительно' }));
     await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe(`/groups/12/gm/characters/${characterId}/page_2`));
-    fireEvent.click(screen.getByRole('link', { name: 'К персонажам' }));
+    fireEvent.click(campaignNavigation.getByRole('link', { name: 'Персонажи' }));
     await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/12/gm/characters'));
     expect(await screen.findByRole('heading', { name: 'Персонажи кампании' })).toBeInTheDocument();
 

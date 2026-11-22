@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { isLosslessNumber } from 'lossless-json';
 import type { AuthenticatedRequest } from '@tdn/shared';
 import { CampaignApiError, createCampaignApi, runCreation } from './api';
 import { parseJson } from './json';
@@ -140,6 +141,74 @@ describe('campaign typed client', () => {
     expect(body).toContain('"expectedRevision":9223372036854775806');
     expect(body).toContain('"value":9007199254740993');
     expect(body).not.toContain('"value":"9007199254740993"');
+  });
+
+  it('writes catalog occurrences and nested group conditions as native lossless JSON', async () => {
+    const contentResponse = new Response('{"campaignId":7,"resourceId":"entry","contentRevision":9223372036854775807,"attributeSchemaRevision":9223372036854775806,"data":{"description":"","attributes":[]},"diagnostics":[]}');
+    const groupsResponse = new Response('{"campaignId":7,"contentRevision":9223372036854775807,"data":{"groups":[]},"attributeSchemaRevision":9223372036854775806,"diagnostics":[]}');
+    const { api, calls, request } = harness([contentResponse, groupsResponse]);
+
+    await api.putCatalogContent(7, 'entry-guid', {
+      expectedRevision: parseJson('9223372036854775806') as any,
+      description: '',
+      attributes: [
+        { id: 'occ-int', attributeId: 'attr-int', typeKey: 'integer', typeRevision: parseJson('9223372036854775807') as any, value: 0, editLevel: 'Definition' },
+        { id: 'occ-bool', attributeId: 'attr-bool', typeKey: 'boolean', typeRevision: 1, value: false, editLevel: 'Character' },
+        { id: 'occ-list', attributeId: 'attr-list', typeKey: 'multiChoice', typeRevision: 1, value: [], editLevel: 'Definition' },
+        { id: 'occ-number', attributeId: 'attr-number', typeKey: 'number', typeRevision: 2, value: parseJson('0.125') as any, editLevel: 'Definition' },
+      ],
+    });
+
+    await api.putCatalogGroups(7, {
+      expectedRevision: parseJson('9223372036854775806') as any,
+      groups: [{
+        id: 'group-guid',
+        title: 'Checks',
+        parentId: null,
+        entryIds: ['entry-guid'],
+        condition: {
+          operator: 'all',
+          children: [{
+            operator: 'not',
+            children: [{
+              operator: 'eq',
+              attributeId: 'attr-number',
+              typeKey: 'number',
+              typeRevision: 2,
+              value: parseJson('0.25') as any,
+            }],
+          }],
+        },
+      }],
+    });
+
+    expect(calls.map(([url]) => url)).toEqual([
+      '/api/campaigns/7/catalog/entry-guid/content',
+      '/api/campaigns/7/catalog/groups',
+    ]);
+    const contentBody = parseJson(String(calls[0][1]?.body)) as any;
+    expect(String(contentBody.expectedRevision)).toBe('9223372036854775806');
+    expect(contentBody.attributes.map((item: any) => item.value)).toEqual([0, false, [], expect.anything()]);
+    expect(isLosslessNumber(contentBody.attributes[3].value)).toBe(true);
+    const groupBody = parseJson(String(calls[1][1]?.body)) as any;
+    expect(String(groupBody.expectedRevision)).toBe('9223372036854775806');
+    expect(groupBody.groups[0].condition).toEqual({
+      operator: 'all',
+      children: [{
+        operator: 'not',
+        children: [{
+          operator: 'eq',
+          attributeId: 'attr-number',
+          typeKey: 'number',
+          typeRevision: 2,
+          value: expect.anything(),
+        }],
+      }],
+    });
+    expect(String(groupBody.groups[0].condition.children[0].children[0].value)).toBe('0.25');
+    expect(isLosslessNumber(groupBody.groups[0].condition.children[0].children[0].value)).toBe(true);
+    expect(calls.every(([, options]) => !Object.keys(options?.headers ?? {}).some(key => key.toLowerCase() === 'x-subject'))).toBe(true);
+    expect(request).toHaveBeenCalledTimes(2);
   });
 
   it('distinguishes authorization errors and conflicts', async () => {

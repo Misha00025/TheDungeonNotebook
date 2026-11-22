@@ -2,6 +2,7 @@ import { makeAuthenticatedRequest } from '@tdn/shared';
 import type { AuthenticatedRequest } from '@tdn/shared';
 import { parseJson, stringifyJson } from './json';
 import type { Assignment, BaseFieldInput, Campaign, CharacterMetadata, CharacterSheetEnvelope, ComputedSheet, ContentRevisionDto, DefinitionCreate, DefinitionMetadata, FormulaContent, FormulaContentEnvelope, FormulaMetadata, Importance, JsonValue, Member, OverridesEnvelope, Permissions, PresentationEnvelope, ResolvedPresentation, TemplateContentEnvelope, TemplateMetadata, User, ViewContentEnvelope, ViewMetadata, ViewNode, ViewSourcesResponse, VirtualFieldInput, VirtualFieldsEnvelope } from './types';
+import type { CatalogAttributeSchemaEnvelope, CatalogContentEnvelope, CatalogCreateRequest, CatalogCreateResult, CatalogGroupConfigurationEnvelope, CatalogGroupEntriesEnvelope, CatalogGroupInput, CatalogGroupsEnvelope, CatalogKind, CatalogMetadata } from './catalogTypes';
 
 export interface Problem { code: string; title: string; detail: string; errors?: Record<string, string[]>; resourceId?: string; requestId?: string }
 export class CampaignApiError extends Error {
@@ -58,6 +59,7 @@ export function createCampaignApi(request: AuthenticatedRequest) {
   const characters = (id: number) => `${c(id)}/characters`;
   const formulas = (id: number) => `${c(id)}/formulas`;
   const views = (id: number) => `${c(id)}/views`;
+  const catalog = (id: number) => `${c(id)}/catalog`;
   const put = <T>(path: string, body: unknown) => send<T>(path, 'PUT', body);
   const create = <T>(path: string, body: unknown) => send<T>(path, 'POST', body);
   const revQuery = (expectedRevision: RevisionPayload['expectedRevision']) => ({ expectedRevision: String(expectedRevision) });
@@ -111,6 +113,18 @@ export function createCampaignApi(request: AuthenticatedRequest) {
     getPresentation: (id: number) => send<PresentationEnvelope>(`${c(id)}/presentation`),
     putPresentation: (id: number, body: { expectedRevision: RevisionPayload['expectedRevision']; defaults: Record<string, string>; contextParams: Record<string, JsonValue> }) => put<PresentationEnvelope>(`${c(id)}/presentation`, body),
     resolvePresentation: (id: number, contextKey: string) => send<ResolvedPresentation>(`${c(id)}/presentation/resolve`, 'GET', undefined, { contextKey }),
+    listCatalog: (id: number, kind?: CatalogKind) => send<CatalogMetadata[]>(catalog(id), 'GET', undefined, kind ? { kind } : undefined),
+    getCatalogEntry: (id: number, entryId: Id) => send<CatalogMetadata>(`${catalog(id)}/${enc(entryId)}`),
+    getCatalogContent: (id: number, entryId: Id) => send<CatalogContentEnvelope>(`${catalog(id)}/${enc(entryId)}/content`),
+    createCatalogEntry: (id: number, body: CatalogCreateRequest) => create<CatalogCreateResult>(catalog(id), body),
+    putCatalogMetadata: (id: number, entryId: Id, body: { name: string; expectedRevision: RevisionPayload['expectedRevision']; isHidden?: boolean; quantityUnit?: string | null; allowNegative?: boolean }) => put<CatalogMetadata>(`${catalog(id)}/${enc(entryId)}`, body),
+    putCatalogContent: (id: number, entryId: Id, body: { expectedRevision: RevisionPayload['expectedRevision']; description: string; attributes: import('./catalogTypes').CatalogAttributeOccurrence[] }) => put<CatalogContentEnvelope>(`${catalog(id)}/${enc(entryId)}/content`, body),
+    getCatalogAttributes: (id: number) => send<CatalogAttributeSchemaEnvelope>(`${catalog(id)}/attributes`),
+    putCatalogAttributes: (id: number, body: { expectedRevision: RevisionPayload['expectedRevision']; definitions: import('./catalogTypes').CatalogAttributeInput[] }) => put<CatalogAttributeSchemaEnvelope>(`${catalog(id)}/attributes`, body),
+    getCatalogGroups: (id: number) => send<CatalogGroupsEnvelope>(`${catalog(id)}/groups`),
+    getCatalogGroupConfiguration: (id: number) => send<CatalogGroupConfigurationEnvelope>(`${catalog(id)}/groups/configuration`),
+    putCatalogGroups: (id: number, body: { expectedRevision: RevisionPayload['expectedRevision']; groups: CatalogGroupInput[] }) => put<CatalogGroupConfigurationEnvelope>(`${catalog(id)}/groups`, body),
+    getCatalogGroupEntries: (id: number, groupId: Id) => send<CatalogGroupEntriesEnvelope>(`${catalog(id)}/groups/${enc(groupId)}/entries`),
     searchUsers: async (nickname: string) => {
       const r = await request(`/users?nickname=${encodeURIComponent(nickname)}`);
       if (!r.ok) throw new CampaignApiError(r.status, { code: 'http_error', title: r.statusText, detail: r.statusText });

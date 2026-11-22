@@ -1,0 +1,21 @@
+import type { JsonValue, Revision } from './types';
+
+export type CatalogKind = 'Item' | 'Skill';
+export type QuantityUnit = 'Whole' | 'Fractional' | 'Single';
+export type CatalogEditLevel = 'Definition' | 'Character';
+export type CatalogAttributeType = 'integer' | 'number' | 'string' | 'boolean' | 'singleChoice' | 'multiChoice';
+export type CatalogAttributeDefinition = { id: string; title: string; typeKey: CatalogAttributeType; typeRevision: Revision; options: { optionKey: string; title: string }[]; isActive: boolean };
+export type CatalogAttributeInput = { id?: string; title: string; typeKey: CatalogAttributeType; options: { optionKey: string; title: string }[]; isActive: boolean };
+export type CatalogAttributeOccurrence = { id: string; attributeId: string; typeKey: CatalogAttributeType | string; typeRevision: Revision; value: JsonValue; editLevel: CatalogEditLevel };
+export type CatalogMetadata = { id: string; campaignId: number; name: string; kind: CatalogKind; creatorUserId: number | null; isHidden: boolean; quantityUnit: QuantityUnit | null; allowNegative: boolean; metadataRevision: Revision };
+export type CatalogContentEnvelope = { campaignId: number; resourceId: string; contentRevision: Revision; attributeSchemaRevision: Revision; data: { description: string; attributes: CatalogAttributeOccurrence[] }; diagnostics: { occurrenceId: string; code: string }[] };
+export type CatalogCreateRequest = { requestId: string; name: string; kind: CatalogKind; isHidden: boolean; quantityUnit?: QuantityUnit | null; allowNegative: boolean; description: string; attributes: CatalogAttributeOccurrence[] };
+export type CatalogCreateResult = { entry: CatalogMetadata; content: CatalogContentEnvelope };
+export type CatalogAttributeSchemaEnvelope = { campaignId: number; contentRevision: Revision; data: { definitions: CatalogAttributeDefinition[] } };
+export type CatalogGroupCondition = { operator: 'all' | 'any' | 'not' | 'exists' | 'eq' | 'gt' | 'gte' | 'lt' | 'lte'; attributeId?: string; typeKey?: string; typeRevision?: Revision; value?: JsonValue; children?: CatalogGroupCondition[] };
+export type CatalogGroup = { id: string; title: string; parentId: string | null; entryIds: string[]; condition: CatalogGroupCondition | null };
+export type CatalogGroupInput = { id?: string; title: string; parentId: string | null; entryIds: string[]; condition: CatalogGroupCondition | null };
+export type CatalogGroupSummary = { id: string; title: string; parentId: string | null };
+export type CatalogGroupsEnvelope = { campaignId: number; contentRevision: Revision; groups: CatalogGroupSummary[] };
+export type CatalogGroupConfigurationEnvelope = { campaignId: number; contentRevision: Revision; data: { groups: CatalogGroup[] }; attributeSchemaRevision: Revision; diagnostics: { groupId: string; entryId: string | null; code: string }[] };
+export type CatalogGroupEntriesEnvelope = { campaignId: number; groupId: string; configurationRevision: Revision; attributeSchemaRevision: Revision; entries: CatalogMetadata[]; diagnostics: { groupId: string; entryId: string | null; code: string }[] };
