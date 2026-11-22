@@ -22,6 +22,8 @@ The shared item/skill catalog routes are described in the campaign-service [cata
 
 Character-attached catalog entries, add receipts, quantities, and local attributes use explicit routes under `/api/campaigns/{campaignId}/characters/{characterId}/entries`; see the campaign-service [character catalog contract](../campaign-service/docs/character-catalog.md). These routes forward the verified `X-Subject` one-to-one and do not add policy hooks or parameter injection.
 
+Campaign catalog group routes are `GET|PUT /api/campaigns/{campaignId}/catalog/groups`, `GET /api/campaigns/{campaignId}/catalog/groups/configuration`, and `GET /api/campaigns/{campaignId}/catalog/groups/{groupId}/entries`. See the campaign-service [catalog groups contract](../campaign-service/docs/catalog-groups.md). They use the existing verified-subject hooks without group-specific access rules or parameter injection.
+
 Virtual-field requests use ordinary `bindings` only; separate parent-field properties are not part of the service contract. Existing template/custom virtual-field and override routes pass bodies through without rewrites.
 
 **Внимание:** root-команда `make test` очищает тестовые данные баз данных перед запуском интеграционных тестов.

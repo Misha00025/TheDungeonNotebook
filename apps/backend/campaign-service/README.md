@@ -8,6 +8,8 @@ The shared item/skill catalog and typed attribute contracts are documented in [`
 
 Character-attached catalog records, quantities, local values, and add receipts are documented in [`docs/character-catalog.md`](docs/character-catalog.md).
 
+Campaign catalog hierarchy and conditional membership are documented in [`docs/catalog-groups.md`](docs/catalog-groups.md).
+
 ## Structure
 
 - `CampaignService.csproj` and `CampaignService.sln` — project and solution files
@@ -51,7 +53,7 @@ Views store a typed Layout/Widget tree and opaque native JSON parameters. The ba
 
 ## Data storage and publication boundaries
 
-SQL stores campaign and member records, one shared-primary-key `CampaignTemplates` metadata row per campaign, shared catalog metadata, character catalog records and add receipts, other resource metadata, and character assignments. MongoDB stores content in `campaignTemplates` (one document per campaign, created by the first content update), `characterSheets`, `formulaContents`, `viewContents`, `campaignPresentationConfigs`, `catalogAttributeDefinitions`, `catalogContents`, and `characterCatalogContents`. Current point reads use MongoDB's standard unique `_id` index, whose value combines campaign ID and the internal resource key; singleton documents use `Guid.Empty` as their resource ID. The template has no public resource selector. The service does not rely on user-created indexes or full collection scans to establish publication. Mongo `contentRevision` and SQL `metadataRevision` are independent. View `params` and context parameters remain native JSON values. This service slice has no filesystem-backed content bodies.
+SQL stores campaign and member records, one shared-primary-key `CampaignTemplates` metadata row per campaign, shared catalog metadata, character catalog records and add receipts, other resource metadata, and character assignments. MongoDB stores content in `campaignTemplates` (one document per campaign, created by the first content update), `characterSheets`, `formulaContents`, `viewContents`, `campaignPresentationConfigs`, `catalogAttributeDefinitions`, `catalogContents`, `characterCatalogContents`, and `catalogGroups`. Current point reads use MongoDB's standard unique `_id` index, whose value combines campaign ID and the internal resource key; singleton documents use `Guid.Empty` as their resource ID. The template has no public resource selector. The service does not rely on user-created indexes or full collection scans to establish publication. Mongo `contentRevision` and SQL `metadataRevision` are independent. View `params` and context parameters remain native JSON values. This service slice has no filesystem-backed content bodies.
 
 Breaking migration `20261118000100_CampaignTemplate` drops the former `TemplateMetadata` table and `CharacterMetadata.TemplateId`, creates shared-primary-key `CampaignTemplates`, and seeds one empty template using the campaign name for each campaign. Old many-template SQL rows are lost; `templateContents` documents are not migrated or read. The migration cannot restore discarded old template data and downgrade is unsupported. This documents the migration behavior; no statement is made about the state of a particular database.
 

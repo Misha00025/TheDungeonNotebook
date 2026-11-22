@@ -96,6 +96,7 @@ public static class CampaignApplication
         builder.Services.AddScoped<IContentStore, MongoContentStore>();
         builder.Services.AddScoped<CatalogService>();
         builder.Services.AddScoped<CharacterCatalogService>();
+        builder.Services.AddScoped<CatalogGroupService>();
         builder.Services.AddScoped<SheetService>();
         builder.Services.AddScoped<FormulaService>();
         builder.Services.AddScoped<VirtualFieldService>();

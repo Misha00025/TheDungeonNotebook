@@ -163,4 +163,4 @@ Requires character write access and the record's SQL `metadataRevision >= 1`. De
 
 Definition unit/negative-policy updates and character quantity operations lock the same catalog definition row. A policy change that would make any existing quantity invalid returns `409 quantity_policy_conflict` without changing metadata or quantities. SQL locking order is definition then character. Create-own locks the character before publishing its new definition ID. SQL row/receipt writes are transactional; Mongo revisions remain independent and there is no cross-database transaction or global snapshot.
 
-This slice does not provide groups, parties, equipment, transfer, price, automatic effects, or group ownership.
+Catalog groups are a separate navigation and selection configuration, not parties, rosters, or character ownership; see [catalog-groups.md](catalog-groups.md). This slice does not provide parties, equipment, transfer, price, or automatic effects.

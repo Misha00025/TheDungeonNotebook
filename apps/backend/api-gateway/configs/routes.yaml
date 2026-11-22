@@ -396,6 +396,39 @@ routes:
     auth: required
     methods: [GET, PUT]
 
+  - path: /api/campaigns/{campaignId}/catalog/groups/{groupId}/entries
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/catalog/groups/{groupId}/entries
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET]
+
+  - path: /api/campaigns/{campaignId}/catalog/groups/configuration
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/catalog/groups/configuration
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET]
+
+  - path: /api/campaigns/{campaignId}/catalog/groups
+    proxy:
+      service: campaign
+      path: /api/campaigns/{campaignId}/catalog/groups
+      headers:
+        X-Subject: "{state.x_subject}"
+    pre_request_handler: campaign_upstream
+    response_handler: campaign_response
+    auth: required
+    methods: [GET, PUT]
+
   - path: /api/campaigns/{campaignId}/catalog/{entryId}/content
     proxy:
       service: campaign
