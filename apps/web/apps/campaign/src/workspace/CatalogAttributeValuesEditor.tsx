@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Button, Field, Select } from '@tdn/shared';
+import { ActionRow, Button, DataTable, Field, IconButton, ModalPortal, Select } from '@tdn/shared';
+import { useDirtyDraft } from './Workspace';
 import type { CatalogAttributeDefinition, CatalogAttributeOccurrence, CatalogEditLevel } from './catalogTypes';
 import { catalogValueLabel, catalogValueType, createCatalogOccurrence, defaultTypedValue } from './catalogModel';
 import { ValueInput, validateFieldValue } from './ValueInput';
@@ -45,6 +46,7 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
   const [inputErrors, setInputErrors] = useState<Record<string, boolean>>({});
   const [changedRows, setChangedRows] = useState<Record<string, boolean>>({});
   const [newAttributeId, setNewAttributeId] = useState('');
+  const [choiceDraft, setChoiceDraft] = useState<{ row: CatalogAttributeOccurrence; value: CatalogAttributeOccurrence['value']; error?: string }>();
   const validityCallback = useRef(onValidityChange);
   validityCallback.current = onValidityChange;
 
@@ -52,6 +54,8 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
   const diagnosticById = useMemo(() => new Map(diagnostics.map(item => [item.occurrenceId, item.code])), [diagnostics]);
   const immutableBindings = useMemo(() => new Set(immutableBindingIds), [immutableBindingIds]);
   const lockedOccurrences = useMemo(() => new Set(lockedOccurrenceIds), [lockedOccurrenceIds]);
+  const choiceDraftDirty = Boolean(choiceDraft && JSON.stringify(choiceDraft.value) !== JSON.stringify(choiceDraft.row.value));
+  useDirtyDraft(`catalog-attribute-choice-${idPrefix}`, choiceDraftDirty);
   const activeIds = useMemo(() => new Set(values.map(row => row.id)), [values]);
   const editableIds = useMemo(() => new Set(values.filter(row => mode === 'definition' || row.editLevel === 'Character').map(row => row.id)), [values, mode]);
   const changedValueInvalid = values.some(row => {
@@ -98,6 +102,12 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
     onChange(values.map(row => row.id === rowId ? next : row));
   };
 
+  const fieldFor = (row: CatalogAttributeOccurrence) => {
+    const definition = definitionById.get(row.attributeId);
+    const valueType = catalogValueType(row.typeKey);
+    return valueType ? { valueType, options: definition?.options ?? [] } : undefined;
+  };
+
   const removeRow = (rowId: string) => {
     onChange(values.filter(row => row.id !== rowId));
     setInputErrors(current => {
@@ -115,7 +125,6 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
   };
 
   const renderRow = (row: CatalogAttributeOccurrence, source: boolean) => {
-    const controlId = `${idPrefix}-attribute-${row.id}`;
     const definition = definitionById.get(row.attributeId);
     const mappedType = catalogValueType(row.typeKey);
     const characterLocked = mode === 'character' && (row.editLevel !== 'Character' || lockedOccurrences.has(row.id));
@@ -144,86 +153,81 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
       setInputErrors(current => ({ ...current, [row.id]: false }));
     };
 
-    return <fieldset key={`${source ? 'source-' : ''}${row.id}`}>
-      <legend>{definition?.title ?? 'Неизвестный атрибут'}{!definition?.isActive && ' · неактивен'}{stale && ' · устаревшее значение'}</legend>
-      {stale && <p>Значение сохранено без изменения. Оно не будет преобразовано автоматически.</p>}
-      {errorMessage && <p role="status">{errorMessage}</p>}
-      {rowReadOnly ? <>
-        <p>{catalogValueLabel(row.value, definition)}</p>
-        <p>{row.editLevel === 'Character' ? 'Можно менять у персонажа' : 'Только в каталоге'}</p>
-        {mode === 'character' && !readOnly && !source && <Button
-          type="button"
-          variant="secondary"
-          disabled={disabled}
-          onClick={() => removeRow(row.id)}
-        >{immutableBindings.has(row.id) ? 'Сбросить к каталогу' : 'Убрать собственное значение'}</Button>}
-      </> : <>
-        <Field label="Атрибут" htmlFor={`${controlId}-binding`}>
-          <Select
-            id={`${controlId}-binding`}
-            value={row.attributeId}
-            disabled={disabled || stale || immutableBindings.has(row.id)}
-            onChange={event => {
-              const nextDefinition = definitionById.get(event.target.value);
-              if (!nextDefinition) return;
-              const next = createCatalogOccurrence(nextDefinition, row.editLevel);
-              if (next) updateRow(row.id, { ...next, id: row.id });
-            }}
-          >
-            <option value={row.attributeId}>{definition?.title ?? 'Неизвестный атрибут'}</option>
-            {definitions.filter(item => item.isActive).map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
-          </Select>
-        </Field>
-        {canEdit && field
-          ? <>
-            <ValueInput
+    const attributeLabel = `${definition?.title ?? 'Неизвестный атрибут'}${!definition?.isActive ? ' · неактивен' : ''}${stale ? ' · устаревшее значение' : ''}`;
+    const multipleChoice = mappedType === 'MultiChoice' && canEdit && field;
+    const canRebind = !rowReadOnly && !immutableBindings.has(row.id);
+    return <tr key={`${source ? 'source-' : ''}${row.id}`}>
+      <th scope="row">{canRebind
+        ? <Select aria-label={`Атрибут: ${definition?.title ?? 'неизвестный атрибут'}`} value={row.attributeId} disabled={disabled || stale || immutableBindings.has(row.id)} onChange={event => {
+          const nextDefinition = definitionById.get(event.target.value);
+          if (!nextDefinition) return;
+          const next = createCatalogOccurrence(nextDefinition, row.editLevel);
+          if (next) updateRow(row.id, { ...next, id: row.id });
+        }}>
+          <option value={row.attributeId}>{definition?.title ?? 'Неизвестный атрибут'}</option>
+          {definitions.filter(item => item.isActive).map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
+        </Select>
+        : attributeLabel}{stale && <small> Значение сохранено без изменения. Оно не будет преобразовано автоматически.</small>}{errorMessage && <small role="status">{errorMessage}</small>}</th>
+      <td>{rowReadOnly
+        ? catalogValueLabel(row.value, definition)
+        : multipleChoice
+          ? <><span>{catalogValueLabel(row.value, definition) || 'Не выбрано'}</span> <Button type="button" size="small" variant="secondary" disabled={disabled} onClick={() => setChoiceDraft({ row, value: row.value, error: validateFieldValue(field!, row.value) })}>Выбрать значения</Button></>
+          : canEdit && field
+            ? <ValueInput
               field={field}
               value={row.value}
               label={`Значение: ${definition?.title ?? 'атрибут'}`}
+              compact
+              inline
               disabled={disabled || stale}
-              onChange={value => updateRow(row.id, {
-                ...row,
-                typeKey: definition.typeKey,
-                typeRevision: definition.typeRevision,
-                value,
-              })}
+              onChange={value => updateRow(row.id, { ...row, typeKey: definition.typeKey, typeRevision: definition.typeRevision, value })}
               onRawChange={() => setChangedRows(current => current[row.id] ? current : { ...current, [row.id]: true })}
-              onValidityChange={error => {
-                const invalid = Boolean(error);
-                setInputErrors(current => current[row.id] === invalid ? current : { ...current, [row.id]: invalid });
-              }}
+              onValidityChange={error => setInputErrors(current => current[row.id] === Boolean(error) ? current : { ...current, [row.id]: Boolean(error) })}
             />
-            {definition?.typeKey === 'boolean' && <span>{row.value === true ? 'Да' : 'Нет'}</span>}
-          </>
-          : <p>{catalogValueLabel(row.value, definition)}</p>}
-        {needsExplicitRefresh && definition && <Button type="button" disabled={disabled} onClick={refresh}>
+            : catalogValueLabel(row.value, definition)}
+      </td>
+      <td>{mode === 'definition'
+        ? !rowReadOnly
+          ? <Select aria-label={`Где разрешено менять: ${definition?.title ?? 'атрибут'}`} value={row.editLevel} disabled={stale} onChange={event => updateRow(row.id, { ...row, editLevel: event.target.value as CatalogEditLevel })}>
+          <option value="Definition">Только в каталоге</option><option value="Character">Можно менять у персонажа</option>
+          </Select>
+          : <>{row.editLevel === 'Character' ? 'Можно менять у персонажа' : 'Только в каталоге'}</>
+        : <>{row.editLevel === 'Character' ? 'Можно менять у персонажа' : 'Только в каталоге'}</>}
+      </td>
+      <td><ActionRow>
+        {mode === 'character' && rowReadOnly && !readOnly && !source && <IconButton
+          icon="delete"
+          size="small"
+          variant="danger"
+          title={immutableBindings.has(row.id) ? 'Сбросить к каталогу' : 'Убрать собственное значение'}
+          ariaLabel={immutableBindings.has(row.id) ? 'Сбросить к каталогу' : 'Убрать собственное значение'}
+          disabled={disabled}
+          onClick={() => removeRow(row.id)}
+        />}
+        {!rowReadOnly && needsExplicitRefresh && definition && <Button type="button" size="small" disabled={disabled} onClick={refresh}>
           {stale ? 'Обновить тип значения' : 'Заменить некорректное значение'}
         </Button>}
-        {mode === 'definition' && <Field label="Где разрешено менять" htmlFor={`${controlId}-edit-level`}>
-          <Select
-            id={`${controlId}-edit-level`}
-            value={row.editLevel}
-            disabled={disabled || stale}
-            onChange={event => updateRow(row.id, { ...row, editLevel: event.target.value as CatalogEditLevel })}
-          >
-            <option value="Definition">Только в каталоге</option>
-            <option value="Character">Можно менять у персонажа</option>
-          </Select>
-        </Field>}
-        <Button type="button" variant="secondary" disabled={disabled} onClick={() => removeRow(row.id)}>
-          {mode === 'character'
-            ? (immutableBindings.has(row.id) ? 'Сбросить к каталогу' : 'Убрать собственное значение')
-            : 'Убрать'}
-        </Button>
-      </>}
-    </fieldset>;
+        {!rowReadOnly && <IconButton
+          icon="delete"
+          size="small"
+          variant="danger"
+          title={mode === 'character' ? (immutableBindings.has(row.id) ? 'Сбросить к каталогу' : 'Убрать собственное значение') : 'Убрать'}
+          ariaLabel={mode === 'character' ? (immutableBindings.has(row.id) ? 'Сбросить к каталогу' : 'Убрать собственное значение') : 'Убрать'}
+          disabled={disabled}
+          onClick={() => removeRow(row.id)}
+        />}
+      </ActionRow></td>
+    </tr>;
   };
 
   return <section>
     <h3>Атрибуты</h3>
-    {sourceValues.map(row => renderRow(row, true))}
-    {values.map(row => renderRow(row, false))}
+    <DataTable aria-label="Атрибуты" minWidth="42rem">
+      <thead><tr><th scope="col">Атрибут</th><th scope="col">Значение</th><th scope="col">Изменение</th><th scope="col">Действия</th></tr></thead>
+      <tbody>{sourceValues.map(row => renderRow(row, true))}{values.map(row => renderRow(row, false))}</tbody>
+    </DataTable>
     {!readOnly && !disabled && <div>
+      <ActionRow>
       <Field label="Новый атрибут" htmlFor={`${idPrefix}-catalog-new-attribute`}>
         <Select id={`${idPrefix}-catalog-new-attribute`} value={newAttributeId} onChange={event => setNewAttributeId(event.target.value)}>
           <option value="">Выберите атрибут</option>
@@ -232,9 +236,40 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
       </Field>
       <Button type="button" onClick={addOccurrence} disabled={!newAttributeId || !definitions.some(item => item.id === newAttributeId && item.isActive && defaultTypedValue(item.typeKey, item.options) !== undefined)}>
         Добавить атрибут
-      </Button>
+      </Button></ActionRow>
     </div>}
     {hasInvalidInput && <p role="alert">Исправьте некорректные значения перед сохранением.</p>}
+    {choiceDraft && (() => {
+      const currentRow = values.find(row => row.id === choiceDraft.row.id);
+      const currentDefinition = currentRow ? definitionById.get(currentRow.attributeId) : undefined;
+      const currentField = currentRow ? fieldFor(currentRow) : undefined;
+      const targetEditable = Boolean(currentRow && !readOnly && !disabled
+        && (mode !== 'character' || currentRow.editLevel === 'Character' && !lockedOccurrences.has(currentRow.id)));
+      const sameBinding = Boolean(currentRow && currentRow.attributeId === choiceDraft.row.attributeId
+        && currentRow.typeKey === choiceDraft.row.typeKey
+        && String(currentRow.typeRevision) === String(choiceDraft.row.typeRevision));
+      const schemaCurrent = Boolean(currentRow && currentDefinition && currentField
+        && currentDefinition.typeKey === currentRow.typeKey
+        && String(currentDefinition.typeRevision) === String(currentRow.typeRevision)
+        && currentRow.typeKey === 'multiChoice');
+      const choiceError = currentField ? validateFieldValue(currentField, choiceDraft.value) : 'Схема атрибута недоступна.';
+      const canApplyChoice = targetEditable && sameBinding && schemaCurrent && !choiceError;
+      const applyChoice = () => {
+        if (!canApplyChoice || !currentRow) return;
+        updateRow(currentRow.id, { ...currentRow, value: choiceDraft.value });
+        setChoiceDraft(undefined);
+      };
+      return <ModalPortal isOpen onClose={() => setChoiceDraft(undefined)} title={`Значения: ${currentDefinition?.title ?? 'атрибут'}`}>
+        {!targetEditable || !sameBinding || !schemaCurrent
+          ? <p role="status">Значение изменилось или редактирование больше недоступно. Закройте диалог и перечитайте запись.</p>
+          : <ValueInput field={currentField!} value={choiceDraft.value} label={`Значение: ${currentDefinition?.title ?? 'атрибут'}`} onChange={value => setChoiceDraft(current => {
+            const field = currentRow ? fieldFor(currentRow) : undefined;
+            return current && field ? { ...current, value, error: validateFieldValue(field, value) } : current;
+          })} onValidityChange={error => setChoiceDraft(current => current ? { ...current, error } : current)} />}
+        {choiceError && targetEditable && sameBinding && schemaCurrent && <p role="alert">{choiceError}</p>}
+        <ActionRow><Button type="button" disabled={!canApplyChoice || Boolean(choiceDraft.error)} onClick={applyChoice}>Применить</Button><Button type="button" variant="secondary" onClick={() => setChoiceDraft(undefined)}>Отмена</Button></ActionRow>
+      </ModalPortal>;
+    })()}
   </section>;
 };
 

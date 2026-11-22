@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Checkbox, Field, Input, ModalPortal, Select, StatePanel } from '@tdn/shared';
+import { ActionRow, Button, Checkbox, DataTable, Field, IconButton, Input, ModalPortal, Select, StatePanel } from '@tdn/shared';
 import { useDirtyDraft, useWorkspace } from './Workspace';
 import { CampaignApiError } from './api';
 import { ApiError } from './Feedback';
@@ -97,12 +97,16 @@ const CatalogAttributesDialog: React.FC<Props> = ({
   const [recoverySchema, setRecoverySchema] = useState<CatalogAttributeSchemaEnvelope>();
   const [acceptOnly, setAcceptOnly] = useState(false);
   const [status, setStatus] = useState('');
+  const [optionsRowKey, setOptionsRowKey] = useState<string>();
+  const [optionsDraft, setOptionsDraft] = useState<AttributeRow['options']>([]);
 
   canWriteRef.current = canManage && !permissionsPending && !revoked;
   const baselineInputs = useMemo(() => baseline ? toInputs(toRows(baseline.data.definitions)) : [], [baseline]);
   const dirty = Boolean(baseline && stringifyJson(toInputs(rows)) !== stringifyJson(baselineInputs));
   const invalid = rows.some(row => !row.title.trim() || row.options.some(option => !option.optionKey.trim()));
-  useDirtyDraft(`catalog-attributes-${sessionKey}-${campaignId}`, dirty || blocked);
+  const optionsDraftDirty = Boolean(optionsRowKey && rows.some(row => row.clientKey === optionsRowKey)
+    && stringifyJson(optionsDraft) !== stringifyJson(rows.find(row => row.clientKey === optionsRowKey)?.options ?? []));
+  useDirtyDraft(`catalog-attributes-${sessionKey}-${campaignId}`, dirty || blocked || optionsDraftDirty);
 
   const reportForbidden = () => {
     if (!mountedRef.current) return;
@@ -139,7 +143,7 @@ const CatalogAttributesDialog: React.FC<Props> = ({
 
   const close = () => {
     if (busyRef.current || recoveryBusyRef.current || recovering) return;
-    if ((dirty || blocked) && !window.confirm('Есть несохранённые изменения. Закрыть и потерять их?')) return;
+    if ((dirty || optionsDraftDirty || blocked) && !window.confirm('Есть несохранённые изменения. Закрыть и потерять их?')) return;
     onCloseRef.current();
   };
 
@@ -158,15 +162,6 @@ const CatalogAttributesDialog: React.FC<Props> = ({
       ...item,
       typeKey,
       options: typeKey === 'singleChoice' || typeKey === 'multiChoice' ? item.options : [],
-    } : item));
-  };
-
-  const removeOption = (row: AttributeRow, optionIndex: number) => {
-    const option = row.options[optionIndex];
-    if (row.id && option && !window.confirm('Удаление варианта может сделать сохранённые значения несовместимыми. Удалить вариант?')) return;
-    setRows(current => current.map(item => item.clientKey === row.clientKey ? {
-      ...item,
-      options: item.options.filter((_, index) => index !== optionIndex),
     } : item));
   };
 
@@ -275,7 +270,16 @@ const CatalogAttributesDialog: React.FC<Props> = ({
 
   const writesDisabled = busy || recovering || permissionsPending || revoked || !canManage || blocked;
 
-  return <ModalPortal isOpen onClose={close} title="Схема атрибутов каталога" dismissDisabled={busy || recovering}>
+  const optionsRow = rows.find(row => row.clientKey === optionsRowKey);
+  const applyOptions = () => {
+    if (!optionsRowKey || writesDisabled) return;
+    const current = rows.find(row => row.clientKey === optionsRowKey);
+    if (!current || (current.typeKey !== 'singleChoice' && current.typeKey !== 'multiChoice')) return;
+    setRows(current => current.map(row => row.clientKey === optionsRowKey ? { ...row, options: optionsDraft.map(option => ({ ...option })) } : row));
+    setOptionsRowKey(undefined);
+  };
+
+  return <ModalPortal isOpen onClose={close} title="Схема атрибутов каталога" size="wide" dismissDisabled={busy || recovering}>
     {loading && <StatePanel kind="loading">Загрузка схемы атрибутов…</StatePanel>}
     {!loading && Boolean(loadError) && <>
       <ApiError error={loadError} />
@@ -287,49 +291,20 @@ const CatalogAttributesDialog: React.FC<Props> = ({
       {revoked && <p role="alert">Управление схемой заблокировано после отказа сервера.</p>}
       {rows.length === 0 && <StatePanel kind="empty">В схеме пока нет атрибутов. Добавьте определение, чтобы использовать типизированные поля.</StatePanel>}
       <p>При смене типа или удалении варианта существующие значения не преобразуются автоматически.</p>
-      {rows.map((row, rowIndex) => <fieldset key={row.clientKey}>
-        <Field label="Название атрибута" htmlFor={`${row.clientKey}-title`} error={!row.title.trim() ? 'Введите название.' : undefined}>
-          <Input
-            id={`${row.clientKey}-title`}
-            value={row.title}
-            disabled={writesDisabled}
-            aria-invalid={!row.title.trim() || undefined}
-            onChange={event => setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, title: event.target.value } : item))}
-          />
-        </Field>
-        <Field label="Тип значения" htmlFor={`${row.clientKey}-type`}>
-          <Select id={`${row.clientKey}-type`} value={row.typeKey} disabled={writesDisabled} onChange={event => changeType(row, event.target.value as CatalogAttributeType)}>
+      <p>Неактивные атрибуты сохраняются и остаются доступны для просмотра ранее записанных значений.</p>
+      <DataTable aria-label="Атрибуты каталога" minWidth="46rem">
+        <thead><tr><th scope="col">Название</th><th scope="col">Тип значения</th><th scope="col">Варианты</th><th scope="col">Активен</th></tr></thead>
+        <tbody>{rows.map(row => <tr key={row.clientKey}>
+          <td><Input aria-label={`Название атрибута ${row.title || 'новый'}`} value={row.title} disabled={writesDisabled} aria-invalid={!row.title.trim() || undefined} onChange={event => setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, title: event.target.value } : item))} /></td>
+          <td><Select aria-label={`Тип атрибута ${row.title || 'новый'}`} value={row.typeKey} disabled={writesDisabled} onChange={event => changeType(row, event.target.value as CatalogAttributeType)}>
             {schemaTypes.map(type => <option key={type} value={type}>{typeLabels[type]}</option>)}
-          </Select>
-        </Field>
-        {(row.typeKey === 'singleChoice' || row.typeKey === 'multiChoice') && <section>
-          <h3>Варианты</h3>
-          {row.options.map((option, optionIndex) => <div key={`${row.clientKey}-option-${optionIndex}`}>
-            <Field label={`Название варианта ${optionIndex + 1}`} htmlFor={`${row.clientKey}-option-${optionIndex}`}>
-              <Input
-                id={`${row.clientKey}-option-${optionIndex}`}
-                value={option.title}
-                disabled={writesDisabled}
-                onChange={event => setRows(current => current.map(item => item.clientKey === row.clientKey ? {
-                  ...item,
-                  options: item.options.map((value, index) => index === optionIndex ? { ...value, title: event.target.value } : value),
-                } : item))}
-              />
-            </Field>
-            <Button type="button" variant="secondary" disabled={writesDisabled} onClick={() => removeOption(row, optionIndex)}>Удалить вариант</Button>
-          </div>)}
-          <Button type="button" disabled={writesDisabled} onClick={() => setRows(current => current.map(item => item.clientKey === row.clientKey ? {
-            ...item,
-            options: [...item.options, { optionKey: crypto.randomUUID(), title: '' }],
-          } : item))}>Добавить вариант</Button>
-        </section>}
-        <label>
-          <Checkbox checked={row.isActive} disabled={writesDisabled} onChange={event => setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, isActive: event.target.checked } : item))} />
-          Активен
-        </label>
-        <p>Неактивные атрибуты сохраняются и остаются доступны для просмотра ранее записанных значений.</p>
-        {rowIndex < rows.length - 1 && <hr />}
-      </fieldset>)}
+          </Select></td>
+          <td>{row.typeKey === 'singleChoice' || row.typeKey === 'multiChoice'
+            ? <Button type="button" size="small" variant="secondary" disabled={writesDisabled} onClick={() => { setOptionsDraft(row.options.map(option => ({ ...option }))); setOptionsRowKey(row.clientKey); }}>Варианты ({row.options.length})</Button>
+            : '—'}</td>
+          <td><Checkbox aria-label={`Активен: ${row.title || 'новый атрибут'}`} checked={row.isActive} disabled={writesDisabled} onChange={event => setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, isActive: event.target.checked } : item))} /></td>
+        </tr>)}</tbody>
+      </DataTable>
       {!writesDisabled && <Button type="button" onClick={addDefinition}>Добавить атрибут</Button>}
       {Boolean(failure) && <>
         <ApiError error={failure} />
@@ -353,6 +328,21 @@ const CatalogAttributesDialog: React.FC<Props> = ({
       {!blocked && <Button type="button" disabled={writesDisabled || invalid || !dirty} onClick={() => void save()}>{busy ? 'Сохранение…' : 'Сохранить схему'}</Button>}
       <Button type="button" variant="secondary" disabled={busy || recovering} onClick={close}>Отмена</Button>
     </> : null}
+    {optionsRow && <ModalPortal isOpen onClose={() => setOptionsRowKey(undefined)} title={`Варианты: ${optionsRow.title || 'новый атрибут'}`} size="compact">
+      <DataTable aria-label={`Варианты атрибута ${optionsRow.title || 'новый'}`} minWidth="24rem">
+        <thead><tr><th scope="col">Название</th><th scope="col">Действия</th></tr></thead>
+        <tbody>{optionsDraft.map((option, index) => <tr key={option.optionKey}>
+          <td><Input aria-label={`Название варианта ${index + 1}`} value={option.title} disabled={writesDisabled} onChange={event => setOptionsDraft(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item))} /></td>
+          <td><IconButton icon="delete" size="small" variant="danger" title="Удалить вариант" ariaLabel="Удалить вариант" disabled={writesDisabled} onClick={() => {
+            const option = optionsDraft[index];
+            if (optionsRow.id && option && !window.confirm('Удаление варианта может сделать сохранённые значения несовместимыми. Удалить вариант?')) return;
+            setOptionsDraft(current => current.filter((_, itemIndex) => itemIndex !== index));
+          }} /></td>
+        </tr>)}</tbody>
+      </DataTable>
+      <ActionRow><Button type="button" size="small" disabled={writesDisabled} onClick={() => setOptionsDraft(current => [...current, { optionKey: crypto.randomUUID(), title: '' }])}>Добавить вариант</Button></ActionRow>
+      <ActionRow><Button type="button" disabled={writesDisabled} onClick={applyOptions}>Применить</Button><Button type="button" variant="secondary" onClick={() => setOptionsRowKey(undefined)}>Отмена</Button></ActionRow>
+    </ModalPortal>}
   </ModalPortal>;
 };
 

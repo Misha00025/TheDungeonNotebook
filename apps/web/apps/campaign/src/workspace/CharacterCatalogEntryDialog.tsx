@@ -518,7 +518,7 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
   const header = catalog.canRead && !notFound ? definition?.name ?? 'Личная запись' : 'Личная запись';
   const visible = catalog.canRead && !notFound;
 
-  return <ModalPortal isOpen onClose={handleClose} title={header} dismissDisabled={busy || recovering || deleting}>
+  return <ModalPortal isOpen onClose={handleClose} title={header} size="wide" dismissDisabled={busy || recovering || deleting}>
     {loading && <StatePanel kind="loading">Загрузка личной записи…</StatePanel>}
     {!loading && Boolean(readError) && <>
       <ApiError error={readError} />

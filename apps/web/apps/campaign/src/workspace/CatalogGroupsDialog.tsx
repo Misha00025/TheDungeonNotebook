@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Checkbox, Field, Input, ModalPortal, Select, StatePanel } from '@tdn/shared';
+import { Button, Checkbox, Field, FieldSet, Input, ModalPortal, Select, StatePanel } from '@tdn/shared';
 import { useDirtyDraft, useWorkspace } from './Workspace';
 import { CampaignApiError } from './api';
 import { ApiError } from './Feedback';
@@ -363,7 +363,7 @@ const CatalogGroupsDialog: React.FC<Props> = ({
             && candidate.id !== currentGroupId
             && !isDescendant(candidate.id, currentGroupId))
           : [];
-        return <fieldset key={row.clientKey}>
+        return <FieldSet key={row.clientKey} legend={row.title || 'Новая группа'}>
           <Field label="Название группы" htmlFor={`${row.clientKey}-title`} error={!row.title.trim() ? 'Введите название.' : undefined}>
             <Input
               id={`${row.clientKey}-title`}
@@ -386,8 +386,7 @@ const CatalogGroupsDialog: React.FC<Props> = ({
               </Select>
             </Field>
             : <p>Новая группа будет создана корневой. Сохраните её, чтобы назначать её родителем.</p>}
-          <fieldset>
-            <legend>Явный состав</legend>
+          <FieldSet legend="Явный состав">
             {catalogEntries.length === 0 && <p>Доступных определений каталога нет.</p>}
             {catalogEntries.map(entry => <label key={entry.id}>
               <Checkbox
@@ -402,7 +401,7 @@ const CatalogGroupsDialog: React.FC<Props> = ({
               />
               {entry.name} <small>{entry.kind === 'Item' ? 'Предмет' : 'Навык'}{entry.isHidden ? ' · скрытое' : ''}</small>
             </label>)}
-          </fieldset>
+          </FieldSet>
           <CatalogConditionEditor
             key={`${conditionEpoch}:${row.clientKey}`}
             definitions={definitions}
@@ -422,7 +421,7 @@ const CatalogGroupsDialog: React.FC<Props> = ({
           })}
           {children && <p role="alert">Перед удалением группы перенесите или удалите её дочерние группы.</p>}
           <Button type="button" variant="secondary" disabled={controlsDisabled || children} onClick={() => removeGroup(row)}>Удалить группу</Button>
-        </fieldset>;
+        </FieldSet>;
       })}
       {!controlsDisabled && <Button type="button" onClick={() => setRows(current => [...current, {
         clientKey: `new:${crypto.randomUUID()}`,

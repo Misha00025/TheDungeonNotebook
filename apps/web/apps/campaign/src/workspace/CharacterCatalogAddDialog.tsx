@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Field, Input, ModalPortal, StatePanel } from '@tdn/shared';
+import { Button, ModalPortal, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
 import { compareNumber } from 'lossless-json';
 import { useResource } from './hooks';
 import { useWorkspace, useDirtyDraft } from './Workspace';
@@ -463,21 +463,13 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
         </>}
 
         {mode === 'catalog' && catalog.canRead && !blocked && <section>
-          <Field label="Поиск по названию" htmlFor="character-catalog-picker-search">
-            <Input
-              id="character-catalog-picker-search"
-              value={search}
-              disabled={busy}
-              onChange={event => setSearch(event.target.value)}
-            />
-          </Field>
+          <Toolbar><SearchBar searchTerm={search} onSearchChange={setSearch} compact aria-label="Поиск по названию" /></Toolbar>
           {groups.loading && !groups.data && <StatePanel kind="loading">Загрузка групп каталога…</StatePanel>}
           {Boolean(groups.error) && <ApiError error={groups.error} onRetry={groups.reload} />}
           {groups.data ? <CatalogGroupTree
             groups={groups.data.groups}
             selectedId={groupId}
             onSelect={setGroupId}
-            showEmptyMessage={false}
           /> : null}
           {groupId && <Button type="button" variant="secondary" disabled={busy} onClick={() => setGroupId('')}>Сбросить группу</Button>}
           {picker.loading && !picker.data && <StatePanel kind="loading">Загрузка определений…</StatePanel>}
@@ -487,7 +479,7 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
           </p>) : null}
           {picker.data
             ? visibleEntries.length === 0
-              ? <StatePanel kind="empty">Подходящих определений не найдено.</StatePanel>
+               ? <StatePanel kind="empty">Ничего не найдено</StatePanel>
               : <ul>
                 {visibleEntries.map(item => <li key={item.id}>
                   <Button

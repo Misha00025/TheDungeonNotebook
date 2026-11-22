@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Button, DataTable, Field, Input, StatePanel } from '@tdn/shared';
+import { Button, DataTable, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
 import { ApiError } from './Feedback';
 import { useCharacterCatalog } from './CharacterCatalogContext';
 import type { CatalogKind } from './catalogTypes';
@@ -23,9 +23,7 @@ const CharacterCatalogPanel: React.FC<CharacterCatalogPanelProps> = ({ kind, can
   const canAdd = catalog.canWrite && !readOnly;
 
   return <section aria-busy={catalog.loading}>
-    <Field label="Поиск по названию" htmlFor={`character-catalog-search-${kind.toLowerCase()}`}>
-      <Input id={`character-catalog-search-${kind.toLowerCase()}`} value={search} onChange={event => setSearch(event.target.value)} />
-    </Field>
+    <Toolbar><SearchBar searchTerm={search} onSearchChange={setSearch} compact aria-label="Поиск по названию" /></Toolbar>
     {canAdd && <Button type="button" onClick={() => setAdding(true)}>{kind === 'Item' ? 'Добавить предмет' : 'Добавить навык'}</Button>}
     {!catalog.canRead && !catalog.permissionsPending && <StatePanel kind="error">Доступ к записям этого персонажа не подтверждён.</StatePanel>}
     {catalog.canRead && catalog.loading && !catalog.entries && <StatePanel kind="loading">Загрузка записей персонажа…</StatePanel>}

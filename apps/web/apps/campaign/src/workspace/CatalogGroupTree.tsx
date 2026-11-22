@@ -1,15 +1,14 @@
 import React from 'react';
-import { Button, StatePanel } from '@tdn/shared';
+import { Button } from '@tdn/shared';
 import type { CatalogGroupSummary } from './catalogTypes';
 
 export type CatalogGroupTreeProps = {
   groups: CatalogGroupSummary[];
   selectedId: string;
   onSelect: (id: string) => void;
-  showEmptyMessage?: boolean;
 };
 
-const CatalogGroupTree: React.FC<CatalogGroupTreeProps> = ({ groups, selectedId, onSelect, showEmptyMessage = true }) => {
+const CatalogGroupTree: React.FC<CatalogGroupTreeProps> = ({ groups, selectedId, onSelect }) => {
   const ids = new Set(groups.map(group => group.id));
   const rendered = new Set<string>();
 
@@ -32,9 +31,7 @@ const CatalogGroupTree: React.FC<CatalogGroupTreeProps> = ({ groups, selectedId,
   const detached = groups.filter(group => !rendered.has(group.id)).map(group => renderBranch(group, new Set<string>()));
   const tree = [...rootItems, ...detached].filter(Boolean);
 
-  if (groups.length === 0) {
-    return showEmptyMessage ? <StatePanel kind="empty">Групп каталога пока нет.</StatePanel> : null;
-  }
+  if (groups.length === 0) return null;
   return <nav aria-label="Группы каталога"><ul>{tree}</ul></nav>;
 };
 

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Button, Field, Input, PageHeader, StatePanel, TabBar } from '@tdn/shared';
+import { Button, PageHeader, SearchBar, StatePanel, TabBar, Toolbar } from '@tdn/shared';
 import { useWorkspace } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 import { useResource } from './hooks';
@@ -94,11 +94,7 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
         { id: 'skills', label: 'Навыки', path: 'skills' },
       ]}
     />
-    <div>
-      <Field label="Поиск по названию" htmlFor="catalog-search">
-        <Input id="catalog-search" value={search} onChange={event => setSearch(event.target.value)} />
-      </Field>
-    </div>
+    <Toolbar><SearchBar searchTerm={search} onSearchChange={setSearch} compact aria-label="Поиск по названию" /></Toolbar>
 
     {summaries.loading && !summaries.data && <StatePanel kind="loading">Загрузка групп каталога…</StatePanel>}
     {summaries.error && <ApiError error={summaries.error} onRetry={summaries.reload} />}
@@ -127,7 +123,7 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
         {diagnostic.entryId ? ` Определение: ${name ?? 'недоступно'}.` : ''}
       </p>;
     })}
-    {entries.data && filteredEntries.length === 0 && <StatePanel kind="empty">Нет определений, соответствующих фильтру.</StatePanel>}
+    {entries.data && filteredEntries.length === 0 && <StatePanel kind="empty">Ничего не найдено</StatePanel>}
     {entries.data && filteredEntries.length > 0 && <ul>{filteredEntries.map(entry => <li key={entry.id}>
       <Button variant="secondary" onClick={() => openDefinition(entry)}>
         {entry.name} <small>{entry.kind === 'Item' ? 'Предмет' : 'Навык'}</small>

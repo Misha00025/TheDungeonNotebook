@@ -121,7 +121,7 @@ describe('character catalog consumer', () => {
   afterEach(() => { vi.restoreAllMocks(); window.localStorage.clear(); });
 
   it('shows an attached hidden definition to a reader without exposing writes or reading source content', async () => {
-    const attached = makeEntry({ quantity: 0 });
+    const attached = makeEntry({ quantity: 0, attributes: [attribute('note-a', 'read-only')] });
     const { request, calls } = makeRequest((url, options) => {
       if (url === `/api/campaigns/12/characters/${characterId}/entries` && options?.method !== 'POST') return response([attached]);
       if (url === `/api/campaigns/12/characters/${characterId}/entries/${recordId}` && options?.method !== 'DELETE') return response(attached);
@@ -135,6 +135,10 @@ describe('character catalog consumer', () => {
     fireEvent.click(recordButton);
     expect(await screen.findByRole('dialog', { name: 'Тайный паёк' })).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Количество' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Значение: Заметка A' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Атрибут: Заметка A' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Убрать собственное значение' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('read-only')[0]).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Сохранить изменения' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Удалить личную запись' })).not.toBeInTheDocument();
     expect(calls.some(([url]) => url === `/api/campaigns/12/catalog/${sourceId}/content`)).toBe(false);
@@ -155,7 +159,8 @@ describe('character catalog consumer', () => {
     });
     render(catalogTree(request, { canWrite: true }));
     fireEvent.click(await screen.findByRole('button', { name: 'Тайный паёк' }));
-    const row = await screen.findByRole('group', { name: /Заметка A/ });
+    const value = await screen.findByRole('textbox', { name: 'Значение: Заметка A' });
+    const row = value.closest('tr') as HTMLElement;
     fireEvent.click(within(row).getByRole('button', { name: 'Сбросить к каталогу' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить изменения' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить изменения' }));
@@ -163,7 +168,7 @@ describe('character catalog consumer', () => {
     await waitFor(() => expect(calls.some(([url, options]) => url.endsWith('/attributes') && options?.method === 'PUT')).toBe(true));
     const write = calls.find(([url, options]) => url.endsWith('/attributes') && options?.method === 'PUT');
     expect(parseJson(String(write?.[1]?.body))).toEqual({ expectedRevision: 7, attributes: [attribute('note-b', 'keep')] });
-    expect(screen.getByRole('group', { name: /Заметка B/ })).toBeInTheDocument();
+    expect(await screen.findByRole('textbox', { name: 'Значение: Заметка B' })).toHaveValue('keep');
     expect(within(screen.getByRole('table', { name: 'Инвентарь персонажа' })).getByText('0')).toBeInTheDocument();
     expect(calls.filter(([, options]) => options?.method === 'DELETE')).toHaveLength(0);
   });
@@ -193,7 +198,8 @@ describe('character catalog consumer', () => {
     render(catalogTree(request, { canWrite: true }));
     fireEvent.click(await screen.findByRole('button', { name: 'Тайный паёк' }));
     fireEvent.change(await screen.findByRole('textbox', { name: 'Количество' }), { target: { value: '2' } });
-    fireEvent.click(within(await screen.findByRole('group', { name: /Заметка A/ })).getByRole('button', { name: 'Сбросить к каталогу' }));
+    const value = await screen.findByRole('textbox', { name: 'Значение: Заметка A' });
+    fireEvent.click(within(value.closest('tr') as HTMLElement).getByRole('button', { name: 'Сбросить к каталогу' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить изменения' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить изменения' }));
     expect(await screen.findByRole('heading', { name: 'Восстановление записи' })).toBeInTheDocument();

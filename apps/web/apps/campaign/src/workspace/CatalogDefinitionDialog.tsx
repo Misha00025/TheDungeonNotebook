@@ -385,7 +385,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
   const fieldReadOnly = !canEdit || loading || Boolean(loadingError);
   const fieldDisabled = busy || recovering || permissionsPending || revoked;
 
-  return <ModalPortal isOpen onClose={close} title={title} dismissDisabled={busy || recovering}>
+  return <ModalPortal isOpen onClose={close} title={title} size="wide" dismissDisabled={busy || recovering}>
     {loading && <StatePanel kind="loading">Загрузка определения и схемы атрибутов…</StatePanel>}
     {!loading && Boolean(loadingError) && <>
       <ApiError error={loadingError} />

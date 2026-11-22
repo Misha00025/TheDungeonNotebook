@@ -209,9 +209,12 @@ describe('campaign catalog', () => {
     expect(screen.queryByRole('button', { name: /Public tonic/ })).not.toBeInTheDocument();
     const search = screen.getByRole('textbox', { name: 'Поиск по названию' });
     fireEvent.change(search, { target: { value: 'Public' } });
-    expect(await screen.findByText('Нет определений, соответствующих фильтру.')).toBeInTheDocument();
+    expect(await screen.findByText('Ничего не найдено')).toBeInTheDocument();
     fireEvent.change(search, { target: { value: 'Arcana' } });
     expect(await screen.findByRole('button', { name: /Arcana/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Очистить поиск' }));
+    expect(await screen.findByRole('button', { name: /Arcana/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Public tonic/ })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Создать определение' }));
 
@@ -348,6 +351,73 @@ describe('catalog definition recovery', () => {
         parentId: null,
         entryIds: [metadata.id],
         condition: staleCondition,
+      }],
+    });
+  });
+});
+
+describe('catalog attribute schema options', () => {
+  beforeEach(resetApi);
+
+  it('discards cancelled option edits and saves applied option changes only with the outer schema revision', async () => {
+    state.mode = 'gm';
+    state.permissions = { canRead: true, canWrite: true, canManageAccess: false };
+    const definition = {
+      id: 'attr-tags',
+      title: 'Tags',
+      typeKey: 'multiChoice' as const,
+      typeRevision: 3,
+      options: [
+        { optionKey: 'option-stealth', title: 'Stealth' },
+        { optionKey: 'option-lore', title: 'Lore' },
+      ],
+      isActive: true,
+    };
+    const schema = {
+      campaignId: 12,
+      contentRevision: 7,
+      data: { definitions: [definition] },
+    };
+    state.api.getCatalogAttributes.mockResolvedValue(schema);
+    state.api.putCatalogAttributes.mockResolvedValue({
+      ...schema,
+      contentRevision: 8,
+      data: { definitions: [{ ...definition, options: [{ optionKey: 'option-stealth', title: 'Quiet' }] }] },
+    });
+    renderCatalog('/groups/12/gm/catalog');
+    fireEvent.click(await screen.findByRole('button', { name: 'Атрибуты каталога' }));
+    const schemaDialog = await screen.findByRole('dialog', { name: 'Схема атрибутов каталога' });
+
+    fireEvent.click(within(schemaDialog).getByRole('button', { name: 'Варианты (2)' }));
+    const cancelledOptions = await screen.findByRole('dialog', { name: 'Варианты: Tags' });
+    fireEvent.change(within(cancelledOptions).getByRole('textbox', { name: 'Название варианта 1' }), { target: { value: 'Discarded' } });
+    fireEvent.click(within(cancelledOptions).getByRole('button', { name: 'Отмена' }));
+    expect(state.api.putCatalogAttributes).not.toHaveBeenCalled();
+    expect(within(schemaDialog).getByRole('button', { name: 'Варианты (2)' })).toBeInTheDocument();
+
+    fireEvent.click(within(schemaDialog).getByRole('button', { name: 'Варианты (2)' }));
+    const optionsDialog = await screen.findByRole('dialog', { name: 'Варианты: Tags' });
+    expect(within(optionsDialog).getByRole('textbox', { name: 'Название варианта 1' })).toHaveValue('Stealth');
+    fireEvent.change(within(optionsDialog).getByRole('textbox', { name: 'Название варианта 1' }), { target: { value: 'Quiet' } });
+    const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.click(within(optionsDialog).getAllByRole('button', { name: 'Удалить вариант' })[1]);
+    expect(confirmation).toHaveBeenCalledWith('Удаление варианта может сделать сохранённые значения несовместимыми. Удалить вариант?');
+    confirmation.mockRestore();
+    fireEvent.click(within(optionsDialog).getByRole('button', { name: 'Применить' }));
+    expect(state.api.putCatalogAttributes).not.toHaveBeenCalled();
+    expect(within(schemaDialog).getByRole('button', { name: 'Варианты (1)' })).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('option-stealth');
+
+    fireEvent.click(within(schemaDialog).getByRole('button', { name: 'Сохранить схему' }));
+    await waitFor(() => expect(state.api.putCatalogAttributes).toHaveBeenCalledTimes(1));
+    expect(state.api.putCatalogAttributes.mock.calls[0][1]).toEqual({
+      expectedRevision: 7,
+      definitions: [{
+        id: 'attr-tags',
+        title: 'Tags',
+        typeKey: 'multiChoice',
+        options: [{ optionKey: 'option-stealth', title: 'Quiet' }],
+        isActive: true,
       }],
     });
   });

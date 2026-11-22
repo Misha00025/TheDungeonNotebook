@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Button, Field, Select } from '@tdn/shared';
+import { Button, Field, FieldSet, Select } from '@tdn/shared';
 import type { JsonValue } from './types';
 import type { CatalogAttributeDefinition, CatalogGroupCondition } from './catalogTypes';
 import { catalogValueLabel, catalogValueType, createConditionLeaf, defaultTypedValue } from './catalogModel';
@@ -178,8 +178,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
   };
 
   if (isCompound(node.operator)) {
-    return <fieldset>
-      <legend>{operatorLabels[node.operator]}</legend>
+    return <FieldSet legend={operatorLabels[node.operator]}>
       {!isRoot && <Field label="Тип условия" htmlFor={`${controlId}-operator`}>
         <Select id={`${controlId}-operator`} value={node.operator} disabled={disabled} onChange={event => changeNodeOperator(event.target.value as ConditionOperator)}>
           {conditionOperators.map(operator => <option key={operator} value={operator}>{operatorLabels[operator]}</option>)}
@@ -204,7 +203,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
       </div>)}
       {(node.operator !== 'not' || children.length === 0) && <Button type="button" disabled={disabled} onClick={addChild}>Добавить условие</Button>}
       {ownInvalid && <p role="alert">Добавьте хотя бы одно условие.</p>}
-    </fieldset>;
+    </FieldSet>;
   }
 
   const eligibleDefinitions = definitions.filter(item => item.isActive || allowedInactive.has(item.id) || item.id === node.attributeId);
@@ -212,8 +211,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
   const rawValue = node.value;
   const defaultValue = definition ? defaultTypedValue(definition.typeKey, definition.options) : undefined;
 
-  return <fieldset>
-    <legend>{operatorLabels[node.operator]}</legend>
+  return <FieldSet legend={operatorLabels[node.operator]}>
     {!isRoot && <Field label="Тип условия" htmlFor={`${controlId}-operator`}>
       <Select id={`${controlId}-operator`} value={node.operator} disabled={disabled} onChange={event => changeNodeOperator(event.target.value as ConditionOperator)}>
         {conditionOperators.map(operator => <option key={operator} value={operator}>{operatorLabels[operator]}</option>)}
@@ -259,7 +257,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
     {stale && definition && <Button type="button" disabled={disabled} onClick={refresh}>Обновить условие по текущей схеме</Button>}
     {ownInvalid && <p role="alert">Выберите атрибут и корректное значение условия.</p>}
     {node.operator !== 'exists' && definition && defaultValue === undefined && <p role="alert">Для этого типа атрибута нельзя создать типизированное условие.</p>}
-  </fieldset>;
+  </FieldSet>;
 };
 
 export const CatalogConditionEditor: React.FC<CatalogConditionEditorProps> = ({

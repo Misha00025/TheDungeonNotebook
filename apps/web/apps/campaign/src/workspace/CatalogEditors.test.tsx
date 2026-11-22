@@ -61,7 +61,7 @@ describe('catalog domain editors', () => {
     const save = screen.getByRole('button', { name: 'Сохранить значения' });
     expect(save).toBeEnabled();
     expect(screen.getByText('Значение сохранено без изменения. Оно не будет преобразовано автоматически.')).toBeInTheDocument();
-    expect(screen.getByText('Нет')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Значение: Enabled' })).not.toBeChecked();
     expect(document.body.textContent).not.toContain('internal-option-key');
 
     fireEvent.click(save);
@@ -78,7 +78,7 @@ describe('catalog domain editors', () => {
     const numberInputs = screen.getAllByRole('textbox', { name: 'Значение: Probability' });
     fireEvent.change(numberInputs[0], { target: { value: '-' } });
     await waitFor(() => expect(save).toBeDisabled());
-    const invalidRow = numberInputs[0].closest('fieldset') as HTMLElement;
+    const invalidRow = numberInputs[0].closest('tr') as HTMLElement;
     fireEvent.click(within(invalidRow).getByRole('button', { name: 'Убрать' }));
     await waitFor(() => expect(save).toBeEnabled());
 
@@ -87,6 +87,31 @@ describe('catalog domain editors', () => {
     const afterRemoval = submittedAttributes.mock.calls[0][0] as CatalogAttributeOccurrence[];
     expect(afterRemoval.map(row => row.id)).toEqual(['occ-stale', 'occ-rate-b', 'occ-enabled', 'occ-tags']);
     expect(afterRemoval[0]).toEqual(initialOccurrences[0]);
+  });
+
+  it('keeps MultiChoice changes local until Apply and preserves occurrence data and native option keys', async () => {
+    render(<AttributeValuesHarness />);
+    expect(screen.getByText('Не выбрано')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Выбрать значения' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Значения: Tags' });
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Stealth' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить значения' }));
+    const cancelled = submittedAttributes.mock.calls[0][0] as CatalogAttributeOccurrence[];
+    expect(cancelled).toEqual(initialOccurrences);
+
+    submittedAttributes.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Выбрать значения' }));
+    const reopened = await screen.findByRole('dialog', { name: 'Значения: Tags' });
+    fireEvent.click(within(reopened).getByRole('checkbox', { name: 'Stealth' }));
+    fireEvent.click(within(reopened).getByRole('button', { name: 'Применить' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить значения' }));
+
+    const applied = submittedAttributes.mock.calls[0][0] as CatalogAttributeOccurrence[];
+    expect(applied).toHaveLength(initialOccurrences.length);
+    expect(applied.slice(0, -1)).toEqual(initialOccurrences.slice(0, -1));
+    expect(applied[applied.length - 1]).toEqual({ ...initialOccurrences[4], value: ['internal-option-key'] });
+    expect(document.body.textContent).not.toContain('internal-option-key');
   });
 
   it('creates an eq leaf from no condition, allows its first attribute selection, and submits the typed native value', async () => {
