@@ -6,6 +6,7 @@ import { CampaignApiError } from './api';
 import { useDirtyDraft, useWorkspace } from './Workspace';
 import { ApiError } from './Feedback';
 import { stringifyJson } from './json';
+import { catalogAttributeIssue } from './catalogModel';
 import { CatalogDefinitionFields, createCatalogDefinitionDraft } from './CatalogDefinitionFields';
 import type { CatalogDefinitionDraft } from './CatalogDefinitionFields';
 import OwnCatalogDefinitionFields from './OwnCatalogDefinitionFields';
@@ -13,12 +14,12 @@ import CatalogEntryDetails from './CatalogEntryDetails';
 import styles from './CatalogDefinitionFields.module.css';
 
 type Domain = 'metadata' | 'content';
-type RecoverySnapshot = { metadata: CatalogMetadata; content: CatalogContentEnvelope };
+type RecoverySnapshot = { metadata: CatalogMetadata; content: CatalogContentEnvelope; schema: CatalogAttributeSchemaEnvelope };
 
 export type CatalogDefinitionDialogProps = {
   campaignId: number;
   entryId?: string;
-  initialKind?: CatalogKind;
+  initialKind: CatalogKind;
   canAdmin: boolean;
   audience?: 'gm' | 'player';
   permissionsPending?: boolean;
@@ -78,7 +79,7 @@ function getExpectedRevision(value: Revision): number | import('lossless-json').
 const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
   campaignId,
   entryId,
-  initialKind = 'Item',
+  initialKind,
   canAdmin,
   audience = canAdmin ? 'gm' : 'player',
   permissionsPending = false,
@@ -136,7 +137,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
   const dirty = entryId
     ? metadataDirty || contentDirty || invalid
     : creationDirty || (invalid && draft.attributes.length > 0) || creationBlocked;
-  const ownerKey = `catalog-definition-${sessionKey}-${campaignId}-${entryId ?? `new-${requestId}`}`;
+  const ownerKey = `catalog-definition-${sessionKey}-${campaignId}-${initialKind}-${entryId ?? `new-${requestId}`}`;
   useDirtyDraft(ownerKey, dirty || blockedDomains.size > 0);
 
   const reportForbidden = useCallback(() => {
@@ -152,9 +153,9 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
     try {
       if (entryId) {
         const [metadata, content, attributeSchema] = await Promise.all([
-          api.getCatalogEntry(campaignId, entryId),
-          api.getCatalogContent(campaignId, entryId),
-          api.getCatalogAttributes(campaignId),
+          api.getCatalogEntry(campaignId, initialKind, entryId),
+          api.getCatalogContent(campaignId, initialKind, entryId),
+          api.getCatalogAttributes(campaignId, initialKind),
         ]);
         if (!mountedRef.current || generation !== readGeneration.current) return;
         setMetadataBaseline(metadata);
@@ -162,7 +163,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
         setSchema(attributeSchema);
         setDraft(draftFromServer(metadata, content));
       } else {
-        const attributeSchema = await api.getCatalogAttributes(campaignId);
+        const attributeSchema = await api.getCatalogAttributes(campaignId, initialKind);
         if (!mountedRef.current || generation !== readGeneration.current) return;
         setSchema(attributeSchema);
       }
@@ -173,7 +174,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
     } finally {
       if (mountedRef.current && generation === readGeneration.current) setLoading(false);
     }
-  }, [api, campaignId, entryId, reportForbidden]);
+  }, [api, campaignId, entryId, initialKind, reportForbidden]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -209,8 +210,8 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
     setFailure(undefined);
     try {
       const [entry, content] = await Promise.all([
-        api.getCatalogEntry(campaignId, requestId),
-        api.getCatalogContent(campaignId, requestId),
+        api.getCatalogEntry(campaignId, initialKind, requestId),
+        api.getCatalogContent(campaignId, initialKind, requestId),
       ]);
       if (!mountedRef.current) return false;
       acceptCreated({ entry, content });
@@ -229,7 +230,6 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
     const request = {
       requestId,
       name: draft.name,
-      kind: initialKind,
       isHidden: draft.isHidden,
       ...(initialKind === 'Item' ? { quantityUnit: draft.quantityUnit ?? 'Whole' } : { quantityUnit: null }),
       allowNegative: initialKind === 'Item' && draft.allowNegative,
@@ -241,7 +241,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
     setFailure(undefined);
     setStatus('');
     try {
-      const created = await api.createCatalogEntry(campaignId, request);
+      const created = await api.createCatalogEntry(campaignId, initialKind, request);
       acceptCreated(created);
     } catch (error) {
       if (!mountedRef.current) return;
@@ -271,7 +271,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
     let activeDomain: Domain = metadataDirty ? 'metadata' : 'content';
     try {
       if (metadataDirty) {
-        const result = await api.putCatalogMetadata(campaignId, entryId, {
+        const result = await api.putCatalogMetadata(campaignId, initialKind, entryId, {
           name: draft.name,
           expectedRevision: getExpectedRevision(metadataBaseline.metadataRevision),
           ...(canPublish && draft.isHidden !== metadataBaseline.isHidden ? { isHidden: draft.isHidden } : {}),
@@ -292,6 +292,54 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
         onSavedRef.current(result);
         setStatus('Название и настройки сохранены.');
       }
+      if (metadataSaved && mountedRef.current) {
+        activeDomain = 'content';
+        let freshContent: CatalogContentEnvelope;
+        let freshSchema: CatalogAttributeSchemaEnvelope;
+        try {
+          [freshContent, freshSchema] = await Promise.all([
+            api.getCatalogContent(campaignId, initialKind, entryId),
+            api.getCatalogAttributes(campaignId, initialKind),
+          ]);
+        } catch (error) {
+          setBlockedDomains(current => new Set(current).add('content'));
+          throw error;
+        }
+        if (!mountedRef.current) return;
+        setSchema(freshSchema);
+        const contentChanged = String(freshContent.contentRevision) !== String(contentBaseline.contentRevision)
+          || stringifyJson(freshContent.data) !== stringifyJson(contentBaseline.data);
+        if (!contentDirty) {
+          setContentBaseline(freshContent);
+          setDraft(current => ({ ...current, description: freshContent.data.description, attributes: freshContent.data.attributes }));
+          setFieldsGeneration(value => value + 1);
+          setBlockedDomains(new Set());
+          onSavedRef.current(savedMetadataBaseline, freshContent);
+          setStatus('Название и настройки сохранены.');
+          setEditing(false);
+          return;
+        }
+        if (contentChanged) {
+          setBlockedDomains(current => new Set(current).add('content'));
+          setRecoverySnapshots(current => ({ ...current, content: { metadata: savedMetadataBaseline, content: freshContent, schema: freshSchema } }));
+          onSavedRef.current(savedMetadataBaseline, freshContent);
+          setStatus('Название и настройки сохранены. Содержимое изменилось; проверьте актуальные значения перед сохранением черновика.');
+          return;
+        }
+        const freshDefinitions = new Map(freshSchema.data.definitions.map(definition => [definition.id, definition]));
+        const changedAttributes = draft.attributes.filter(attribute => {
+          const baselineAttribute = contentBaseline.data.attributes.find(value => value.id === attribute.id);
+          return !baselineAttribute || stringifyJson(attribute) !== stringifyJson(baselineAttribute);
+        });
+        const invalidChangedAttribute = changedAttributes.some(attribute => catalogAttributeIssue(freshDefinitions.get(attribute.attributeId), attribute));
+        if (invalidChangedAttribute) {
+          setBlockedDomains(current => new Set(current).add('content'));
+          setRecoverySnapshots(current => ({ ...current, content: { metadata: savedMetadataBaseline, content: freshContent, schema: freshSchema } }));
+          onSavedRef.current(savedMetadataBaseline, freshContent);
+          setStatus('Название и настройки сохранены. Проверьте характеристики по актуальной схеме перед сохранением содержимого.');
+          return;
+        }
+      }
       if (contentDirty && mountedRef.current) {
         if (!writeAllowedRef.current) {
           setStatus(metadataSaved
@@ -300,7 +348,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
           return;
         }
         activeDomain = 'content';
-        const result = await api.putCatalogContent(campaignId, entryId, {
+        const result = await api.putCatalogContent(campaignId, initialKind, entryId, {
           expectedRevision: getExpectedRevision(contentBaseline.contentRevision),
           description: draft.description,
           attributes: draft.attributes,
@@ -316,7 +364,10 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
     } catch (error) {
       if (!mountedRef.current) return;
       setFailure(error);
-      if (metadataSaved) setStatus('Название и настройки сохранены. Описание и характеристики сохранить не удалось; черновик остался.');
+      if (metadataSaved) {
+        setBlockedDomains(current => new Set(current).add('content'));
+        setStatus('Название и настройки сохранены. Состояние содержимого не подтверждено; черновик остался.');
+      }
       if ((error as { status?: number })?.status === 403) reportForbidden();
       if (isRecoverableWriteFailure(error)) setBlockedDomains(current => new Set(current).add(activeDomain));
     } finally {
@@ -341,12 +392,14 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
       return next;
     });
     try {
-      const [metadata, content] = await Promise.all([
-        api.getCatalogEntry(campaignId, entryId),
-        api.getCatalogContent(campaignId, entryId),
+      const [metadata, content, freshSchema] = await Promise.all([
+        api.getCatalogEntry(campaignId, initialKind, entryId),
+        api.getCatalogContent(campaignId, initialKind, entryId),
+        api.getCatalogAttributes(campaignId, initialKind),
       ]);
       if (!mountedRef.current) return;
-      setRecoverySnapshots(current => ({ ...current, [domain]: { metadata, content } }));
+      setSchema(freshSchema);
+      setRecoverySnapshots(current => ({ ...current, [domain]: { metadata, content, schema: freshSchema } }));
       onSavedRef.current(metadata, content);
     } catch (error) {
       if (!mountedRef.current) return;
@@ -375,8 +428,16 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
       }
     } else {
       setContentBaseline(snapshot.content);
+      setSchema(snapshot.schema);
       if (action === 'accept') {
         setDraft(current => ({ ...current, description: snapshot.content.data.description, attributes: snapshot.content.data.attributes }));
+        setFieldsGeneration(value => value + 1);
+      } else {
+        const validIds = new Set(snapshot.schema.data.definitions.map(definition => definition.id));
+        setDraft(current => ({
+          ...current,
+          attributes: current.attributes.filter(attribute => validIds.has(attribute.attributeId)),
+        }));
         setFieldsGeneration(value => value + 1);
       }
     }
@@ -447,7 +508,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
       {revoked && <p role="alert">Запись заблокирована после отказа сервера. Проверьте права кампании.</p>}
       {entryId && !editing && metadataBaseline && contentBaseline && <>
         <div className={audience === 'gm' ? styles.viewGrid : undefined}>
-          <CatalogEntryDetails description={contentBaseline.data.description} definitions={schema.data.definitions} values={contentBaseline.data.attributes} diagnostics={contentBaseline.diagnostics} showEditRules={audience === 'gm'} />
+          <CatalogEntryDetails description={contentBaseline.data.description} definitions={schema.data.definitions} values={contentBaseline.data.attributes} showEditRules={audience === 'gm'} />
           {audience === 'gm' && <Panel title="Настройки каталога" density="compact"><dl className={styles.summary}>
           <dt>Видимость</dt><dd>{metadataBaseline.isHidden ? 'Скрыт из общего каталога' : 'Доступен в общем каталоге'}</dd>
           {entryKind === 'Item' && <><dt>Единица количества</dt><dd>{metadataBaseline.quantityUnit === 'Whole' ? 'Целое' : metadataBaseline.quantityUnit === 'Fractional' ? 'Дробное' : 'Единичное'}</dd><dt>Отрицательное количество</dt><dd>{metadataBaseline.allowNegative ? 'Разрешено' : 'Запрещено'}</dd></>}
@@ -457,8 +518,8 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
       {(!entryId || editing) && <>
         {entryId && isOwner && !canAdmin && <p>Изменения затрагивают {entryKind === 'Item' ? 'предмет' : 'навык'} в каталоге, а не только запись у персонажа.</p>}
         {entryId && isOwner && !canAdmin
-          ? <OwnCatalogDefinitionFields key={fieldsGeneration} draft={draft} onChange={setDraft} definitions={schema.data.definitions} diagnostics={contentBaseline?.diagnostics} readOnly={fieldReadOnly} disabled={fieldDisabled} onValidityChange={setInvalid} autoFocusName={autoFocusName} />
-          : <CatalogDefinitionFields key={fieldsGeneration} draft={draft} onChange={setDraft} definitions={schema.data.definitions} canPublish={canPublish} readOnly={fieldReadOnly} disabled={fieldDisabled} diagnostics={contentBaseline?.diagnostics} onValidityChange={setInvalid} autoFocusName={autoFocusName} />}
+          ? <OwnCatalogDefinitionFields key={fieldsGeneration} draft={draft} onChange={setDraft} definitions={schema.data.definitions} savedAttributes={contentBaseline?.data.attributes ?? []} readOnly={fieldReadOnly} disabled={fieldDisabled} onValidityChange={setInvalid} autoFocusName={autoFocusName} />
+          : <CatalogDefinitionFields key={fieldsGeneration} draft={draft} onChange={setDraft} definitions={schema.data.definitions} canPublish={canPublish} savedAttributes={contentBaseline?.data.attributes ?? []} readOnly={fieldReadOnly} disabled={fieldDisabled} onValidityChange={setInvalid} autoFocusName={autoFocusName} />}
       </>}
       {Boolean(failure) && <>
         <ApiError error={failure} />

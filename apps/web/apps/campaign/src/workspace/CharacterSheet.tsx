@@ -659,6 +659,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
       <CharacterCatalogProvider
         campaignId={campaignId}
         characterId={characterId}
+        kind={pageKey === 'inventory' ? 'Item' : 'Skill'}
         canRead={characterCanRead}
         canWrite={characterCanWrite}
         permissionsPending={catalogPermissionsPending}

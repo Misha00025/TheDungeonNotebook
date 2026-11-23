@@ -1,11 +1,11 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ActionRow, Button, Field, ModalPortal, Select } from '@tdn/shared';
-import type { CatalogAttributeDefinition, CatalogAttributeOccurrence, CatalogDiagnostic } from './catalogTypes';
+import type { CatalogAttributeDefinition, CatalogAttributeOccurrence } from './catalogTypes';
+import { catalogAttributeField, catalogAttributeIssue, catalogValueLabel, createCatalogOccurrence, defaultTypedValue } from './catalogModel';
 import { catalogAttributeTags } from './catalogAttributeTags';
-import { catalogValueType, createCatalogOccurrence, defaultTypedValue } from './catalogModel';
 import { stringifyJson } from './json';
 import { useDirtyDraft } from './Workspace';
-import { ValueInput, validateFieldValue } from './ValueInput';
+import { ValueInput } from './ValueInput';
 import styles from './CharacterCatalogAttributes.module.css';
 
 export type CharacterCatalogAttributesProps = {
@@ -13,7 +13,7 @@ export type CharacterCatalogAttributesProps = {
   sourceValues: CatalogAttributeOccurrence[];
   values: CatalogAttributeOccurrence[];
   savedValues?: CatalogAttributeOccurrence[];
-  diagnostics?: CatalogDiagnostic[];
+  effectiveValues?: CatalogAttributeOccurrence[];
   lockedOccurrenceIds?: string[];
   readOnly?: boolean;
   disabled?: boolean;
@@ -24,11 +24,10 @@ export type CharacterCatalogAttributesProps = {
 type ChoiceDraft = {
   row: CatalogAttributeOccurrence;
   source?: CatalogAttributeOccurrence;
+  schema: { typeKey: string; options: CatalogAttributeDefinition['options'] };
   value: CatalogAttributeOccurrence['value'];
   error?: string;
 };
-
-const nonEffectiveDiagnosticCodes = new Set(['attribute_binding_changed', 'edit_level_changed']);
 
 function formatOccurrence(definitions: CatalogAttributeDefinition[], occurrence: CatalogAttributeOccurrence): string {
   return catalogAttributeTags(definitions, [occurrence])[0]?.values.join('; ') ?? '';
@@ -38,8 +37,8 @@ export const CharacterCatalogAttributes: React.FC<CharacterCatalogAttributesProp
   definitions,
   sourceValues,
   values,
-  savedValues = [],
-  diagnostics = [],
+  savedValues,
+  effectiveValues,
   lockedOccurrenceIds = [],
   readOnly = false,
   disabled = false,
@@ -47,7 +46,7 @@ export const CharacterCatalogAttributes: React.FC<CharacterCatalogAttributesProp
   onValidityChange,
 }) => {
   const idPrefix = useId();
-  const [changedRows, setChangedRows] = useState<Record<string, boolean>>({});
+  const baselineRef = useRef(savedValues ?? values);
   const [inputErrors, setInputErrors] = useState<Record<string, boolean>>({});
   const [newAttributeId, setNewAttributeId] = useState('');
   const [choiceDraft, setChoiceDraft] = useState<ChoiceDraft>();
@@ -56,54 +55,45 @@ export const CharacterCatalogAttributes: React.FC<CharacterCatalogAttributesProp
 
   const definitionById = useMemo(() => new Map(definitions.map(definition => [definition.id, definition])), [definitions]);
   const sourceById = useMemo(() => new Map(sourceValues.map(occurrence => [occurrence.id, occurrence])), [sourceValues]);
-  const savedById = useMemo(() => new Map(savedValues.map(occurrence => [occurrence.id, occurrence])), [savedValues]);
+  const baselineValues = savedValues ?? baselineRef.current;
+  const savedById = useMemo(() => new Map(baselineValues.map(occurrence => [occurrence.id, occurrence])), [baselineValues]);
   const valuesById = useMemo(() => new Map(values.map(occurrence => [occurrence.id, occurrence])), [values]);
-  const diagnosticsById = useMemo(() => new Map(diagnostics.map(diagnostic => [diagnostic.occurrenceId, diagnostic.code])), [diagnostics]);
-  const nonEffectiveIds = useMemo(() => new Set(diagnostics
-    .filter(diagnostic => nonEffectiveDiagnosticCodes.has(diagnostic.code))
-    .map(diagnostic => diagnostic.occurrenceId)), [diagnostics]);
+  const effectiveById = useMemo(() => effectiveValues ? new Map(effectiveValues.map(occurrence => [occurrence.id, occurrence])) : undefined, [effectiveValues]);
   const lockedIds = useMemo(() => new Set(lockedOccurrenceIds), [lockedOccurrenceIds]);
   const activeIds = useMemo(() => new Set(values.map(occurrence => occurrence.id)), [values]);
-  const orderedIds = useMemo(() => [...new Set([...sourceValues, ...savedValues, ...values].map(occurrence => occurrence.id))], [sourceValues, savedValues, values]);
-  const supportedDefinitions = useMemo(() => definitions.filter(definition => definition.isActive
-    && catalogValueType(definition.typeKey) !== undefined
+  const orderedIds = useMemo(() => [...new Set([...sourceValues, ...baselineValues, ...(effectiveValues ?? []), ...values].map(occurrence => occurrence.id))], [sourceValues, baselineValues, effectiveValues, values]);
+  const supportedDefinitions = useMemo(() => definitions.filter(definition => catalogAttributeField(definition)
     && defaultTypedValue(definition.typeKey, definition.options) !== undefined), [definitions]);
 
-  const definitionCurrent = (occurrence: CatalogAttributeOccurrence) => {
-    const definition = definitionById.get(occurrence.attributeId);
-    return Boolean(definition && definition.isActive && catalogValueType(occurrence.typeKey)
-      && definition.typeKey === occurrence.typeKey
-      && stringifyJson(definition.typeRevision) === stringifyJson(occurrence.typeRevision));
+  const fieldFor = (occurrence: CatalogAttributeOccurrence) => catalogAttributeField(definitionById.get(occurrence.attributeId));
+  const bindingMatches = (left: CatalogAttributeOccurrence, right: CatalogAttributeOccurrence) => left.attributeId === right.attributeId && left.editLevel === right.editLevel;
+  const sourceBindingValid = (occurrence: CatalogAttributeOccurrence) => {
+    const source = sourceById.get(occurrence.id);
+    return !source || (source.editLevel === 'Character' && source.attributeId === occurrence.attributeId);
   };
+  const editableLocal = (occurrence: CatalogAttributeOccurrence) => !readOnly && !disabled
+    && occurrence.editLevel === 'Character' && !lockedIds.has(occurrence.id)
+    && sourceBindingValid(occurrence) && Boolean(fieldFor(occurrence));
 
-  const editableLocal = (occurrence: CatalogAttributeOccurrence, source?: CatalogAttributeOccurrence) => {
-    return !readOnly && !disabled && occurrence.editLevel === 'Character' && !lockedIds.has(occurrence.id)
-      && (!source || source.editLevel === 'Character')
-      && !nonEffectiveIds.has(occurrence.id)
-      && definitionCurrent(occurrence);
-  };
-
-  const directSourceEditable = (occurrence: CatalogAttributeOccurrence) => {
-    const definition = definitionById.get(occurrence.attributeId);
-    const valueType = catalogValueType(occurrence.typeKey);
-    const diagnosticCode = diagnosticsById.get(occurrence.id);
-    return !readOnly && !disabled && occurrence.editLevel === 'Character' && !lockedIds.has(occurrence.id)
-      && Boolean(definition?.isActive && valueType && definition.typeKey === occurrence.typeKey
-        && stringifyJson(definition.typeRevision) === stringifyJson(occurrence.typeRevision))
-      && !diagnosticCode
-      && validateFieldValue({ valueType: valueType!, options: definition!.options }, occurrence.value) === undefined;
-  };
-
+  const nonEffectiveIds = useMemo(() => {
+    if (!effectiveById) return new Set<string>();
+    return new Set(baselineValues.filter(local => {
+      const effective = effectiveById.get(local.id);
+      return !effective || !bindingMatches(local, effective);
+    }).map(local => local.id));
+  }, [effectiveById, baselineValues]);
+  const changedAttributes = values.some(occurrence => {
+    const saved = savedById.get(occurrence.id);
+    return !saved || stringifyJson(saved) !== stringifyJson(occurrence);
+  }) || baselineValues.some(saved => !valuesById.has(saved.id));
   const changedInvalid = values.some(occurrence => {
-    if (!changedRows[occurrence.id] || !editableLocal(occurrence, sourceById.get(occurrence.id))) return false;
-    const definition = definitionById.get(occurrence.attributeId);
-    const valueType = catalogValueType(occurrence.typeKey);
-    return Boolean(definition && valueType
-      && validateFieldValue({ valueType, options: definition.options }, occurrence.value) !== undefined);
+    const saved = savedById.get(occurrence.id);
+    if (saved && stringifyJson(saved) === stringifyJson(occurrence)) return false;
+    return !sourceBindingValid(occurrence) || Boolean(catalogAttributeIssue(definitionById.get(occurrence.attributeId), occurrence));
   });
-  const hasInvalidInput = !readOnly && (changedInvalid || Object.entries(inputErrors)
-    .some(([id, invalid]) => invalid && activeIds.has(id) && changedRows[id]
-      && valuesById.has(id) && editableLocal(valuesById.get(id)!, sourceById.get(id))));
+  const hasInvalidInput = !readOnly && (changedInvalid
+    || Object.entries(inputErrors).some(([id, invalid]) => invalid && activeIds.has(id) && valuesById.has(id) && editableLocal(valuesById.get(id)!))
+    || Boolean(effectiveById && changedAttributes && [...nonEffectiveIds].some(id => valuesById.has(id))));
   const choiceDirty = Boolean(choiceDraft && stringifyJson(choiceDraft.value) !== stringifyJson(choiceDraft.row.value));
   useDirtyDraft(`character-catalog-attributes-choice-${idPrefix}`, choiceDirty);
 
@@ -112,7 +102,6 @@ export const CharacterCatalogAttributes: React.FC<CharacterCatalogAttributesProp
       const next = Object.fromEntries(Object.entries(current).filter(([id]) => activeIds.has(id)));
       return Object.keys(next).length === Object.keys(current).length ? current : next;
     };
-    setChangedRows(prune);
     setInputErrors(prune);
   }, [activeIds]);
 
@@ -125,54 +114,35 @@ export const CharacterCatalogAttributes: React.FC<CharacterCatalogAttributesProp
   }, [newAttributeId, supportedDefinitions]);
 
   const updateOccurrence = (id: string, occurrence: CatalogAttributeOccurrence) => {
-    setChangedRows(current => ({ ...current, [id]: true }));
     onChange(values.map(item => item.id === id ? occurrence : item));
   };
 
   const removeLocal = (id: string) => {
     onChange(values.filter(item => item.id !== id));
-    setInputErrors(current => {
-      if (!(id in current)) return current;
-      const next = { ...current };
-      delete next[id];
-      return next;
-    });
-    setChangedRows(current => {
-      if (!(id in current)) return current;
-      const next = { ...current };
-      delete next[id];
-      return next;
-    });
+    setInputErrors(current => { const next = { ...current }; delete next[id]; return next; });
   };
 
   const restoreSaved = (occurrence: CatalogAttributeOccurrence) => {
     if (valuesById.has(occurrence.id)) return;
-    const savedIndex = savedValues.findIndex(item => item.id === occurrence.id);
+    const savedIndex = baselineValues.findIndex(item => item.id === occurrence.id);
     let insertionIndex = -1;
-    for (let index = savedIndex + 1; index < savedValues.length; index += 1) {
-      const nextIndex = values.findIndex(item => item.id === savedValues[index].id);
-      if (nextIndex >= 0) {
-        insertionIndex = nextIndex;
-        break;
-      }
+    for (let index = savedIndex + 1; index < baselineValues.length; index += 1) {
+      const nextIndex = values.findIndex(item => item.id === baselineValues[index].id);
+      if (nextIndex >= 0) { insertionIndex = nextIndex; break; }
     }
     if (insertionIndex < 0) {
       for (let index = savedIndex - 1; index >= 0; index -= 1) {
-        const previousIndex = values.findIndex(item => item.id === savedValues[index].id);
-        if (previousIndex >= 0) {
-          insertionIndex = previousIndex + 1;
-          break;
-        }
+        const previousIndex = values.findIndex(item => item.id === baselineValues[index].id);
+        if (previousIndex >= 0) { insertionIndex = previousIndex + 1; break; }
       }
     }
     if (insertionIndex < 0) {
       const firstNewIndex = values.findIndex(item => !savedById.has(item.id));
       insertionIndex = firstNewIndex >= 0 ? firstNewIndex : values.length;
     }
-    const nextValues = [...values];
-    nextValues.splice(insertionIndex, 0, occurrence);
-    onChange(nextValues);
-    setChangedRows(current => ({ ...current, [occurrence.id]: false }));
+    const next = [...values];
+    next.splice(insertionIndex, 0, occurrence);
+    onChange(next);
     setInputErrors(current => ({ ...current, [occurrence.id]: false }));
   };
 
@@ -181,26 +151,7 @@ export const CharacterCatalogAttributes: React.FC<CharacterCatalogAttributesProp
     if (!definition) return;
     const occurrence = createCatalogOccurrence(definition, 'Character');
     if (!occurrence) return;
-    setChangedRows(current => ({ ...current, [occurrence.id]: true }));
     onChange([...values, occurrence]);
-  };
-
-  const fieldFor = (occurrence: CatalogAttributeOccurrence) => {
-    const valueType = catalogValueType(occurrence.typeKey);
-    const definition = definitionById.get(occurrence.attributeId);
-    return valueType ? { valueType, options: definition?.options ?? [] } : undefined;
-  };
-
-  const refreshStale = (occurrence: CatalogAttributeOccurrence) => {
-    const definition = definitionById.get(occurrence.attributeId);
-    const source = sourceById.get(occurrence.id);
-    if (readOnly || disabled || occurrence.editLevel !== 'Character' || lockedIds.has(occurrence.id)
-      || source && source.editLevel !== 'Character' || nonEffectiveIds.has(occurrence.id)
-      || !definition?.isActive || !catalogValueType(definition.typeKey)) return;
-    const value = defaultTypedValue(definition.typeKey, definition.options);
-    if (value === undefined) return;
-    updateOccurrence(occurrence.id, { ...occurrence, typeKey: definition.typeKey, typeRevision: definition.typeRevision, value });
-    setInputErrors(current => ({ ...current, [occurrence.id]: false }));
   };
 
   const renderChoiceModal = () => {
@@ -208,40 +159,28 @@ export const CharacterCatalogAttributes: React.FC<CharacterCatalogAttributesProp
     const currentRow = valuesById.get(choiceDraft.row.id);
     const currentSource = sourceById.get(choiceDraft.row.id);
     const currentDefinition = currentRow ? definitionById.get(currentRow.attributeId) : undefined;
-    const currentField = currentRow ? fieldFor(currentRow) : undefined;
-    const sameBinding = Boolean(currentRow
-      && currentRow.attributeId === choiceDraft.row.attributeId
-      && currentRow.typeKey === choiceDraft.row.typeKey
-      && stringifyJson(currentRow.typeRevision) === stringifyJson(choiceDraft.row.typeRevision)
-      && currentRow.editLevel === choiceDraft.row.editLevel);
-    const sameSourceBinding = Boolean(Boolean(currentSource) === Boolean(choiceDraft.source)
-      && (!currentSource || !choiceDraft.source || currentSource.attributeId === choiceDraft.source.attributeId
-        && currentSource.typeKey === choiceDraft.source.typeKey
-        && stringifyJson(currentSource.typeRevision) === stringifyJson(choiceDraft.source.typeRevision)
-        && currentSource.editLevel === choiceDraft.source.editLevel));
-    const schemaCurrent = Boolean(currentRow && currentDefinition?.isActive && currentField
-      && currentDefinition.typeKey === currentRow.typeKey
-      && stringifyJson(currentDefinition.typeRevision) === stringifyJson(currentRow.typeRevision)
-      && currentRow.typeKey === 'multiChoice');
-    const canEditChoice = Boolean(currentRow && !readOnly && !disabled && sameBinding && sameSourceBinding && schemaCurrent
-      && currentRow.editLevel === 'Character' && (!currentSource || currentSource.editLevel === 'Character')
-      && !lockedIds.has(currentRow.id) && !nonEffectiveIds.has(currentRow.id));
-    const error = currentField ? validateFieldValue(currentField, choiceDraft.value) : 'Схема характеристики недоступна.';
-    const canApply = canEditChoice && !error;
-    return <ModalPortal
-      isOpen
-      title={`Значения: ${currentDefinition?.title ?? 'характеристика'}`}
-      onClose={() => setChoiceDraft(undefined)}
-      footer={<ActionRow justify="end"><Button type="button" variant="secondary" onClick={() => setChoiceDraft(undefined)}>Отмена</Button><Button type="button" disabled={!canApply || Boolean(error) || Boolean(choiceDraft.error)} onClick={() => {
-        if (!canApply || choiceDraft.error || !currentRow) return;
+    const currentField = catalogAttributeField(currentDefinition);
+    const sameBinding = Boolean(currentRow && bindingMatches(currentRow, choiceDraft.row));
+    const sourceBindingMatches = Boolean(Boolean(currentSource) === Boolean(choiceDraft.source)
+      && (!currentSource || !choiceDraft.source || bindingMatches(currentSource, choiceDraft.source)));
+    const schemaCurrent = Boolean(currentDefinition && currentDefinition.typeKey === choiceDraft.schema.typeKey
+      && stringifyJson(currentDefinition.options) === stringifyJson(choiceDraft.schema.options) && currentDefinition.typeKey === 'multiChoice');
+    const canEditChoice = Boolean(currentRow && !readOnly && !disabled && sameBinding && sourceBindingMatches && schemaCurrent
+      && editableLocal(currentRow) && !nonEffectiveIds.has(currentRow.id));
+    const valueIssue = currentRow && currentDefinition ? catalogAttributeIssue(currentDefinition, { ...currentRow, value: choiceDraft.value }) : 'Характеристика удалена или недоступна.';
+    const canApply = canEditChoice && !valueIssue;
+    return <ModalPortal isOpen title={`Значения: ${currentDefinition?.title ?? 'характеристика'}`} onClose={() => setChoiceDraft(undefined)}
+      footer={<ActionRow justify="end"><Button type="button" variant="secondary" onClick={() => setChoiceDraft(undefined)}>Отмена</Button><Button type="button" disabled={!canApply || Boolean(choiceDraft.error)} onClick={() => {
+        if (!canApply || !currentRow) return;
         updateOccurrence(currentRow.id, { ...currentRow, value: choiceDraft.value });
         setChoiceDraft(undefined);
-      }}>Применить</Button></ActionRow>}
-    >
-      {!canEditChoice
-        ? <><p role="status">Значение изменилось или редактирование больше недоступно. Черновик сохранён и не применён.</p><p>{formatOccurrence(definitions, { ...choiceDraft.row, value: choiceDraft.value })}</p></>
-        : <ValueInput field={currentField!} value={choiceDraft.value} label={`Значение: ${currentDefinition?.title ?? 'характеристика'}`} onChange={value => setChoiceDraft(current => current ? { ...current, value } : current)} onValidityChange={value => setChoiceDraft(current => current ? { ...current, error: value } : current)} />}
-      {error && canEditChoice && <p role="alert">{error}</p>}
+      }}>Применить</Button></ActionRow>}>
+      {!canEditChoice && <p role="status">Характеристика или право редактирования изменились. Черновик выбора сохранён.</p>}
+      {currentField && canEditChoice
+        ? <ValueInput field={currentField} value={choiceDraft.value} label={`Значение: ${currentDefinition?.title ?? 'характеристика'}`} onChange={value => setChoiceDraft(current => current ? { ...current, value } : current)} onValidityChange={error => setChoiceDraft(current => current ? { ...current, error } : current)} />
+        : <p>{currentDefinition?.typeKey === 'multiChoice' ? catalogValueLabel(choiceDraft.value, currentDefinition) : 'Выбор недоступен'}</p>}
+      {valueIssue && <p role="alert">{valueIssue}</p>}
+      {choiceDraft.error && <p role="alert">{choiceDraft.error}</p>}
     </ModalPortal>;
   };
 
@@ -251,74 +190,70 @@ export const CharacterCatalogAttributes: React.FC<CharacterCatalogAttributesProp
       const source = sourceById.get(id);
       const saved = savedById.get(id);
       const local = valuesById.get(id);
-      const diagnosticCode = diagnosticsById.get(id);
-      const notEffective = Boolean(local && nonEffectiveIds.has(id));
-      const effective = notEffective ? source : local ?? source ?? saved;
-      const primary = effective ?? local ?? saved ?? source;
-      if (!primary) return null;
-      const definition = definitionById.get(primary.attributeId);
-      const title = definition?.title ?? 'Неизвестная характеристика';
-      const locked = lockedIds.has(id);
-      const localStale = Boolean(local && !definitionCurrent(local));
-      const sourceOnly = Boolean(source && !local && !saved);
-      const canEditLocal = Boolean(local && !notEffective && editableLocal(local, source));
-      const canOverrideSource = Boolean(sourceOnly && directSourceEditable(source!));
-      const canRefresh = Boolean(local && localStale && !notEffective && local.editLevel === 'Character' && !locked && !readOnly && !disabled
-        && (!source || source.editLevel === 'Character') && definition?.isActive && catalogValueType(definition.typeKey));
+      const effective = effectiveById?.get(id);
+      const localDefinition = local ? definitionById.get(local.attributeId) : undefined;
+      const savedNotApplied = Boolean(effectiveById && saved && nonEffectiveIds.has(id));
+      const relationMismatch = Boolean(local && saved && savedNotApplied);
+      const localBindingMismatch = Boolean(local && !sourceBindingValid(local));
+      const localApplicable = Boolean(local && !relationMismatch && !localBindingMismatch);
       const savedPendingRemoval = Boolean(saved && !local);
-      const changeBaseline = saved ?? source;
-      const localChanged = Boolean(local && (!changeBaseline || stringifyJson(local) !== stringifyJson(changeBaseline)));
-      const changeLabel = localChanged ? readOnly ? 'Не сохранено' : changeBaseline ? 'Изменено' : 'Добавлено' : undefined;
-      const shown = effective ?? local ?? saved ?? source!;
-      const valueLabel = formatOccurrence(definitions, shown);
-      const isMultiChoice = Boolean(local && catalogValueType(local.typeKey) === 'MultiChoice' && canEditLocal);
-      const hasUnappliedWarning = Boolean(local && notEffective);
-      const definitionForRow = definitionById.get(local?.attributeId ?? '');
-      const canRebind = Boolean(local && !source && !readOnly && !disabled && local.editLevel === 'Character'
-        && !locked && definitionForRow && !notEffective);
-      const diagnosticMessage = diagnosticCode ? 'Значение требует проверки.' : undefined;
-
+      const primary = readOnly
+        ? effectiveById ? effective : source
+        : savedPendingRemoval
+          ? saved
+          : localApplicable
+            ? local
+            : effective ?? source ?? saved ?? local;
+      const rowDefinitionOccurrence = primary ?? local ?? saved ?? source;
+      if (!rowDefinitionOccurrence) return null;
+      const definition = primary ? definitionById.get(primary.attributeId) : undefined;
+      const rowDefinition = definitionById.get(rowDefinitionOccurrence.attributeId);
+      const title = rowDefinition?.title ?? 'Характеристика удалена';
+      const locked = lockedIds.has(id);
+      const localIssue = local ? catalogAttributeIssue(definitionById.get(local.attributeId), local) : undefined;
+      const sourceIssue = source ? catalogAttributeIssue(definitionById.get(source.attributeId), source) : undefined;
+      const localChanged = Boolean(local && (!saved || stringifyJson(local) !== stringifyJson(saved)));
+      const changeLabel = localChanged ? saved ? 'Изменено' : 'Добавлено' : undefined;
+      const localEditable = Boolean(local && localApplicable && editableLocal(local) && !localIssue);
+      const sourceCanCopy = Boolean(source && !local && !saved && !readOnly && !disabled && source.editLevel === 'Character' && !lockedIds.has(id) && catalogAttributeField(definitionById.get(source.attributeId)));
+      const canReplaceLocal = Boolean(local && localIssue && localDefinition && !readOnly && !disabled && local.editLevel === 'Character' && !locked);
+      const canRebind = Boolean(local && !source && !readOnly && !disabled && local.editLevel === 'Character' && !locked);
+      const multiChoice = Boolean(local && localEditable && localDefinition?.typeKey === 'multiChoice');
+      const valueLabel = primary ? formatOccurrence(definitions, primary) : '';
+      const localDetails = local ? formatOccurrence(definitions, local) : saved ? formatOccurrence(definitions, saved) : '';
+      const replaceLocal = () => {
+        if (!local || !localDefinition || !canReplaceLocal) return;
+        const value = defaultTypedValue(localDefinition.typeKey, localDefinition.options);
+        if (value === undefined) return;
+        updateOccurrence(id, { id: local.id, attributeId: local.attributeId, editLevel: local.editLevel, value });
+        setInputErrors(current => ({ ...current, [id]: false }));
+      };
+      const issueMessage = localIssue || sourceIssue;
       return <div className={styles.row} key={id}>
         <div className={styles.name}>
-          {canRebind && <Select aria-label={`Характеристика: ${title}`} value={local!.attributeId} disabled={disabled || localStale} onChange={event => {
+          {canRebind && localDefinition && <Select aria-label={`Характеристика: ${title}`} value={local!.attributeId} disabled={disabled} onChange={event => {
             const nextDefinition = supportedDefinitions.find(item => item.id === event.target.value);
-            if (!nextDefinition) return;
-            const next = createCatalogOccurrence(nextDefinition, 'Character');
-            if (!next) return;
-            updateOccurrence(id, { ...next, id });
-            setInputErrors(current => ({ ...current, [id]: false }));
-          }}>
-            <option value={local!.attributeId}>{title}</option>
-            {supportedDefinitions.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
-          </Select>}
+            const next = nextDefinition && createCatalogOccurrence(nextDefinition, 'Character');
+            if (next) updateOccurrence(id, { ...next, id });
+          }}><option value={local!.attributeId}>{title}</option>{supportedDefinitions.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</Select>}
           {!canRebind && <span>{title}</span>}
         </div>
         <div className={styles.value}>
-          {isMultiChoice
-            ? <><span>{valueLabel || 'Не выбрано'}</span><Button type="button" size="small" variant="secondary" disabled={disabled} onClick={() => setChoiceDraft({ row: local!, source, value: local!.value, error: validateFieldValue(fieldFor(local!)!, local!.value) })}>Выбрать значения: {title}</Button></>
-            : canEditLocal && local
-              ? <ValueInput
-                field={fieldFor(local)!}
-                value={local.value}
-                label={`Значение: ${title}`}
-                compact
-                inline
-                disabled={disabled}
-                onChange={value => updateOccurrence(id, { ...local, value })}
-                onRawChange={() => setChangedRows(current => current[id] ? current : { ...current, [id]: true })}
-                onValidityChange={error => setInputErrors(current => current[id] === Boolean(error) ? current : { ...current, [id]: Boolean(error) })}
-              />
-              : <span className={styles.valueText}>{valueLabel || 'Не задано'}</span>}
+          {multiChoice && local
+            ? <><span>{valueLabel || 'Не выбрано'}</span><Button type="button" size="small" variant="secondary" disabled={disabled} onClick={() => setChoiceDraft({ row: local, source, schema: { typeKey: localDefinition!.typeKey, options: localDefinition!.options }, value: local.value })}>Выбрать значения: {title}</Button></>
+            : localEditable && local && localDefinition
+              ? <ValueInput field={catalogAttributeField(localDefinition)!} value={local.value} label={`Значение: ${title}`} compact inline disabled={disabled} onChange={value => updateOccurrence(id, { ...local, value })} onValidityChange={error => setInputErrors(current => current[id] === Boolean(error) ? current : { ...current, [id]: Boolean(error)})} />
+              : <span className={styles.valueText}>{valueLabel || (readOnly && effectiveById && !effective ? 'Не применяется' : 'Не задано')}</span>}
+          {issueMessage && <small className={styles.note}>{definition ? 'Значение не соответствует текущей характеристике.' : 'Характеристика удалена или недоступна.'}</small>}
           {savedPendingRemoval && <small className={styles.note}>{source ? 'Сброс ожидает сохранения; значение из каталога пока не подтверждено.' : 'Характеристика будет убрана после сохранения.'}</small>}
-          {diagnosticMessage && <small className={styles.note}>{diagnosticMessage}</small>}
           {changeLabel && <small className={styles.note}>{changeLabel}</small>}
-          {hasUnappliedWarning && <details className={styles.unapplied}><summary>Собственное значение не применяется</summary><span>{formatOccurrence(definitions, local!) || 'Не задано'}</span></details>}
-          {canRefresh && <Button type="button" size="small" variant="secondary" disabled={disabled} onClick={() => refreshStale(local!)}>Заменить устаревшее значение</Button>}
+          {(savedNotApplied || localBindingMismatch) && <details className={styles.unapplied}><summary>Собственное значение не применяется</summary><span>{localDetails || 'Не задано'}</span></details>}
+          {canReplaceLocal && <Button type="button" size="small" variant="secondary" disabled={disabled} onClick={replaceLocal}>Заменить некорректное значение</Button>}
+          {source && sourceIssue && !local && <small className={styles.note}>Значение не соответствует текущей характеристике.</small>}
         </div>
         <div className={styles.actions}>
-          {canOverrideSource && <Button type="button" size="small" variant="secondary" disabled={disabled} onClick={() => {
-            if (!source || valuesById.has(id) || !directSourceEditable(source)) return;
-            setChangedRows(current => ({ ...current, [id]: true }));
+          {sourceCanCopy && <Button type="button" size="small" variant="secondary" disabled={disabled} onClick={() => {
+            if (!source || valuesById.has(id)) return;
             onChange([...values, source]);
           }}>Изменить: {title}</Button>}
           {savedPendingRemoval && !readOnly && <Button type="button" size="small" variant="secondary" disabled={disabled} onClick={() => restoreSaved(saved!)}>Отменить {source ? 'сброс' : 'удаление'}</Button>}
@@ -329,8 +264,7 @@ export const CharacterCatalogAttributes: React.FC<CharacterCatalogAttributesProp
     {!readOnly && <ActionRow className={styles.addRow}>
       <Field label="Новая характеристика" htmlFor={`${idPrefix}-new-attribute`}>
         <Select id={`${idPrefix}-new-attribute`} value={newAttributeId} disabled={disabled || supportedDefinitions.length === 0} onChange={event => setNewAttributeId(event.target.value)}>
-          <option value="">Выберите характеристику</option>
-          {supportedDefinitions.map(definition => <option key={definition.id} value={definition.id}>{definition.title}</option>)}
+          <option value="">Выберите характеристику</option>{supportedDefinitions.map(definition => <option key={definition.id} value={definition.id}>{definition.title}</option>)}
         </Select>
       </Field>
       <Button type="button" size="small" disabled={disabled || !supportedDefinitions.some(definition => definition.id === newAttributeId)} onClick={addOccurrence}>Добавить характеристику</Button>

@@ -7,7 +7,7 @@ import CatalogGroupConditionDialog from './CatalogGroupConditionDialog';
 import CatalogGroupMembersDialog from './CatalogGroupMembersDialog';
 import CatalogGroupMoveDialog from './CatalogGroupMoveDialog';
 import styles from './CatalogGroupsDialog.module.css';
-import type { CatalogAttributeDefinition, CatalogGroupCondition, CatalogGroupConfigurationEnvelope, CatalogMetadata } from './catalogTypes';
+import type { CatalogAttributeDefinition, CatalogGroupCondition, CatalogGroupConfigurationEnvelope, CatalogKind, CatalogMetadata } from './catalogTypes';
 import { assignConfirmedIds, createGroupDraftRow, groupDraftHierarchyError, groupDraftIsDirty, planGroupSaveStage, rowsFromAcceptedGroups, rowsFromConfiguration } from './catalogGroupDraft';
 import type { CatalogGroupDraftRow } from './catalogGroupDraft';
 
@@ -21,6 +21,7 @@ type ActiveEditor = { kind: 'members' | 'condition' | 'move'; clientKey: string 
 
 type Props = {
   campaignId: number;
+  kind: CatalogKind;
   canManage: boolean;
   permissionsPending?: boolean;
   onClose: () => void;
@@ -55,15 +56,9 @@ const safeMessage = (error: unknown) => {
 const isRecoverable = (error: unknown) => error instanceof CampaignApiError
   && (error.conflict || error.unknownOutcome || error.status === 0);
 
-function collectAttributeIds(condition: CatalogGroupCondition | null, ids = new Set<string>()): string[] {
-  if (!condition) return [...ids];
-  if (condition.attributeId) ids.add(condition.attributeId);
-  condition.children?.forEach(child => collectAttributeIds(child, ids));
-  return [...ids];
-}
-
 const CatalogGroupsDialog: React.FC<Props> = ({
   campaignId,
+  kind,
   canManage,
   permissionsPending = false,
   onClose,
@@ -90,7 +85,6 @@ const CatalogGroupsDialog: React.FC<Props> = ({
   const titleInputRefs = useRef(new Map<string, HTMLInputElement>());
   const [catalogEntries, setCatalogEntries] = useState<CatalogMetadata[]>([]);
   const [definitions, setDefinitions] = useState<CatalogAttributeDefinition[]>([]);
-  const [allowInactiveByGroup, setAllowInactiveByGroup] = useState<Record<string, string[]>>({});
   const [diagnostics, setDiagnostics] = useState<CatalogGroupConfigurationEnvelope['diagnostics']>([]);
   const [activeEditor, setActiveEditor] = useState<ActiveEditor>();
   const [loading, setLoading] = useState(true);
@@ -110,7 +104,7 @@ const CatalogGroupsDialog: React.FC<Props> = ({
   const invalidTitles = rows.some(row => !row.title.trim());
   const hierarchyError = groupDraftHierarchyError(rows);
   const invalid = invalidTitles || Boolean(hierarchyError || draftError);
-  useDirtyDraft(`catalog-groups-${sessionKey}-${campaignId}`, dirty || blocked);
+  useDirtyDraft(`catalog-groups-${sessionKey}-${campaignId}-${kind}`, dirty || blocked);
 
   useEffect(() => {
     if (!focusGroupKey) return;
@@ -132,10 +126,6 @@ const CatalogGroupsDialog: React.FC<Props> = ({
     setCatalogEntries(snapshot.entries);
     setDefinitions(snapshot.definitions);
     setDiagnostics(snapshot.configuration.diagnostics);
-    setAllowInactiveByGroup(Object.fromEntries(snapshot.configuration.data.groups.map(group => [
-      group.id,
-      collectAttributeIds(group.condition),
-    ])));
     setActiveEditor(undefined);
     setRecovery(undefined);
     setBlocked(false);
@@ -152,9 +142,9 @@ const CatalogGroupsDialog: React.FC<Props> = ({
     setLoadError(undefined);
     try {
       const [configuration, entries, schema] = await Promise.all([
-        api.getCatalogGroupConfiguration(campaignId),
-        api.listCatalog(campaignId),
-        api.getCatalogAttributes(campaignId),
+        api.getCatalogGroupConfiguration(campaignId, kind),
+        api.listCatalog(campaignId, kind),
+        api.getCatalogAttributes(campaignId, kind),
       ]);
       if (!mountedRef.current || generation !== loadGeneration.current) return;
       setBaseline(configuration);
@@ -164,10 +154,6 @@ const CatalogGroupsDialog: React.FC<Props> = ({
       setCatalogEntries(entries);
       setDefinitions(schema.data.definitions);
       setDiagnostics(configuration.diagnostics);
-      setAllowInactiveByGroup(Object.fromEntries(configuration.data.groups.map(group => [
-        group.id,
-        collectAttributeIds(group.condition),
-      ])));
     } catch (error) {
       if (!mountedRef.current || generation !== loadGeneration.current) return;
       setLoadError(error);
@@ -184,7 +170,7 @@ const CatalogGroupsDialog: React.FC<Props> = ({
       mountedRef.current = false;
       loadGeneration.current += 1;
     };
-  }, [campaignId, api]);
+  }, [campaignId, kind, api]);
 
   const close = () => {
     if (busyRef.current || recoveryBusyRef.current || recovering) return;
@@ -271,7 +257,7 @@ const CatalogGroupsDialog: React.FC<Props> = ({
           break;
         }
         failedStageContainsNewGroups = plan.stage.containsNewGroups;
-        const result = await api.putCatalogGroups(campaignId, {
+        const result = await api.putCatalogGroups(campaignId, kind, {
           expectedRevision: confirmed.contentRevision,
           groups: plan.stage.groups,
         });
@@ -283,7 +269,6 @@ const CatalogGroupsDialog: React.FC<Props> = ({
         setBaseline(result);
         setRows(workingRows);
         setDiagnostics(result.diagnostics);
-        setAllowInactiveByGroup(Object.fromEntries(result.data.groups.map(group => [group.id, collectAttributeIds(group.condition)])));
         onSavedRef.current(result);
         if (plan.stage.kind === 'final') {
           setStatus('Конфигурация групп подтверждённо сохранена.');
@@ -318,9 +303,9 @@ const CatalogGroupsDialog: React.FC<Props> = ({
     setFailure(undefined);
     try {
       const [configuration, entries, schema] = await Promise.all([
-        api.getCatalogGroupConfiguration(campaignId),
-        api.listCatalog(campaignId),
-        api.getCatalogAttributes(campaignId),
+        api.getCatalogGroupConfiguration(campaignId, kind),
+        api.listCatalog(campaignId, kind),
+        api.getCatalogAttributes(campaignId, kind),
       ]);
       if (!mountedRef.current) return;
       const snapshot = { configuration, entries, definitions: schema.data.definitions };
@@ -348,10 +333,6 @@ const CatalogGroupsDialog: React.FC<Props> = ({
     setCatalogEntries(recovery.entries);
     setDefinitions(recovery.definitions);
     setDiagnostics(recovery.configuration.diagnostics);
-    setAllowInactiveByGroup(Object.fromEntries(recovery.configuration.data.groups.map(group => [
-      group.id,
-      collectAttributeIds(group.condition),
-    ])));
     setRecovery(undefined);
     setBlocked(false);
     setFailure(undefined);
@@ -517,7 +498,6 @@ const CatalogGroupsDialog: React.FC<Props> = ({
           groupLabel={row.title || 'Новая группа'}
           initialCondition={row.condition}
           definitions={definitions}
-          allowInactiveAttributeIds={row.id ? allowInactiveByGroup[row.id] ?? [] : []}
           disabled={controlsDisabled}
           onApply={condition => applyCondition(row.clientKey, condition)}
           onClose={() => setActiveEditor(undefined)}

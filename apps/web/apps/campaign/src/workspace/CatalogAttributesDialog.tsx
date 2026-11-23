@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionRow, Button, Checkbox, DataTable, Field, IconButton, Input, ModalPortal, Select, StatePanel } from '@tdn/shared';
+import { ActionRow, Button, DataTable, Field, IconButton, Input, ModalPortal, Select, StatePanel } from '@tdn/shared';
 import { useDirtyDraft, useWorkspace } from './Workspace';
 import { CampaignApiError } from './api';
 import { ApiError } from './Feedback';
 import { stringifyJson } from './json';
-import type { CatalogAttributeDefinition, CatalogAttributeInput, CatalogAttributeSchemaEnvelope, CatalogAttributeType } from './catalogTypes';
+import type { CatalogAttributeDefinition, CatalogAttributeInput, CatalogAttributeSchemaEnvelope, CatalogAttributeType, CatalogKind } from './catalogTypes';
 
 type AttributeRow = {
   clientKey: string;
@@ -12,11 +12,12 @@ type AttributeRow = {
   title: string;
   typeKey: CatalogAttributeType;
   options: { optionKey: string; title: string }[];
-  isActive: boolean;
+  removed?: boolean;
 };
 
 type Props = {
   campaignId: number;
+  kind: CatalogKind;
   canManage: boolean;
   permissionsPending?: boolean;
   onClose: () => void;
@@ -41,15 +42,13 @@ const toRows = (definitions: CatalogAttributeDefinition[]): AttributeRow[] => de
   title: definition.title,
   typeKey: definition.typeKey,
   options: definition.options.map(option => ({ ...option })),
-  isActive: definition.isActive,
 }));
 
-const toInputs = (rows: AttributeRow[]): CatalogAttributeInput[] => rows.map(({ id, title, typeKey, options, isActive }) => ({
+const toInputs = (rows: AttributeRow[]): CatalogAttributeInput[] => rows.filter(row => !row.removed).map(({ id, title, typeKey, options }) => ({
   ...(id ? { id } : {}),
   title,
   typeKey,
   options,
-  isActive,
 }));
 
 const safeMessage = (error: unknown) => {
@@ -66,6 +65,7 @@ const isRecoverable = (error: unknown) => error instanceof CampaignApiError
 
 const CatalogAttributesDialog: React.FC<Props> = ({
   campaignId,
+  kind,
   canManage,
   permissionsPending = false,
   onClose,
@@ -103,10 +103,10 @@ const CatalogAttributesDialog: React.FC<Props> = ({
   canWriteRef.current = canManage && !permissionsPending && !revoked;
   const baselineInputs = useMemo(() => baseline ? toInputs(toRows(baseline.data.definitions)) : [], [baseline]);
   const dirty = Boolean(baseline && stringifyJson(toInputs(rows)) !== stringifyJson(baselineInputs));
-  const invalid = rows.some(row => !row.title.trim() || row.options.some(option => !option.optionKey.trim()));
+  const invalid = rows.some(row => !row.removed && (!row.title.trim() || row.options.some(option => !option.optionKey.trim())));
   const optionsDraftDirty = Boolean(optionsRowKey && rows.some(row => row.clientKey === optionsRowKey)
     && stringifyJson(optionsDraft) !== stringifyJson(rows.find(row => row.clientKey === optionsRowKey)?.options ?? []));
-  useDirtyDraft(`catalog-attributes-${sessionKey}-${campaignId}`, dirty || blocked || optionsDraftDirty);
+  useDirtyDraft(`catalog-attributes-${sessionKey}-${campaignId}-${kind}`, dirty || blocked || optionsDraftDirty);
 
   const reportForbidden = () => {
     if (!mountedRef.current) return;
@@ -119,7 +119,7 @@ const CatalogAttributesDialog: React.FC<Props> = ({
     setLoading(true);
     setLoadError(undefined);
     try {
-      const result = await api.getCatalogAttributes(campaignId);
+      const result = await api.getCatalogAttributes(campaignId, kind);
       if (!mountedRef.current || generation !== loadGeneration.current) return;
       setBaseline(result);
       setRows(toRows(result.data.definitions));
@@ -139,7 +139,7 @@ const CatalogAttributesDialog: React.FC<Props> = ({
       mountedRef.current = false;
       loadGeneration.current += 1;
     };
-  }, [campaignId, api]);
+  }, [campaignId, kind, api]);
 
   const close = () => {
     if (busyRef.current || recoveryBusyRef.current || recovering) return;
@@ -152,7 +152,6 @@ const CatalogAttributesDialog: React.FC<Props> = ({
     title: '',
     typeKey: 'string',
     options: [],
-    isActive: true,
   }]);
 
   const changeType = (row: AttributeRow, typeKey: CatalogAttributeType) => {
@@ -179,26 +178,28 @@ const CatalogAttributesDialog: React.FC<Props> = ({
   const save = async () => {
     if (!baseline || invalid || !dirty || busyRef.current || blocked || !canWriteRef.current) return;
     const submitted = toInputs(rows);
+    const submittedIds = new Set(submitted.flatMap(item => item.id ? [item.id] : []));
+    const removedExisting = baseline.data.definitions.some(definition => !submittedIds.has(definition.id));
+    if (removedExisting && !window.confirm(`Удалённые характеристики исчезнут из ${kind === 'Item' ? 'предметов' : 'навыков'} этого каталога и записей персонажей. Условия групп, которые их используют, будут отключены. Сохранить изменения?`)) return;
     const hadNewRows = submitted.some(item => !item.id);
     busyRef.current = true;
     setBusy(true);
     setFailure(undefined);
     setStatus('');
     try {
-      const result = await api.putCatalogAttributes(campaignId, {
+      const result = await api.putCatalogAttributes(campaignId, kind, {
         expectedRevision: baseline.contentRevision,
         definitions: submitted,
       });
       if (!mountedRef.current) return;
       const acceptedRows = result.data.definitions.map((definition, index) => {
-        const submittedRow = rows[index];
+        const submittedRow = rows.filter(row => !row.removed)[index];
         return {
           clientKey: submittedRow?.clientKey ?? `schema-${definition.id}`,
           id: definition.id,
           title: definition.title,
           typeKey: definition.typeKey,
           options: definition.options.map(option => ({ ...option })),
-          isActive: definition.isActive,
         } satisfies AttributeRow;
       });
       setBaseline(result);
@@ -226,7 +227,7 @@ const CatalogAttributesDialog: React.FC<Props> = ({
     setRecoverySchema(undefined);
     setFailure(undefined);
     try {
-      const result = await api.getCatalogAttributes(campaignId);
+      const result = await api.getCatalogAttributes(campaignId, kind);
       if (!mountedRef.current) return;
       setRecoverySchema(result);
       onSavedRef.current(result);
@@ -248,6 +249,7 @@ const CatalogAttributesDialog: React.FC<Props> = ({
       return;
     }
     if (acceptOnly) return;
+    const recoveryIds = new Set(recoverySchema.data.definitions.map(definition => definition.id));
     const priorIds = new Set(baseline?.data.definitions.map(definition => definition.id) ?? []);
     const localIds = new Set(rows.flatMap(row => row.id ? [row.id] : []));
     const serverAddedRows = recoverySchema.data.definitions
@@ -258,19 +260,18 @@ const CatalogAttributesDialog: React.FC<Props> = ({
         title: definition.title,
         typeKey: definition.typeKey,
         options: definition.options.map(option => ({ ...option })),
-        isActive: definition.isActive,
       }));
     setBaseline(recoverySchema);
-    setRows([...rows, ...serverAddedRows]);
+    setRows([...rows.filter(row => !row.id || recoveryIds.has(row.id)), ...serverAddedRows]);
     setRecoverySchema(undefined);
     setBlocked(false);
     setFailure(undefined);
-    setStatus('Черновик оставлен с серверными атрибутами. Следующее явное сохранение заменит схему целиком.');
+    setStatus('Черновик сохранён; удалённые на сервере характеристики исключены. Следующее явное сохранение заменит схему целиком.');
   };
 
   const writesDisabled = busy || recovering || permissionsPending || revoked || !canManage || blocked;
 
-  const optionsRow = rows.find(row => row.clientKey === optionsRowKey);
+  const optionsRow = rows.find(row => row.clientKey === optionsRowKey && !row.removed);
   const applyOptions = () => {
     if (!optionsRowKey || writesDisabled) return;
     const current = rows.find(row => row.clientKey === optionsRowKey);
@@ -291,10 +292,10 @@ const CatalogAttributesDialog: React.FC<Props> = ({
       {revoked && <p role="alert">Управление схемой заблокировано после отказа сервера.</p>}
       {rows.length === 0 && <StatePanel kind="empty">В схеме пока нет атрибутов. Добавьте атрибут, чтобы использовать типизированные поля.</StatePanel>}
       <p>При смене типа или удалении варианта существующие значения не преобразуются автоматически.</p>
-      <p>Неактивные атрибуты сохраняются и остаются доступны для просмотра ранее записанных значений.</p>
       <DataTable aria-label="Атрибуты каталога" minWidth="46rem">
-        <thead><tr><th scope="col">Название</th><th scope="col">Тип значения</th><th scope="col">Варианты</th><th scope="col">Активен</th></tr></thead>
+        <thead><tr><th scope="col">Название</th><th scope="col">Тип значения</th><th scope="col">Варианты</th><th scope="col">Действия</th></tr></thead>
         <tbody>{rows.map(row => <tr key={row.clientKey}>
+          {row.removed ? <td colSpan={4}><strong>{row.title || 'Новая характеристика'}</strong><p>Будет удалена после сохранения</p><Button type="button" size="small" variant="secondary" disabled={writesDisabled} onClick={() => setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, removed: false } : item))}>Восстановить характеристику: {row.title || 'новая'}</Button></td> : <>
           <td><Input aria-label={`Название атрибута ${row.title || 'новый'}`} value={row.title} disabled={writesDisabled} aria-invalid={!row.title.trim() || undefined} onChange={event => setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, title: event.target.value } : item))} /></td>
           <td><Select aria-label={`Тип атрибута ${row.title || 'новый'}`} value={row.typeKey} disabled={writesDisabled} onChange={event => changeType(row, event.target.value as CatalogAttributeType)}>
             {schemaTypes.map(type => <option key={type} value={type}>{typeLabels[type]}</option>)}
@@ -302,7 +303,10 @@ const CatalogAttributesDialog: React.FC<Props> = ({
           <td>{row.typeKey === 'singleChoice' || row.typeKey === 'multiChoice'
             ? <Button type="button" size="small" variant="secondary" disabled={writesDisabled} onClick={() => { setOptionsDraft(row.options.map(option => ({ ...option }))); setOptionsRowKey(row.clientKey); }}>Варианты ({row.options.length})</Button>
             : '—'}</td>
-          <td><Checkbox aria-label={`Активен: ${row.title || 'новый атрибут'}`} checked={row.isActive} disabled={writesDisabled} onChange={event => setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, isActive: event.target.checked } : item))} /></td>
+          <td><IconButton icon="delete" size="small" variant="danger" title={`Удалить характеристику: ${row.title || 'новая'}`} ariaLabel={`Удалить характеристику: ${row.title || 'новая'}`} disabled={writesDisabled} onClick={() => row.id
+            ? (setOptionsRowKey(current => current === row.clientKey ? undefined : current), setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, removed: true } : item)))
+            : setRows(current => current.filter(item => item.clientKey !== row.clientKey))} /></td>
+          </>}
         </tr>)}</tbody>
       </DataTable>
       {!writesDisabled && <Button type="button" onClick={addDefinition}>Добавить атрибут</Button>}

@@ -11,11 +11,11 @@ import { CatalogAttributeValuesEditor } from './CatalogAttributeValuesEditor';
 import { CatalogDefinitionBasics, CatalogDefinitionSettings, createCatalogDefinitionDraft } from './CatalogDefinitionFields';
 import type { CatalogDefinitionDraft } from './CatalogDefinitionFields';
 import { CharacterQuantityInput } from './CharacterQuantityInput';
-import { catalogValueType } from './catalogModel';
-import { validateCharacterQuantity } from './characterCatalogModel';
-import { validateFieldValue } from './ValueInput';
+import { catalogAttributeField, catalogAttributeIssue } from './catalogModel';
+import { supportsCharacterAttributes, validateCharacterQuantity } from './characterCatalogModel';
 import { stringifyJson } from './json';
 import CharacterCatalogAttributes from './CharacterCatalogAttributes';
+import { CatalogAttributeReadout } from './CatalogAttributeReadout';
 import styles from './CharacterCatalogDialog.module.css';
 import type { CatalogAttributeOccurrence, CatalogKind, CatalogMetadata, CatalogContentEnvelope, CatalogGroupEntriesEnvelope, CharacterCatalogAddRequest, CharacterCatalogCreateRequest, CharacterCatalogEntryEnvelope } from './catalogTypes';
 import type { JsonNumber } from './types';
@@ -34,6 +34,7 @@ export type CharacterCatalogAddDialogProps = {
 function safeErrorMessage(error: unknown): string {
   if (!(error instanceof CampaignApiError)) return 'Не удалось выполнить операцию. Попробуйте ещё раз.';
   if (error.unknownOutcome || error.status === 0) return 'Не удалось подтвердить добавление. Сначала проверьте результат, чтобы не добавить повторно.';
+  if (error.problem.code === 'stack_state_not_supported') return 'Личные характеристики доступны только для навыков и предметов с количеством «Единичный». Измените настройки предмета или удалите личные характеристики.';
   if (error.status === 400) return 'Проверьте количество и характеристики предмета или навыка.';
   if (error.status === 403) return 'Право записи персонажа больше недоступно.';
   if (error.status === 404) return 'Запись каталога больше недоступна.';
@@ -71,7 +72,6 @@ function sameNumericValue(left: JsonNumber | null | undefined, right: JsonNumber
 }
 
 const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
-  kind,
   canPublishDefinition = false,
   characterName,
   definitionPermissionsPending = false,
@@ -79,6 +79,7 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
 }) => {
   const { api, sessionKey } = useWorkspace();
   const catalog = useCharacterCatalog();
+  const kind = catalog.kind;
   const mountedRef = useRef(false);
   const busyRef = useRef(false);
   const sourceReadGeneration = useRef(0);
@@ -118,11 +119,11 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   const picker = useResource<PickerData>(
     `${scope}:add-picker:${groupId || 'ungrouped'}`,
     () => groupId
-      ? api.getCatalogGroupEntries(catalog.campaignId, groupId).then(result => ({ entries: result.entries, diagnostics: result.diagnostics }))
+      ? api.getCatalogGroupEntries(catalog.campaignId, kind, groupId).then(result => ({ entries: result.entries, diagnostics: result.diagnostics }))
       : api.listCatalog(catalog.campaignId, kind).then(entries => ({ entries, diagnostics: [] })),
     pickerEnabled,
   );
-  const groups = useResource(`${scope}:add-groups`, () => api.getCatalogGroups(catalog.campaignId), pickerEnabled);
+  const groups = useResource(`${scope}:add-groups`, () => api.getCatalogGroups(catalog.campaignId, kind), pickerEnabled);
   const definitions = catalog.definitions ?? [];
   const schemaReady = catalog.definitions !== undefined && !catalog.schemaLoading;
   useEffect(() => {
@@ -143,8 +144,8 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
     setSourceError(undefined);
     setSelectedSource(undefined);
     Promise.all([
-      api.getCatalogEntry(catalog.campaignId, selectedEntryId),
-      api.getCatalogContent(catalog.campaignId, selectedEntryId),
+      api.getCatalogEntry(catalog.campaignId, kind, selectedEntryId),
+      api.getCatalogContent(catalog.campaignId, kind, selectedEntryId),
     ]).then(([metadata, content]) => {
       if (!mountedRef.current || generation !== sourceReadGeneration.current) return;
       if (metadata.kind !== kind) {
@@ -169,13 +170,15 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   const ownDraftDirty = stringifyJson(ownDraft) !== stringifyJson(ownBaseline);
   const localAttributesDirty = localAttributes.length > 0;
   const quantityPolicy = mode === 'own' ? ownDraft : selectedSource?.metadata;
+  const allowsLocalAttributes = Boolean(quantityPolicy && supportsCharacterAttributes(quantityPolicy));
   const quantityValidation = quantityPolicy
     ? validateCharacterQuantity(quantityRaw, quantityPolicy)
     : undefined;
   const initialQuantityValidation = quantityPolicy
     ? validateCharacterQuantity(quantityInitialRaw, quantityPolicy)
     : undefined;
-  const quantityEditable = quantityPolicy?.kind === 'Item' && quantityPolicy.quantityUnit !== 'Single';
+  const quantityEditable = quantityPolicy?.kind === 'Item'
+    && (quantityPolicy.quantityUnit === 'Whole' || quantityPolicy.quantityUnit === 'Fractional');
   const quantityDirty = Boolean(quantityEditable && (
     quantityValidation?.issue
       ? quantityRaw !== quantityInitialRaw
@@ -195,21 +198,18 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   const localRowsInvalid = localAttributes.some(value => {
     if (value.editLevel !== 'Character') return true;
     const attribute = definitions.find(definition => definition.id === value.attributeId);
-    const valueType = attribute ? catalogValueType(attribute.typeKey) : undefined;
-    if (!attribute || !attribute.isActive || !valueType) return true;
-    if (attribute.typeKey !== value.typeKey || String(attribute.typeRevision) !== String(value.typeRevision)) return true;
-    if (validateFieldValue({ valueType, options: attribute.options }, value.value) !== undefined) return true;
+    if (!catalogAttributeField(attribute)) return true;
+    if (catalogAttributeIssue(attribute, value)) return true;
     return localBindingMismatches.some(mismatch => mismatch.id === value.id);
   });
   const ownSourceRowsInvalid = mode === 'own' && ownDraft.attributes.some(value => {
     const attribute = definitions.find(definition => definition.id === value.attributeId);
-    const valueType = attribute ? catalogValueType(attribute.typeKey) : undefined;
-    if (!attribute || !attribute.isActive || !valueType) return true;
-    if (attribute.typeKey !== value.typeKey || String(attribute.typeRevision) !== String(value.typeRevision)) return true;
-    return validateFieldValue({ valueType, options: attribute.options }, value.value) !== undefined;
+    if (!catalogAttributeField(attribute)) return true;
+    return Boolean(catalogAttributeIssue(attribute, value));
   });
   const invalid = (mode === 'own' && (sourceFieldsInvalid || ownBaseInvalid))
     || localAttributesInvalid
+    || Boolean(!allowsLocalAttributes && localAttributes.length > 0)
     || localRowsInvalid
     || Boolean(quantityDirty && quantityValidation?.issue)
     || Boolean(ownSourceRowsInvalid);
@@ -217,15 +217,10 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   const sourceDirty = mode === 'catalog' && Boolean(selectedEntryId) && (localAttributesDirty || quantityDirty);
   const dirty = !confirmedRemoved && (ownDirty || sourceDirty);
 
-  const sourceDiagnostics = mode === 'catalog' ? selectedSource?.content.diagnostics ?? [] : [];
   const lockedOccurrenceIds = [...new Set([
     ...localBindingMismatches.map(value => value.id),
     ...localEditLevelMismatches.map(value => value.id),
   ])];
-  const localDiagnostics = [
-    ...localBindingMismatches.map(value => ({ occurrenceId: value.id, code: 'attribute_binding_changed' })),
-    ...localEditLevelMismatches.map(value => ({ occurrenceId: value.id, code: 'edit_level_changed' })),
-  ];
   const visibleEntries = (picker.data?.entries ?? []).filter(entry =>
     entry.kind === kind && entry.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
   const fieldsDisabled = busy || blocked || confirmedRemoved || !canWriteRef.current || catalog.permissionsPending || definitionPermissionsPending;
@@ -246,16 +241,16 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
     setVerificationError(undefined);
     setVerificationMessage('');
     try {
-      const receipt = await api.getCharacterAddition(catalog.campaignId, catalog.characterId, requestId);
+      const receipt = await api.getCharacterAddition(catalog.campaignId, kind, catalog.characterId, requestId);
       if (!mountedRef.current) return;
       if (receipt.requestId !== requestId || receipt.campaignId !== catalog.campaignId || receipt.characterId !== catalog.characterId) {
         setVerificationError(new Error('Receipt did not match this operation.'));
         return;
       }
       try {
-        const entry = await api.getCharacterEntry(catalog.campaignId, catalog.characterId, receipt.entryId);
+        const entry = await api.getCharacterEntry(catalog.campaignId, kind, catalog.characterId, receipt.entryId);
         if (!mountedRef.current) return;
-        if (entry.record.id !== receipt.entryId || entry.record.catalogEntryId !== receipt.catalogEntryId) {
+        if (entry.record.id !== receipt.entryId || entry.record.campaignId !== catalog.campaignId || entry.record.characterId !== catalog.characterId || entry.record.catalogEntryId !== receipt.catalogEntryId || entry.definition.kind !== kind) {
           setVerificationError(new Error('Receipt entry did not match the operation.'));
           return;
         }
@@ -297,21 +292,22 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
         requestId,
         catalogEntryId: selectedSource.metadata.id,
         quantity: quantity ?? null,
-        attributes: localAttributes,
+        attributes: allowsLocalAttributes ? localAttributes : [],
       } satisfies CharacterCatalogAddRequest;
     } else {
       const definition = {
-        ...ownDraft,
-        kind,
+        name: ownDraft.name,
         isHidden: canPublish ? ownDraft.isHidden : true,
         quantityUnit: kind === 'Item' ? ownDraft.quantityUnit ?? 'Whole' : null,
         allowNegative: kind === 'Item' && ownDraft.allowNegative,
+        description: ownDraft.description,
+        attributes: ownDraft.attributes,
       };
       payload = {
         requestId,
         definition,
         quantity: quantity ?? null,
-        attributes: localAttributes,
+        attributes: allowsLocalAttributes ? localAttributes : [],
       } satisfies CharacterCatalogCreateRequest;
     }
 
@@ -321,11 +317,18 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
     setVerificationError(undefined);
     try {
       const response = mode === 'catalog'
-        ? await catalog.runWrite(() => api.addCharacterEntry(catalog.campaignId, catalog.characterId, payload as CharacterCatalogAddRequest))
-        : await catalog.runWrite(() => api.createOwnCharacterEntry(catalog.campaignId, catalog.characterId, payload as CharacterCatalogCreateRequest));
+        ? await catalog.runWrite(() => api.addCharacterEntry(catalog.campaignId, kind, catalog.characterId, payload as CharacterCatalogAddRequest))
+        : await catalog.runWrite(() => api.createOwnCharacterEntry(catalog.campaignId, kind, catalog.characterId, payload as CharacterCatalogCreateRequest));
       if (!mountedRef.current) return;
       if (response.requestId !== requestId) {
         const mismatch = new CampaignApiError(0, { code: 'unknown_outcome', title: 'Unknown outcome', detail: 'The publication response did not match the submitted operation.' }, true);
+        setBlocked(true);
+        setFailure(mismatch);
+        await checkReceipt();
+        return;
+      }
+      if (response.entry.record.campaignId !== catalog.campaignId || response.entry.record.characterId !== catalog.characterId || response.entry.definition.kind !== kind) {
+        const mismatch = new CampaignApiError(0, { code: 'unknown_outcome', title: 'Unknown outcome', detail: 'The publication response did not match the current catalog scope.' }, true);
         setBlocked(true);
         setFailure(mismatch);
         await checkReceipt();
@@ -502,21 +505,20 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
                 <h3>{selectedSource.metadata.name}</h3>
                 <p className={styles.description}>{selectedSource.content.data.description || 'Описание отсутствует.'}</p>
               </div>
-              {selectedSource.metadata.kind === 'Item' && <CharacterQuantityInput metadata={selectedSource.metadata} raw={quantityRaw} onRawChange={setQuantityRaw} required disabled={fieldsDisabled} serverError={isQuantityServerError(failure) ? failure : undefined} />}
-              <section className={styles.section}>
+               {selectedSource.metadata.kind === 'Item' && <CharacterQuantityInput metadata={selectedSource.metadata} raw={quantityRaw} onRawChange={setQuantityRaw} required readOnly={!quantityEditable} disabled={fieldsDisabled} serverError={isQuantityServerError(failure) ? failure : undefined} />}
+               <section className={styles.section}>
                 <h3>Характеристики</h3>
-                <CharacterCatalogAttributes
+                {allowsLocalAttributes ? <CharacterCatalogAttributes
                   definitions={definitions}
                   sourceValues={selectedSource.content.data.attributes}
                   values={localAttributes}
                   savedValues={[]}
-                  diagnostics={[...selectedSource.content.diagnostics, ...localDiagnostics]}
                   lockedOccurrenceIds={lockedOccurrenceIds}
                   readOnly={!catalog.canWrite}
                   disabled={fieldsDisabled}
                   onChange={setLocalAttributes}
                   onValidityChange={setLocalAttributesInvalid}
-                />
+                /> : <CatalogAttributeReadout definitions={definitions} values={selectedSource.content.data.attributes} />}
               </section>
             </>)}
         </section>}
@@ -528,22 +530,28 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
               : <StatePanel kind="loading">Загрузка {kind === 'Item' ? 'предмета' : 'навыка'}…</StatePanel>
             : <>
               <CatalogDefinitionBasics draft={ownDraft} onChange={setOwnDraft} readOnly={!catalog.canWrite} disabled={fieldsDisabled} onValidityChange={setSourceFieldsInvalid} />
-              {kind === 'Item' && <CharacterQuantityInput metadata={ownDraft} raw={quantityRaw} onRawChange={setQuantityRaw} required disabled={fieldsDisabled} serverError={isQuantityServerError(failure) ? failure : undefined} />}
+               {kind === 'Item' && <CharacterQuantityInput metadata={ownDraft} raw={quantityRaw} onRawChange={setQuantityRaw} required readOnly={!quantityEditable} disabled={fieldsDisabled} serverError={isQuantityServerError(failure) ? failure : undefined} />}
               {!canPublishDefinition && <p className={styles.context}>Не публикуется в общем каталоге</p>}
               <section className={styles.section}>
                 <h3>Характеристики</h3>
-                <CharacterCatalogAttributes
+                 {allowsLocalAttributes ? <CharacterCatalogAttributes
                   definitions={definitions}
                   sourceValues={ownDraft.attributes}
                   values={localAttributes}
                   savedValues={[]}
-                  diagnostics={localDiagnostics}
                   lockedOccurrenceIds={lockedOccurrenceIds}
                   readOnly={!catalog.canWrite}
                   disabled={fieldsDisabled}
                   onChange={setLocalAttributes}
                   onValidityChange={setLocalAttributesInvalid}
-                />
+                 /> : <>
+                   <CatalogAttributeReadout definitions={definitions} values={ownDraft.attributes} />
+                   <p role="status">Личные характеристики доступны только у единичных предметов. Измените «Количество» в разделе «Настройки предмета».</p>
+                   {localAttributes.length > 0 && <>
+                     <p role="alert">Черновик личных характеристик не поддерживается для выбранного типа предмета и не будет отправлен.</p>
+                     <Button type="button" size="small" variant="secondary" disabled={fieldsDisabled} onClick={() => { setLocalAttributes([]); setLocalAttributesInvalid(false); }}>Убрать личные характеристики</Button>
+                   </>}
+                 </>}
               </section>
               <details className={styles.advanced}>
                 <summary>Настройки {kind === 'Item' ? 'предмета' : 'навыка'}</summary>
@@ -551,7 +559,7 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
                   <p>{kind === 'Item' ? 'Базовые характеристики относятся к самому предмету; личные значения выше — к этому персонажу.' : 'Базовые характеристики относятся к самому навыку; личные значения выше — к этому персонажу.'}</p>
                   <CatalogDefinitionSettings draft={ownDraft} onChange={setOwnDraft} canPublish={canPublish} readOnly={!catalog.canWrite} disabled={fieldsDisabled} />
                   <FieldSet legend="Базовые характеристики">
-                    <CatalogAttributeValuesEditor definitions={definitions} values={ownDraft.attributes} onChange={attributes => setOwnDraft(current => ({ ...current, attributes }))} onValidityChange={setOwnBaseInvalid} disabled={fieldsDisabled} readOnly={!catalog.canWrite} />
+                     <CatalogAttributeValuesEditor definitions={definitions} values={ownDraft.attributes} savedValues={[]} onChange={attributes => setOwnDraft(current => ({ ...current, attributes }))} onValidityChange={setOwnBaseInvalid} disabled={fieldsDisabled} readOnly={!catalog.canWrite} />
                   </FieldSet>
                 </div>
               </details>

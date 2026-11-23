@@ -1,26 +1,27 @@
 import React from 'react';
-import type { CatalogAttributeDefinition, CatalogAttributeOccurrence, CatalogDiagnostic } from './catalogTypes';
+import type { CatalogAttributeDefinition, CatalogAttributeOccurrence } from './catalogTypes';
 import { catalogAttributeTags } from './catalogAttributeTags';
+import { catalogAttributeIssue } from './catalogModel';
 import styles from './CatalogDefinitionFields.module.css';
 
 export type CatalogAttributeReadoutProps = {
   definitions: CatalogAttributeDefinition[];
   values: CatalogAttributeOccurrence[];
-  diagnostics?: CatalogDiagnostic[];
   showEditRules?: boolean;
 };
 
-export const CatalogAttributeReadout: React.FC<CatalogAttributeReadoutProps> = ({ definitions, values, diagnostics = [], showEditRules = false }) => {
-  if (!values.length) return <p>Характеристик пока нет.</p>;
-  const diagnosticIds = new Set(diagnostics.map(item => item.occurrenceId));
+export const CatalogAttributeReadout: React.FC<CatalogAttributeReadoutProps> = ({ definitions, values, showEditRules = false }) => {
+  const visibleValues = values.filter(occurrence => definitions.some(item => item.id === occurrence.attributeId));
+  if (!visibleValues.length) return <p>Характеристик пока нет.</p>;
   return <dl className={styles.readout}>
-    {values.map(occurrence => {
+    {visibleValues.map(occurrence => {
       const definition = definitions.find(item => item.id === occurrence.attributeId);
       const formatted = catalogAttributeTags(definitions, [occurrence])[0]?.values.join('; ') ?? '';
+      const issue = definition && catalogAttributeIssue(definition, occurrence);
       return <div className={styles.readoutRow} key={occurrence.id}>
-        <dt>{definition?.title ?? 'Неизвестный атрибут'}</dt>
+        <dt>{definition!.title}</dt>
         <dd>{formatted || 'Не задано'}
-          {diagnosticIds.has(occurrence.id) && <small className={styles.readoutNote}>Значение требует проверки</small>}
+          {issue && <small className={styles.readoutNote}>Значение не соответствует текущей характеристике.</small>}
           {showEditRules && <small className={styles.readoutNote}>{occurrence.editLevel === 'Character' ? 'Можно менять у персонажа' : 'Только в каталоге'}</small>}
         </dd>
       </div>;

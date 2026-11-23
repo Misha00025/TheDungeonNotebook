@@ -2,7 +2,7 @@ import { makeAuthenticatedRequest } from '@tdn/shared';
 import type { AuthenticatedRequest } from '@tdn/shared';
 import { parseJson, stringifyJson } from './json';
 import type { Assignment, BaseFieldInput, Campaign, CharacterMetadata, CharacterSheetEnvelope, ComputedSheet, ContentRevisionDto, DefinitionCreate, DefinitionMetadata, FormulaContent, FormulaContentEnvelope, FormulaMetadata, Importance, JsonValue, Member, OverridesEnvelope, Permissions, PresentationEnvelope, ResolvedPresentation, TemplateContentEnvelope, TemplateMetadata, User, ViewContentEnvelope, ViewMetadata, ViewNode, ViewSourcesResponse, VirtualFieldInput, VirtualFieldsEnvelope } from './types';
-import type { CatalogAttributeSchemaEnvelope, CatalogContentEnvelope, CatalogCreateRequest, CatalogCreateResult, CatalogGroupConfigurationEnvelope, CatalogGroupEntriesEnvelope, CatalogGroupInput, CatalogGroupsEnvelope, CatalogKind, CatalogMetadata, CharacterCatalogAddRequest, CharacterCatalogAddResponse, CharacterCatalogAdditionDto, CharacterCatalogAttributesUpdateRequest, CharacterCatalogCreateRequest, CharacterCatalogEntryEnvelope, CharacterCatalogQuantityUpdateRequest } from './catalogTypes';
+import type { CatalogAttributeSchemaEnvelope, CatalogContentEnvelope, CatalogCreateRequest, CatalogCreateResult, CatalogCreateResultDto, CatalogGroupConfigurationEnvelope, CatalogGroupEntriesDto, CatalogGroupInput, CatalogGroupsEnvelope, CatalogKind, CatalogMetadata, CatalogMetadataDto, CharacterCatalogAddRequest, CharacterCatalogAddResponse, CharacterCatalogAdditionDto, CharacterCatalogAttributesUpdateRequest, CharacterCatalogCreateRequest, CharacterCatalogEntryDto, CharacterCatalogEntryEnvelope, CharacterCatalogQuantityUpdateRequest } from './catalogTypes';
 
 export interface Problem { code: string; title: string; detail: string; errors?: Record<string, string[]>; resourceId?: string; requestId?: string }
 export class CampaignApiError extends Error {
@@ -59,8 +59,18 @@ export function createCampaignApi(request: AuthenticatedRequest) {
   const characters = (id: number) => `${c(id)}/characters`;
   const formulas = (id: number) => `${c(id)}/formulas`;
   const views = (id: number) => `${c(id)}/views`;
-  const catalog = (id: number) => `${c(id)}/catalog`;
-  const characterEntries = (id: number, characterId: Id) => `${characters(id)}/${enc(characterId)}/entries`;
+  const catalog = (id: number, kind: CatalogKind) => `${c(id)}/${kind === 'Item' ? 'items' : 'skills'}`;
+  const characterEntries = (id: number, characterId: Id, kind: CatalogKind) => `${characters(id)}/${enc(characterId)}/${kind === 'Item' ? 'items' : 'skills'}`;
+  const enrichMetadata = (metadata: CatalogMetadataDto, kind: CatalogKind): CatalogMetadata => ({ ...metadata, kind });
+  const enrichCharacterEntry = (entry: CharacterCatalogEntryDto, kind: CatalogKind): CharacterCatalogEntryEnvelope => ({ ...entry, definition: enrichMetadata(entry.definition, kind) });
+  const enrichCharacterResponse = (response: { requestId: string; entry: CharacterCatalogEntryDto }, kind: CatalogKind): CharacterCatalogAddResponse => ({ ...response, entry: enrichCharacterEntry(response.entry, kind) });
+  const wireOccurrences = (attributes: import('./catalogTypes').CatalogAttributeOccurrence[]) => attributes.map(({ id, attributeId, value, editLevel }) => ({ id, attributeId, value, editLevel }));
+  const wireCondition = (condition: import('./catalogTypes').CatalogGroupInput['condition']): import('./catalogTypes').CatalogGroupInput['condition'] => condition ? ({
+    operator: condition.operator,
+    ...(condition.attributeId === undefined ? {} : { attributeId: condition.attributeId }),
+    ...('value' in condition && condition.value !== undefined ? { value: condition.value } : {}),
+    ...('children' in condition && condition.children ? { children: condition.children.map(child => wireCondition(child)!) } : {}),
+  }) : null;
   const put = <T>(path: string, body: unknown) => send<T>(path, 'PUT', body);
   const create = <T>(path: string, body: unknown) => send<T>(path, 'POST', body);
   const revQuery = (expectedRevision: RevisionPayload['expectedRevision']) => ({ expectedRevision: String(expectedRevision) });
@@ -114,26 +124,63 @@ export function createCampaignApi(request: AuthenticatedRequest) {
     getPresentation: (id: number) => send<PresentationEnvelope>(`${c(id)}/presentation`),
     putPresentation: (id: number, body: { expectedRevision: RevisionPayload['expectedRevision']; defaults: Record<string, string>; contextParams: Record<string, JsonValue> }) => put<PresentationEnvelope>(`${c(id)}/presentation`, body),
     resolvePresentation: (id: number, contextKey: string) => send<ResolvedPresentation>(`${c(id)}/presentation/resolve`, 'GET', undefined, { contextKey }),
-    listCatalog: (id: number, kind?: CatalogKind) => send<CatalogMetadata[]>(catalog(id), 'GET', undefined, kind ? { kind } : undefined),
-    getCatalogEntry: (id: number, entryId: Id) => send<CatalogMetadata>(`${catalog(id)}/${enc(entryId)}`),
-    getCatalogContent: (id: number, entryId: Id) => send<CatalogContentEnvelope>(`${catalog(id)}/${enc(entryId)}/content`),
-    createCatalogEntry: (id: number, body: CatalogCreateRequest) => create<CatalogCreateResult>(catalog(id), body),
-    putCatalogMetadata: (id: number, entryId: Id, body: { name: string; expectedRevision: RevisionPayload['expectedRevision']; isHidden?: boolean; quantityUnit?: string | null; allowNegative?: boolean }) => put<CatalogMetadata>(`${catalog(id)}/${enc(entryId)}`, body),
-    putCatalogContent: (id: number, entryId: Id, body: { expectedRevision: RevisionPayload['expectedRevision']; description: string; attributes: import('./catalogTypes').CatalogAttributeOccurrence[] }) => put<CatalogContentEnvelope>(`${catalog(id)}/${enc(entryId)}/content`, body),
-    getCatalogAttributes: (id: number) => send<CatalogAttributeSchemaEnvelope>(`${catalog(id)}/attributes`),
-    putCatalogAttributes: (id: number, body: { expectedRevision: RevisionPayload['expectedRevision']; definitions: import('./catalogTypes').CatalogAttributeInput[] }) => put<CatalogAttributeSchemaEnvelope>(`${catalog(id)}/attributes`, body),
-    getCatalogGroups: (id: number) => send<CatalogGroupsEnvelope>(`${catalog(id)}/groups`),
-    getCatalogGroupConfiguration: (id: number) => send<CatalogGroupConfigurationEnvelope>(`${catalog(id)}/groups/configuration`),
-    putCatalogGroups: (id: number, body: { expectedRevision: RevisionPayload['expectedRevision']; groups: CatalogGroupInput[] }) => put<CatalogGroupConfigurationEnvelope>(`${catalog(id)}/groups`, body),
-    getCatalogGroupEntries: (id: number, groupId: Id) => send<CatalogGroupEntriesEnvelope>(`${catalog(id)}/groups/${enc(groupId)}/entries`),
-    listCharacterEntries: (id: number, characterId: Id, kind?: CatalogKind) => send<CharacterCatalogEntryEnvelope[]>(characterEntries(id, characterId), 'GET', undefined, kind ? { kind } : undefined),
-    getCharacterEntry: (id: number, characterId: Id, entryId: Id) => send<CharacterCatalogEntryEnvelope>(`${characterEntries(id, characterId)}/${enc(entryId)}`),
-    addCharacterEntry: (id: number, characterId: Id, body: CharacterCatalogAddRequest) => create<CharacterCatalogAddResponse>(characterEntries(id, characterId), body),
-    createOwnCharacterEntry: (id: number, characterId: Id, body: CharacterCatalogCreateRequest) => create<CharacterCatalogAddResponse>(`${characterEntries(id, characterId)}/create`, body),
-    getCharacterAddition: (id: number, characterId: Id, requestId: Id) => send<CharacterCatalogAdditionDto>(`${characterEntries(id, characterId)}/additions/${enc(requestId)}`),
-    putCharacterEntryQuantity: (id: number, characterId: Id, entryId: Id, body: CharacterCatalogQuantityUpdateRequest) => put<CharacterCatalogEntryEnvelope>(`${characterEntries(id, characterId)}/${enc(entryId)}/quantity`, body),
-    putCharacterEntryAttributes: (id: number, characterId: Id, entryId: Id, body: CharacterCatalogAttributesUpdateRequest) => put<CharacterCatalogEntryEnvelope>(`${characterEntries(id, characterId)}/${enc(entryId)}/attributes`, body),
-    deleteCharacterEntry: (id: number, characterId: Id, entryId: Id, expectedRevision: RevisionPayload['expectedRevision']) => send<void>(`${characterEntries(id, characterId)}/${enc(entryId)}`, 'DELETE', undefined, revQuery(expectedRevision)),
+    listCatalog: async (id: number, kind: CatalogKind) => (await send<CatalogMetadataDto[]>(catalog(id, kind))).map(entry => enrichMetadata(entry, kind)),
+    getCatalogEntry: async (id: number, kind: CatalogKind, entryId: Id) => enrichMetadata(await send<CatalogMetadataDto>(`${catalog(id, kind)}/${enc(entryId)}`), kind),
+    getCatalogContent: (id: number, kind: CatalogKind, entryId: Id) => send<CatalogContentEnvelope>(`${catalog(id, kind)}/${enc(entryId)}/content`),
+    createCatalogEntry: async (id: number, kind: CatalogKind, body: CatalogCreateRequest) => {
+      const result = await create<CatalogCreateResultDto>(catalog(id, kind), {
+        requestId: body.requestId,
+        name: body.name,
+        isHidden: body.isHidden,
+        ...(body.quantityUnit === undefined ? {} : { quantityUnit: body.quantityUnit }),
+        allowNegative: body.allowNegative,
+        description: body.description,
+        attributes: wireOccurrences(body.attributes),
+      });
+      return { ...result, entry: enrichMetadata(result.entry, kind) };
+    },
+    putCatalogMetadata: async (id: number, kind: CatalogKind, entryId: Id, body: { name: string; expectedRevision: RevisionPayload['expectedRevision']; isHidden?: boolean; quantityUnit?: string | null; allowNegative?: boolean }) => enrichMetadata(await put<CatalogMetadataDto>(`${catalog(id, kind)}/${enc(entryId)}`, {
+      name: body.name,
+      expectedRevision: body.expectedRevision,
+      ...(body.isHidden === undefined ? {} : { isHidden: body.isHidden }),
+      ...(body.quantityUnit === undefined ? {} : { quantityUnit: body.quantityUnit }),
+      ...(body.allowNegative === undefined ? {} : { allowNegative: body.allowNegative }),
+    }), kind),
+    putCatalogContent: (id: number, kind: CatalogKind, entryId: Id, body: { expectedRevision: RevisionPayload['expectedRevision']; description: string; attributes: import('./catalogTypes').CatalogAttributeOccurrence[] }) => put<CatalogContentEnvelope>(`${catalog(id, kind)}/${enc(entryId)}/content`, { expectedRevision: body.expectedRevision, description: body.description, attributes: wireOccurrences(body.attributes) }),
+    getCatalogAttributes: (id: number, kind: CatalogKind) => send<CatalogAttributeSchemaEnvelope>(`${catalog(id, kind)}/attributes`),
+    putCatalogAttributes: (id: number, kind: CatalogKind, body: { expectedRevision: RevisionPayload['expectedRevision']; definitions: import('./catalogTypes').CatalogAttributeInput[] }) => put<CatalogAttributeSchemaEnvelope>(`${catalog(id, kind)}/attributes`, { expectedRevision: body.expectedRevision, definitions: body.definitions.map(({ id: attributeId, title, typeKey, options }) => ({ ...(attributeId ? { id: attributeId } : {}), title, typeKey, options })) }),
+    getCatalogGroups: (id: number, kind: CatalogKind) => send<CatalogGroupsEnvelope>(`${catalog(id, kind)}/groups`),
+    getCatalogGroupConfiguration: (id: number, kind: CatalogKind) => send<CatalogGroupConfigurationEnvelope>(`${catalog(id, kind)}/groups/configuration`),
+    putCatalogGroups: (id: number, kind: CatalogKind, body: { expectedRevision: RevisionPayload['expectedRevision']; groups: CatalogGroupInput[] }) => put<CatalogGroupConfigurationEnvelope>(`${catalog(id, kind)}/groups`, { expectedRevision: body.expectedRevision, groups: body.groups.map(({ id: groupId, title, parentId, entryIds, condition }) => ({ ...(groupId ? { id: groupId } : {}), title, parentId, entryIds, condition: wireCondition(condition) })) }),
+    getCatalogGroupEntries: async (id: number, kind: CatalogKind, groupId: Id) => {
+      const result = await send<CatalogGroupEntriesDto>(`${catalog(id, kind)}/groups/${enc(groupId)}/entries`);
+      return { ...result, entries: result.entries.map(entry => enrichMetadata(entry, kind)) };
+    },
+    listCharacterEntries: async (id: number, kind: CatalogKind, characterId: Id) => (await send<CharacterCatalogEntryDto[]>(characterEntries(id, characterId, kind))).map(entry => enrichCharacterEntry(entry, kind)),
+    getCharacterEntry: async (id: number, kind: CatalogKind, characterId: Id, entryId: Id) => enrichCharacterEntry(await send<CharacterCatalogEntryDto>(`${characterEntries(id, characterId, kind)}/${enc(entryId)}`), kind),
+    addCharacterEntry: async (id: number, kind: CatalogKind, characterId: Id, body: CharacterCatalogAddRequest) => enrichCharacterResponse(await create<{ requestId: string; entry: CharacterCatalogEntryDto }>(characterEntries(id, characterId, kind), {
+      requestId: body.requestId,
+      catalogEntryId: body.catalogEntryId,
+      ...(body.quantity === undefined ? {} : { quantity: body.quantity }),
+      attributes: wireOccurrences(body.attributes),
+    }), kind),
+    createOwnCharacterEntry: async (id: number, kind: CatalogKind, characterId: Id, body: CharacterCatalogCreateRequest) => enrichCharacterResponse(await create<{ requestId: string; entry: CharacterCatalogEntryDto }>(`${characterEntries(id, characterId, kind)}/create`, {
+      requestId: body.requestId,
+      definition: {
+        name: body.definition.name,
+        isHidden: body.definition.isHidden,
+        ...(body.definition.quantityUnit === undefined ? {} : { quantityUnit: body.definition.quantityUnit }),
+        allowNegative: body.definition.allowNegative,
+        description: body.definition.description,
+        attributes: wireOccurrences(body.definition.attributes),
+      },
+      ...(body.quantity === undefined ? {} : { quantity: body.quantity }),
+      attributes: wireOccurrences(body.attributes),
+    }), kind),
+    getCharacterAddition: (id: number, kind: CatalogKind, characterId: Id, requestId: Id) => send<CharacterCatalogAdditionDto>(`${characterEntries(id, characterId, kind)}/additions/${enc(requestId)}`),
+    putCharacterEntryQuantity: async (id: number, characterId: Id, entryId: Id, body: CharacterCatalogQuantityUpdateRequest) => enrichCharacterEntry(await put<CharacterCatalogEntryDto>(`${characters(id)}/${enc(characterId)}/items/${enc(entryId)}/quantity`, body), 'Item'),
+    putCharacterEntryAttributes: async (id: number, kind: CatalogKind, characterId: Id, entryId: Id, body: CharacterCatalogAttributesUpdateRequest) => enrichCharacterEntry(await put<CharacterCatalogEntryDto>(`${characterEntries(id, characterId, kind)}/${enc(entryId)}/attributes`, { expectedRevision: body.expectedRevision, attributes: wireOccurrences(body.attributes) }), kind),
+    deleteCharacterEntry: (id: number, kind: CatalogKind, characterId: Id, entryId: Id, expectedRevision: RevisionPayload['expectedRevision']) => send<void>(`${characterEntries(id, characterId, kind)}/${enc(entryId)}`, 'DELETE', undefined, revQuery(expectedRevision)),
     searchUsers: async (nickname: string) => {
       const r = await request(`/users?nickname=${encodeURIComponent(nickname)}`);
       if (!r.ok) throw new CampaignApiError(r.status, { code: 'http_error', title: r.statusText, detail: r.statusText });

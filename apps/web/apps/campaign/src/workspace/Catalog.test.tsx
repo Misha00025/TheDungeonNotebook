@@ -105,9 +105,7 @@ const content: CatalogContentEnvelope = {
   campaignId: 12,
   resourceId: metadata.id,
   contentRevision: 1,
-  attributeSchemaRevision: 0,
   data: { description: 'Restores a little health.', attributes: [] },
-  diagnostics: [],
 };
 
 function resetApi() {
@@ -117,7 +115,7 @@ function resetApi() {
   state.mode = 'player';
   state.permissionsLoading = false;
   state.permissions = { canRead: true, canWrite: false, canManageAccess: false };
-  state.api.listCatalog.mockResolvedValue([metadata, skillMetadata]);
+  state.api.listCatalog.mockImplementation(async (_campaignId: number, kind: CatalogMetadata['kind']) => kind === 'Item' ? [metadata] : [skillMetadata]);
   state.api.getCatalogGroups.mockResolvedValue({ campaignId: 12, contentRevision: 0, groups: [] });
   state.api.getCatalogAttributes.mockResolvedValue({ campaignId: 12, contentRevision: 0, data: { definitions: [] } });
   state.api.getCatalogGroupEntries.mockResolvedValue({ entries: [], diagnostics: [] });
@@ -127,8 +125,8 @@ function resetApi() {
   state.api.putCatalogMetadata.mockResolvedValue({ ...metadata, metadataRevision: 2 });
   state.api.putCatalogContent.mockResolvedValue({ ...content, contentRevision: 2 });
   state.api.putCatalogAttributes.mockResolvedValue({ campaignId: 12, contentRevision: 1, data: { definitions: [] } });
-  state.api.getCatalogGroupConfiguration.mockResolvedValue({ campaignId: 12, contentRevision: 0, data: { groups: [] }, attributeSchemaRevision: 0, diagnostics: [] });
-  state.api.putCatalogGroups.mockResolvedValue({ campaignId: 12, contentRevision: 1, data: { groups: [] }, attributeSchemaRevision: 0, diagnostics: [] });
+  state.api.getCatalogGroupConfiguration.mockResolvedValue({ campaignId: 12, contentRevision: 0, data: { groups: [] }, diagnostics: [] });
+  state.api.putCatalogGroups.mockResolvedValue({ campaignId: 12, contentRevision: 1, data: { groups: [] }, diagnostics: [] });
 }
 
 const renderDefinition = (props: Partial<React.ComponentProps<typeof CatalogDefinitionDialog>> = {}) => render(
@@ -136,6 +134,7 @@ const renderDefinition = (props: Partial<React.ComponentProps<typeof CatalogDefi
     <MemoryRouter>
       <CatalogDefinitionDialog
         campaignId={12}
+        initialKind="Item"
         canAdmin={false}
         onClose={vi.fn()}
         onSaved={vi.fn()}
@@ -146,10 +145,11 @@ const renderDefinition = (props: Partial<React.ComponentProps<typeof CatalogDefi
   </RemoteAuthProvider>,
 );
 
-const renderGroupsDialog = () => render(
+const renderGroupsDialog = (kind: CatalogMetadata['kind'] = 'Item') => render(
   <MemoryRouter>
     <CatalogGroupsDialog
       campaignId={12}
+      kind={kind}
       canManage
       onClose={vi.fn()}
       onSaved={vi.fn()}
@@ -169,13 +169,13 @@ describe('campaign catalog', () => {
 
   it('lets a player browse server-visible metadata without admin configuration access and opens another creator’s entry read-only', async () => {
     const definitions = [
-      { id: 'charge', title: 'Заряды', typeKey: 'integer' as const, typeRevision: 1, options: [], isActive: true },
-      { id: 'bound', title: 'Связан', typeKey: 'boolean' as const, typeRevision: 1, options: [], isActive: true },
+      { id: 'charge', title: 'Заряды', typeKey: 'integer' as const, options: [] },
+      { id: 'bound', title: 'Связан', typeKey: 'boolean' as const, options: [] },
     ];
     state.api.getCatalogAttributes.mockResolvedValue({ campaignId: 12, contentRevision: 1, data: { definitions } });
     state.api.getCatalogContent.mockResolvedValue({ ...content, data: { description: content.data.description, attributes: [
-      { id: 'charge-value', attributeId: 'charge', typeKey: 'integer', typeRevision: 1, value: 0, editLevel: 'Definition' },
-      { id: 'bound-value', attributeId: 'bound', typeKey: 'boolean', typeRevision: 1, value: false, editLevel: 'Definition' },
+      { id: 'charge-value', attributeId: 'charge', value: 0, editLevel: 'Definition' },
+      { id: 'bound-value', attributeId: 'bound', value: false, editLevel: 'Definition' },
     ] } });
     renderCatalog();
 
@@ -194,7 +194,7 @@ describe('campaign catalog', () => {
     expect(within(dialog).queryByRole('textbox', { name: 'Название' })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Редактировать' })).not.toBeInTheDocument();
     expect(within(dialog).queryByText('Настройки каталога')).not.toBeInTheDocument();
-    expect(state.api.listCatalog).toHaveBeenCalledWith(12);
+    expect(state.api.listCatalog).toHaveBeenCalledWith(12, 'Item');
     expect(screen.queryByRole('button', { name: 'Создать предмет' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Создать навык' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Атрибуты каталога' })).not.toBeInTheDocument();
@@ -218,16 +218,16 @@ describe('campaign catalog', () => {
         { id: 'group-magic', title: 'Magic shelf', parentId: 'group-root' },
       ],
     });
-    state.api.getCatalogGroupEntries.mockImplementation(async (_campaignId: number, groupId: string) => ({
-      entries: groupId === 'group-magic' ? [skillMetadata] : [],
+    state.api.getCatalogGroupEntries.mockImplementation(async (_campaignId: number, kind: CatalogMetadata['kind'], groupId: string) => ({
+      entries: kind === 'Skill' && groupId === 'group-magic' ? [skillMetadata] : [],
       diagnostics: [],
     }));
-    state.api.createCatalogEntry.mockImplementation(async (_campaignId: number, request: CatalogCreateRequest) => {
+    state.api.createCatalogEntry.mockImplementation(async (_campaignId: number, kind: CatalogMetadata['kind'], request: CatalogCreateRequest) => {
       const entry: CatalogMetadata = {
-        id: `created-${request.kind}`,
+        id: `created-${kind}`,
         campaignId: 12,
         name: request.name,
-        kind: request.kind,
+        kind,
         creatorUserId: 4,
         isHidden: request.isHidden,
         quantityUnit: request.quantityUnit ?? null,
@@ -279,12 +279,12 @@ describe('campaign catalog', () => {
     fireEvent.click(within(itemDialog).getByRole('checkbox', { name: 'Разрешить отрицательное количество' }));
     fireEvent.click(within(itemDialog).getByRole('button', { name: 'Создать предмет' }));
     await waitFor(() => expect(state.api.createCatalogEntry).toHaveBeenCalledTimes(1));
-    expect(state.api.createCatalogEntry.mock.calls[0][1]).toMatchObject({
+    expect(state.api.createCatalogEntry.mock.calls[0][2]).toMatchObject({
       name: 'Created tonic',
-      kind: 'Item',
       quantityUnit: 'Fractional',
       allowNegative: true,
     });
+    expect(state.api.createCatalogEntry.mock.calls[0][1]).toBe('Item');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Новый предмет' })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('link', { name: 'Навыки' }));
@@ -300,25 +300,25 @@ describe('campaign catalog', () => {
     fireEvent.change(within(skillDialog).getByRole('textbox', { name: 'Название' }), { target: { value: 'Created skill' } });
     fireEvent.click(within(skillDialog).getByRole('button', { name: 'Создать навык' }));
     await waitFor(() => expect(state.api.createCatalogEntry).toHaveBeenCalledTimes(2));
-    expect(state.api.createCatalogEntry.mock.calls[1][1]).toMatchObject({
+    expect(state.api.createCatalogEntry.mock.calls[1][2]).toMatchObject({
       name: 'Created skill',
-      kind: 'Skill',
       quantityUnit: null,
       allowNegative: false,
     });
+    expect(state.api.createCatalogEntry.mock.calls[1][1]).toBe('Skill');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Новый навык' })).not.toBeInTheDocument());
   });
 
   it('shows grouped attribute tags once per branch and reuses lazy content reads across expansion', async () => {
     const sharedEntry = { ...metadata, id: 'entry-shared', name: 'Shared relic' };
-    const attribute = { id: 'attribute-type', title: 'Тип', typeKey: 'string' as const, typeRevision: 1, options: [], isActive: true };
+    const attribute = { id: 'attribute-type', title: 'Тип', typeKey: 'string' as const, options: [] };
     const taggedContent: CatalogContentEnvelope = {
       ...content,
       resourceId: sharedEntry.id,
       data: { description: '', attributes: [
-        { id: 'occurrence-weapon', attributeId: attribute.id, typeKey: 'string', typeRevision: 1, value: 'Оружие', editLevel: 'Definition' },
-        { id: 'occurrence-one-handed', attributeId: attribute.id, typeKey: 'string', typeRevision: 1, value: 'Одноручное', editLevel: 'Definition' },
-        { id: 'occurrence-polearm', attributeId: attribute.id, typeKey: 'string', typeRevision: 1, value: 'Древковое', editLevel: 'Definition' },
+        { id: 'occurrence-weapon', attributeId: attribute.id, value: 'Оружие', editLevel: 'Definition' },
+        { id: 'occurrence-one-handed', attributeId: attribute.id, value: 'Одноручное', editLevel: 'Definition' },
+        { id: 'occurrence-polearm', attributeId: attribute.id, value: 'Древковое', editLevel: 'Definition' },
       ] },
     };
     state.api.listCatalog.mockResolvedValue([sharedEntry]);
@@ -332,11 +332,11 @@ describe('campaign catalog', () => {
       ],
     });
     state.api.getCatalogAttributes.mockResolvedValue({ campaignId: 12, contentRevision: 1, data: { definitions: [attribute] } });
-    state.api.getCatalogGroupEntries.mockImplementation(async (_campaignId: number, groupId: string) => ({
+    state.api.getCatalogGroupEntries.mockImplementation(async (_campaignId: number, _kind: CatalogMetadata['kind'], groupId: string) => ({
       entries: [sharedEntry],
       diagnostics: [],
     }));
-    state.api.getCatalogContent.mockImplementation(async (_campaignId: number, entryId: string) => ({ ...taggedContent, resourceId: entryId }));
+    state.api.getCatalogContent.mockImplementation(async (_campaignId: number, _kind: CatalogMetadata['kind'], entryId: string) => ({ ...taggedContent, resourceId: entryId }));
     renderCatalog();
 
     await screen.findByText('Root group');
@@ -348,7 +348,7 @@ describe('campaign catalog', () => {
     expect(entryButtons).toHaveLength(2);
     await Promise.all(entryButtons.map(button => within(button).findByText('Тип: Оружие; Одноручное; Древковое')));
     expect(state.api.getCatalogContent).toHaveBeenCalledTimes(1);
-    expect(state.api.getCatalogContent).toHaveBeenCalledWith(12, sharedEntry.id);
+    expect(state.api.getCatalogContent).toHaveBeenCalledWith(12, 'Item', sharedEntry.id);
     expect(state.api.getCatalogEntry).not.toHaveBeenCalled();
     const search = screen.getByRole('textbox', { name: 'Поиск по названию' });
     fireEvent.change(search, { target: { value: 'Одноручное' } });
@@ -385,7 +385,7 @@ describe('campaign catalog', () => {
     state.api.getCatalogGroupEntries
       .mockImplementationOnce(async () => ({ entries: [goodEntry], diagnostics: [] }))
       .mockRejectedValueOnce(new Error('private error payload'))
-      .mockImplementation(async (_campaignId: number, groupId: string) => ({
+      .mockImplementation(async (_campaignId: number, _kind: CatalogMetadata['kind'], groupId: string) => ({
         entries: groupId === 'group-good' ? [goodEntry] : [failedEntry],
         diagnostics: [],
       }));
@@ -416,12 +416,12 @@ describe('campaign catalog', () => {
     state.permissions = { canRead: true, canWrite: true, canManageAccess: false };
     const ownedEntry = { ...metadata, name: 'Old tonic', creatorUserId: 4 };
     const renamedEntry = { ...ownedEntry, name: 'Renamed tonic', metadataRevision: 2 };
-    const attribute = { id: 'attribute-type', title: 'Тип', typeKey: 'string' as const, typeRevision: 1, options: [], isActive: true };
+    const attribute = { id: 'attribute-type', title: 'Тип', typeKey: 'string' as const, options: [] };
     const initialContent: CatalogContentEnvelope = {
       ...content,
       resourceId: ownedEntry.id,
       data: { description: '', attributes: [{
-        id: 'occurrence-type', attributeId: attribute.id, typeKey: 'string', typeRevision: 1, value: 'Старое значение', editLevel: 'Definition',
+        id: 'occurrence-type', attributeId: attribute.id, value: 'Старое значение', editLevel: 'Definition',
       }] },
     };
     const savedContent: CatalogContentEnvelope = {
@@ -464,8 +464,8 @@ describe('campaign catalog', () => {
 
     await waitFor(() => expect(state.api.putCatalogMetadata).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(state.api.putCatalogContent).toHaveBeenCalledTimes(1));
-    expect(state.api.putCatalogMetadata.mock.calls[0][2]).toMatchObject({ name: 'Renamed tonic', expectedRevision: 1 });
-    expect(state.api.putCatalogContent.mock.calls[0][2]).toMatchObject({ attributes: [expect.objectContaining({ value: 'Новое значение' })] });
+    expect(state.api.putCatalogMetadata.mock.calls[0][3]).toMatchObject({ name: 'Renamed tonic', expectedRevision: 1 });
+    expect(state.api.putCatalogContent.mock.calls[0][3]).toMatchObject({ attributes: [expect.objectContaining({ value: 'Новое значение' })] });
     await within(dialog).findByText('Изменения сохранены.');
     fireEvent.click(within(dialog).getByText('Закрыть', { selector: 'button' }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Renamed tonic' })).not.toBeInTheDocument());
@@ -487,11 +487,11 @@ describe('catalog definition recovery and group editing', () => {
     const currentContent = { ...initialContent, contentRevision: 8, data: { description: 'Server copy', attributes: [] } };
     const savedMetadata = { ...ownedEntry, name: 'Renamed tonic', metadataRevision: 2 };
     state.api.getCatalogEntry.mockResolvedValueOnce(ownedEntry).mockResolvedValueOnce(savedMetadata);
-    state.api.getCatalogContent.mockResolvedValueOnce(initialContent).mockResolvedValueOnce(currentContent);
+    state.api.getCatalogContent.mockResolvedValueOnce(initialContent).mockResolvedValueOnce(initialContent).mockResolvedValueOnce(currentContent);
     state.api.putCatalogMetadata.mockResolvedValue(savedMetadata);
     state.api.putCatalogContent
       .mockRejectedValueOnce(new CampaignApiError(409, { code: 'content_revision_conflict', title: 'Conflict', detail: 'stale' }))
-      .mockImplementationOnce(async (_campaignId: number, _entryId: string, body: { expectedRevision: number; description: string; attributes: [] }) => ({
+      .mockImplementationOnce(async (_campaignId: number, _kind: CatalogMetadata['kind'], _entryId: string, body: { expectedRevision: number; description: string; attributes: [] }) => ({
         ...currentContent,
         contentRevision: body.expectedRevision + 1,
         data: { description: body.description, attributes: body.attributes },
@@ -508,11 +508,11 @@ describe('catalog definition recovery and group editing', () => {
     expect(await within(dialog).findByRole('button', { name: 'Проверить актуальные данные' })).toBeInTheDocument();
     expect(state.api.putCatalogMetadata).toHaveBeenCalledTimes(1);
     expect(state.api.putCatalogContent).toHaveBeenCalledTimes(1);
-    expect(state.api.putCatalogMetadata.mock.calls[0][2]).toMatchObject({
+    expect(state.api.putCatalogMetadata.mock.calls[0][3]).toMatchObject({
       name: 'Renamed tonic',
       expectedRevision: 1,
     });
-    expect(state.api.putCatalogContent.mock.calls[0][2]).toMatchObject({
+    expect(state.api.putCatalogContent.mock.calls[0][3]).toMatchObject({
       expectedRevision: 5,
       description: 'My content draft',
     });
@@ -525,7 +525,7 @@ describe('catalog definition recovery and group editing', () => {
 
     await waitFor(() => expect(state.api.putCatalogContent).toHaveBeenCalledTimes(2));
     expect(state.api.putCatalogMetadata).toHaveBeenCalledTimes(1);
-    expect(state.api.putCatalogContent.mock.calls[1][2]).toMatchObject({
+    expect(state.api.putCatalogContent.mock.calls[1][3]).toMatchObject({
       expectedRevision: 8,
       description: 'My content draft',
     });
@@ -543,13 +543,12 @@ describe('catalog definition recovery and group editing', () => {
 
     const checkButton = await within(dialog).findByRole('button', { name: 'Проверить результат' });
     await waitFor(() => expect(state.api.createCatalogEntry).toHaveBeenCalledTimes(1));
-    const requestId = state.api.createCatalogEntry.mock.calls[0][1].requestId;
-    expect(state.api.getCatalogEntry).toHaveBeenLastCalledWith(12, requestId);
-    expect(state.api.getCatalogContent).toHaveBeenLastCalledWith(12, requestId);
-    expect(state.api.createCatalogEntry.mock.calls[0][1]).toMatchObject({
+    const requestId = state.api.createCatalogEntry.mock.calls[0][2].requestId;
+    expect(state.api.getCatalogEntry).toHaveBeenLastCalledWith(12, 'Item', requestId);
+    expect(state.api.getCatalogContent).toHaveBeenLastCalledWith(12, 'Item', requestId);
+    expect(state.api.createCatalogEntry.mock.calls[0][2]).toMatchObject({
       requestId,
       name: 'New tonic',
-      kind: 'Item',
       quantityUnit: 'Whole',
       allowNegative: false,
     });
@@ -558,7 +557,7 @@ describe('catalog definition recovery and group editing', () => {
     await waitFor(() => expect(state.api.getCatalogEntry).toHaveBeenCalledTimes(2));
     expect(state.api.getCatalogContent).toHaveBeenCalledTimes(2);
     expect(state.api.createCatalogEntry).toHaveBeenCalledTimes(1);
-    expect(state.api.createCatalogEntry.mock.calls[0][1].requestId).toBe(requestId);
+    expect(state.api.createCatalogEntry.mock.calls[0][2].requestId).toBe(requestId);
     expect(within(dialog).getByRole('button', { name: 'Проверить результат' })).toBeInTheDocument();
     expect(within(dialog).queryByText('not published yet')).not.toBeInTheDocument();
   });
@@ -567,8 +566,6 @@ describe('catalog definition recovery and group editing', () => {
     const staleCondition = {
       operator: 'eq' as const,
       attributeId: 'attribute-strength',
-      typeKey: 'integer',
-      typeRevision: 1,
       value: 2,
     };
     const group = {
@@ -582,20 +579,18 @@ describe('catalog definition recovery and group editing', () => {
       campaignId: 12,
       contentRevision: 5,
       data: { groups: [group] },
-      attributeSchemaRevision: 2,
       diagnostics: [{ groupId: group.id, entryId: null, code: 'incompatible_attribute_type' }],
     });
     state.api.listCatalog.mockResolvedValue([metadata]);
     state.api.getCatalogAttributes.mockResolvedValue({
       campaignId: 12,
       contentRevision: 2,
-      data: { definitions: [{ id: 'attribute-strength', title: 'Strength', typeKey: 'integer', typeRevision: 2, options: [], isActive: true }] },
+      data: { definitions: [{ id: 'attribute-strength', title: 'Strength', typeKey: 'string', options: [] }] },
     });
     const savedConfiguration = {
       campaignId: 12,
       contentRevision: 6,
       data: { groups: [{ ...group, title: 'Renamed group' }] },
-      attributeSchemaRevision: 2,
       diagnostics: [{ groupId: group.id, entryId: null, code: 'incompatible_attribute_type' }],
     };
     state.api.putCatalogGroups.mockResolvedValue(savedConfiguration);
@@ -607,7 +602,7 @@ describe('catalog definition recovery and group editing', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить группы' }));
 
     await waitFor(() => expect(state.api.putCatalogGroups).toHaveBeenCalledTimes(1));
-    expect(state.api.putCatalogGroups.mock.calls[0][1]).toEqual({
+    expect(state.api.putCatalogGroups.mock.calls[0][2]).toEqual({
       expectedRevision: 5,
       groups: [{
         id: group.id,
@@ -641,19 +636,17 @@ describe('catalog definition recovery and group editing', () => {
       campaignId: 12,
       contentRevision: 11,
       data: { groups: [firstGroup, secondGroup] },
-      attributeSchemaRevision: 4,
       diagnostics: [],
     });
     state.api.getCatalogAttributes.mockResolvedValue({
       campaignId: 12,
       contentRevision: 4,
-      data: { definitions: [{ id: 'attribute-power', title: 'Power', typeKey: 'integer', typeRevision: 4, options: [], isActive: true }] },
+      data: { definitions: [{ id: 'attribute-power', title: 'Power', typeKey: 'integer', options: [] }] },
     });
     state.api.putCatalogGroups.mockResolvedValue({
       campaignId: 12,
       contentRevision: 12,
       data: { groups: [firstGroup, secondGroup] },
-      attributeSchemaRevision: 4,
       diagnostics: [],
     });
     renderGroupsDialog();
@@ -697,7 +690,7 @@ describe('catalog definition recovery and group editing', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить группы' }));
     await waitFor(() => expect(state.api.putCatalogGroups).toHaveBeenCalledTimes(1));
-    const submitted = state.api.putCatalogGroups.mock.calls[0][1];
+    const submitted = state.api.putCatalogGroups.mock.calls[0][2];
     expect(submitted.expectedRevision).toBe(11);
     expect(submitted.groups).toMatchObject([
       {
@@ -715,7 +708,7 @@ describe('catalog definition recovery and group editing', () => {
       },
     ]);
     expect(stringifyJson(submitted.groups[0].condition)).toBe(
-      '{"operator":"eq","attributeId":"attribute-power","typeKey":"integer","typeRevision":4,"value":7}',
+      '{"operator":"eq","attributeId":"attribute-power","value":7}',
     );
     expect(state.api.putCatalogMetadata).not.toHaveBeenCalled();
     expect(state.api.putCatalogAttributes).not.toHaveBeenCalled();
@@ -728,7 +721,6 @@ describe('catalog definition recovery and group editing', () => {
       campaignId: 12,
       contentRevision: 3,
       data: { groups: [parent, child] },
-      attributeSchemaRevision: 0,
       diagnostics: [],
     });
     state.api.listCatalog.mockResolvedValue([metadata]);
@@ -736,7 +728,6 @@ describe('catalog definition recovery and group editing', () => {
       campaignId: 12,
       contentRevision: 4,
       data: { groups: [{ ...child, parentId: null }] },
-      attributeSchemaRevision: 0,
       diagnostics: [],
     });
     renderGroupsDialog();
@@ -755,7 +746,7 @@ describe('catalog definition recovery and group editing', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Удалить группу Parent' }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить группы' }));
     await waitFor(() => expect(state.api.putCatalogGroups).toHaveBeenCalledTimes(1));
-    expect(state.api.putCatalogGroups.mock.calls[0][1]).toEqual({
+    expect(state.api.putCatalogGroups.mock.calls[0][2]).toEqual({
       expectedRevision: 3,
       groups: [{ id: child.id, title: child.title, parentId: null, entryIds: [], condition: null }],
     });
@@ -769,10 +760,10 @@ describe('catalog definition recovery and group editing', () => {
     let confirmedGroups: CatalogGroup[] = [root, other];
     let revision = 8;
     let generatedId = 0;
-    state.api.getCatalogGroupConfiguration.mockResolvedValue({ campaignId: 12, contentRevision: revision, data: { groups: confirmedGroups }, attributeSchemaRevision: 0, diagnostics: [] });
+    state.api.getCatalogGroupConfiguration.mockResolvedValue({ campaignId: 12, contentRevision: revision, data: { groups: confirmedGroups }, diagnostics: [] });
     state.api.listCatalog.mockResolvedValue([]);
     state.api.getCatalogAttributes.mockResolvedValue({ campaignId: 12, contentRevision: 0, data: { definitions: [] } });
-    state.api.putCatalogGroups.mockImplementation(async (_campaignId: number, body: GroupPutBody) => {
+    state.api.putCatalogGroups.mockImplementation(async (_campaignId: number, _kind: CatalogMetadata['kind'], body: GroupPutBody) => {
       const existingIds = new Set(confirmedGroups.map(group => group.id));
       const assigned: CatalogGroup[] = body.groups.map((group): CatalogGroup => {
         if (group.id && !existingIds.has(group.id)) throw new Error('A new group ID was supplied to the server.');
@@ -784,7 +775,7 @@ describe('catalog definition recovery and group editing', () => {
       }
       confirmedGroups = assigned;
       revision += 1;
-      const result: CatalogGroupConfigurationEnvelope = { campaignId: 12, contentRevision: revision, data: { groups: confirmedGroups }, attributeSchemaRevision: 0, diagnostics: [] };
+      const result: CatalogGroupConfigurationEnvelope = { campaignId: 12, contentRevision: revision, data: { groups: confirmedGroups }, diagnostics: [] };
       state.api.getCatalogGroupConfiguration.mockResolvedValue(result);
       return result;
     });
@@ -814,7 +805,7 @@ describe('catalog definition recovery and group editing', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить группы' }));
     await waitFor(() => expect(state.api.putCatalogGroups).toHaveBeenCalledTimes(2));
 
-    const firstStage = state.api.putCatalogGroups.mock.calls[0][1] as GroupPutBody;
+    const firstStage = state.api.putCatalogGroups.mock.calls[0][2] as GroupPutBody;
     expect(firstStage).toEqual({
       expectedRevision: 8,
       groups: [
@@ -823,7 +814,7 @@ describe('catalog definition recovery and group editing', () => {
         { title: 'Child', parentId: root.id, entryIds: [], condition: null },
       ],
     });
-    const finalStage = state.api.putCatalogGroups.mock.calls[1][1] as GroupPutBody;
+    const finalStage = state.api.putCatalogGroups.mock.calls[1][2] as GroupPutBody;
     expect(finalStage).toEqual({
       expectedRevision: 9,
       groups: [
@@ -842,11 +833,11 @@ describe('catalog definition recovery and group editing', () => {
     const root: CatalogGroup = { id: 'saved-root', title: 'Root', parentId: null, entryIds: [], condition: null };
     let confirmedGroups: CatalogGroup[] = [root];
     let revision = 30;
-    state.api.getCatalogGroupConfiguration.mockResolvedValue({ campaignId: 12, contentRevision: revision, data: { groups: confirmedGroups }, attributeSchemaRevision: 0, diagnostics: [] });
+    state.api.getCatalogGroupConfiguration.mockResolvedValue({ campaignId: 12, contentRevision: revision, data: { groups: confirmedGroups }, diagnostics: [] });
     state.api.listCatalog.mockResolvedValue([]);
     state.api.getCatalogAttributes.mockResolvedValue({ campaignId: 12, contentRevision: 0, data: { definitions: [] } });
     state.api.putCatalogGroups
-      .mockImplementationOnce(async (_campaignId: number, body: GroupPutBody) => {
+      .mockImplementationOnce(async (_campaignId: number, _kind: CatalogMetadata['kind'], body: GroupPutBody) => {
         const priorIds = new Set(confirmedGroups.map(group => group.id));
         const assigned: CatalogGroup[] = body.groups.map((group): CatalogGroup => {
           if (group.id && !priorIds.has(group.id)) throw new Error('A new group ID was supplied to the server.');
@@ -856,7 +847,7 @@ describe('catalog definition recovery and group editing', () => {
         if (assigned.some(group => group.parentId && !assignedIds.has(group.parentId))) throw new Error('A parent was not included in the request.');
         confirmedGroups = assigned;
         revision += 1;
-        const result = { campaignId: 12, contentRevision: revision, data: { groups: confirmedGroups }, attributeSchemaRevision: 0, diagnostics: [] };
+        const result = { campaignId: 12, contentRevision: revision, data: { groups: confirmedGroups }, diagnostics: [] };
         state.api.getCatalogGroupConfiguration.mockResolvedValue(result);
         return result;
       })
@@ -880,14 +871,14 @@ describe('catalog definition recovery and group editing', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить группы' }));
     await waitFor(() => expect(state.api.putCatalogGroups).toHaveBeenCalledTimes(2));
     expect(confirmedGroups.map(group => group.id)).toEqual([root.id, 'server-child']);
-    expect(state.api.putCatalogGroups.mock.calls[0][1]).toEqual({
+    expect(state.api.putCatalogGroups.mock.calls[0][2]).toEqual({
       expectedRevision: 30,
       groups: [
         { id: root.id, title: root.title, parentId: null, entryIds: [], condition: null },
         { title: 'Child', parentId: root.id, entryIds: [], condition: null },
       ],
     });
-    expect(state.api.putCatalogGroups.mock.calls[1][1]).toEqual({
+    expect(state.api.putCatalogGroups.mock.calls[1][2]).toEqual({
       expectedRevision: 31,
       groups: [
         { id: root.id, title: root.title, parentId: null, entryIds: [], condition: null },
@@ -921,12 +912,10 @@ describe('catalog attribute schema options', () => {
       id: 'attr-tags',
       title: 'Tags',
       typeKey: 'multiChoice' as const,
-      typeRevision: 3,
       options: [
         { optionKey: 'option-stealth', title: 'Stealth' },
         { optionKey: 'option-lore', title: 'Lore' },
       ],
-      isActive: true,
     };
     const schema = {
       campaignId: 12,
@@ -965,14 +954,13 @@ describe('catalog attribute schema options', () => {
 
     fireEvent.click(within(schemaDialog).getByRole('button', { name: 'Сохранить схему' }));
     await waitFor(() => expect(state.api.putCatalogAttributes).toHaveBeenCalledTimes(1));
-    expect(state.api.putCatalogAttributes.mock.calls[0][1]).toEqual({
+    expect(state.api.putCatalogAttributes.mock.calls[0][2]).toEqual({
       expectedRevision: 7,
       definitions: [{
         id: 'attr-tags',
         title: 'Tags',
         typeKey: 'multiChoice',
         options: [{ optionKey: 'option-stealth', title: 'Quiet' }],
-        isActive: true,
       }],
     });
   });

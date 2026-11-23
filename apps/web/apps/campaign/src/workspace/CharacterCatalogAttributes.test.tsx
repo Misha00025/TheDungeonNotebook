@@ -9,15 +9,13 @@ const choices: CatalogAttributeDefinition = {
   id: 'tags',
   title: 'Теги',
   typeKey: 'multiChoice',
-  typeRevision: 4,
   options: [{ optionKey: 'key-a', title: 'Альфа' }, { optionKey: 'key-b', title: 'Бета' }],
-  isActive: true,
 };
 
 describe('character catalog attributes', () => {
   it('keeps a MultiChoice draft isolated until Apply and preserves it while temporarily disabled', async () => {
-    const saved: CatalogAttributeOccurrence = { id: 'saved-tags', attributeId: 'tags', typeKey: 'multiChoice', typeRevision: 4, value: ['key-a'], editLevel: 'Character' };
-    const source: CatalogAttributeOccurrence = { id: 'saved-tags', attributeId: 'tags', typeKey: 'multiChoice', typeRevision: 4, value: ['key-a'], editLevel: 'Character' };
+    const saved: CatalogAttributeOccurrence = { id: 'saved-tags', attributeId: 'tags', value: ['key-a'], editLevel: 'Character' };
+    const source: CatalogAttributeOccurrence = { id: 'saved-tags', attributeId: 'tags', value: ['key-a'], editLevel: 'Character' };
     const onChange = vi.fn();
     const submit = vi.fn();
     const Harness: React.FC<{ disabled: boolean }> = ({ disabled }) => {
@@ -40,8 +38,8 @@ describe('character catalog attributes', () => {
     fireEvent.click(within(dialog).getByLabelText('Бета'));
     view.rerender(<Harness disabled />);
     dialog = screen.getByRole('dialog', { name: 'Значения: Теги' });
-    expect(within(dialog).getByText(/Черновик сохранён и не применён/)).toBeInTheDocument();
-    expect(within(dialog).getByText('Альфа; Бета')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Черновик выбора сохранён/)).toBeInTheDocument();
+    expect(within(dialog).getByText('Альфа, Бета')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: 'Применить' })).toBeDisabled();
     expect(dialog.textContent).not.toContain('key-a');
     expect(dialog.textContent).not.toContain('key-b');
@@ -56,11 +54,11 @@ describe('character catalog attributes', () => {
   });
 
   it('validates edits to repeated numeric occurrences and preserves falsy and lossless values', async () => {
-    const number: CatalogAttributeDefinition = { id: 'number', title: 'Число', typeKey: 'integer', typeRevision: 2, options: [], isActive: true };
-    const flag: CatalogAttributeDefinition = { id: 'flag', title: 'Флаг', typeKey: 'boolean', typeRevision: 1, options: [], isActive: true };
-    const fixed: CatalogAttributeOccurrence = { id: 'fixed-zero', attributeId: 'number', typeKey: 'integer', typeRevision: 2, value: 0, editLevel: 'Definition' };
-    const editable: CatalogAttributeOccurrence = { id: 'editable-large', attributeId: 'number', typeKey: 'integer', typeRevision: 2, value: new LosslessNumber('9007199254740993'), editLevel: 'Character' };
-    const savedFalse: CatalogAttributeOccurrence = { id: 'saved-false', attributeId: 'flag', typeKey: 'boolean', typeRevision: 1, value: false, editLevel: 'Character' };
+    const number: CatalogAttributeDefinition = { id: 'number', title: 'Число', typeKey: 'integer', options: [] };
+    const flag: CatalogAttributeDefinition = { id: 'flag', title: 'Флаг', typeKey: 'boolean', options: [] };
+    const fixed: CatalogAttributeOccurrence = { id: 'fixed-zero', attributeId: 'number', value: 0, editLevel: 'Definition' };
+    const editable: CatalogAttributeOccurrence = { id: 'editable-large', attributeId: 'number', value: new LosslessNumber('9007199254740993'), editLevel: 'Character' };
+    const savedFalse: CatalogAttributeOccurrence = { id: 'saved-false', attributeId: 'flag', value: false, editLevel: 'Character' };
     const submit = vi.fn();
     const Harness: React.FC = () => {
       const [values, setValues] = useState([savedFalse]);

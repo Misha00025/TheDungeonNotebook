@@ -144,22 +144,22 @@ describe('campaign typed client', () => {
   });
 
   it('writes catalog occurrences and nested group conditions as native lossless JSON', async () => {
-    const contentResponse = new Response('{"campaignId":7,"resourceId":"entry","contentRevision":9223372036854775807,"attributeSchemaRevision":9223372036854775806,"data":{"description":"","attributes":[]},"diagnostics":[]}');
-    const groupsResponse = new Response('{"campaignId":7,"contentRevision":9223372036854775807,"data":{"groups":[]},"attributeSchemaRevision":9223372036854775806,"diagnostics":[]}');
+    const contentResponse = new Response('{"campaignId":7,"resourceId":"entry","contentRevision":9223372036854775807,"data":{"description":"","attributes":[]}}');
+    const groupsResponse = new Response('{"campaignId":7,"contentRevision":9223372036854775807,"data":{"groups":[]},"diagnostics":[]}');
     const { api, calls, request } = harness([contentResponse, groupsResponse]);
 
-    await api.putCatalogContent(7, 'entry-guid', {
+    await api.putCatalogContent(7, 'Item', 'entry-guid', {
       expectedRevision: parseJson('9223372036854775806') as any,
       description: '',
       attributes: [
-        { id: 'occ-int', attributeId: 'attr-int', typeKey: 'integer', typeRevision: parseJson('9223372036854775807') as any, value: 0, editLevel: 'Definition' },
-        { id: 'occ-bool', attributeId: 'attr-bool', typeKey: 'boolean', typeRevision: 1, value: false, editLevel: 'Character' },
-        { id: 'occ-list', attributeId: 'attr-list', typeKey: 'multiChoice', typeRevision: 1, value: [], editLevel: 'Definition' },
-        { id: 'occ-number', attributeId: 'attr-number', typeKey: 'number', typeRevision: 2, value: parseJson('0.125') as any, editLevel: 'Definition' },
+        { id: 'occ-int', attributeId: 'attr-int', value: 0, editLevel: 'Definition' },
+        { id: 'occ-bool', attributeId: 'attr-bool', value: false, editLevel: 'Character' },
+        { id: 'occ-list', attributeId: 'attr-list', value: [], editLevel: 'Definition' },
+        { id: 'occ-number', attributeId: 'attr-number', value: parseJson('0.125') as any, editLevel: 'Definition' },
       ],
     });
 
-    await api.putCatalogGroups(7, {
+    await api.putCatalogGroups(7, 'Item', {
       expectedRevision: parseJson('9223372036854775806') as any,
       groups: [{
         id: 'group-guid',
@@ -173,8 +173,6 @@ describe('campaign typed client', () => {
             children: [{
               operator: 'eq',
               attributeId: 'attr-number',
-              typeKey: 'number',
-              typeRevision: 2,
               value: parseJson('0.25') as any,
             }],
           }],
@@ -183,8 +181,8 @@ describe('campaign typed client', () => {
     });
 
     expect(calls.map(([url]) => url)).toEqual([
-      '/api/campaigns/7/catalog/entry-guid/content',
-      '/api/campaigns/7/catalog/groups',
+      '/api/campaigns/7/items/entry-guid/content',
+      '/api/campaigns/7/items/groups',
     ]);
     const contentBody = parseJson(String(calls[0][1]?.body)) as any;
     expect(String(contentBody.expectedRevision)).toBe('9223372036854775806');
@@ -199,9 +197,7 @@ describe('campaign typed client', () => {
         children: [{
           operator: 'eq',
           attributeId: 'attr-number',
-          typeKey: 'number',
-          typeRevision: 2,
-          value: expect.anything(),
+      value: expect.anything(),
         }],
       }],
     });
@@ -214,21 +210,21 @@ describe('campaign typed client', () => {
   it('uses personal-entry routes and keeps add wrappers and independent revisions lossless', async () => {
     const recordId = 'character-record';
     const sourceId = 'hidden-catalog-definition';
-    const entry = `{"record":{"id":"${recordId}","campaignId":7,"characterId":"character-guid","catalogEntryId":"${sourceId}","quantity":9007199254740993.125,"metadataRevision":9223372036854775806},"definition":{"id":"${sourceId}","campaignId":7,"name":"Hidden ration","kind":"Item","creatorUserId":null,"isHidden":true,"quantityUnit":"Fractional","allowNegative":false,"metadataRevision":2},"definitionDescription":"","effectiveAttributes":[],"explicitAttributes":[],"diagnostics":[],"schemaRevision":1,"definitionContentRevision":3,"localContentRevision":9223372036854775805}`;
+    const entry = `{"record":{"id":"${recordId}","campaignId":7,"characterId":"character-guid","catalogEntryId":"${sourceId}","quantity":9007199254740993.125,"metadataRevision":9223372036854775806},"definition":{"id":"${sourceId}","campaignId":7,"name":"Hidden ration","creatorUserId":null,"isHidden":true,"quantityUnit":"Fractional","allowNegative":false,"metadataRevision":2},"definitionDescription":"","effectiveAttributes":[],"explicitAttributes":[],"definitionContentRevision":3,"localContentRevision":9223372036854775805}`;
     const { api, calls } = harness([
       new Response(`[${entry}]`),
       new Response(`{"requestId":"request-add","entry":${entry}}`),
       new Response(null, { status: 204 }),
     ]);
 
-    const listed = await api.listCharacterEntries(7, 'character-guid');
-    const added = await api.addCharacterEntry(7, 'character-guid', {
+    const listed = await api.listCharacterEntries(7, 'Item', 'character-guid');
+    const added = await api.addCharacterEntry(7, 'Item', 'character-guid', {
       requestId: 'request-add',
       catalogEntryId: sourceId,
       quantity: parseJson('0.125') as any,
       attributes: [],
     });
-    await api.deleteCharacterEntry(7, 'character-guid', recordId, parseJson('9223372036854775806') as any);
+    await api.deleteCharacterEntry(7, 'Item', 'character-guid', recordId, parseJson('9223372036854775806') as any);
 
     expect(String(listed[0].record.quantity)).toBe('9007199254740993.125');
     expect(String(listed[0].record.metadataRevision)).toBe('9223372036854775806');
@@ -236,9 +232,9 @@ describe('campaign typed client', () => {
     expect(added.requestId).toBe('request-add');
     expect(added.entry.record.id).toBe(recordId);
     expect(calls.map(([url]) => url)).toEqual([
-      '/api/campaigns/7/characters/character-guid/entries',
-      '/api/campaigns/7/characters/character-guid/entries',
-      `/api/campaigns/7/characters/character-guid/entries/${recordId}?expectedRevision=9223372036854775806`,
+      '/api/campaigns/7/characters/character-guid/items',
+      '/api/campaigns/7/characters/character-guid/items',
+      `/api/campaigns/7/characters/character-guid/items/${recordId}?expectedRevision=9223372036854775806`,
     ]);
     expect(String(calls[1][1]?.body)).toContain('"quantity":0.125');
     expect(String(calls[1][1]?.body)).not.toContain('"quantity":"0.125"');

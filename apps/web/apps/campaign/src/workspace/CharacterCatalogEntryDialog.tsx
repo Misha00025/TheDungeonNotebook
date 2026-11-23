@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActionRow, Button, ModalPortal, StatePanel, useAuth } from '@tdn/shared';
 import { compareNumber } from 'lossless-json';
 import type { JsonNumber } from './types';
-import type { CatalogAttributeDefinition, CatalogAttributeOccurrence, CatalogDiagnostic, CharacterCatalogEntryEnvelope } from './catalogTypes';
+import type { CatalogAttributeDefinition, CatalogAttributeOccurrence, CharacterCatalogEntryEnvelope } from './catalogTypes';
 import { useCharacterCatalog } from './CharacterCatalogContext';
 import { CampaignApiError } from './api';
 import { useDirtyDraft, useWorkspace } from './Workspace';
@@ -11,7 +11,8 @@ import CharacterCatalogAttributes from './CharacterCatalogAttributes';
 import { CharacterQuantityInput } from './CharacterQuantityInput';
 import CatalogDefinitionDialog from './CatalogDefinitionDialog';
 import { stringifyJson } from './json';
-import { validateCharacterQuantity, characterQuantityToRaw } from './characterCatalogModel';
+import { characterQuantityToRaw, supportsCharacterAttributes, validateCharacterQuantity } from './characterCatalogModel';
+import { CatalogAttributeReadout } from './CatalogAttributeReadout';
 import styles from './CharacterCatalogDialog.module.css';
 
 type QuantityBaseline = { value: JsonNumber | null; revision: CharacterCatalogEntryEnvelope['record']['metadataRevision'] };
@@ -36,6 +37,7 @@ const noop = () => {};
 function safeErrorMessage(error: unknown): string {
   if (!(error instanceof CampaignApiError)) return 'Не удалось выполнить операцию. Попробуйте ещё раз.';
   if (error.unknownOutcome || error.status === 0) return 'Не удалось подтвердить сохранение. Проверьте актуальные данные перед продолжением.';
+  if (error.status === 400 && error.problem.code === 'stack_state_not_supported') return 'Личные характеристики доступны только для навыков и предметов с количеством «Единичный».';
   if (error.status === 400) return 'Сервер не принял количество или характеристики. Проверьте введённые данные.';
   if (error.status === 403) return 'Право записи больше недоступно.';
   if (error.status === 404) return 'Личная запись больше недоступна.';
@@ -59,10 +61,6 @@ function isRecoverableWriteFailure(error: unknown): boolean {
 function sameQuantity(left: JsonNumber | null, right: JsonNumber | null): boolean {
   if (left === null || right === null) return left === right;
   return compareNumber(String(left), String(right)) === 0;
-}
-
-function isBindingDiagnostic(diagnostic: CatalogDiagnostic): boolean {
-  return diagnostic.code === 'attribute_binding_changed' || diagnostic.code === 'edit_level_changed';
 }
 
 const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = ({ entryId, readOnly = false, characterName, audience = 'player', canAdminDefinition = false, definitionPermissionsPending = false, onDefinitionForbidden = noop, onClose }) => {
@@ -114,7 +112,8 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
   const quantityValidation = quantityPolicy
     ? validateCharacterQuantity(quantityRaw, quantityPolicy)
     : { value: undefined, issue: undefined };
-  const quantityEditable = Boolean(entry && entry.definition.kind === 'Item' && entry.definition.quantityUnit !== 'Single');
+  const supportsLocalAttributes = Boolean(entry && supportsCharacterAttributes(entry.definition));
+  const quantityEditable = Boolean(entry && entry.definition.kind === 'Item' && (entry.definition.quantityUnit === 'Whole' || entry.definition.quantityUnit === 'Fractional'));
   const quantityBaselineRaw = characterQuantityToRaw(quantityBaseline?.value);
   const quantityDirty = Boolean(quantityEditable && quantityBaseline && (
     quantityValidation.issue
@@ -124,26 +123,22 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
         : quantityValidation.value !== undefined
           && (quantityBaseline.value === null || !sameQuantity(quantityValidation.value, quantityBaseline.value))
   ));
-  const attributesDirty = Boolean(attributesBaseline
+  const attributesDirty = Boolean(supportsLocalAttributes && attributesBaseline
     && stringifyJson(attributesDraft) !== stringifyJson(attributesBaseline.values));
   const dirty = quantityDirty || attributesDirty;
   const invalid = Boolean(quantityDirty && quantityValidation.issue) || attributesInvalid;
   const writeBlocked = blockedDomains.size > 0 || deleteBlocked;
   const controlsDisabled = busy || recovering || deleting || writeBlocked || readOnly || !catalog.canWrite || catalog.permissionsPending;
-  const owner = `character-catalog-entry-${sessionKey}-${catalog.campaignId}-${catalog.characterId}-${entryId}`;
+  const owner = `character-catalog-entry-${sessionKey}-${catalog.campaignId}-${catalog.kind}-${catalog.characterId}-${entryId}`;
   useDirtyDraft(owner, dirty || invalid || writeBlocked || missingDraft);
 
-  const bindingDiagnosticIds = useMemo(() => new Set((entry?.diagnostics ?? []).filter(isBindingDiagnostic).map(value => value.occurrenceId)), [entry?.diagnostics]);
   const lockedOccurrenceIds = useMemo(() => {
     const locked = attributesDraft.filter(value => value.editLevel !== 'Character').map(value => value.id);
-    for (const diagnostic of entry?.diagnostics ?? []) {
-      if (isBindingDiagnostic(diagnostic)) locked.push(diagnostic.occurrenceId);
-    }
     for (const value of entry?.effectiveAttributes ?? []) {
       if (value.editLevel === 'Definition') locked.push(value.id);
     }
     return [...new Set(locked)];
-  }, [attributesDraft, entry?.diagnostics, entry?.effectiveAttributes]);
+  }, [attributesDraft, entry?.effectiveAttributes]);
 
   const adoptInitialSnapshot = (snapshot: EntrySnapshot) => {
     entryRef.current = snapshot.entry;
@@ -161,12 +156,12 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
   const readSnapshot = async (): Promise<SnapshotReadResult> => {
     let currentEntry: CharacterCatalogEntryEnvelope;
     try {
-      currentEntry = await api.getCharacterEntry(catalog.campaignId, catalog.characterId, entryId);
+      currentEntry = await api.getCharacterEntry(catalog.campaignId, catalog.kind, catalog.characterId, entryId);
     } catch (error) {
       return { ok: false, source: 'entry', error };
     }
     try {
-      const schema = await api.getCatalogAttributes(catalog.campaignId);
+      const schema = await api.getCatalogAttributes(catalog.campaignId, catalog.kind);
       return { ok: true, snapshot: { entry: currentEntry, definitions: schema.data.definitions } };
     } catch (error) {
       return { ok: false, source: 'schema', error };
@@ -290,6 +285,12 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
       }
 
       if (attributesWereDirty && mountedRef.current) {
+        if (!supportsCharacterAttributes(entry.definition)) {
+          setStatus(quantityWasDirty
+            ? 'Количество сохранено. Личные характеристики недоступны для этого типа предмета; черновик характеристик не отправлен.'
+            : 'Личные характеристики недоступны для этого типа предмета; черновик характеристик не отправлен.');
+          return;
+        }
         if (!canWriteRef.current) {
           setStatus(quantityWasDirty
             ? 'Количество сохранено. Запись характеристик остановлена, так как право доступа изменилось.'
@@ -299,6 +300,7 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
         activeDomain = 'attributes';
         const updated = await catalog.runWrite(() => api.putCharacterEntryAttributes(
           catalog.campaignId,
+          catalog.kind,
           catalog.characterId,
           entryId,
           { expectedRevision: attributesBaseline.revision, attributes: attributesDraft },
@@ -455,6 +457,7 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
     try {
       await catalog.runWrite(() => api.deleteCharacterEntry(
         catalog.campaignId,
+        catalog.kind,
         catalog.characterId,
         entryId,
         quantityBaseline.revision,
@@ -512,8 +515,6 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
   const subtitle = definition
     ? `${definition.kind === 'Item' ? 'Предмет' : 'Навык'}${characterName ? ` · У персонажа «${characterName}»` : ''}`
     : undefined;
-  const unmatchedDiagnostics = Boolean(entry && entry.diagnostics.some(diagnostic =>
-    ![...entry.effectiveAttributes, ...entry.explicitAttributes].some(value => value.id === diagnostic.occurrenceId)));
 
   const footer = <div className={styles.footer}>
     <div className={styles.footerLeft}>
@@ -556,27 +557,26 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
             raw={quantityRaw}
             onRawChange={setQuantityRaw}
             required
-            readOnly={!editing || readOnly || !catalog.canWrite}
+            readOnly={!editing || !quantityEditable || readOnly || !catalog.canWrite}
             disabled={editing && controlsDisabled}
             serverError={failureDomain === 'quantity' ? failure : undefined}
           />
         </section>}
         <section className={styles.section}>
           <h3>Характеристики</h3>
-          <CharacterCatalogAttributes
+          {supportsLocalAttributes ? <CharacterCatalogAttributes
             key={attributesEditorGeneration}
             definitions={definitions}
             sourceValues={entry.effectiveAttributes}
             values={editing ? attributesDraft : entry.explicitAttributes}
             savedValues={editing ? attributesBaseline?.values ?? [] : entry.explicitAttributes}
-            diagnostics={entry.diagnostics}
+            effectiveValues={entry.effectiveAttributes}
             lockedOccurrenceIds={lockedOccurrenceIds}
             readOnly={!editing || readOnly || !catalog.canWrite}
             disabled={editing && controlsDisabled}
             onChange={setAttributesDraft}
             onValidityChange={setAttributesInvalid}
-          />
-          {unmatchedDiagnostics && <p className={styles.warning} role="status">Часть характеристик требует проверки.</p>}
+          /> : <CatalogAttributeReadout definitions={definitions} values={entry.effectiveAttributes} />}
         </section>
       </div>
 

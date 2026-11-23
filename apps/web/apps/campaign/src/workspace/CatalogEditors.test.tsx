@@ -8,19 +8,19 @@ import { CatalogAttributeValuesEditor } from './CatalogAttributeValuesEditor';
 import { CatalogConditionEditor } from './CatalogConditionEditor';
 
 const definitions: CatalogAttributeDefinition[] = [
-  { id: 'attr-stale', title: 'Old strength', typeKey: 'integer', typeRevision: 3, options: [], isActive: true },
-  { id: 'attr-rate', title: 'Probability', typeKey: 'number', typeRevision: 2, options: [], isActive: true },
-  { id: 'attr-strength', title: 'Strength', typeKey: 'integer', typeRevision: 4, options: [], isActive: true },
-  { id: 'attr-enabled', title: 'Enabled', typeKey: 'boolean', typeRevision: 1, options: [], isActive: true },
-  { id: 'attr-tags', title: 'Tags', typeKey: 'multiChoice', typeRevision: 1, options: [{ optionKey: 'internal-option-key', title: 'Stealth' }], isActive: true },
+  { id: 'attr-stale', title: 'Old strength', typeKey: 'integer', options: [] },
+  { id: 'attr-rate', title: 'Probability', typeKey: 'number', options: [] },
+  { id: 'attr-strength', title: 'Strength', typeKey: 'integer', options: [] },
+  { id: 'attr-enabled', title: 'Enabled', typeKey: 'boolean', options: [] },
+  { id: 'attr-tags', title: 'Tags', typeKey: 'multiChoice', options: [{ optionKey: 'internal-option-key', title: 'Stealth' }] },
 ];
 
 const initialOccurrences: CatalogAttributeOccurrence[] = [
-  { id: 'occ-stale', attributeId: 'attr-stale', typeKey: 'integer', typeRevision: 2, value: 0, editLevel: 'Definition' },
-  { id: 'occ-rate-a', attributeId: 'attr-rate', typeKey: 'number', typeRevision: 2, value: new LosslessNumber('0.125'), editLevel: 'Definition' },
-  { id: 'occ-rate-b', attributeId: 'attr-rate', typeKey: 'number', typeRevision: 2, value: 0, editLevel: 'Definition' },
-  { id: 'occ-enabled', attributeId: 'attr-enabled', typeKey: 'boolean', typeRevision: 1, value: false, editLevel: 'Definition' },
-  { id: 'occ-tags', attributeId: 'attr-tags', typeKey: 'multiChoice', typeRevision: 1, value: [], editLevel: 'Definition' },
+  { id: 'occ-stale', attributeId: 'attr-stale', value: 'legacy text', editLevel: 'Definition' },
+  { id: 'occ-rate-a', attributeId: 'attr-rate', value: new LosslessNumber('0.125'), editLevel: 'Definition' },
+  { id: 'occ-rate-b', attributeId: 'attr-rate', value: 0, editLevel: 'Definition' },
+  { id: 'occ-enabled', attributeId: 'attr-enabled', value: false, editLevel: 'Definition' },
+  { id: 'occ-tags', attributeId: 'attr-tags', value: [], editLevel: 'Definition' },
 ];
 
 const submittedAttributes = vi.fn();
@@ -35,7 +35,6 @@ const AttributeValuesHarness: React.FC = () => {
       values={values}
       onChange={setValues}
       onValidityChange={setInvalid}
-      diagnostics={[{ occurrenceId: 'occ-stale', code: 'incompatible_attribute_type' }]}
     />
     <button type="button" disabled={invalid} onClick={() => submittedAttributes(values)}>Сохранить значения</button>
   </>;
@@ -60,7 +59,7 @@ describe('catalog domain editors', () => {
     render(<AttributeValuesHarness />);
     const save = screen.getByRole('button', { name: 'Сохранить значения' });
     expect(save).toBeEnabled();
-    expect(screen.getByText('Значение сохранено без изменения. Оно не будет преобразовано автоматически.')).toBeInTheDocument();
+    expect(screen.getByText('Значение не соответствует текущей характеристике.')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Значение: Enabled' })).not.toBeChecked();
     expect(document.body.textContent).not.toContain('internal-option-key');
 
@@ -128,7 +127,7 @@ describe('catalog domain editors', () => {
     fireEvent.click(save);
 
     expect(stringifyJson(submittedCondition.mock.calls[0][0])).toBe(
-      '{"operator":"eq","attributeId":"attr-strength","typeKey":"integer","typeRevision":4,"value":17}',
+      '{"operator":"eq","attributeId":"attr-strength","value":17}',
     );
   });
 
@@ -154,7 +153,7 @@ describe('catalog domain editors', () => {
     fireEvent.click(save);
 
     expect(stringifyJson(submittedCondition.mock.calls[0][0])).toBe(
-      '{"operator":"all","children":[{"operator":"not","children":[{"operator":"eq","attributeId":"attr-rate","typeKey":"number","typeRevision":2,"value":3.5}]}]}',
+      '{"operator":"all","children":[{"operator":"not","children":[{"operator":"eq","attributeId":"attr-rate","value":3.5}]}]}',
     );
   });
 

@@ -9,7 +9,6 @@ type Props = {
   groupLabel: string;
   initialCondition: CatalogGroupCondition | null;
   definitions: CatalogAttributeDefinition[];
-  allowInactiveAttributeIds: string[];
   disabled: boolean;
   onApply: (condition: CatalogGroupCondition | null) => void;
   onClose: () => void;
@@ -19,7 +18,7 @@ const cloneCondition = (condition: CatalogGroupCondition | null): CatalogGroupCo
   ? parseJson(stringifyJson(condition)) as unknown as CatalogGroupCondition
   : null;
 
-const CatalogGroupConditionDialog: React.FC<Props> = ({ groupLabel, initialCondition, definitions, allowInactiveAttributeIds, disabled, onApply, onClose }) => {
+const CatalogGroupConditionDialog: React.FC<Props> = ({ groupLabel, initialCondition, definitions, disabled, onApply, onClose }) => {
   const id = useId();
   const initialValue = useRef(stringifyJson(initialCondition));
   const [condition, setCondition] = useState(() => cloneCondition(initialCondition));
@@ -37,7 +36,6 @@ const CatalogGroupConditionDialog: React.FC<Props> = ({ groupLabel, initialCondi
       definitions={definitions}
       condition={condition}
       disabled={disabled}
-      allowInactiveAttributeIds={allowInactiveAttributeIds}
       onChange={setCondition}
       onValidityChange={setInvalid}
       onInteraction={() => setTouched(true)}

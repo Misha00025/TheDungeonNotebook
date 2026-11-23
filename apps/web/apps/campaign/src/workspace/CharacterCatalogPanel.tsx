@@ -16,8 +16,9 @@ export type CharacterCatalogPanelProps = {
   onDefinitionForbidden?: () => void;
 };
 
-const CharacterCatalogPanel: React.FC<CharacterCatalogPanelProps> = ({ kind, canPublishDefinition = false, readOnly = false, characterName, audience = 'player', definitionPermissionsPending = false, onDefinitionForbidden }) => {
+const CharacterCatalogPanel: React.FC<CharacterCatalogPanelProps> = ({ canPublishDefinition = false, readOnly = false, characterName, audience = 'player', definitionPermissionsPending = false, onDefinitionForbidden }) => {
   const catalog = useCharacterCatalog();
+  const kind = catalog.kind;
   const [search, setSearch] = useState('');
   const [selectedEntryId, setSelectedEntryId] = useState<string>();
   const [adding, setAdding] = useState(false);

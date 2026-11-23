@@ -8,6 +8,10 @@ export type CharacterQuantityPolicy = {
   allowNegative: boolean;
 };
 
+export function supportsCharacterAttributes(policy: Pick<CharacterQuantityPolicy, 'kind' | 'quantityUnit'>): boolean {
+  return policy.kind === 'Skill' || policy.quantityUnit === 'Single';
+}
+
 export type CharacterQuantityIssue = 'required' | 'invalid_number' | 'whole_required' | 'negative_not_allowed' | 'invalid_definition';
 
 export type CharacterQuantityValidation = {

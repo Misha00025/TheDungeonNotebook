@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { CampaignApiError } from './api';
-import type { CharacterCatalogEntryEnvelope } from './catalogTypes';
+import type { CatalogKind, CharacterCatalogEntryEnvelope } from './catalogTypes';
 import { useResource } from './hooks';
 import { useWorkspace } from './Workspace';
 import type { CatalogAttributeSchemaEnvelope } from './catalogTypes';
@@ -8,6 +8,7 @@ import type { CatalogAttributeSchemaEnvelope } from './catalogTypes';
 export type CharacterCatalogProviderProps = React.PropsWithChildren<{
   campaignId: number;
   characterId: string;
+  kind: CatalogKind;
   canRead: boolean;
   canWrite: boolean;
   permissionsPending?: boolean;
@@ -17,6 +18,7 @@ export type CharacterCatalogProviderProps = React.PropsWithChildren<{
 export type CharacterCatalogContextValue = {
   campaignId: number;
   characterId: string;
+  kind: CatalogKind;
   entries?: CharacterCatalogEntryEnvelope[];
   definitions?: CatalogAttributeSchemaEnvelope['data']['definitions'];
   entriesLoading: boolean;
@@ -45,6 +47,7 @@ const isAccessDenied = (error: unknown) => statusOf(error) === 403 || statusOf(e
 const ScopedCharacterCatalogProvider: React.FC<CharacterCatalogProviderProps & { sessionKey: string }> = ({
   campaignId,
   characterId,
+  kind,
   canRead,
   canWrite,
   permissionsPending = false,
@@ -64,7 +67,7 @@ const ScopedCharacterCatalogProvider: React.FC<CharacterCatalogProviderProps & {
   const onForbiddenRef = useRef(onForbidden);
   onForbiddenRef.current = onForbidden;
 
-  const scope = `${sessionKey}:${campaignId}:${characterId}`;
+  const scope = `${sessionKey}:${campaignId}:${characterId}:${kind}`;
   const accessDenied = revoked;
   const readEnabled = requested && canRead && !accessDenied;
   canWriteRef.current = canWrite && canRead && !permissionsPending && !accessDenied;
@@ -73,12 +76,12 @@ const ScopedCharacterCatalogProvider: React.FC<CharacterCatalogProviderProps & {
 
   const entriesResource = useResource(
     `${scope}:character-catalog-entries`,
-    () => api.listCharacterEntries(campaignId, characterId),
+    () => api.listCharacterEntries(campaignId, kind, characterId),
     readEnabled,
   );
   const schemaResource = useResource(
-    `${sessionKey}:${campaignId}:catalog-attribute-schema`,
-    () => api.getCatalogAttributes(campaignId),
+    `${sessionKey}:${campaignId}:${kind}:catalog-attribute-schema`,
+    () => api.getCatalogAttributes(campaignId, kind),
     readEnabled,
   );
 
@@ -138,10 +141,10 @@ const ScopedCharacterCatalogProvider: React.FC<CharacterCatalogProviderProps & {
     const merged = new Map(entriesResource.data.map(entry => [entry.record.id, entry]));
     for (const [recordId, entry] of Object.entries(overrides)) {
       if (entry === null) merged.delete(recordId);
-      else if (entry.record.campaignId === campaignId && entry.record.characterId === characterId) merged.set(recordId, entry);
+       else if (entry.definition.kind === kind && entry.record.campaignId === campaignId && entry.record.characterId === characterId) merged.set(recordId, entry);
     }
     return [...merged.values()];
-  }, [readEnabled, entriesResource.error, schemaResource.error, entriesResource.data, overrides, campaignId, characterId]);
+  }, [readEnabled, entriesResource.error, schemaResource.error, entriesResource.data, overrides, campaignId, characterId, kind]);
 
   const definitions = readEnabled && !isAccessDenied(entriesResource.error) && !isAccessDenied(schemaResource.error)
     ? schemaResource.data?.data.definitions
@@ -149,9 +152,9 @@ const ScopedCharacterCatalogProvider: React.FC<CharacterCatalogProviderProps & {
 
   const upsert = useCallback((entry: CharacterCatalogEntryEnvelope) => {
     if (!mountedRef.current || !readAccessRef.current) return;
-    if (entry.record.campaignId !== campaignId || entry.record.characterId !== characterId) return;
+    if (entry.definition.kind !== kind || entry.record.campaignId !== campaignId || entry.record.characterId !== characterId) return;
     setOverrides(current => ({ ...current, [entry.record.id]: entry }));
-  }, [campaignId, characterId]);
+  }, [campaignId, characterId, kind]);
 
   const remove = useCallback((recordId: string) => {
     if (!mountedRef.current || !readAccessRef.current) return;
@@ -178,6 +181,7 @@ const ScopedCharacterCatalogProvider: React.FC<CharacterCatalogProviderProps & {
   const value = useMemo<InternalCharacterCatalogContextValue>(() => ({
     campaignId,
     characterId,
+    kind,
     entries,
     definitions,
     entriesLoading,
@@ -196,14 +200,14 @@ const ScopedCharacterCatalogProvider: React.FC<CharacterCatalogProviderProps & {
     runWrite,
     reportAccessFailure,
     activate,
-  }), [campaignId, characterId, entries, definitions, entriesLoading, schemaLoading, requested, readEnabled, entriesResource.loading, schemaResource.loading, entriesResource.error, schemaResource.error, effectiveCanRead, effectiveCanWrite, permissionsPending, reload, upsert, remove, runWrite, reportAccessFailure, activate]);
+  }), [campaignId, characterId, kind, entries, definitions, entriesLoading, schemaLoading, requested, readEnabled, entriesResource.loading, schemaResource.loading, entriesResource.error, schemaResource.error, effectiveCanRead, effectiveCanWrite, permissionsPending, reload, upsert, remove, runWrite, reportAccessFailure, activate]);
 
   return <CharacterCatalogContext.Provider value={value}>{children}</CharacterCatalogContext.Provider>;
 };
 
 export const CharacterCatalogProvider: React.FC<CharacterCatalogProviderProps> = props => {
   const { sessionKey } = useWorkspace();
-  const scope = `${sessionKey}:${props.campaignId}:${props.characterId}`;
+  const scope = `${sessionKey}:${props.campaignId}:${props.characterId}:${props.kind}`;
   return <ScopedCharacterCatalogProvider key={scope} {...props} sessionKey={sessionKey} />;
 };
 

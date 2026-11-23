@@ -2,7 +2,6 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { Checkbox, Field, FieldSet, Input, Panel, Select, Textarea } from '@tdn/shared';
 import type { CatalogAttributeDefinition, CatalogAttributeOccurrence, CatalogKind, QuantityUnit } from './catalogTypes';
 import { CatalogAttributeValuesEditor } from './CatalogAttributeValuesEditor';
-import type { CatalogAttributeDiagnostic } from './CatalogAttributeValuesEditor';
 import styles from './CatalogDefinitionFields.module.css';
 
 export type CatalogDefinitionDraft = {
@@ -22,7 +21,7 @@ export type CatalogDefinitionFieldsProps = {
   canPublish: boolean;
   readOnly?: boolean;
   disabled?: boolean;
-  diagnostics?: CatalogAttributeDiagnostic[];
+  savedAttributes?: CatalogAttributeOccurrence[];
   onValidityChange?: (invalid: boolean) => void;
 };
 
@@ -63,7 +62,7 @@ export const CatalogDefinitionSettings: React.FC<SharedFieldsProps & { canPublis
   </div>;
 };
 
-export const CatalogDefinitionFields: React.FC<CatalogDefinitionFieldsProps & { autoFocusName?: boolean }> = ({ draft, onChange, definitions, canPublish, readOnly = false, disabled = false, diagnostics = [], onValidityChange, autoFocusName = false }) => {
+export const CatalogDefinitionFields: React.FC<CatalogDefinitionFieldsProps & { autoFocusName?: boolean }> = ({ draft, onChange, definitions, canPublish, readOnly = false, disabled = false, savedAttributes, onValidityChange, autoFocusName = false }) => {
   const [invalidAttributes, setInvalidAttributes] = useState(false);
   const invalidName = !draft.name.trim();
   const invalid = !readOnly && (invalidName || invalidAttributes);
@@ -78,7 +77,7 @@ export const CatalogDefinitionFields: React.FC<CatalogDefinitionFieldsProps & { 
       <Panel title="Настройки" density="compact">{publish}</Panel>
     </div>
     <FieldSet className={styles.attributes} legend="Характеристики">
-      <CatalogAttributeValuesEditor definitions={definitions} values={draft.attributes} onChange={attributes => update({ attributes })} onValidityChange={setInvalidAttributes} disabled={disabled} readOnly={readOnly} diagnostics={diagnostics} />
+      <CatalogAttributeValuesEditor definitions={definitions} values={draft.attributes} savedValues={savedAttributes} onChange={attributes => update({ attributes })} onValidityChange={setInvalidAttributes} disabled={disabled} readOnly={readOnly} />
     </FieldSet>
     {invalid && <p role="alert">Проверьте название и значения атрибутов.</p>}
   </div>;

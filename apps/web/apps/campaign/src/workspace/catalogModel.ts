@@ -1,6 +1,7 @@
 import type { JsonValue, ValueType } from './types';
 import type { CatalogAttributeDefinition, CatalogAttributeOccurrence, CatalogAttributeType, CatalogEditLevel, CatalogGroupCondition } from './catalogTypes';
 import { displayValue } from './json';
+import { validateFieldValue } from './ValueInput';
 
 const valueTypeMap: Record<CatalogAttributeType, ValueType> = {
   integer: 'Integer',
@@ -29,6 +30,18 @@ export function defaultTypedValue(typeKey: string, options: CatalogAttributeDefi
   }
 }
 
+export function catalogAttributeField(definition?: CatalogAttributeDefinition): { valueType: ValueType; options: CatalogAttributeDefinition['options'] } | undefined {
+  if (!definition) return undefined;
+  const valueType = catalogValueType(definition.typeKey);
+  return valueType ? { valueType, options: definition.options } : undefined;
+}
+
+export function catalogAttributeIssue(definition: CatalogAttributeDefinition | undefined, occurrence: CatalogAttributeOccurrence): string | undefined {
+  if (!definition) return 'Характеристика удалена или недоступна.';
+  const field = catalogAttributeField(definition);
+  return field ? validateFieldValue(field, occurrence.value) : 'Характеристика удалена или недоступна.';
+}
+
 export function catalogValueLabel(value: JsonValue, definition?: CatalogAttributeDefinition): string {
   if (typeof value === 'boolean') return value ? 'Да' : 'Нет';
   if (definition?.typeKey === 'singleChoice' && typeof value === 'string') {
@@ -51,8 +64,6 @@ export function createCatalogOccurrence(
   return {
     id: crypto.randomUUID(),
     attributeId: definition.id,
-    typeKey: definition.typeKey,
-    typeRevision: definition.typeRevision,
     value,
     editLevel,
   };
@@ -66,7 +77,7 @@ export function createConditionLeaf(
   const value = definition && defaultTypedValue(definition.typeKey, definition.options);
   return {
     operator,
-    ...(definition ? { attributeId: definition.id, typeKey: definition.typeKey, typeRevision: definition.typeRevision } : {}),
+    ...(definition ? { attributeId: definition.id } : {}),
     ...(value !== undefined ? { value } : {}),
   };
 }

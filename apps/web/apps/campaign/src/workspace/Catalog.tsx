@@ -13,7 +13,7 @@ import CatalogGroupsDialog from './CatalogGroupsDialog';
 import CatalogSections from './CatalogSections';
 import { buildCatalogBrowseModel } from './catalogBrowseModel';
 import type { CatalogMembershipResult } from './catalogBrowseModel';
-import type { CatalogContentEnvelope, CatalogGroupConfigurationEnvelope, CatalogGroupSummary, CatalogKind, CatalogMetadata } from './catalogTypes';
+import type { CatalogAttributeSchemaEnvelope, CatalogContentEnvelope, CatalogGroupConfigurationEnvelope, CatalogGroupSummary, CatalogKind, CatalogMetadata } from './catalogTypes';
 
 export { CatalogAttributeValuesEditor };
 
@@ -26,7 +26,7 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
   const campaignId = Number(groupId);
   const { api, path, sessionKey } = useWorkspace();
   const { permissions, permissionsLoading, mode, reloadPermissions } = useCampaignWorkspace();
-  const identity = `${sessionKey}:${campaignId}`;
+  const identity = `${sessionKey}:${campaignId}:${kind}`;
   const browseScope = `${identity}:${kind}`;
   const canManage = mode === 'gm' && !permissionsLoading && permissions.canWrite;
   const canKeepManagementDialogs = mode === 'gm' && (permissionsLoading || permissions.canWrite);
@@ -40,19 +40,21 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
   const [previewVersions, setPreviewVersions] = useState<Record<string, number>>({});
   const previewPromises = useMemo(() => new Map<string, Promise<CatalogContentEnvelope>>(), [api, identity]);
 
-  const rootCatalog = useResource<CatalogMetadata[]>(`${identity}:catalog-browse`, () => api.listCatalog(campaignId));
-  const summaries = useResource(`${identity}:catalog-groups`, () => api.getCatalogGroups(campaignId));
-  const schema = useResource(`${identity}:catalog-attributes`, () => api.getCatalogAttributes(campaignId));
+  const rootCatalog = useResource<CatalogMetadata[]>(`${identity}:catalog-browse`, () => api.listCatalog(campaignId, kind));
+  const summaries = useResource(`${identity}:catalog-groups`, () => api.getCatalogGroups(campaignId, kind));
+  const schema = useResource(`${identity}:catalog-attributes`, () => api.getCatalogAttributes(campaignId, kind));
+  const schemaRevision = String(schema.data?.contentRevision ?? '');
   const loadPreview = useCallback((entryId: string) => {
-    const existing = previewPromises.get(entryId);
+    const key = `${schemaRevision}:${entryId}`;
+    const existing = previewPromises.get(key);
     if (existing) return existing;
-    const request = api.getCatalogContent(campaignId, entryId);
-    previewPromises.set(entryId, request);
+    const request = api.getCatalogContent(campaignId, kind, entryId);
+    previewPromises.set(key, request);
     request.catch(() => {
-      if (previewPromises.get(entryId) === request) previewPromises.delete(entryId);
+      if (previewPromises.get(key) === request) previewPromises.delete(key);
     });
     return request;
-  }, [api, campaignId, previewPromises]);
+  }, [api, campaignId, kind, previewPromises, schemaRevision]);
   const summariesForbidden = summaries.error instanceof CampaignApiError
     && (summaries.error.status === 403 || summaries.error.status === 404);
   const groups = summariesForbidden ? emptyGroups : summaries.data?.groups ?? emptyGroups;
@@ -61,7 +63,7 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
     `${identity}:catalog-memberships:${membershipScope}`,
     async () => Promise.all(groups.map(async group => {
       try {
-        const result = await api.getCatalogGroupEntries(campaignId, group.id);
+        const result = await api.getCatalogGroupEntries(campaignId, kind, group.id);
         return { groupId: group.id, entries: result.entries, diagnostics: result.diagnostics };
       } catch (error) {
         return { groupId: group.id, error };
@@ -131,8 +133,9 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
   };
 
   const acceptSavedMetadata = (saved: CatalogMetadata, content?: CatalogContentEnvelope) => {
-    if (content) previewPromises.set(saved.id, Promise.resolve(content));
-    else previewPromises.delete(saved.id);
+    const previewKey = `${schemaRevision}:${saved.id}`;
+    if (content) previewPromises.set(previewKey, Promise.resolve(content));
+    else previewPromises.delete(previewKey);
     setPreviewVersions(current => ({ ...current, [saved.id]: (current[saved.id] ?? 0) + 1 }));
     const current = rootCatalog.data;
     if (!current) {
@@ -145,6 +148,14 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
       rootCatalog.setData(next);
     }
     if (memberships.data) memberships.reload();
+  };
+
+  const acceptSavedSchema = (result: CatalogAttributeSchemaEnvelope) => {
+    schema.setData(result);
+    previewPromises.clear();
+    setPreviewVersions({});
+    summaries.reload();
+    memberships.reload();
   };
 
   const allSectionsOpen = Boolean(model?.sectionKeys.length)
@@ -217,7 +228,7 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
         definitions={schema.data && !schema.error ? schema.data.data.definitions : undefined}
         attributeSchemaLoading={schema.loading && !schema.data && !schema.error}
         loadContent={loadPreview}
-        previewScope={identity}
+        previewScope={`${identity}:${schemaRevision}`}
         previewVersions={previewVersions}
       />
     </>}
@@ -238,15 +249,17 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
     {canKeepManagementDialogs && attributesOpen && <CatalogAttributesDialog
       key={`${identity}:attributes`}
       campaignId={campaignId}
+      kind={kind}
       canManage={canManage}
       permissionsPending={permissionsLoading}
       onClose={() => setAttributesOpen(false)}
-      onSaved={result => schema.setData(result)}
+      onSaved={acceptSavedSchema}
       onForbidden={reloadPermissions}
     />}
     {canKeepManagementDialogs && groupsOpen && <CatalogGroupsDialog
       key={`${identity}:groups`}
       campaignId={campaignId}
+      kind={kind}
       canManage={canManage}
       permissionsPending={permissionsLoading}
       onClose={() => setGroupsOpen(false)}

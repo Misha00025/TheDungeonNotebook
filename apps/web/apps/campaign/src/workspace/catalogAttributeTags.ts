@@ -12,34 +12,27 @@ export function catalogAttributeTags(
 
   for (const occurrence of occurrences) {
     const definition = definitionsById.get(occurrence.attributeId);
+    if (!definition) continue;
     const tag = tags.get(occurrence.attributeId) ?? {
       attributeId: occurrence.attributeId,
-      title: definition?.title ?? 'Неизвестный атрибут',
+      title: definition.title,
       values: [],
     };
     if (!tags.has(occurrence.attributeId)) tags.set(occurrence.attributeId, tag);
 
-    const compatible = definition !== undefined
-      && definition.typeKey === occurrence.typeKey
-      && String(definition.typeRevision) === String(occurrence.typeRevision);
-    const choiceValue = occurrence.typeKey === 'singleChoice' || occurrence.typeKey === 'multiChoice'
-      || definition?.typeKey === 'singleChoice' || definition?.typeKey === 'multiChoice';
-
-    if (compatible && definition?.typeKey === 'multiChoice') {
+    if (definition.typeKey === 'multiChoice') {
       if (Array.isArray(occurrence.value)) {
         if (occurrence.value.length === 0) tag.values.push('Не выбрано');
         else tag.values.push(...occurrence.value.map(value => typeof value === 'string'
           ? catalogValueLabel([value], definition)
-          : catalogValueLabel(value)));
+          : 'Неизвестный вариант'));
       } else {
         tag.values.push('Неизвестный вариант');
       }
-    } else if (compatible && definition?.typeKey === 'singleChoice') {
+    } else if (definition.typeKey === 'singleChoice') {
       tag.values.push(typeof occurrence.value === 'string'
         ? catalogValueLabel(occurrence.value, definition)
-        : catalogValueLabel(occurrence.value));
-    } else if (choiceValue) {
-      tag.values.push('Неизвестный вариант');
+        : 'Неизвестный вариант');
     } else {
       const label = catalogValueLabel(occurrence.value, definition);
       tag.values.push(typeof occurrence.value === 'string' && occurrence.value === '' ? 'Не задано' : label);

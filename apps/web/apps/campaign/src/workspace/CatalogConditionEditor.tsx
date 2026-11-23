@@ -3,7 +3,7 @@ import { ActionRow, Button, DataTable, IconButton, ModalPortal, Select } from '@
 import { useDirtyDraft } from './Workspace';
 import type { JsonValue } from './types';
 import type { CatalogAttributeDefinition, CatalogGroupCondition } from './catalogTypes';
-import { catalogValueLabel, catalogValueType, createConditionLeaf, defaultTypedValue } from './catalogModel';
+import { catalogAttributeField, catalogValueLabel, createConditionLeaf, defaultTypedValue } from './catalogModel';
 import { stringifyJson } from './json';
 import { ValueInput, validateFieldValue } from './ValueInput';
 
@@ -17,7 +17,6 @@ export type CatalogConditionEditorProps = {
   disabled?: boolean;
   onValidityChange?: (invalid: boolean) => void;
   onInteraction?: () => void;
-  allowInactiveAttributeIds?: string[];
 };
 
 const operatorLabels: Record<ConditionOperator | 'none', string> = {
@@ -65,7 +64,6 @@ type NodeProps = {
   path: number[];
   definitions: CatalogAttributeDefinition[];
   definitionById: Map<string, CatalogAttributeDefinition>;
-  allowedInactive: Set<string>;
   disabled: boolean;
   isRoot?: boolean;
   idPrefix: string;
@@ -83,7 +81,6 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
   path,
   definitions,
   definitionById,
-  allowedInactive,
   disabled,
   isRoot = false,
   idPrefix,
@@ -98,21 +95,17 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
   const unchanged = sameCondition(node, baseline);
   const [childValidity, setChildValidity] = useState<Record<string, boolean>>({});
   const [inputInvalid, setInputInvalid] = useState(false);
-  const [choiceDraft, setChoiceDraft] = useState<{ value: JsonValue; initialValue: JsonValue; attributeId: string; typeKey: string; typeRevision: CatalogGroupCondition['typeRevision'] }>();
+  const [choiceDraft, setChoiceDraft] = useState<{ value: JsonValue; initialValue: JsonValue; attributeId: string; typeKey: string; options: CatalogAttributeDefinition['options']; operator: ConditionOperator }>();
   const numericInputTouched = useRef(false);
   const validityCallback = useRef(onValidityChange);
   validityCallback.current = onValidityChange;
   const definition = node.attributeId ? definitionById.get(node.attributeId) : undefined;
-  const valueType = node.typeKey ? catalogValueType(node.typeKey) : undefined;
-  const schemaMatches = Boolean(definition)
-    && node.typeKey === definition?.typeKey
-    && String(node.typeRevision) === String(definition?.typeRevision);
+  const currentField = catalogAttributeField(definition);
   const currentValueValid = node.operator === 'exists'
     ? Boolean(definition)
-    : Boolean(valueType && definition && node.value !== undefined
-      && validateFieldValue({ valueType, options: definition.options }, node.value) === undefined);
-  const stale = Boolean(node.attributeId) && (!definition
-    || (node.operator !== 'exists' && (!schemaMatches || !currentValueValid))
+    : Boolean(currentField && node.value !== undefined && validateFieldValue(currentField, node.value) === undefined);
+  const stale = !isCompound(node.operator) && (!definition
+    || (node.operator !== 'exists' && !currentValueValid)
     || (numericOperators.has(node.operator) && definition?.typeKey !== 'integer' && definition?.typeKey !== 'number'));
   const children = isCompound(node.operator) ? node.children ?? [] : [];
   const childKeys = children.map((_, index) => [...path, index].join('.') || 'root');
@@ -126,12 +119,11 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
     }
     if (unchanged && stale) return false;
     if (!node.attributeId || !definition) return true;
-    if (!definition.isActive && !allowedInactive.has(definition.id)) return true;
     if (node.operator === 'exists') return false;
-    if (!schemaMatches || !currentValueValid) return true;
+    if (!currentValueValid) return true;
     if (numericOperators.has(node.operator) && definition.typeKey !== 'integer' && definition.typeKey !== 'number') return true;
     return false;
-  }, [unchanged, stale, node, children.length, definition, allowedInactive, schemaMatches, currentValueValid]);
+  }, [unchanged, stale, node, children.length, definition, currentValueValid]);
   const invalid = ownInvalid || inputInvalid || relevantChildValidity.some(([, childInvalid]) => childInvalid);
   const choiceDraftDirty = Boolean(choiceDraft && stringifyJson(choiceDraft.value) !== stringifyJson(choiceDraft.initialValue));
   useDirtyDraft(`catalog-condition-choice-${idPrefix}-${key}`, choiceDraftDirty);
@@ -139,7 +131,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
   useEffect(() => {
     numericInputTouched.current = false;
     setInputInvalid(false);
-  }, [node.operator, node.attributeId, node.typeKey, node.typeRevision]);
+  }, [node.operator, node.attributeId]);
 
   useEffect(() => {
     validityCallback.current(key, invalid);
@@ -147,7 +139,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
 
   const updateAttribute = (attributeId: string) => {
     const selected = definitionById.get(attributeId);
-    if (!selected || (!selected.isActive && !allowedInactive.has(selected.id))) {
+    if (!selected) {
       onChange({ operator: node.operator });
       return;
     }
@@ -186,24 +178,21 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
     onChange({ operator: node.operator, children: children.filter((_, childIndex) => childIndex !== index) });
   };
 
-  const eligibleDefinitions = definitions.filter(item => item.isActive || allowedInactive.has(item.id) || item.id === node.attributeId);
-  const currentValueType = definition ? catalogValueType(definition.typeKey) : undefined;
+  const eligibleDefinitions = definitions;
   const rawValue = node.value;
   const defaultValue = definition ? defaultTypedValue(definition.typeKey, definition.options) : undefined;
-  const currentField = currentValueType && definition ? { valueType: currentValueType, options: definition.options } : undefined;
   const choiceSnapshotMatches = Boolean(choiceDraft && choiceDraft.attributeId === node.attributeId
-    && choiceDraft.typeKey === node.typeKey
-    && String(choiceDraft.typeRevision) === String(node.typeRevision));
+    && choiceDraft.operator === node.operator
+    && choiceDraft.typeKey === definition?.typeKey
+    && stringifyJson(choiceDraft.options) === stringifyJson(definition?.options));
   const choiceError = currentField && choiceDraft ? validateFieldValue(currentField, choiceDraft.value) : 'Схема атрибута недоступна.';
-  const canApplyChoice = Boolean(choiceDraft && !disabled && !stale && schemaMatches
-    && node.operator !== 'exists' && node.typeKey === 'multiChoice' && choiceSnapshotMatches && !choiceError);
+  const canApplyChoice = Boolean(choiceDraft && !disabled && !stale
+    && node.operator !== 'exists' && definition?.typeKey === 'multiChoice' && choiceSnapshotMatches && !choiceError);
   const applyChoice = () => {
     if (!choiceDraft || !canApplyChoice || !definition) return;
     onChange({
       operator: node.operator,
       attributeId: definition.id,
-      typeKey: definition.typeKey,
-      typeRevision: definition.typeRevision,
       value: choiceDraft.value,
     });
     setChoiceDraft(undefined);
@@ -219,7 +208,8 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
           initialValue: rawValue!,
           attributeId: definition!.id,
           typeKey: definition!.typeKey,
-          typeRevision: definition!.typeRevision,
+          options: definition!.options,
+          operator: node.operator,
         })}>Выбрать значения</Button>
       </ActionRow>
       : <>
@@ -233,8 +223,6 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
           onChange={(value: JsonValue) => onChange({
             operator: node.operator,
             attributeId: definition!.id,
-            typeKey: definition!.typeKey,
-            typeRevision: definition!.typeRevision,
             value,
           })}
           onRawChange={() => {
@@ -276,7 +264,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
         ? '—'
         : <Select aria-label="Атрибут" value={node.attributeId ?? ''} disabled={disabled} onChange={event => updateAttribute(event.target.value)}>
           <option value="">Выберите атрибут</option>
-          {eligibleDefinitions.map(item => <option key={item.id} value={item.id}>{item.title}{item.isActive ? '' : ' · неактивен'}</option>)}
+          {eligibleDefinitions.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
         </Select>}
       </td>
       <td>{isCompound(node.operator) || node.operator === 'exists'
@@ -295,7 +283,6 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
       path={[...path, index]}
       definitions={definitions}
       definitionById={definitionById}
-      allowedInactive={allowedInactive}
       disabled={disabled}
       isRoot={false}
       idPrefix={idPrefix}
@@ -306,10 +293,10 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
       onValidityChange={validityCallback.current}
     />)}
     {choiceDraft && <ModalPortal isOpen onClose={() => setChoiceDraft(undefined)} title={`Значения: ${definition?.title ?? 'атрибут'}`}>
-      {!choiceSnapshotMatches || disabled || stale || !schemaMatches
+      {!choiceSnapshotMatches || disabled || stale
         ? <p role="status">Условие изменилось или редактирование больше недоступно. Закройте диалог и перечитайте данные.</p>
         : <ValueInput field={currentField!} value={choiceDraft.value} label={`Значение: ${definition?.title ?? 'атрибут'}`} onChange={value => setChoiceDraft(current => current ? { ...current, value } : current)} />}
-      {choiceError && choiceSnapshotMatches && !disabled && !stale && schemaMatches && <p role="alert">{choiceError}</p>}
+      {choiceError && choiceSnapshotMatches && !disabled && !stale && <p role="alert">{choiceError}</p>}
       <ActionRow style={{ gap: '0.5rem' }}><Button type="button" disabled={!canApplyChoice} onClick={applyChoice}>Применить</Button><Button type="button" variant="secondary" onClick={() => setChoiceDraft(undefined)}>Отмена</Button></ActionRow>
     </ModalPortal>}
   </>;
@@ -322,7 +309,6 @@ export const CatalogConditionEditor: React.FC<CatalogConditionEditorProps> = ({
   disabled = false,
   onValidityChange,
   onInteraction,
-  allowInactiveAttributeIds = [],
 }) => {
   const idPrefix = useId();
   const [nodeValidity, setNodeValidity] = useState<Record<string, boolean>>({});
@@ -341,7 +327,6 @@ export const CatalogConditionEditor: React.FC<CatalogConditionEditorProps> = ({
     lastEmittedCondition.current = undefined;
   }
   const definitionById = useMemo(() => new Map(definitions.map(item => [item.id, item])), [definitions]);
-  const allowedInactive = useMemo(() => new Set(allowInactiveAttributeIds), [allowInactiveAttributeIds]);
   const activeNodeKeys: string[] = [];
   const collectKeys = (node: CatalogGroupCondition, path: number[] = []) => {
     activeNodeKeys.push(path.join('.') || 'root');
@@ -395,7 +380,6 @@ export const CatalogConditionEditor: React.FC<CatalogConditionEditorProps> = ({
         path={[]}
         definitions={definitions}
         definitionById={definitionById}
-        allowedInactive={allowedInactive}
         disabled={disabled}
         isRoot
         idPrefix={idPrefix}

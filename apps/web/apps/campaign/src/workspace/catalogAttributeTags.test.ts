@@ -3,20 +3,16 @@ import { LosslessNumber } from 'lossless-json';
 import { catalogAttributeTags } from './catalogAttributeTags';
 import type { CatalogAttributeDefinition, CatalogAttributeOccurrence } from './catalogTypes';
 
-const definition = (id: string, title: string, typeKey: CatalogAttributeDefinition['typeKey'], options: CatalogAttributeDefinition['options'] = [], isActive = true): CatalogAttributeDefinition => ({
+const definition = (id: string, title: string, typeKey: CatalogAttributeDefinition['typeKey'], options: CatalogAttributeDefinition['options'] = []): CatalogAttributeDefinition => ({
   id,
   title,
   typeKey,
-  typeRevision: 1,
   options,
-  isActive,
 });
 
-const occurrence = (id: string, attributeId: string, typeKey: CatalogAttributeOccurrence['typeKey'], value: CatalogAttributeOccurrence['value'], typeRevision = 1): CatalogAttributeOccurrence => ({
+const occurrence = (id: string, attributeId: string, value: CatalogAttributeOccurrence['value']): CatalogAttributeOccurrence => ({
   id,
   attributeId,
-  typeKey,
-  typeRevision,
   value,
   editLevel: 'Definition',
 });
@@ -36,15 +32,15 @@ describe('catalog attribute tags', () => {
       definition('attribute-empty-choice', 'Пустой выбор', 'multiChoice', []),
     ];
     const tags = catalogAttributeTags(definitions, [
-      occurrence('occurrence-type-1', 'attribute-type', 'string', 'Оружие'),
-      occurrence('occurrence-type-2', 'attribute-type', 'string', 'Одноручное'),
-      occurrence('occurrence-type-3', 'attribute-type', 'string', 'Древковое'),
-      occurrence('occurrence-flag', 'attribute-flag', 'boolean', false),
-      occurrence('occurrence-zero', 'attribute-zero', 'integer', 0),
-      occurrence('occurrence-large', 'attribute-large', 'integer', new LosslessNumber('9007199254740993')),
-      occurrence('occurrence-choice', 'attribute-choice', 'multiChoice', ['option-weapon', 'option-ranged']),
-      occurrence('occurrence-empty', 'attribute-empty', 'string', ''),
-      occurrence('occurrence-empty-choice', 'attribute-empty-choice', 'multiChoice', []),
+      occurrence('occurrence-type-1', 'attribute-type', 'Оружие'),
+      occurrence('occurrence-type-2', 'attribute-type', 'Одноручное'),
+      occurrence('occurrence-type-3', 'attribute-type', 'Древковое'),
+      occurrence('occurrence-flag', 'attribute-flag', false),
+      occurrence('occurrence-zero', 'attribute-zero', 0),
+      occurrence('occurrence-large', 'attribute-large', new LosslessNumber('9007199254740993')),
+      occurrence('occurrence-choice', 'attribute-choice', ['option-weapon', 'option-ranged']),
+      occurrence('occurrence-empty', 'attribute-empty', ''),
+      occurrence('occurrence-empty-choice', 'attribute-empty-choice', []),
     ]);
 
     expect(tags).toEqual([
@@ -63,22 +59,21 @@ describe('catalog attribute tags', () => {
       definition('attribute-one', 'Общее имя', 'singleChoice', [{ optionKey: 'known-option', title: 'Известно' }]),
       definition('attribute-two', 'Общее имя', 'string'),
       definition('attribute-stale', 'Устаревший выбор', 'singleChoice', [{ optionKey: 'current-option', title: 'Текущий вариант' }]),
-      definition('attribute-inactive', 'Неактивный', 'string', [], false),
+      definition('attribute-kept', 'Сохранённый', 'string'),
     ];
     const tags = catalogAttributeTags(definitions, [
-      occurrence('private-occurrence-id', 'unknown-attribute-id', 'singleChoice', 'private-option-key'),
-      occurrence('stale-occurrence-id', 'attribute-stale', 'singleChoice', 'private-stale-option', 2),
-      occurrence('one-occurrence', 'attribute-one', 'singleChoice', 'known-option'),
-      occurrence('two-occurrence', 'attribute-two', 'string', 'Сохранено'),
-      occurrence('inactive-occurrence', 'attribute-inactive', 'string', 'Сохранённое значение'),
+      occurrence('private-occurrence-id', 'unknown-attribute-id', 'private-option-key'),
+      occurrence('stale-occurrence-id', 'attribute-stale', 'private-stale-option'),
+      occurrence('one-occurrence', 'attribute-one', 'known-option'),
+      occurrence('two-occurrence', 'attribute-two', 'Сохранено'),
+      occurrence('kept-occurrence', 'attribute-kept', 'Сохранённое значение'),
     ]);
 
     expect(tags).toEqual([
-      { attributeId: 'unknown-attribute-id', title: 'Неизвестный атрибут', values: ['Неизвестный вариант'] },
       { attributeId: 'attribute-stale', title: 'Устаревший выбор', values: ['Неизвестный вариант'] },
       { attributeId: 'attribute-one', title: 'Общее имя', values: ['Известно'] },
       { attributeId: 'attribute-two', title: 'Общее имя', values: ['Сохранено'] },
-      { attributeId: 'attribute-inactive', title: 'Неактивный', values: ['Сохранённое значение'] },
+      { attributeId: 'attribute-kept', title: 'Сохранённый', values: ['Сохранённое значение'] },
     ]);
     expect(JSON.stringify(tags)).not.toContain('private-');
   });
