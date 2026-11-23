@@ -145,6 +145,17 @@ describe('presentation model normalization', () => {
     expect(node.params).toBe(scalar);
   });
 
+  it('reads invisible appearance for explicit and typeless groups and preserves it through JSON round-trip', () => {
+    const params = { ...object(makeNode('group').params), appearance: 'invisible' } as JsonValue;
+    const read = readParams(parseJson(stringifyJson(params)));
+    expect(read.status).toBe('supported');
+    if (read.status === 'supported') expect(read.params.appearance).toBe('invisible');
+
+    const typeless = readParams(parseJson('{"appearance":"invisible"}'));
+    expect(typeless.status).toBe('supported');
+    if (typeless.status === 'supported') expect(typeless.params.appearance).toBe('invisible');
+  });
+
   it('reports unsupported and invalid explicit params while retaining their exact JSON', () => {
     const unknown = parseJson('{"version":9,"type":"inventory","extension":{"amount":9223372036854775807}}');
     const unsupported = readParams(unknown);

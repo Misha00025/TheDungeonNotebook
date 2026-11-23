@@ -160,7 +160,9 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; con
   }
   return content;
    }, [node.params, node.children, sheet, conditionSheet, sample, surface, renderValue, onDropNode, onDropMarker, renderNodeActions, read, params, statFormat, statCondition]);
-  const groupAppearance = params?.type === 'group' && params.appearance === 'panel';
+   const groupAppearance = params?.type === 'group' && params.appearance === 'panel';
+   const invisibleGroup = params?.type === 'group' && params.appearance === 'invisible';
+   const invisibleGroupEditor = invisibleGroup && Boolean(renderNodeActions);
   const nestedChildren = params?.type !== 'group' && node.children.length > 0 ? <div className={styles.children}>{node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} conditionSheet={conditionSheet} sample={sample} surface={surface} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={onDropMarker} renderNodeActions={renderNodeActions} />)}</div> : null;
   const handleDrop = (event: React.DragEvent<HTMLElement>) => {
     event.stopPropagation();
@@ -176,9 +178,9 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; con
     if (!(related instanceof Node) || !event.currentTarget.contains(related)) onDropMarker?.(event.currentTarget, null);
   };
   const sizeClass = params && (params.type === 'resource' || params.type === 'composite') ? params.size === 'compact' ? styles.sizeCompact : params.size === 'medium' ? styles.sizeMedium : '' : '';
-  return <article className={`${styles.node} ${groupAppearance ? styles.panel : ''} ${surface !== 'page' ? styles.compactSurface : ''} ${sizeClass}`} data-node-type={params?.type} data-drop-axis={orientation === 'row' ? 'x' : 'y'} tabIndex={renderNodeActions ? 0 : undefined} draggable={Boolean(onDropNode)} aria-label={node.title || 'Компонент отображения'} onDragStart={event => { event.stopPropagation(); if (onDropNode) event.dataTransfer.setData('application/x-tdn-presentation', JSON.stringify({ kind: 'node', nodeKey: node.nodeKey })); }} onDragOver={onDropOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+   return <article className={`${styles.node} ${groupAppearance ? styles.panel : ''} ${invisibleGroup ? invisibleGroupEditor ? styles.invisibleGroupEditor : styles.invisibleGroup : ''} ${surface !== 'page' ? styles.compactSurface : ''} ${sizeClass}`} data-node-type={params?.type} data-drop-axis={orientation === 'row' ? 'x' : 'y'} tabIndex={renderNodeActions ? 0 : undefined} draggable={Boolean(onDropNode)} aria-label={node.title || 'Компонент отображения'} onDragStart={event => { event.stopPropagation(); if (onDropNode) event.dataTransfer.setData('application/x-tdn-presentation', JSON.stringify({ kind: 'node', nodeKey: node.nodeKey })); }} onDragOver={onDropOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
       {renderNodeActions && <div className={styles.nodeControls} role="group" aria-label="Действия компонента" onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onPointerUp={event => event.stopPropagation()} onKeyDown={event => event.stopPropagation()} onKeyUp={event => event.stopPropagation()} onDragStart={event => { event.preventDefault(); event.stopPropagation(); }} onDragOver={event => event.stopPropagation()} onDragLeave={event => event.stopPropagation()} onDrop={event => { event.preventDefault(); event.stopPropagation(); const nodeElement = event.currentTarget.parentElement; if (nodeElement instanceof HTMLElement) onDropMarker?.(nodeElement, null); }} onDragEnd={event => event.stopPropagation()}>{renderNodeActions(node)}</div>}
-      {node.title && <h3 className={styles.nodeTitle}>{node.title}</h3>}
+       {node.title && (!invisibleGroup || invisibleGroupEditor) && <h3 className={styles.nodeTitle}>{node.title}</h3>}
       {read.status !== 'supported' ? <p className={styles.diagnostic} role="status">{read.message}</p> : <>{body}{nestedChildren}</>}
         {read.status !== 'supported' && node.children.length > 0 && <div className={styles.children}>{node.children.map(child => <NodeContent key={child.nodeKey} node={child} sheet={sheet} conditionSheet={conditionSheet} sample={sample} surface={surface} renderValue={renderValue} onDropNode={onDropNode} onDropMarker={onDropMarker} renderNodeActions={renderNodeActions} />)}</div>}
    </article>;

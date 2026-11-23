@@ -29,20 +29,23 @@ describe('presentation group direction contracts', () => {
     open();
     expect(screen.getByRole('option', { name: 'По колонкам' })).toHaveValue('column');
     fireEvent.change(screen.getByLabelText('Колонки'), { target: { value: '4' } });
+    fireEvent.change(screen.getByLabelText('Оформление'), { target: { value: 'invisible' } });
     close();
     let changed = onChange.mock.calls[0]?.[0] as PresentationNode[];
-    expect(changed[0]).toMatchObject({ nodeKey: 'group', children: roots()[0].children, params: { direction: 'column', columns: 4, opaque: { keep: true } } });
+    expect(changed[0]).toMatchObject({ nodeKey: 'group', children: roots()[0].children, params: { direction: 'column', columns: 4, appearance: 'invisible', opaque: { keep: true } } });
 
     fireEvent.change(open(), { target: { value: 'row' } });
+    expect(screen.getByLabelText('Оформление')).toHaveValue('invisible');
     close();
     changed = onChange.mock.calls[1]?.[0] as PresentationNode[];
-    expect(changed[0].params).toMatchObject({ direction: 'row', columns: 4, opaque: { keep: true } });
+    expect(changed[0].params).toMatchObject({ direction: 'row', columns: 4, appearance: 'invisible', opaque: { keep: true } });
 
     fireEvent.change(open(), { target: { value: 'column' } });
     close();
     open();
     expect(screen.getByLabelText('Направление')).toHaveValue('column');
     expect(screen.getByLabelText('Колонки')).toHaveValue('4');
+    expect(screen.getByLabelText('Оформление')).toHaveValue('invisible');
     close();
     expect(onChange).toHaveBeenCalledTimes(3);
   });

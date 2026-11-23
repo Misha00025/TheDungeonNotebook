@@ -11,7 +11,7 @@ export type PresentationSize = 'compact' | 'medium' | 'large';
 export type JsonFieldReference = { kind: FieldReference['kind']; fieldId: string; [key: string]: JsonValue };
 export type FieldPart = { text: string } | { source: JsonFieldReference; signed?: boolean };
 export type PresentationParams =
-  | { version: 1; type: 'group'; direction: 'row' | 'column'; columns: number; gap: 'small' | 'medium' | 'large'; appearance: 'plain' | 'panel'; [key: string]: JsonValue }
+  | { version: 1; type: 'group'; direction: 'row' | 'column'; columns: number; gap: 'small' | 'medium' | 'large'; appearance: 'plain' | 'panel' | 'invisible'; [key: string]: JsonValue }
   | { version: 1; type: 'composite'; parts: FieldPart[]; primary: JsonFieldReference | null; size: PresentationSize; [key: string]: JsonValue }
   | { version: 1; type: 'resource'; current: JsonFieldReference | null; maximum: JsonFieldReference | null; showBar: boolean; size: PresentationSize; [key: string]: JsonValue }
   | { version: 1; type: 'stat-list'; entries: { source: JsonFieldReference; label: string; [key: string]: JsonValue }[]; columns: number; format: string; expressions: (string | null)[]; condition: string; [key: string]: JsonValue }
@@ -35,7 +35,7 @@ export function readParams(params: JsonValue): ParamsRead {
       direction: legacy.direction === 'row' || legacy.direction === 'column' ? legacy.direction : 'column',
       columns: positiveInteger(legacy.columns) ? legacy.columns : 1,
       gap: legacy.gap === 'small' || legacy.gap === 'medium' || legacy.gap === 'large' ? legacy.gap : 'medium',
-      appearance: legacy.appearance === 'plain' || legacy.appearance === 'panel' ? legacy.appearance : 'plain',
+      appearance: legacy.appearance === 'plain' || legacy.appearance === 'panel' || legacy.appearance === 'invisible' ? legacy.appearance : 'plain',
     };
     return { status: 'supported', type: 'group', params: legacyParams as Extract<PresentationParams, { type: 'group' }> };
   }
@@ -44,7 +44,7 @@ export function readParams(params: JsonValue): ParamsRead {
   if (type !== 'group' && type !== 'composite' && type !== 'resource' && type !== 'stat-list' && type !== 'catalog') return { status: 'unsupported', message: 'Тип отображения не поддерживается.', params };
   if (params.version !== undefined && params.version !== 1) return { status: 'unsupported', message: 'Версия настроек не поддерживается.', params };
   const valid = type === 'group'
-    ? (params.direction === 'row' || params.direction === 'column') && positiveInteger(params.columns) && (params.gap === 'small' || params.gap === 'medium' || params.gap === 'large') && (params.appearance === 'plain' || params.appearance === 'panel')
+    ? (params.direction === 'row' || params.direction === 'column') && positiveInteger(params.columns) && (params.gap === 'small' || params.gap === 'medium' || params.gap === 'large') && (params.appearance === 'plain' || params.appearance === 'panel' || params.appearance === 'invisible')
     : type === 'composite'
        ? Array.isArray(params.parts) && params.parts.every(validPart) && (params.primary === null || validRef(params.primary) && params.primary.kind === 'Base') && (params.size === undefined || validSize(params.size))
        : type === 'resource'
