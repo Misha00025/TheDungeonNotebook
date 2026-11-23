@@ -10,6 +10,7 @@ import CatalogGroupsDialog from './CatalogGroupsDialog';
 import { CampaignApiError } from './api';
 import { stringifyJson } from './json';
 import type { CatalogContentEnvelope, CatalogGroup, CatalogGroupConfigurationEnvelope, CatalogGroupInput, CatalogMetadata } from './catalogTypes';
+import { buildCatalogBrowseModel } from './catalogBrowseModel';
 
 type GroupPutBody = { expectedRevision: CatalogGroupConfigurationEnvelope['contentRevision']; groups: CatalogGroupInput[] };
 
@@ -169,6 +170,8 @@ describe('campaign catalog', () => {
   it('lets a player browse server-visible metadata without admin configuration access and opens another creator’s entry read-only', async () => {
     renderCatalog();
 
+    await screen.findByText('Без группы');
+    fireEvent.click(screen.getByRole('button', { name: 'Развернуть всё' }));
     fireEvent.click(await screen.findByRole('button', { name: /Public tonic/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Public tonic' });
     expect(within(dialog).getByText('Restores a little health.')).toBeInTheDocument();
@@ -186,7 +189,7 @@ describe('campaign catalog', () => {
     expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
   });
 
-  it('switches item/skill tabs, filters group entries and search locally, and creates the selected kind', async () => {
+  it('switches item/skill tabs, searches the full current catalogue, and creates the selected kind', async () => {
     state.mode = 'gm';
     state.permissions = { canRead: true, canWrite: true, canManageAccess: false };
     state.api.getCatalogGroups.mockResolvedValue({
@@ -197,11 +200,16 @@ describe('campaign catalog', () => {
         { id: 'group-magic', title: 'Magic shelf', parentId: 'group-root' },
       ],
     });
-    state.api.getCatalogGroupEntries.mockResolvedValue({ entries: [metadata, skillMetadata], diagnostics: [] });
+    state.api.getCatalogGroupEntries.mockImplementation(async (_campaignId: number, groupId: string) => ({
+      entries: groupId === 'group-magic' ? [skillMetadata] : [],
+      diagnostics: [],
+    }));
     renderCatalog('/groups/12/gm/catalog');
 
     expect(await screen.findByRole('button', { name: 'Атрибуты каталога' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Группы каталога' })).toBeInTheDocument();
+    await screen.findByText('Без группы');
+    fireEvent.click(screen.getByRole('button', { name: 'Развернуть всё' }));
     expect(screen.getByRole('button', { name: /Public tonic/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Arcana/ })).not.toBeInTheDocument();
 
@@ -209,13 +217,12 @@ describe('campaign catalog', () => {
     expect(within(itemTab).getByRole('link', { name: 'Предметы' })).toHaveAttribute('href', '/groups/12/gm/catalog/');
     expect(within(itemTab).getByRole('link', { name: 'Навыки' })).toHaveAttribute('href', '/groups/12/gm/catalog/skills');
     fireEvent.click(within(itemTab).getByRole('link', { name: 'Навыки' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: /Arcana/ })).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: /Public tonic/ })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Magic shelf' }));
-    await waitFor(() => expect(state.api.getCatalogGroupEntries).toHaveBeenCalledWith(12, 'group-magic'));
+    await screen.findByText('Collections');
+    expect(screen.queryByRole('button', { name: /Arcana/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Развернуть всё' }));
     expect(await screen.findByRole('button', { name: /Arcana/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Public tonic/ })).not.toBeInTheDocument();
+
     const search = screen.getByRole('textbox', { name: 'Поиск по названию' });
     fireEvent.change(search, { target: { value: 'Public' } });
     expect(await screen.findByText('Ничего не найдено')).toBeInTheDocument();
@@ -229,6 +236,110 @@ describe('campaign catalog', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Новое определение' });
     expect(within(dialog).getByRole('combobox', { name: 'Тип определения' })).toHaveValue('Skill');
+  });
+
+  it('browses nested memberships, global search, and ungrouped entries with reversible section expansion', async () => {
+    const rootEntry = { ...metadata, id: 'entry-root', name: 'Root relic' };
+    const childEntry = { ...metadata, id: 'entry-child', name: 'Child charm' };
+    const ungroupedEntry = { ...metadata, id: 'entry-ungrouped', name: 'Loose tonic' };
+    state.api.listCatalog.mockResolvedValue([rootEntry, childEntry, ungroupedEntry]);
+    state.api.getCatalogGroups.mockResolvedValue({
+      campaignId: 12,
+      contentRevision: 4,
+      groups: [
+        { id: 'group-root', title: 'Root group', parentId: null },
+        { id: 'group-child', title: 'Child group', parentId: 'group-root' },
+      ],
+    });
+    state.api.getCatalogGroupEntries.mockImplementation(async (_campaignId: number, groupId: string) => ({
+      entries: groupId === 'group-root' ? [rootEntry] : [childEntry],
+      diagnostics: [],
+    }));
+    renderCatalog();
+
+    await screen.findByText('Без группы');
+    expect(screen.getByText('Root group')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Root relic/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Child charm/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Loose tonic/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Развернуть всё' }));
+    expect(await screen.findByRole('button', { name: /Root relic/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Child charm/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Loose tonic/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Свернуть всё' }));
+    expect(screen.queryByRole('button', { name: /Root relic/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Child charm/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Loose tonic/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Root group'));
+    expect(await screen.findByRole('button', { name: /Root relic/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Child charm/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Child group'));
+    expect(await screen.findByRole('button', { name: /Child charm/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Child group'));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Child charm/ })).not.toBeInTheDocument());
+
+    const membershipReadCount = state.api.getCatalogGroupEntries.mock.calls.length;
+    const search = screen.getByRole('textbox', { name: 'Поиск по названию' });
+    fireEvent.change(search, { target: { value: 'Child' } });
+    expect(await screen.findByRole('button', { name: /Child charm/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Очистить поиск' }));
+    expect(screen.getByRole('button', { name: /Root relic/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Child charm/ })).not.toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: 'Child' } });
+    expect(await screen.findByRole('button', { name: /Child charm/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Свернуть всё' }));
+    expect(screen.queryByRole('button', { name: /Child charm/ })).not.toBeInTheDocument();
+    expect(state.api.getCatalogGroupEntries).toHaveBeenCalledTimes(membershipReadCount);
+    expect(state.api.createCatalogEntry).not.toHaveBeenCalled();
+    expect(state.api.putCatalogMetadata).not.toHaveBeenCalled();
+    expect(state.api.putCatalogContent).not.toHaveBeenCalled();
+    expect(state.api.putCatalogAttributes).not.toHaveBeenCalled();
+    expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
+    expect(state.api.getCatalogEntry).not.toHaveBeenCalled();
+    expect(state.api.getCatalogContent).not.toHaveBeenCalled();
+  });
+
+  it('keeps readable group sections when another membership fails and retries with reads only', async () => {
+    const goodEntry = { ...metadata, id: 'entry-good', name: 'Readable tonic' };
+    const failedEntry = { ...metadata, id: 'entry-retry', name: 'Recovered charm' };
+    state.api.listCatalog.mockResolvedValue([goodEntry, failedEntry]);
+    state.api.getCatalogGroups.mockResolvedValue({
+      campaignId: 12,
+      contentRevision: 6,
+      groups: [
+        { id: 'group-good', title: 'Readable group', parentId: null },
+        { id: 'group-retry', title: 'Retry group', parentId: null },
+      ],
+    });
+    state.api.getCatalogGroupEntries
+      .mockImplementationOnce(async () => ({ entries: [goodEntry], diagnostics: [] }))
+      .mockRejectedValueOnce(new Error('private error payload'))
+      .mockImplementation(async (_campaignId: number, groupId: string) => ({
+        entries: groupId === 'group-good' ? [goodEntry] : [failedEntry],
+        diagnostics: [],
+      }));
+    renderCatalog();
+
+    await screen.findByText('Retry group');
+    fireEvent.click(screen.getByRole('button', { name: 'Развернуть всё' }));
+    expect(await screen.findByRole('button', { name: /Readable tonic/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Повторить загрузку раздела' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Recovered charm/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Без группы')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ничего не найдено')).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('private error payload');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить загрузку раздела' }));
+    expect(await screen.findByRole('button', { name: /Recovered charm/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Readable tonic/ })).toBeInTheDocument();
+    expect(state.api.getCatalogGroupConfiguration).not.toHaveBeenCalled();
+    expect(state.api.createCatalogEntry).not.toHaveBeenCalled();
+    expect(state.api.putCatalogMetadata).not.toHaveBeenCalled();
+    expect(state.api.putCatalogContent).not.toHaveBeenCalled();
+    expect(state.api.putCatalogAttributes).not.toHaveBeenCalled();
+    expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
   });
 });
 

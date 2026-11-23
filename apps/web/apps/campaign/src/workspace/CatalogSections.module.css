@@ -1,0 +1,83 @@
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.section {
+  min-width: 0;
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2rem;
+  padding: 0.25rem 0.35rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+.summary:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 1px;
+}
+
+.chevron {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+
+.section[open] > .summary .chevron {
+  transform: rotate(45deg);
+}
+
+.body {
+  margin-left: 0.65rem;
+  padding-left: 0.65rem;
+  border-left: 1px solid var(--border-color);
+}
+
+.entries {
+  margin: 0.2rem 0 0.45rem;
+}
+
+.sections .entry {
+  width: 100%;
+  min-height: 1.75rem;
+  justify-content: flex-start;
+  gap: 0.55rem;
+  padding: 0.3rem 0.45rem;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  color: var(--text-primary);
+  margin: 0.05rem 0;
+}
+
+.sections .entry:hover {
+  background: var(--bg-secondary);
+}
+
+.sections .entry:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: -2px;
+}
+
+.sections .entry small {
+  color: var(--text-secondary);
+}
+
+.diagnostic {
+  color: var(--text-secondary);
+}

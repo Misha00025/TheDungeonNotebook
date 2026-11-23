@@ -1,28 +1,25 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Button, PageHeader, SearchBar, StatePanel, TabBar, Toolbar } from '@tdn/shared';
+import { ActionRow, Button, IconButton, PageHeader, SearchBar, StatePanel, TabBar, Toolbar } from '@tdn/shared';
 import { useWorkspace } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 import { useResource } from './hooks';
 import { ApiError } from './Feedback';
+import { CampaignApiError } from './api';
 import { CatalogAttributeValuesEditor } from './CatalogAttributeValuesEditor';
 import CatalogAttributesDialog from './CatalogAttributesDialog';
 import CatalogDefinitionDialog from './CatalogDefinitionDialog';
 import CatalogGroupsDialog from './CatalogGroupsDialog';
-import CatalogGroupTree from './CatalogGroupTree';
-import type { CatalogGroupEntriesEnvelope, CatalogKind, CatalogMetadata } from './catalogTypes';
+import CatalogSections from './CatalogSections';
+import { buildCatalogBrowseModel } from './catalogBrowseModel';
+import type { CatalogMembershipResult } from './catalogBrowseModel';
+import type { CatalogGroupConfigurationEnvelope, CatalogGroupSummary, CatalogKind, CatalogMetadata } from './catalogTypes';
 
 export { CatalogAttributeValuesEditor };
 
 type DefinitionDialogState = { entryId?: string; initialKind: CatalogKind };
-type CatalogBrowseData = Pick<CatalogGroupEntriesEnvelope, 'entries' | 'diagnostics'>;
-
-const entryDiagnosticLabels: Record<string, string> = {
-  invalid_condition: 'Условие группы некорректно; автоматический отбор отключён.',
-  unknown_attribute: 'Условие ссылается на отсутствующий атрибут.',
-  incompatible_attribute_type: 'Условие использует устаревший тип атрибута.',
-  invalid_attribute_value: 'Значение условия не соответствует схеме.',
-};
+type SearchExpansion = { scope: string; searching: boolean; previousKeys: Set<string> };
+const emptyGroups: CatalogGroupSummary[] = [];
 
 const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
   const { groupId = '' } = useParams();
@@ -30,36 +27,90 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
   const { api, path, sessionKey } = useWorkspace();
   const { permissions, permissionsLoading, mode, reloadPermissions } = useCampaignWorkspace();
   const identity = `${sessionKey}:${campaignId}`;
+  const browseScope = `${identity}:${kind}`;
   const canManage = mode === 'gm' && !permissionsLoading && permissions.canWrite;
   const canKeepManagementDialogs = mode === 'gm' && (permissionsLoading || permissions.canWrite);
 
   const [search, setSearch] = useState('');
-  const [groupIdSelected, setGroupIdSelected] = useState('');
+  const [expanded, setExpanded] = useState<{ scope: string; keys: Set<string> }>({ scope: browseScope, keys: new Set() });
+  const searchExpansion = useRef<SearchExpansion>({ scope: browseScope, searching: false, previousKeys: new Set() });
   const [definitionDialog, setDefinitionDialog] = useState<DefinitionDialogState>();
   const [attributesOpen, setAttributesOpen] = useState(false);
   const [groupsOpen, setGroupsOpen] = useState(false);
 
-  const entries = useResource<CatalogBrowseData>(
-    `${identity}:catalog-browse:${groupIdSelected || 'ungrouped'}`,
-    () => groupIdSelected
-      ? api.getCatalogGroupEntries(campaignId, groupIdSelected).then(({ entries: groupEntries, diagnostics }) => ({ entries: groupEntries, diagnostics }))
-      : api.listCatalog(campaignId).then(catalogEntries => ({ entries: catalogEntries, diagnostics: [] })),
-  );
+  const rootCatalog = useResource<CatalogMetadata[]>(`${identity}:catalog-browse`, () => api.listCatalog(campaignId));
   const summaries = useResource(`${identity}:catalog-groups`, () => api.getCatalogGroups(campaignId));
   const schema = useResource(`${identity}:catalog-attributes`, () => api.getCatalogAttributes(campaignId));
+  const summariesForbidden = summaries.error instanceof CampaignApiError
+    && (summaries.error.status === 403 || summaries.error.status === 404);
+  const groups = summariesForbidden ? emptyGroups : summaries.data?.groups ?? emptyGroups;
+  const membershipScope = `${String(summaries.data?.contentRevision ?? '')}:${groups.map(group => group.id).join(',')}`;
+  const memberships = useResource<CatalogMembershipResult[]>(
+    `${identity}:catalog-memberships:${membershipScope}`,
+    async () => Promise.all(groups.map(async group => {
+      try {
+        const result = await api.getCatalogGroupEntries(campaignId, group.id);
+        return { groupId: group.id, entries: result.entries, diagnostics: result.diagnostics };
+      } catch (error) {
+        return { groupId: group.id, error };
+      }
+    })),
+    Boolean(summaries.data) && !summariesForbidden,
+  );
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!canKeepManagementDialogs) {
       setAttributesOpen(false);
       setGroupsOpen(false);
     }
   }, [canKeepManagementDialogs]);
 
-  const filteredEntries = useMemo(() => (entries.data?.entries ?? []).filter(entry => {
-    const kindMatches = entry.kind === kind;
-    const nameMatches = entry.name.toLocaleLowerCase().includes(search.toLocaleLowerCase());
-    return kindMatches && nameMatches;
-  }), [entries.data, kind, search]);
+  const rootCatalogForbidden = rootCatalog.error instanceof CampaignApiError
+    && (rootCatalog.error.status === 403 || rootCatalog.error.status === 404);
+  const model = useMemo(() => rootCatalog.data && !rootCatalogForbidden
+    ? buildCatalogBrowseModel({
+      rootCatalog: rootCatalog.data,
+      groups,
+      memberships: memberships.data ?? [],
+      kind,
+      search,
+      summariesReady: Boolean(summaries.data) && !summaries.error,
+      membershipsReady: Boolean(memberships.data) && !memberships.error && !summaries.error,
+    })
+    : undefined,
+  [rootCatalog.data, rootCatalogForbidden, groups, memberships.data, memberships.error, kind, search, summaries.data, summaries.error]);
+
+  const openKeys = expanded.scope === browseScope ? expanded.keys : new Set<string>();
+  useEffect(() => {
+    if (searchExpansion.current.scope !== browseScope) {
+      searchExpansion.current = { scope: browseScope, searching: Boolean(search.trim()), previousKeys: new Set() };
+    }
+    if (search.trim() && model) {
+      setExpanded(current => {
+        const next = new Set(current.scope === browseScope ? current.keys : []);
+        model.keysToOpenForSearch.forEach(key => next.add(key));
+        return current.scope === browseScope && next.size === current.keys.size && [...next].every(key => current.keys.has(key))
+          ? current
+          : { scope: browseScope, keys: next };
+      });
+    }
+  }, [browseScope, search, model?.keysToOpenForSearch]);
+
+  const changeSearch = (value: string) => {
+    const hasQuery = Boolean(value.trim());
+    const current = searchExpansion.current.scope === browseScope
+      ? searchExpansion.current
+      : { scope: browseScope, searching: false, previousKeys: new Set<string>() };
+    if (!hasQuery && current.searching) {
+      setExpanded({ scope: browseScope, keys: new Set(current.previousKeys) });
+      searchExpansion.current = { scope: browseScope, searching: false, previousKeys: new Set() };
+    } else if (hasQuery && !current.searching) {
+      searchExpansion.current = { scope: browseScope, searching: true, previousKeys: new Set(openKeys) };
+    } else if (hasQuery) {
+      searchExpansion.current = current;
+    }
+    setSearch(value);
+  };
 
   const openDefinition = (entry: CatalogMetadata) => setDefinitionDialog({ entryId: entry.id, initialKind: entry.kind });
   const startCreate = () => {
@@ -68,21 +119,28 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
   };
 
   const acceptSavedMetadata = (saved: CatalogMetadata) => {
-    if (groupIdSelected) {
-      entries.reload();
-      return;
-    }
-    const current = entries.data?.entries;
+    const current = rootCatalog.data;
     if (!current) {
-      entries.reload();
-      return;
+      rootCatalog.reload();
+    } else {
+      const index = current.findIndex(item => item.id === saved.id);
+      const next = [...current];
+      if (index >= 0) next[index] = saved;
+      else next.push(saved);
+      rootCatalog.setData(next);
     }
-    const index = current.findIndex(item => item.id === saved.id);
-    const next = [...current];
-    if (index >= 0) next[index] = saved;
-    else next.push(saved);
-    entries.setData({ entries: next, diagnostics: [] });
+    if (memberships.data) memberships.reload();
   };
+
+  const allSectionsOpen = Boolean(model?.sectionKeys.length)
+    && model!.sectionKeys.every(key => openKeys.has(key));
+  const toggleAll = () => {
+    if (!model) return;
+    const keys = allSectionsOpen ? new Set<string>() : new Set(model.sectionKeys);
+    setExpanded({ scope: browseScope, keys });
+  };
+
+  const rootEntriesUnavailable = rootCatalogForbidden ? undefined : rootCatalog.data;
 
   return <>
     <PageHeader title="Каталог" subtitle="Общие определения предметов и навыков кампании" />
@@ -94,42 +152,55 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
         { id: 'skills', label: 'Навыки', path: 'skills' },
       ]}
     />
-    <Toolbar><SearchBar searchTerm={search} onSearchChange={setSearch} compact aria-label="Поиск по названию" /></Toolbar>
+    <Toolbar>
+      <SearchBar searchTerm={search} onSearchChange={changeSearch} compact aria-label="Поиск по названию" />
+      <ActionRow style={{ gap: '0.5rem' }}>
+        <IconButton
+          icon={allSectionsOpen ? 'collapse-all' : 'expand-all'}
+          size="small"
+          variant="secondary"
+          title={allSectionsOpen ? 'Свернуть всё' : 'Развернуть всё'}
+          ariaLabel={allSectionsOpen ? 'Свернуть всё' : 'Развернуть всё'}
+          disabled={!model?.sectionKeys.length}
+          onClick={toggleAll}
+        />
+        {canManage && <>
+          <IconButton icon="add" size="small" variant="secondary" title="Создать определение" ariaLabel="Создать определение" onClick={startCreate} />
+          <IconButton icon="edit" size="small" variant="secondary" title="Атрибуты каталога" ariaLabel="Атрибуты каталога" onClick={() => setAttributesOpen(true)} />
+          <IconButton icon="sort" size="small" variant="secondary" title="Группы каталога" ariaLabel="Группы каталога" onClick={() => setGroupsOpen(true)} />
+        </>}
+      </ActionRow>
+    </Toolbar>
 
+    {Boolean(rootCatalog.error) && <ApiError error={rootCatalog.error} onRetry={rootCatalog.reload} />}
+    {Boolean(summaries.error) && <ApiError error={summaries.error} onRetry={summaries.reload} />}
+    {Boolean(schema.error) && <ApiError error={schema.error} onRetry={schema.reload} />}
     {summaries.loading && !summaries.data && <StatePanel kind="loading">Загрузка групп каталога…</StatePanel>}
-    {summaries.error && <ApiError error={summaries.error} onRetry={summaries.reload} />}
-    {summaries.data && <CatalogGroupTree
-      groups={summaries.data.groups}
-      selectedId={groupIdSelected}
-      onSelect={setGroupIdSelected}
-    />}
-    {groupIdSelected && <Button variant="secondary" onClick={() => setGroupIdSelected('')}>Сбросить группу</Button>}
+    {rootCatalog.loading && !rootEntriesUnavailable && <StatePanel kind="loading">Загрузка каталога…</StatePanel>}
+    {!rootEntriesUnavailable && !rootCatalog.loading && !rootCatalog.error && <StatePanel kind="error">Каталог недоступен.</StatePanel>}
 
-    {schema.error && <ApiError error={schema.error} onRetry={schema.reload} />}
-    {canManage && <div>
-      <Button onClick={startCreate}>Создать определение</Button>
-      <Button variant="secondary" onClick={() => setAttributesOpen(true)}>Атрибуты каталога</Button>
-      <Button variant="secondary" onClick={() => setGroupsOpen(true)}>Группы каталога</Button>
-    </div>}
-
-    {entries.loading && !entries.data && <StatePanel kind="loading">Загрузка каталога…</StatePanel>}
-    {entries.error && <ApiError error={entries.error} onRetry={entries.reload} />}
-    {entries.data && entries.data.diagnostics.map((diagnostic, index) => {
-      const name = diagnostic.entryId
-        ? entries.data?.entries.find(entry => entry.id === diagnostic.entryId)?.name
-        : undefined;
-      return <p role="status" key={`${diagnostic.groupId}-${diagnostic.entryId ?? 'group'}-${diagnostic.code}-${index}`}>
-        {entryDiagnosticLabels[diagnostic.code] ?? 'Сервер обнаружил проблему при вычислении состава группы.'}
-        {diagnostic.entryId ? ` Определение: ${name ?? 'недоступно'}.` : ''}
-      </p>;
-    })}
-    {entries.data && filteredEntries.length === 0 && <StatePanel kind="empty">Ничего не найдено</StatePanel>}
-    {entries.data && filteredEntries.length > 0 && <ul>{filteredEntries.map(entry => <li key={entry.id}>
-      <Button variant="secondary" onClick={() => openDefinition(entry)}>
-        {entry.name} <small>{entry.kind === 'Item' ? 'Предмет' : 'Навык'}</small>
-      </Button>
-    </li>)}</ul>}
-    {!entries.data && !entries.loading && !entries.error && <StatePanel kind="error">Каталог недоступен.</StatePanel>}
+    {model && <>
+      {model.ungroupedState === 'loading' && summaries.data && <StatePanel kind="loading">Проверка принадлежности определений к группам…</StatePanel>}
+      {model.ungroupedState === 'unavailable' && (memberships.data?.some(result => result.error)
+        ? <><StatePanel kind="error">Не удалось определить, какие определения не входят в группы.</StatePanel><Button size="small" variant="ghost" type="button" onClick={memberships.reload}>Повторить загрузку групп</Button></>
+        : summaries.error
+          ? null
+          : <StatePanel kind="loading">Загрузка групп каталога…</StatePanel>)}
+      {model.noMatches && !rootCatalog.error && <StatePanel kind="empty">Ничего не найдено</StatePanel>}
+      <CatalogSections
+        sections={model.sections}
+        openKeys={openKeys}
+        onToggle={(key, open) => setExpanded(current => {
+          const keys = new Set(current.scope === browseScope ? current.keys : []);
+          if (keys.has(key) === open) return current;
+          if (open) keys.add(key);
+          else keys.delete(key);
+          return { scope: browseScope, keys };
+        })}
+        onOpenEntry={openDefinition}
+        onRetryMembership={() => memberships.reload()}
+      />
+    </>}
 
     {definitionDialog && <CatalogDefinitionDialog
       key={`${identity}:${definitionDialog.entryId ?? `new-${definitionDialog.initialKind}`}`}
@@ -158,14 +229,11 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
       canManage={canManage}
       permissionsPending={permissionsLoading}
       onClose={() => setGroupsOpen(false)}
-      onSaved={result => {
-        summaries.setData({
-          campaignId: result.campaignId,
-          contentRevision: result.contentRevision,
-          groups: result.data.groups.map(({ id, title, parentId }) => ({ id, title, parentId })),
-        });
-        if (groupIdSelected) entries.reload();
-      }}
+      onSaved={(result: CatalogGroupConfigurationEnvelope) => summaries.setData({
+        campaignId: result.campaignId,
+        contentRevision: result.contentRevision,
+        groups: result.data.groups.map(({ id, title, parentId }) => ({ id, title, parentId })),
+      })}
       onForbidden={reloadPermissions}
     />}
   </>;
