@@ -28,6 +28,7 @@ export type CharacterCatalogAddDialogProps = {
   canPublishDefinition?: boolean;
   characterName?: string;
   definitionPermissionsPending?: boolean;
+  onAdded?: (entry: CharacterCatalogEntryEnvelope) => void;
   onClose: () => void;
 };
 
@@ -75,6 +76,7 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   canPublishDefinition = false,
   characterName,
   definitionPermissionsPending = false,
+  onAdded,
   onClose,
 }) => {
   const { api, sessionKey } = useWorkspace();
@@ -86,7 +88,9 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   const requestIdRef = useRef<string | null>(null);
   const canWriteRef = useRef(catalog.canWrite);
   const onCloseRef = useRef(onClose);
+  const onAddedRef = useRef(onAdded);
   onCloseRef.current = onClose;
+  onAddedRef.current = onAdded;
   canWriteRef.current = catalog.canWrite;
   if (!requestIdRef.current) requestIdRef.current = crypto.randomUUID();
 
@@ -232,6 +236,7 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
     setBlocked(false);
     setVerificationError(undefined);
     setVerificationMessage('');
+    onAddedRef.current?.(entry);
     onCloseRef.current();
   };
 

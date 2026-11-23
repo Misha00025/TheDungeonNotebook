@@ -8,17 +8,19 @@ import styles from './Presentation.module.css';
 import IconButton from '@tdn/shared/ui/Buttons/IconButton/IconButton';
 import ModalPortal from '@tdn/shared/ui/ModalPortal/ModalPortal';
 import Checkbox from '@tdn/shared/ui/Form/Checkbox';
-import { Field, Select } from '@tdn/shared';
+import { Field, Select, StatePanel } from '@tdn/shared';
 import { compileStatListCondition, compileStatListFormat } from './statListFormat';
 import PresentationSurfaceFrame from './PresentationSurfaceFrame';
 import type { PresentationSurface } from './presentationModel';
+import { PresentationCatalogSettings } from './PresentationCatalog';
 
-export type PresentationEditorProps = { roots: PresentationNode[]; onChange: (roots: PresentationNode[]) => void; sheet?: ComputedSheet; choicesSheet?: ComputedSheet; sample?: boolean; disabled?: boolean; surface?: PresentationSurface; previewName?: string; previewDescription?: string };
+export type PresentationEditorProps = { roots: PresentationNode[]; onChange: (roots: PresentationNode[]) => void; sheet?: ComputedSheet; choicesSheet?: ComputedSheet; sample?: boolean; disabled?: boolean; surface?: PresentationSurface; previewName?: string; previewDescription?: string; campaignId?: number };
 type FieldOption = { reference: FieldReference; value: string; label: string; numeric: boolean };
 const palette: { type: PresentationType; label: string }[] = [
   { type: 'group', label: 'Группа' },
   { type: 'composite', label: 'Составной показатель' },
   { type: 'resource', label: 'Ресурс' },
+  { type: 'catalog', label: 'Каталог' },
   { type: 'stat-list', label: 'Список характеристик' },
 ];
 const referenceValue = (reference?: FieldReference) => reference ? `${reference.kind}:${encodeURIComponent(reference.fieldId)}` : '';
@@ -52,13 +54,14 @@ const eventPayload = (event: React.DragEvent): { kind: 'palette'; type: Presenta
   return null;
 };
 
-const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ roots, onChange, sheet, choicesSheet, sample = false, disabled = false, surface = 'page', previewName = 'Имя персонажа', previewDescription = 'Описание персонажа' }) => {
+const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ roots, onChange, sheet, choicesSheet, sample = false, disabled = false, surface = 'page', previewName = 'Имя персонажа', previewDescription = 'Описание персонажа', campaignId }) => {
   const [preview, setPreview] = useState(false);
   const [widthMode, setWidthMode] = useState<'desktop' | 'mobile'>('desktop');
   const widthFieldId = useId();
   const rootDropRef = useRef<HTMLDivElement>(null);
   const [settingsDraft, setSettingsDraft] = useState<PresentationNode | null>(null);
   const [statSearch, setStatSearch] = useState('');
+  const [catalogSettingsInvalid, setCatalogSettingsInvalid] = useState(false);
   const settingsDraftRef = useRef<PresentationNode | null>(null);
   const activeSettings = settingsDraft && findNode(roots, settingsDraft.nodeKey) ? settingsDraft : undefined;
   const settingsRead = activeSettings ? readParams(activeSettings.params) : undefined;
@@ -80,8 +83,8 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
       setSettingsDraft(null);
     }
   }, [preview, roots]);
-  const latest = useRef({ roots, onChange, disabled, preview, surface });
-  useLayoutEffect(() => { latest.current = { roots, onChange, disabled, preview, surface }; });
+  const latest = useRef({ roots, onChange, disabled, preview, surface, catalogSettingsInvalid });
+  useLayoutEffect(() => { latest.current = { roots, onChange, disabled, preview, surface, catalogSettingsInvalid }; });
   useEffect(() => {
     const clear = () => rootDropRef.current?.removeAttribute('data-active');
     if (disabled || preview) { clear(); return; }
@@ -120,8 +123,11 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
   };
   const closeSettings = useCallback(() => {
     const draft = settingsDraftRef.current;
+    const draftRead = draft ? readParams(draft.params) : undefined;
+    if (draftRead?.status === 'supported' && draftRead.type === 'catalog' && latest.current.catalogSettingsInvalid) return;
     settingsDraftRef.current = null;
     setSettingsDraft(null);
+    setCatalogSettingsInvalid(false);
     const latestState = latest.current;
     if (!draft || latestState.disabled) return;
     const current = findNode(latestState.roots, draft.nodeKey);
@@ -180,7 +186,7 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
      const defaultsValue = makeNode(type).params;
      const defaults = isJsonObject(defaultsValue) ? defaultsValue : {};
      const source = isJsonObject(current.params) ? current.params : { legacyParams: current.params };
-     const reserved = new Set(['version', 'type', 'direction', 'columns', 'gap', 'appearance', 'parts', 'primary', 'current', 'maximum', 'showBar', 'size', 'entries', 'format', 'expressions', 'condition', 'legacyFormatError']);
+      const reserved = new Set(['version', 'type', 'direction', 'columns', 'gap', 'appearance', 'parts', 'primary', 'current', 'maximum', 'showBar', 'size', 'entries', 'format', 'expressions', 'condition', 'kind', 'legacyFormatError']);
       const unknown = Object.fromEntries(Object.entries(source).filter(([key]) => !reserved.has(key)));
      const size = source.size === 'compact' || source.size === 'medium' || source.size === 'large' ? source.size : undefined;
      updateSettingsDraft(node => ({ ...node, params: { ...unknown, ...defaults, ...((type === 'resource' || type === 'composite') && size ? { size } : {}) } }));
@@ -192,6 +198,7 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
     const node = findNode(current.roots, nodeKey);
     if (!node) return;
     if (action === 'more') {
+      setCatalogSettingsInvalid(false);
       settingsDraftRef.current = node;
       setSettingsDraft(node);
       return;
@@ -228,12 +235,12 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
   const updateEntries = (entries: { source: JsonFieldReference; label: string; [key: string]: JsonValue }[]) => patch({ entries });
 
   return <section className={styles.editor}>
-     <header className={styles.editorHeader}><h2>Конструктор отображения</h2><div className={styles.inlineActions}>{!preview && <Field className={styles.widthField} label="Ширина" htmlFor={widthFieldId}><Select id={widthFieldId} value={widthMode} onChange={event => setWidthMode(event.target.value as 'desktop' | 'mobile')}><option value="desktop">ПК</option><option value="mobile">Мобильный</option></Select></Field>}<button type="button" disabled={disabled} onClick={() => { setPreview(value => !value); settingsDraftRef.current = null; setSettingsDraft(null); }}>{preview ? 'Редактировать' : 'Предпросмотр'}</button></div></header>
+     <header className={styles.editorHeader}><h2>Конструктор отображения</h2><div className={styles.inlineActions}>{!preview && <Field className={styles.widthField} label="Ширина" htmlFor={widthFieldId}><Select id={widthFieldId} value={widthMode} onChange={event => setWidthMode(event.target.value as 'desktop' | 'mobile')}><option value="desktop">ПК</option><option value="mobile">Мобильный</option></Select></Field>}<button type="button" disabled={disabled || catalogSettingsInvalid} onClick={() => { setPreview(value => !value); settingsDraftRef.current = null; setSettingsDraft(null); }}>{preview ? 'Редактировать' : 'Предпросмотр'}</button></div></header>
     {!preview && <div className={styles.palette} role="group" aria-label="Компоненты">
       <h3>Компоненты</h3>
           {palette.map(item => <button key={item.type} type="button" draggable={!disabled} disabled={disabled} onClick={() => add(item.type)} onDragStart={event => event.dataTransfer.setData('application/x-tdn-presentation', JSON.stringify({ kind: 'palette', type: item.type }))}>{item.label}</button>)}
     </div>}
-    <div className={`${styles.editorLayout} ${preview ? styles.previewLayout : ''}`}>
+     <div className={`${styles.editorLayout} ${preview ? styles.previewLayout : ''}`}>
       <main className={styles.canvasColumn}>
         <div className={`${styles.canvas} ${roots.length === 0 ? styles.emptyCanvas : ''} ${surface !== 'page' ? styles.surfaceCanvas : ''}`} onDragOver={surface === 'page' && !preview && !disabled ? event => { if (!event.defaultPrevented && Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) event.preventDefault(); } : undefined} onDrop={surface === 'page' && !preview && !disabled ? handleRootDrop : undefined}>
           {surface === 'page' ? <>
@@ -249,7 +256,7 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
           {surface === 'page' && roots.length > 0 && !preview && <div ref={rootDropRef} className={styles.rootDrop} aria-label="Добавить в конец холста" onDragEnter={event => { if (!disabled && !latest.current.preview && Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) event.currentTarget.setAttribute('data-active', 'true'); }} onDragOver={event => { if (!disabled && !event.defaultPrevented && Array.from(event.dataTransfer.types).includes('application/x-tdn-presentation')) event.preventDefault(); }} onDragLeave={event => event.currentTarget.removeAttribute('data-active')} onDrop={event => { event.currentTarget.removeAttribute('data-active'); handleRootDrop(event); }} />}
         </div>
       </main>
-      <ModalPortal isOpen={!preview && Boolean(activeSettings)} title="Настройки компонента" size="wide" onClose={closeSettings}>
+     <ModalPortal isOpen={!preview && Boolean(activeSettings)} title="Настройки компонента" size="wide" onClose={closeSettings} dismissDisabled={settingsRead?.status === 'supported' && settingsRead.type === 'catalog' && catalogSettingsInvalid}>
         {activeSettings && settingsRead && <div className={styles.properties}>
           <label>Название<input value={activeSettings.title} disabled={disabled} onChange={event => patchTitle(event.target.value)} /></label>
            {settingsRead.status !== 'supported' ? <div className={styles.unsupported} role="status"><p>{settingsRead.message}</p><span>Настроить как:</span>{palette.map(item => <button key={item.type} type="button" disabled={disabled} onClick={() => configureAs(item.type)}>{item.label}</button>)}</div> : settingsRead.type === 'group' ? <>
@@ -265,12 +272,22 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
             </div>)}
             <div className={styles.inlineActions}><button type="button" disabled={disabled} onClick={() => updateParts([...settingsRead.params.parts, newPart('text')])}>Добавить текст</button><button type="button" disabled={disabled || choices.length === 0} onClick={() => updateParts([...settingsRead.params.parts, newPart('source')])}>Добавить характеристику</button></div>
              <label>Основное значение<Select disabled={disabled} value={referenceValue(settingsRead.params.primary ?? undefined)} onChange={event => { const reference = parseReference(event.target.value); patch({ primary: reference?.kind === 'Base' && partBaseChoices.some(option => option.reference.fieldId === reference.fieldId) ? asJsonReference(reference) : null }); }}><option value="">Только чтение</option>{partBaseChoices.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></label>
-           </> : settingsRead.type === 'resource' ? <>
+            </> : settingsRead.type === 'resource' ? <>
               <label>Размер<Select disabled={disabled} value={settingsRead.params.size} onChange={event => patch({ size: event.target.value })}><option value="compact">Компактный</option><option value="medium">Средний</option><option value="large">Большой</option></Select></label>
              <label>Текущее значение<Select disabled={disabled} value={referenceValue(settingsRead.params.current ?? undefined)} onChange={event => { const reference = parseReference(event.target.value); patch({ current: reference ? asJsonReference(reference) : null }); }}><option value="">Выберите характеристику</option>{settingsRead.params.current && !choices.some(option => option.numeric && option.value === referenceValue(settingsRead.params.current!)) && <option value={referenceValue(settingsRead.params.current)}>Сохранённый источник недоступен или имеет другой тип</option>}{choices.filter(option => option.numeric).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></label>
              <label>Максимум<Select disabled={disabled} value={referenceValue(settingsRead.params.maximum ?? undefined)} onChange={event => patch({ maximum: event.target.value ? asJsonReference(parseReference(event.target.value)!) : null })}><option value="">Не задан</option>{settingsRead.params.maximum && !choices.some(option => option.numeric && option.value === referenceValue(settingsRead.params.maximum!)) && <option value={referenceValue(settingsRead.params.maximum)}>Сохранённый максимум недоступен</option>}{choices.filter(option => option.numeric).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></label>
              <label><Checkbox disabled={disabled} checked={settingsRead.params.showBar} onChange={event => patch({ showBar: event.target.checked })} />Показывать шкалу</label>
-           </> : <>
+            </> : settingsRead.type === 'catalog' ? <>
+              {campaignId !== undefined ? <PresentationCatalogSettings
+                campaignId={campaignId}
+                kind={settingsRead.params.kind}
+                condition={settingsRead.params.condition}
+                disabled={disabled}
+                onValidityChange={setCatalogSettingsInvalid}
+                onChange={changes => { if (changes.kind !== undefined) setCatalogSettingsInvalid(false); patch(changes as Record<string, JsonValue>); }}
+              /> : <StatePanel kind="info">Контекст кампании недоступен.</StatePanel>}
+              {catalogSettingsInvalid && <p role="alert">Исправьте условие перед закрытием настроек.</p>}
+            </> : <>
              <h4>Характеристики</h4>
              <label>Поиск характеристик<input value={statSearch} disabled={disabled} onChange={event => setStatSearch(event.target.value)} /></label>
              <div className={styles.statChoices}>

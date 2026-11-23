@@ -40,6 +40,7 @@ export type CharacterCatalogContextValue = {
 
 type InternalCharacterCatalogContextValue = CharacterCatalogContextValue & { activate: () => void };
 const CharacterCatalogContext = createContext<InternalCharacterCatalogContextValue | undefined>(undefined);
+const CharacterCatalogRegistryContext = createContext<Partial<Record<CatalogKind, InternalCharacterCatalogContextValue>>>({});
 
 const statusOf = (error: unknown) => (error as { status?: number } | undefined)?.status;
 const isAccessDenied = (error: unknown) => statusOf(error) === 403 || statusOf(error) === 404;
@@ -55,6 +56,7 @@ const ScopedCharacterCatalogProvider: React.FC<CharacterCatalogProviderProps & {
   sessionKey,
   children,
 }) => {
+  const inheritedRegistry = useContext(CharacterCatalogRegistryContext);
   const { api } = useWorkspace();
   const [requested, setRequested] = useState(false);
   const [revoked, setRevoked] = useState(false);
@@ -202,7 +204,8 @@ const ScopedCharacterCatalogProvider: React.FC<CharacterCatalogProviderProps & {
     activate,
   }), [campaignId, characterId, kind, entries, definitions, entriesLoading, schemaLoading, requested, readEnabled, entriesResource.loading, schemaResource.loading, entriesResource.error, schemaResource.error, effectiveCanRead, effectiveCanWrite, permissionsPending, reload, upsert, remove, runWrite, reportAccessFailure, activate]);
 
-  return <CharacterCatalogContext.Provider value={value}>{children}</CharacterCatalogContext.Provider>;
+  const registry = useMemo(() => ({ ...inheritedRegistry, [kind]: value }), [inheritedRegistry, kind, value]);
+  return <CharacterCatalogRegistryContext.Provider value={registry}><CharacterCatalogContext.Provider value={value}>{children}</CharacterCatalogContext.Provider></CharacterCatalogRegistryContext.Provider>;
 };
 
 export const CharacterCatalogProvider: React.FC<CharacterCatalogProviderProps> = props => {
@@ -214,6 +217,14 @@ export const CharacterCatalogProvider: React.FC<CharacterCatalogProviderProps> =
 export function useOptionalCharacterCatalog(): CharacterCatalogContextValue | undefined {
   return useContext(CharacterCatalogContext);
 }
+
+export const CharacterCatalogScope: React.FC<React.PropsWithChildren<{ kind: CatalogKind }>> = ({ kind, children }) => {
+  const registry = useContext(CharacterCatalogRegistryContext);
+  const fallback = useContext(CharacterCatalogContext);
+  const value = registry[kind] ?? (fallback?.kind === kind ? fallback : undefined);
+  if (!value) throw new Error(`CharacterCatalogScope requires a registered ${kind} catalog provider`);
+  return <CharacterCatalogContext.Provider value={value}>{children}</CharacterCatalogContext.Provider>;
+};
 
 export function useCharacterCatalog(): CharacterCatalogContextValue {
   const context = useContext(CharacterCatalogContext);

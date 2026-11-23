@@ -24,6 +24,7 @@ type SnapshotReadResult = { ok: true; snapshot: EntrySnapshot } | { ok: false; s
 export type CharacterCatalogEntryDialogProps = {
   entryId: string;
   readOnly?: boolean;
+  preview?: boolean;
   characterName?: string;
   audience?: 'gm' | 'player';
   canAdminDefinition?: boolean;
@@ -63,7 +64,7 @@ function sameQuantity(left: JsonNumber | null, right: JsonNumber | null): boolea
   return compareNumber(String(left), String(right)) === 0;
 }
 
-const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = ({ entryId, readOnly = false, characterName, audience = 'player', canAdminDefinition = false, definitionPermissionsPending = false, onDefinitionForbidden = noop, onClose }) => {
+const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = ({ entryId, readOnly = false, preview = false, characterName, audience = 'player', canAdminDefinition = false, definitionPermissionsPending = false, onDefinitionForbidden = noop, onClose }) => {
   const { api, sessionKey } = useWorkspace();
   const catalog = useCharacterCatalog();
   const auth = useAuth();
@@ -510,7 +511,7 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
   const userId = Number(auth.userId);
   const isDefinitionOwner = Boolean(definition && definition.creatorUserId !== null && definition.creatorUserId === userId);
   const canEditDefinition = !definitionPermissionsPending && (canAdminDefinition || isDefinitionOwner);
-  const canOpenDefinition = Boolean(catalog.canRead && !loading && !readError && !notFound && entry && !editing && canEditDefinition && !dirty && !invalid && !busy && !recovering && !deleting
+  const canOpenDefinition = Boolean(!preview && catalog.canRead && !loading && !readError && !notFound && entry && !editing && canEditDefinition && !dirty && !invalid && !busy && !recovering && !deleting
     && blockedDomains.size === 0 && !deleteBlocked && !missingDraft);
   const subtitle = definition
     ? `${definition.kind === 'Item' ? 'Предмет' : 'Навык'}${characterName ? ` · У персонажа «${characterName}»` : ''}`

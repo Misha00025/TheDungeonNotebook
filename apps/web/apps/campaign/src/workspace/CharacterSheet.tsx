@@ -21,6 +21,7 @@ import InlineValueEditor from './InlineValueEditor';
 import CharacterStatsTable from './CharacterStatsTable';
 import { CharacterCatalogProvider } from './CharacterCatalogContext';
 import CharacterCatalogPanel from './CharacterCatalogPanel';
+import { PresentationCatalogProvider } from './PresentationCatalog';
 
 const importanceLabel: Record<string, string> = { Background: 'Фоновый', Secondary: 'Второстепенный', Key: 'Ключевой' };
 type MetadataDraft = { name: string; importance: CharacterMetadata['importance'] };
@@ -598,6 +599,19 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
     permissionResource.reload();
     sheetResource.reload();
   };
+  const withCatalogs = (content: React.ReactNode) => <PresentationCatalogProvider
+    campaignId={campaignId}
+    characterId={characterId}
+    canRead={readAllowed}
+    canWrite={canWrite && !permissionPending}
+    permissionsPending={permissionPending}
+    onForbidden={() => { permissionResource.reload(); campaignWorkspace?.reloadPermissions(); }}
+    characterName={metadata?.name}
+    audience={mode}
+    canPublishDefinition={Boolean(campaignWorkspace?.permissions.canWrite && !campaignWorkspace.permissionsLoading)}
+    definitionPermissionsPending={campaignWorkspace?.permissionsLoading ?? false}
+    onDefinitionForbidden={() => campaignWorkspace?.reloadPermissions()}
+  >{content}</PresentationCatalogProvider>;
 
   if (variant === 'card') {
     const cardFrame = metadata ? <PresentationSurfaceFrame
@@ -609,7 +623,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
     >
       {readAllowed && sheet && presentationSheet && cardViewMatches && <PresentationRenderer roots={cardRoots} sheet={presentationSheet} conditionSheet={sheet} surface="card" renderValue={editorAllowed ? renderValue : undefined} />}
     </PresentationSurfaceFrame> : null;
-    return <section className={characterStyles.cardSection} aria-label={`Карточка персонажа${metadata ? ` ${metadata.name}` : ''}`} aria-busy={cardBusy || permissionPending}>
+    return withCatalogs(<section className={characterStyles.cardSection} aria-label={`Карточка персонажа${metadata ? ` ${metadata.name}` : ''}`} aria-busy={cardBusy || permissionPending}>
       {cardFrame}
       {!metadata && (metadataResource.error ? <ApiError error={metadataResource.error} onRetry={retryInitialLoad} /> : <StatePanel kind="loading">Загрузка персонажа…</StatePanel>)}
       {!readAllowed && <div className={characterStyles.cardFeedback}>
@@ -623,7 +637,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
       {Boolean(writeError) && <ApiError error={writeError} onRetry={retrySnapshot} />}
       {writeStatus && <Notification kind={writeStatusKind} eventKey={writeStatusEvent}>{writeStatus}</Notification>}
       {loadedRecovery.length > 0 && <section className={characterStyles.recoveryTray} aria-label="Неподтверждённые значения"><h2>Неподтверждённые значения</h2>{loadedRecovery}</section>}
-    </section>;
+    </section>);
   }
 
   if (gmCatalogPage) {
@@ -722,7 +736,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
   const displayedPageKey = pageKey ?? (baseEntryWithDraft ? pages[0]?.key : undefined);
   const visiblePage = Boolean(displayedPageKey && pages.some(page => page.key === displayedPageKey));
     const shellBusy = (!gmStatsPage && !gmCatalogPage && presentationPending) || snapshotBusy || computedReadBusy || (permissionResource.loading && !permissionSnapshot);
-  return <section className={characterStyles.sheetSection} aria-busy={shellBusy}>
+  return withCatalogs(<section className={characterStyles.sheetSection} aria-busy={shellBusy}>
     {!readAllowed ? <div className={characterStyles.accessState}>
       {Boolean(permissionError || snapshotError) ? <><ApiError error={permissionError ?? snapshotError} onRetry={() => void refreshAll()} /><Button variant="secondary" type="button" onClick={() => void refreshAll()}>Проверить доступ и данные</Button></> : <Notification kind="warning" eventKey={`${scope}:permission`}>Доступ к актуальным данным персонажа не подтверждён.</Notification>}
       {Boolean(writeError) && <ApiError error={writeError} onRetry={() => void refreshAll()} />}{Boolean(metadataError) && <ApiError error={metadataError} onRetry={() => void refreshAll()} />}
@@ -747,7 +761,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
       {writeStatus && <Notification kind={writeStatusKind} eventKey={writeStatusEvent}>{writeStatus}</Notification>}
     </List>}
     {loadedRecovery.length > 0 && <section className={characterStyles.recoveryTray} aria-label="Неподтверждённые значения"><h2>Неподтверждённые значения</h2>{loadedRecovery}</section>}
-  </section>;
+  </section>);
 };
 
 export default CharacterSheet;

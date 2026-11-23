@@ -9,6 +9,7 @@ import type { LocalDraft, LocalDraftScope, PresentationNode, PresentationSurface
 import PresentationEditor from './PresentationEditor';
 import { stringifyJson } from './json';
 import { ApiError } from './Feedback';
+import { PresentationCatalogProvider } from './PresentationCatalog';
 import styles from './ViewEditor.module.css';
 
 type ViewSnapshot = { metadata: ViewMetadata; content: ViewContentEnvelope; roots: PresentationNode[]; legacy: boolean };
@@ -351,7 +352,9 @@ const ViewEditor: React.FC<{ campaignId: number; viewId: string; canWrite: boole
           {activeUses.length > 0 && <p className={styles.surfaceUsage}>Используется в: {activeUses.join(', ')}. Сохранение содержимого отображения изменит все эти места.</p>}
          {focusSurface && <p className={styles.surfaceUsage}>Открыто из назначения «{focusSurface === 'header' ? 'Шапка персонажа' : 'Карточка персонажа'}». Формат рабочего макета настраивается отдельно от самого назначения.</p>}
          {templateSheet ? <div className={styles.previewCanvasSection} aria-busy={previewLoading}>
-            <PresentationEditor roots={roots} onChange={handleRootsChange} sheet={effectiveSheet} choicesSheet={templateSheet} sample={!characterId} disabled={!writable || saving} surface={surfaceFocus ?? surface} previewName={previewName} previewDescription={previewDescription} />
+             <PresentationCatalogProvider campaignId={campaignId} characterId={characterId} canRead={Boolean(characterId) && !previewError} canWrite={false} permissionsPending={previewLoading || !characterId || Boolean(previewError)} audience="gm" characterName={previewName} preview>
+               <PresentationEditor roots={roots} onChange={handleRootsChange} sheet={effectiveSheet} choicesSheet={templateSheet} sample={!characterId} disabled={!writable || saving} surface={surfaceFocus ?? surface} previewName={previewName} previewDescription={previewDescription} campaignId={campaignId} />
+             </PresentationCatalogProvider>
         </div> : null}
          {Boolean(metadataError) && <ApiError error={metadataError} onRetry={!metadataBlocked ? () => void save() : undefined} />}{Boolean(contentError) && <ApiError error={contentError} onRetry={!contentBlocked ? () => void save() : undefined} />}{Boolean(surfaceError) && <ApiError error={surfaceError} onRetry={!surfaceBlocked ? () => void save() : undefined} />}{Boolean(verifyError) && <ApiError error={verifyError} onRetry={() => void verifySave()} />}
          {(metadataBlocked || contentBlocked || surfaceBlocked) && <div className={styles.conflictPanel}>

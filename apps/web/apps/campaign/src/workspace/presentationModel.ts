@@ -1,9 +1,11 @@
 import type { FieldReference, JsonValue, Presentation, Revision, ViewNode, WidgetNode } from './types';
 import { parseJson, stringifyJson } from './json';
 import { isLosslessNumber } from 'lossless-json';
+import { isCatalogCondition } from './catalogFilter';
+import type { CatalogGroupCondition, CatalogKind } from './catalogTypes';
 
 export type PresentationNode = { kind: 'layout'; nodeKey: string; title: string; params: JsonValue; children: PresentationNode[] };
-export type PresentationType = 'group' | 'composite' | 'resource' | 'stat-list';
+export type PresentationType = 'group' | 'composite' | 'resource' | 'stat-list' | 'catalog';
 export type PresentationSurface = 'page' | 'header' | 'card';
 export type PresentationSize = 'compact' | 'medium' | 'large';
 export type JsonFieldReference = { kind: FieldReference['kind']; fieldId: string; [key: string]: JsonValue };
@@ -12,7 +14,8 @@ export type PresentationParams =
   | { version: 1; type: 'group'; direction: 'row' | 'column'; columns: number; gap: 'small' | 'medium' | 'large'; appearance: 'plain' | 'panel'; [key: string]: JsonValue }
   | { version: 1; type: 'composite'; parts: FieldPart[]; primary: JsonFieldReference | null; size: PresentationSize; [key: string]: JsonValue }
   | { version: 1; type: 'resource'; current: JsonFieldReference | null; maximum: JsonFieldReference | null; showBar: boolean; size: PresentationSize; [key: string]: JsonValue }
-  | { version: 1; type: 'stat-list'; entries: { source: JsonFieldReference; label: string; [key: string]: JsonValue }[]; columns: number; format: string; expressions: (string | null)[]; condition: string; [key: string]: JsonValue };
+  | { version: 1; type: 'stat-list'; entries: { source: JsonFieldReference; label: string; [key: string]: JsonValue }[]; columns: number; format: string; expressions: (string | null)[]; condition: string; [key: string]: JsonValue }
+  | { version: 1; type: 'catalog'; kind: CatalogKind; condition: CatalogGroupCondition | null; [key: string]: JsonValue };
 export type ParamsRead = { [T in PresentationType]: { status: 'supported'; type: T; params: Extract<PresentationParams, { type: T }> } }[PresentationType] | { status: 'unsupported' | 'invalid'; message: string; params: JsonValue };
 
 const isRecord = (value: unknown): value is Record<string, JsonValue> => typeof value === 'object' && value !== null && !Array.isArray(value) && !isLosslessNumber(value);
@@ -38,7 +41,7 @@ export function readParams(params: JsonValue): ParamsRead {
   }
   if (params.legacyFormatError === true) return { status: 'invalid', message: 'Формат старого виджета не удалось распознать.', params };
   const type = params.type === undefined ? 'group' : params.type;
-  if (type !== 'group' && type !== 'composite' && type !== 'resource' && type !== 'stat-list') return { status: 'unsupported', message: 'Тип отображения не поддерживается.', params };
+  if (type !== 'group' && type !== 'composite' && type !== 'resource' && type !== 'stat-list' && type !== 'catalog') return { status: 'unsupported', message: 'Тип отображения не поддерживается.', params };
   if (params.version !== undefined && params.version !== 1) return { status: 'unsupported', message: 'Версия настроек не поддерживается.', params };
   const valid = type === 'group'
     ? (params.direction === 'row' || params.direction === 'column') && positiveInteger(params.columns) && (params.gap === 'small' || params.gap === 'medium' || params.gap === 'large') && (params.appearance === 'plain' || params.appearance === 'panel')
@@ -46,7 +49,9 @@ export function readParams(params: JsonValue): ParamsRead {
        ? Array.isArray(params.parts) && params.parts.every(validPart) && (params.primary === null || validRef(params.primary) && params.primary.kind === 'Base') && (params.size === undefined || validSize(params.size))
        : type === 'resource'
          ? (params.current === null || validRef(params.current)) && (params.maximum === null || validRef(params.maximum)) && typeof params.showBar === 'boolean' && (params.size === undefined || validSize(params.size))
-        : Array.isArray(params.entries) && params.entries.every(entry => isRecord(entry) && validRef(entry.source) && typeof entry.label === 'string') && positiveInteger(params.columns) && (params.format === undefined || typeof params.format === 'string') && (params.condition === undefined || typeof params.condition === 'string') && (params.expressions === undefined || Array.isArray(params.expressions) && params.expressions.every(expression => expression === null || typeof expression === 'string'));
+         : type === 'stat-list'
+           ? Array.isArray(params.entries) && params.entries.every(entry => isRecord(entry) && validRef(entry.source) && typeof entry.label === 'string') && positiveInteger(params.columns) && (params.format === undefined || typeof params.format === 'string') && (params.condition === undefined || typeof params.condition === 'string') && (params.expressions === undefined || Array.isArray(params.expressions) && params.expressions.every(expression => expression === null || typeof expression === 'string'))
+           : (params.kind === 'Item' || params.kind === 'Skill') && (params.condition === null || isCatalogCondition(params.condition));
   return valid ? { status: 'supported', type, params: { ...params, version: 1, type, ...((type === 'composite' || type === 'resource') ? { size: validSize(params.size) ? params.size : 'large' } : {}), ...(type === 'stat-list' ? { format: typeof params.format === 'string' ? params.format : '$0', expressions: Array.isArray(params.expressions) ? params.expressions as (string | null)[] : [], condition: typeof params.condition === 'string' ? params.condition : '' } : {}) } as PresentationParams } as ParamsRead : { status: 'invalid', message: 'Настройки отображения заполнены некорректно.', params };
 }
 
@@ -57,7 +62,8 @@ export const makeNode = (type: PresentationType, title = ''): PresentationNode =
     ? { version: 1, type, direction: 'column', columns: 1, gap: 'medium', appearance: 'plain' }
      : type === 'composite' ? { version: 1, type, parts: [], primary: null, size: 'large' }
        : type === 'resource' ? { version: 1, type, current: null, maximum: null, showBar: true, size: 'large' }
-          : { version: 1, type, entries: [], columns: 1, format: '$0', expressions: [], condition: '' },
+           : type === 'stat-list' ? { version: 1, type, entries: [], columns: 1, format: '$0', expressions: [], condition: '' }
+             : { version: 1, type, kind: 'Item', condition: null },
 });
 
 function parseWidgetFormat(format: string, sources: WidgetNode['sources']): FieldPart[] | null {

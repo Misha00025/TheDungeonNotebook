@@ -43,11 +43,11 @@ describe('PresentationEditor inline actions and settings', () => {
     expect(onChange.mock.calls[0]?.[0][0].params).toMatchObject({ entries: [{ source: { kind: 'Virtual', fieldId: 'virtual-field' }, label: '' }] });
   });
 
-  it('shows four palette choices and five actions only inside the selected node; selection alone does not open settings', () => {
+  it('shows five palette choices and five actions only inside the selected node; selection alone does not open settings', () => {
     const root = group('root-a', 'Первая группа');
     render(<Harness initialRoots={[root]} />);
 
-    expect(screen.getByRole('group', { name: 'Компоненты' }).querySelectorAll('button')).toHaveLength(4);
+    expect(screen.getByRole('group', { name: 'Компоненты' }).querySelectorAll('button')).toHaveLength(5);
     const palette = screen.getByRole('group', { name: 'Компоненты' });
     for (const name of ['Группа', 'Составной показатель', 'Ресурс', 'Список характеристик']) expect(within(palette).getByRole('button', { name })).toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: 'Свойства' })).not.toBeInTheDocument();

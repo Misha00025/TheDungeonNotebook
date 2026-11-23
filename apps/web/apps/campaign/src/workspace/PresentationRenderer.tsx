@@ -5,6 +5,7 @@ import { displayValue } from './json';
 import { readParams, type FieldPart, type PresentationNode, type PresentationSurface } from './presentationModel';
 import styles from './Presentation.module.css';
 import { compileStatListCondition, compileStatListFormat } from './statListFormat';
+import { PresentationCatalog } from './PresentationCatalog';
 
 export type ResolvedField =
   | { status: 'value'; reference: FieldReference; label: string; value: JsonValue; valueType: string; sampleValue: JsonValue; sampleLabel?: string }
@@ -126,7 +127,9 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; con
           {params.maximum ? <><span className={styles.resourceSeparator} aria-hidden="true">/</span><div className={styles.resourceMaximum}>{maximum?.status === 'value' && !maximumNumeric ? <span className={styles.diagnostic}>Максимум должен быть числовым.</span> : maximumEditable && maximum?.status === 'value' ? renderValue!(params.maximum, maximum.label, displayResolved(maximum, sample)) : maximum ? displayResolved(maximum, sample) : <span className={styles.placeholder}>Максимум недоступен</span>}</div></> : null}</div>
       {params.showBar && hasValidMaximum && <div className={styles.progressTrack} role="img" aria-label={sample ? 'Образец соотношения текущего значения и максимума' : 'Соотношение текущего значения и максимума'}><span style={{ width: `${barWidth}%` }} /></div>}
     </div>;
-  } else if (params?.type === 'stat-list') {
+   } else if (params?.type === 'catalog') {
+     content = <PresentationCatalog kind={params.kind} condition={params.condition} sample={sample} />;
+   } else if (params?.type === 'stat-list') {
     const mainRows: React.ReactNode[] = [];
     const hiddenRows: React.ReactNode[] = [];
     params.entries.forEach((entry, index) => {
