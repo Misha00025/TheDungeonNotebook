@@ -37,9 +37,9 @@ const pickerDiagnosticLabels: Record<string, string> = {
 function safeErrorMessage(error: unknown): string {
   if (!(error instanceof CampaignApiError)) return 'Не удалось выполнить операцию. Попробуйте ещё раз.';
   if (error.unknownOutcome || error.status === 0) return 'Результат добавления неизвестен. Проверьте подтверждение перед продолжением.';
-  if (error.status === 400) return 'Проверьте количество, атрибуты и данные определения.';
+  if (error.status === 400) return 'Проверьте количество, атрибуты и данные предмета или навыка.';
   if (error.status === 403) return 'Право записи персонажа больше недоступно.';
-  if (error.status === 404) return 'Определение каталога больше недоступно.';
+  if (error.status === 404) return 'Запись каталога больше недоступна.';
   if (error.status === 409) return 'Добавление уже выполнялось или публикацию нельзя подтвердить. Проверьте результат.';
   if (error.status === 503) return 'Сервис временно недоступен.';
   return 'Не удалось выполнить операцию. Попробуйте ещё раз.';
@@ -472,7 +472,7 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
             onSelect={setGroupId}
           /> : null}
           {groupId && <Button type="button" variant="secondary" disabled={busy} onClick={() => setGroupId('')}>Сбросить группу</Button>}
-          {picker.loading && !picker.data && <StatePanel kind="loading">Загрузка определений…</StatePanel>}
+          {picker.loading && !picker.data && <StatePanel kind="loading">Загрузка {kind === 'Item' ? 'предметов' : 'навыков'}…</StatePanel>}
           {Boolean(picker.error) && <ApiError error={picker.error} onRetry={picker.reload} />}
           {picker.data ? picker.data.diagnostics.map((diagnostic, index) => <p role="status" key={`${diagnostic.groupId}-${diagnostic.entryId ?? 'group'}-${index}`}>
             {pickerDiagnosticLabels[diagnostic.code] ?? 'Сервер обнаружил проблему при вычислении состава группы.'}
@@ -495,11 +495,11 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
         </section>}
 
         {mode === 'catalog' && selectedEntryId && <section>
-          {sourceLoading && <StatePanel kind="loading">Загрузка определения каталога…</StatePanel>}
+          {sourceLoading && <StatePanel kind="loading">Загрузка {kind === 'Item' ? 'предмета' : 'навыка'}…</StatePanel>}
           {Boolean(sourceError) && <>
             <ApiError error={sourceError} />
             <p role="alert">{safeErrorMessage(sourceError)}</p>
-            <Button type="button" disabled={busy || blocked} onClick={changeSourceRetry}>Повторить чтение определения</Button>
+            <Button type="button" disabled={busy || blocked} onClick={changeSourceRetry}>Повторить загрузку {kind === 'Item' ? 'предмета' : 'навыка'}</Button>
           </>}
           {!sourceLoading && !sourceError && selectedSource ? <>
             {!schemaReady
@@ -513,7 +513,7 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
                   <p>{selectedSource.content.data.description || 'Описание отсутствует.'}</p>
                 </section>
                 <section>
-                  <h3>Атрибуты определения</h3>
+                  <h3>Атрибуты {kind === 'Item' ? 'предмета' : 'навыка'}</h3>
                   <CatalogAttributeValuesEditor
                     definitions={definitions}
                     values={[]}
@@ -576,8 +576,6 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
                 onChange={setOwnDraft}
                 definitions={definitions}
                 canPublish={canPublish}
-                creating
-                kindEditable={false}
                 readOnly={!catalog.canWrite}
                 disabled={fieldsDisabled}
                 onValidityChange={setSourceFieldsInvalid}

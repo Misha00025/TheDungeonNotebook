@@ -40,18 +40,21 @@ describe('campaign navigation under the Hub route', () => {
 
     for (const [index, label] of labels.entries()) {
       fireEvent.click(within(navigation).getByRole('link', { name: label }));
-      await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe(`/groups/12/${suffixes[index]}`));
+      const expectedPath = suffixes[index] === 'gm/catalog'
+        ? '/groups/12/gm/catalog/items'
+        : `/groups/12/${suffixes[index]}`;
+      await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe(expectedPath));
       expect(screen.queryByRole('heading', { name: 'Страница не найдена' })).not.toBeInTheDocument();
       if (suffixes[index] === 'gm/catalog') {
         expect(await screen.findByRole('heading', { name: 'Каталог' })).toBeInTheDocument();
         const catalogNavigation = screen.getByRole('navigation', { name: 'Разделы каталога' });
-        expect(within(catalogNavigation).getByRole('link', { name: 'Предметы' })).toHaveAttribute('href', `${prefix}/12/gm/catalog/`);
+        expect(within(catalogNavigation).getByRole('link', { name: 'Предметы' })).toHaveAttribute('href', `${prefix}/12/gm/catalog/items`);
         expect(within(catalogNavigation).getByRole('link', { name: 'Навыки' })).toHaveAttribute('href', `${prefix}/12/gm/catalog/skills`);
         fireEvent.click(within(catalogNavigation).getByRole('link', { name: 'Навыки' }));
         await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/12/gm/catalog/skills'));
         expect(await screen.findByRole('heading', { name: 'Каталог' })).toBeInTheDocument();
         fireEvent.click(within(screen.getByRole('navigation', { name: 'Разделы каталога' })).getByRole('link', { name: 'Предметы' }));
-        await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent?.replace(/\/$/, '')).toBe('/groups/12/gm/catalog'));
+        await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/12/gm/catalog/items'));
         expect(screen.queryByRole('heading', { name: 'Страница не найдена' })).not.toBeInTheDocument();
       }
     }
@@ -78,13 +81,16 @@ describe('campaign navigation under the Hub route', () => {
     const playerNavigation = await screen.findByRole('navigation', { name: 'Разделы кампании' });
     expect(within(playerNavigation).getByRole('link', { name: 'Каталог' })).toHaveAttribute('href', `${prefix}/13/player/catalog`);
     fireEvent.click(within(playerNavigation).getByRole('link', { name: 'Каталог' }));
-    await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/13/player/catalog'));
+    await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/13/player/catalog/items'));
     expect(await screen.findByRole('heading', { name: 'Каталог' })).toBeInTheDocument();
     const playerCatalogTabs = screen.getByRole('navigation', { name: 'Разделы каталога' });
+    expect(within(playerCatalogTabs).getByRole('link', { name: 'Предметы' })).toHaveAttribute('href', `${prefix}/13/player/catalog/items`);
     expect(within(playerCatalogTabs).getByRole('link', { name: 'Навыки' })).toHaveAttribute('href', `${prefix}/13/player/catalog/skills`);
     fireEvent.click(within(playerCatalogTabs).getByRole('link', { name: 'Навыки' }));
     await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/13/player/catalog/skills'));
     expect(await screen.findByRole('heading', { name: 'Каталог' })).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Разделы каталога' })).getByRole('link', { name: 'Предметы' }));
+    await waitFor(() => expect(screen.getByLabelText('Current pathname').textContent).toBe('/groups/13/player/catalog/items'));
     expect(request).toHaveBeenCalled();
   });
 

@@ -40,7 +40,7 @@ function safeFailureMessage(error: unknown): string {
   if (error.unknownOutcome || error.status === 0) return 'Результат записи пока не подтверждён. Проверьте актуальные данные перед продолжением.';
   if (error.status === 400) return 'Проверьте введённые данные.';
   if (error.status === 403) return 'Право записи больше недоступно.';
-  if (error.status === 404) return 'Не удалось подтвердить опубликованное определение.';
+  if (error.status === 404) return 'Не удалось подтвердить созданную запись каталога.';
   if (error.status === 409) return 'Данные изменились на сервере. Перечитайте актуальную версию.';
   if (error.status === 503) return 'Сервис временно недоступен.';
   return 'Не удалось выполнить операцию. Попробуйте ещё раз.';
@@ -125,7 +125,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
   const metadataDirty = Boolean(metadataBaseline && !metadataDraftEqual(draft, metadataBaseline));
   const contentDirty = Boolean(contentBaseline && !contentDraftEqual(draft, contentBaseline));
   const creationDirty = !entryId && (draft.name !== '' || draft.isHidden || draft.description !== '' || draft.attributes.length > 0
-    || draft.kind !== initialKind || draft.quantityUnit !== (initialKind === 'Item' ? 'Whole' : null) || draft.allowNegative);
+    || draft.quantityUnit !== (initialKind === 'Item' ? 'Whole' : null) || draft.allowNegative);
   const dirty = entryId
     ? metadataDirty || contentDirty || invalid
     : creationDirty || (invalid && draft.attributes.length > 0) || creationBlocked;
@@ -218,10 +218,10 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
     const request = {
       requestId,
       name: draft.name,
-      kind: draft.kind,
+      kind: initialKind,
       isHidden: draft.isHidden,
-      ...(draft.kind === 'Item' ? { quantityUnit: draft.quantityUnit ?? 'Whole' } : { quantityUnit: null }),
-      allowNegative: draft.kind === 'Item' && draft.allowNegative,
+      ...(initialKind === 'Item' ? { quantityUnit: draft.quantityUnit ?? 'Whole' } : { quantityUnit: null }),
+      allowNegative: initialKind === 'Item' && draft.allowNegative,
       description: draft.description,
       attributes: draft.attributes,
     };
@@ -381,15 +381,18 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
       : `Черновик сохранён локально; актуальная ревизия принята для следующего явного сохранения: ${domain === 'metadata' ? 'метаданные' : 'содержимое'}.`);
   };
 
-  const title = entryId ? metadataBaseline?.name ?? 'Определение каталога' : 'Новое определение';
+  const entryKind = metadataBaseline?.kind ?? initialKind;
+  const kindName = entryKind === 'Item' ? 'предмет' : 'навык';
+  const kindGenitive = entryKind === 'Item' ? 'предмета' : 'навыка';
+  const title = entryId ? metadataBaseline?.name ?? (entryKind === 'Item' ? 'Предмет' : 'Навык') : `Новый ${kindName}`;
   const fieldReadOnly = !canEdit || loading || Boolean(loadingError);
   const fieldDisabled = busy || recovering || permissionsPending || revoked;
 
   return <ModalPortal isOpen onClose={close} title={title} size="wide" dismissDisabled={busy || recovering}>
-    {loading && <StatePanel kind="loading">Загрузка определения и схемы атрибутов…</StatePanel>}
+    {loading && <StatePanel kind="loading">Загрузка {kindGenitive} и схемы атрибутов…</StatePanel>}
     {!loading && Boolean(loadingError) && <>
       <ApiError error={loadingError} />
-      <p role="alert">Не удалось загрузить полные данные определения. Редактирование недоступно.</p>
+      <p role="alert">Не удалось загрузить полные данные {entryKind === 'Item' ? 'предмета' : 'навыка'}. Редактирование недоступно.</p>
       <Button type="button" onClick={() => void loadInitial()}>Повторить чтение</Button>
     </>}
     {!loading && !loadingError && schema && (!entryId || Boolean(metadataBaseline && contentBaseline)) ? <>
@@ -401,7 +404,6 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
         onChange={setDraft}
         definitions={schema.data.definitions}
         canPublish={canPublish}
-        creating={!entryId}
         readOnly={fieldReadOnly}
         disabled={fieldDisabled}
         diagnostics={contentBaseline?.diagnostics}
@@ -415,7 +417,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
       {creationBlocked && <section>
         <h3>Проверка публикации</h3>
         <p>Повторная отправка заблокирована. Проверьте результат запроса тем же идентификатором; выполняются только чтения.</p>
-        {creationCheckFailed && <p role="alert">Опубликованное определение пока не подтверждено. Проверку можно повторить.</p>}
+        {creationCheckFailed && <p role="alert">Создание {kindGenitive} пока не подтверждено. Проверку можно повторить.</p>}
         <Button type="button" disabled={busy} onClick={() => {
           if (busyRef.current) return;
           busyRef.current = true;

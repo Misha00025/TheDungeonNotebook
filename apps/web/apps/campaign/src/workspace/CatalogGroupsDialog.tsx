@@ -366,7 +366,7 @@ const CatalogGroupsDialog: React.FC<Props> = ({
   const diagnosticMessage = (diagnostic: CatalogGroupConfigurationEnvelope['diagnostics'][number]) => {
     const message = diagnosticLabels[diagnostic.code] ?? 'Сервер обнаружил проблему в настройке группы.';
     const entryName = diagnostic.entryId ? entryById.get(diagnostic.entryId)?.name : undefined;
-    return diagnostic.entryId ? `${message} Определение: ${entryName ?? 'недоступно'}.` : message;
+    return diagnostic.entryId ? `${message} Запись: ${entryName ?? 'недоступно'}.` : message;
   };
   const applyMembers = (clientKey: string, entryIds: string[]) => {
     if (activeEditor?.kind !== 'members' || activeEditor.clientKey !== clientKey

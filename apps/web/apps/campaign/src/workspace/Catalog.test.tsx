@@ -9,7 +9,7 @@ import CatalogDefinitionDialog from './CatalogDefinitionDialog';
 import CatalogGroupsDialog from './CatalogGroupsDialog';
 import { CampaignApiError } from './api';
 import { stringifyJson } from './json';
-import type { CatalogContentEnvelope, CatalogGroup, CatalogGroupConfigurationEnvelope, CatalogGroupInput, CatalogMetadata } from './catalogTypes';
+import type { CatalogContentEnvelope, CatalogCreateRequest, CatalogGroup, CatalogGroupConfigurationEnvelope, CatalogGroupInput, CatalogMetadata } from './catalogTypes';
 import { buildCatalogBrowseModel } from './catalogBrowseModel';
 
 type GroupPutBody = { expectedRevision: CatalogGroupConfigurationEnvelope['contentRevision']; groups: CatalogGroupInput[] };
@@ -64,13 +64,13 @@ const responseAuth = (userId = state.userId) => ({
   refreshSession: vi.fn(),
 }) as unknown as HubRemoteProps['auth'];
 
-const renderCatalog = (path = '/groups/12/player/catalog') => render(
+const renderCatalog = (path = '/groups/12/player/catalog/items') => render(
   <RemoteAuthProvider auth={responseAuth()}>
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/groups/:groupId/player/catalog" element={<Catalog kind="Item" />} />
+        <Route path="/groups/:groupId/player/catalog/items" element={<Catalog kind="Item" />} />
         <Route path="/groups/:groupId/player/catalog/skills" element={<Catalog kind="Skill" />} />
-        <Route path="/groups/:groupId/gm/catalog" element={<Catalog kind="Item" />} />
+        <Route path="/groups/:groupId/gm/catalog/items" element={<Catalog kind="Item" />} />
         <Route path="/groups/:groupId/gm/catalog/skills" element={<Catalog kind="Skill" />} />
       </Routes>
     </MemoryRouter>
@@ -178,7 +178,8 @@ describe('campaign catalog', () => {
     expect(within(dialog).queryByRole('textbox', { name: 'Название' })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Сохранить' })).not.toBeInTheDocument();
     expect(state.api.listCatalog).toHaveBeenCalledWith(12);
-    expect(screen.queryByRole('button', { name: 'Создать определение' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Создать предмет' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Создать навык' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Атрибуты каталога' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Группы каталога' })).not.toBeInTheDocument();
     expect(state.api.getCatalogGroupConfiguration).not.toHaveBeenCalled();
@@ -204,7 +205,24 @@ describe('campaign catalog', () => {
       entries: groupId === 'group-magic' ? [skillMetadata] : [],
       diagnostics: [],
     }));
-    renderCatalog('/groups/12/gm/catalog');
+    state.api.createCatalogEntry.mockImplementation(async (_campaignId: number, request: CatalogCreateRequest) => {
+      const entry: CatalogMetadata = {
+        id: `created-${request.kind}`,
+        campaignId: 12,
+        name: request.name,
+        kind: request.kind,
+        creatorUserId: 4,
+        isHidden: request.isHidden,
+        quantityUnit: request.quantityUnit ?? null,
+        allowNegative: request.allowNegative,
+        metadataRevision: 1,
+      };
+      return {
+        entry,
+        content: { ...content, resourceId: entry.id, data: { description: request.description, attributes: request.attributes } },
+      };
+    });
+    renderCatalog('/groups/12/gm/catalog/items');
 
     expect(await screen.findByRole('button', { name: 'Атрибуты каталога' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Группы каталога' })).toBeInTheDocument();
@@ -214,7 +232,7 @@ describe('campaign catalog', () => {
     expect(screen.queryByRole('button', { name: /Arcana/ })).not.toBeInTheDocument();
 
     const itemTab = screen.getByRole('navigation', { name: 'Разделы каталога' });
-    expect(within(itemTab).getByRole('link', { name: 'Предметы' })).toHaveAttribute('href', '/groups/12/gm/catalog/');
+    expect(within(itemTab).getByRole('link', { name: 'Предметы' })).toHaveAttribute('href', '/groups/12/gm/catalog/items');
     expect(within(itemTab).getByRole('link', { name: 'Навыки' })).toHaveAttribute('href', '/groups/12/gm/catalog/skills');
     fireEvent.click(within(itemTab).getByRole('link', { name: 'Навыки' }));
     await screen.findByText('Collections');
@@ -232,10 +250,46 @@ describe('campaign catalog', () => {
     expect(await screen.findByRole('button', { name: /Arcana/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Public tonic/ })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Создать определение' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Предметы' }));
+    await screen.findByText('Без группы');
+    fireEvent.click(screen.getByRole('button', { name: 'Развернуть всё' }));
+    expect(await screen.findByRole('button', { name: /Public tonic/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Создать предмет' }));
+    const itemDialog = await screen.findByRole('dialog', { name: 'Новый предмет' });
+    expect(within(itemDialog).queryByRole('combobox', { name: 'Тип определения' })).not.toBeInTheDocument();
+    fireEvent.change(within(itemDialog).getByRole('textbox', { name: 'Название' }), { target: { value: 'Created tonic' } });
+    fireEvent.change(within(itemDialog).getByRole('combobox', { name: 'Единица количества' }), { target: { value: 'Fractional' } });
+    fireEvent.click(within(itemDialog).getByRole('checkbox', { name: 'Разрешить отрицательное количество' }));
+    fireEvent.click(within(itemDialog).getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => expect(state.api.createCatalogEntry).toHaveBeenCalledTimes(1));
+    expect(state.api.createCatalogEntry.mock.calls[0][1]).toMatchObject({
+      name: 'Created tonic',
+      kind: 'Item',
+      quantityUnit: 'Fractional',
+      allowNegative: true,
+    });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Новый предмет' })).not.toBeInTheDocument());
 
-    const dialog = await screen.findByRole('dialog', { name: 'Новое определение' });
-    expect(within(dialog).getByRole('combobox', { name: 'Тип определения' })).toHaveValue('Skill');
+    fireEvent.click(screen.getByRole('link', { name: 'Навыки' }));
+    await screen.findByText('Collections');
+    fireEvent.click(screen.getByRole('button', { name: 'Развернуть всё' }));
+    expect(screen.queryByRole('button', { name: /Public tonic/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Arcana/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Создать навык' }));
+    const skillDialog = await screen.findByRole('dialog', { name: 'Новый навык' });
+    expect(within(skillDialog).queryByRole('combobox', { name: 'Тип определения' })).not.toBeInTheDocument();
+    expect(within(skillDialog).queryByRole('combobox', { name: 'Единица количества' })).not.toBeInTheDocument();
+    expect(within(skillDialog).queryByRole('checkbox', { name: 'Разрешить отрицательное количество' })).not.toBeInTheDocument();
+    fireEvent.change(within(skillDialog).getByRole('textbox', { name: 'Название' }), { target: { value: 'Created skill' } });
+    fireEvent.click(within(skillDialog).getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => expect(state.api.createCatalogEntry).toHaveBeenCalledTimes(2));
+    expect(state.api.createCatalogEntry.mock.calls[1][1]).toMatchObject({
+      name: 'Created skill',
+      kind: 'Skill',
+      quantityUnit: null,
+      allowNegative: false,
+    });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Новый навык' })).not.toBeInTheDocument());
   });
 
   it('browses nested memberships, global search, and ungrouped entries with reversible section expansion', async () => {
@@ -400,7 +454,7 @@ describe('catalog definition recovery and group editing', () => {
     state.api.getCatalogContent.mockRejectedValue(new Error('not published yet'));
     renderDefinition({ canAdmin: true });
 
-    const dialog = await screen.findByRole('dialog', { name: 'Новое определение' });
+    const dialog = await screen.findByRole('dialog', { name: 'Новый предмет' });
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Название' }), { target: { value: 'New tonic' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
 
@@ -409,6 +463,13 @@ describe('catalog definition recovery and group editing', () => {
     const requestId = state.api.createCatalogEntry.mock.calls[0][1].requestId;
     expect(state.api.getCatalogEntry).toHaveBeenLastCalledWith(12, requestId);
     expect(state.api.getCatalogContent).toHaveBeenLastCalledWith(12, requestId);
+    expect(state.api.createCatalogEntry.mock.calls[0][1]).toMatchObject({
+      requestId,
+      name: 'New tonic',
+      kind: 'Item',
+      quantityUnit: 'Whole',
+      allowNegative: false,
+    });
 
     fireEvent.click(checkButton);
     await waitFor(() => expect(state.api.getCatalogEntry).toHaveBeenCalledTimes(2));
@@ -518,16 +579,16 @@ describe('catalog definition recovery and group editing', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Состав: First group' }));
     const cancelledMembers = await screen.findByRole('dialog', { name: 'Состав: First group' });
     fireEvent.click(within(cancelledMembers).getByRole('checkbox', { name: 'Включить Second tonic в группу' }));
-    fireEvent.click(within(cancelledMembers).getByRole('checkbox', { name: 'Убрать недоступное определение 1 из группы' }));
+    fireEvent.click(within(cancelledMembers).getByRole('checkbox', { name: 'Убрать недоступную запись 1 из группы' }));
     fireEvent.click(within(cancelledMembers).getByRole('button', { name: 'Отмена' }));
     expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Состав: First group' }));
     const members = await screen.findByRole('dialog', { name: 'Состав: First group' });
     expect(within(members).getByRole('checkbox', { name: 'Включить Hidden tonic в группу' })).toBeChecked();
-    expect(within(members).getByRole('checkbox', { name: 'Убрать недоступное определение 1 из группы' })).toBeChecked();
+    expect(within(members).getByRole('checkbox', { name: 'Убрать недоступную запись 1 из группы' })).toBeChecked();
     expect(within(members).getByRole('checkbox', { name: 'Включить Second tonic в группу' })).not.toBeChecked();
-    fireEvent.change(within(members).getByRole('textbox', { name: 'Поиск определений' }), { target: { value: 'Second' } });
+    fireEvent.change(within(members).getByRole('textbox', { name: 'Поиск предметов и навыков' }), { target: { value: 'Second' } });
     fireEvent.click(within(members).getByRole('checkbox', { name: 'Включить Second tonic в группу' }));
     fireEvent.click(within(members).getByRole('button', { name: 'Применить' }));
     expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
@@ -795,7 +856,7 @@ describe('catalog attribute schema options', () => {
       contentRevision: 8,
       data: { definitions: [{ ...definition, options: [{ optionKey: 'option-stealth', title: 'Quiet' }] }] },
     });
-    renderCatalog('/groups/12/gm/catalog');
+    renderCatalog('/groups/12/gm/catalog/items');
     fireEvent.click(await screen.findByRole('button', { name: 'Атрибуты каталога' }));
     const schemaDialog = await screen.findByRole('dialog', { name: 'Схема атрибутов каталога' });
 

@@ -143,12 +143,12 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
   const rootEntriesUnavailable = rootCatalogForbidden ? undefined : rootCatalog.data;
 
   return <>
-    <PageHeader title="Каталог" subtitle="Общие определения предметов и навыков кампании" />
+    <PageHeader title="Каталог" subtitle="Предметы и навыки кампании" />
     <TabBar
       aria-label="Разделы каталога"
       basePath={path(`/${campaignId}/${mode}/catalog`)}
       tabs={[
-        { id: 'items', label: 'Предметы', path: '' },
+        { id: 'items', label: 'Предметы', path: 'items' },
         { id: 'skills', label: 'Навыки', path: 'skills' },
       ]}
     />
@@ -165,7 +165,7 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
           onClick={toggleAll}
         />
         {canManage && <>
-          <IconButton icon="add" size="small" variant="secondary" title="Создать определение" ariaLabel="Создать определение" onClick={startCreate} />
+          <IconButton icon="add" size="small" variant="secondary" title={kind === 'Item' ? 'Создать предмет' : 'Создать навык'} ariaLabel={kind === 'Item' ? 'Создать предмет' : 'Создать навык'} onClick={startCreate} />
           <IconButton icon="edit" size="small" variant="secondary" title="Атрибуты каталога" ariaLabel="Атрибуты каталога" onClick={() => setAttributesOpen(true)} />
           <IconButton icon="sort" size="small" variant="secondary" title="Группы каталога" ariaLabel="Группы каталога" onClick={() => setGroupsOpen(true)} />
         </>}
@@ -180,9 +180,9 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
     {!rootEntriesUnavailable && !rootCatalog.loading && !rootCatalog.error && <StatePanel kind="error">Каталог недоступен.</StatePanel>}
 
     {model && <>
-      {model.ungroupedState === 'loading' && summaries.data && <StatePanel kind="loading">Проверка принадлежности определений к группам…</StatePanel>}
+      {model.ungroupedState === 'loading' && summaries.data && <StatePanel kind="loading">Проверка принадлежности записей к группам…</StatePanel>}
       {model.ungroupedState === 'unavailable' && (memberships.data?.some(result => result.error)
-        ? <><StatePanel kind="error">Не удалось определить, какие определения не входят в группы.</StatePanel><Button size="small" variant="ghost" type="button" onClick={memberships.reload}>Повторить загрузку групп</Button></>
+        ? <><StatePanel kind="error">Не удалось определить, какие записи не входят в группы.</StatePanel><Button size="small" variant="ghost" type="button" onClick={memberships.reload}>Повторить загрузку групп</Button></>
         : summaries.error
           ? null
           : <StatePanel kind="loading">Загрузка групп каталога…</StatePanel>)}

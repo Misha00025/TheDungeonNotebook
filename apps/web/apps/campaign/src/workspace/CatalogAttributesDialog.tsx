@@ -157,7 +157,7 @@ const CatalogAttributesDialog: React.FC<Props> = ({
 
   const changeType = (row: AttributeRow, typeKey: CatalogAttributeType) => {
     if (typeKey === row.typeKey || !canWriteRef.current || busyRef.current) return;
-    if (!window.confirm('Смена типа не преобразует значения, уже сохранённые у определений каталога. Продолжить?')) return;
+    if (!window.confirm('Смена типа не преобразует значения, уже сохранённые у предметов и навыков каталога. Продолжить?')) return;
     setRows(current => current.map(item => item.clientKey === row.clientKey ? {
       ...item,
       typeKey,
@@ -289,7 +289,7 @@ const CatalogAttributesDialog: React.FC<Props> = ({
     {!loading && !loadError && baseline ? <>
       {permissionsPending && <p role="status">Проверка прав. Запись до её завершения отключена.</p>}
       {revoked && <p role="alert">Управление схемой заблокировано после отказа сервера.</p>}
-      {rows.length === 0 && <StatePanel kind="empty">В схеме пока нет атрибутов. Добавьте определение, чтобы использовать типизированные поля.</StatePanel>}
+      {rows.length === 0 && <StatePanel kind="empty">В схеме пока нет атрибутов. Добавьте атрибут, чтобы использовать типизированные поля.</StatePanel>}
       <p>При смене типа или удалении варианта существующие значения не преобразуются автоматически.</p>
       <p>Неактивные атрибуты сохраняются и остаются доступны для просмотра ранее записанных значений.</p>
       <DataTable aria-label="Атрибуты каталога" minWidth="46rem">

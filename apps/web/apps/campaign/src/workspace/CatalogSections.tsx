@@ -37,7 +37,7 @@ const Section: React.FC<{ section: CatalogBrowseSection; props: CatalogSectionsP
       {section.state === 'loading' && <StatePanel kind="loading">Загрузка состава раздела…</StatePanel>}
       {section.state === 'error' && <><ApiError error={section.error} /><Button size="small" variant="ghost" type="button" onClick={() => props.onRetryMembership(section.key.slice('group:'.length))}>Повторить загрузку раздела</Button></>}
       {section.state === 'ready' && section.diagnostics.map((diagnostic, index) => <p className={styles.diagnostic} role="status" key={`${diagnostic.groupId}-${diagnostic.entryId ?? 'group'}-${diagnostic.code}-${index}`}>{diagnosticLabels[diagnostic.code] ?? 'Сервер обнаружил проблему при вычислении состава группы.'}</p>)}
-      {section.state === 'ready' && section.ownEntries.length > 0 && <List className={styles.entries} layout="vertical" gap="small" aria-label={`Определения: ${section.title}`}>
+      {section.state === 'ready' && section.ownEntries.length > 0 && <List className={styles.entries} layout="vertical" gap="small" aria-label={`Записи: ${section.title}`}>
         {section.ownEntries.map(entry => <EntryRow key={entry.id} entry={entry} onOpen={props.onOpenEntry} />)}
       </List>}
       {section.children.map(child => <Section key={child.key} section={child} props={props} />)}

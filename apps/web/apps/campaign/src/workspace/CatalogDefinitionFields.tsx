@@ -19,8 +19,6 @@ export type CatalogDefinitionFieldsProps = {
   onChange: (draft: CatalogDefinitionDraft) => void;
   definitions: CatalogAttributeDefinition[];
   canPublish: boolean;
-  creating: boolean;
-  kindEditable?: boolean;
   readOnly?: boolean;
   disabled?: boolean;
   diagnostics?: CatalogAttributeDiagnostic[];
@@ -44,8 +42,6 @@ export const CatalogDefinitionFields: React.FC<CatalogDefinitionFieldsProps> = (
   onChange,
   definitions,
   canPublish,
-  creating,
-  kindEditable = true,
   readOnly = false,
   disabled = false,
   diagnostics = [],
@@ -63,30 +59,17 @@ export const CatalogDefinitionFields: React.FC<CatalogDefinitionFieldsProps> = (
   }, [invalid]);
 
   const update = (patch: Partial<CatalogDefinitionDraft>) => onChange({ ...draft, ...patch });
-  const setKind = (kind: CatalogKind) => update({
-    kind,
-    ...(kind === 'Skill' ? { quantityUnit: null, allowNegative: false } : { quantityUnit: draft.quantityUnit ?? 'Whole' }),
-  });
-
   return <div>
     <Field label="Название" htmlFor={`${idPrefix}-name`} error={!readOnly && invalidName ? 'Введите название.' : undefined}>
       {readOnly
         ? <p>{draft.name}</p>
         : <Input id={`${idPrefix}-name`} value={draft.name} disabled={disabled} aria-invalid={invalidName || undefined} aria-describedby={invalidName ? `${idPrefix}-name-error` : undefined} onChange={event => update({ name: event.target.value })} />}
     </Field>
-    <Field label="Тип определения" htmlFor={`${idPrefix}-kind`}>
-      {creating && kindEditable && !readOnly
-        ? <Select id={`${idPrefix}-kind`} value={draft.kind} disabled={disabled} onChange={event => setKind(event.target.value as CatalogKind)}>
-          <option value="Item">Предмет</option>
-          <option value="Skill">Навык</option>
-        </Select>
-        : <p>{draft.kind === 'Item' ? 'Предмет' : 'Навык'}</p>}
-    </Field>
     {canPublish && <label>
       <Checkbox checked={draft.isHidden} disabled={disabled || readOnly} onChange={event => update({ isHidden: event.target.checked })} />
-      Скрытое определение
+      Скрыть из общего каталога
     </label>}
-    {!canPublish && <p>{draft.isHidden ? 'Скрытое определение' : 'Открытое определение'}</p>}
+    {!canPublish && <p>{draft.isHidden ? 'Скрыт из общего каталога' : 'Доступен в общем каталоге'}</p>}
     {draft.kind === 'Item' && <>
       <Field label="Единица количества" htmlFor={`${idPrefix}-quantity-unit`}>
         {readOnly

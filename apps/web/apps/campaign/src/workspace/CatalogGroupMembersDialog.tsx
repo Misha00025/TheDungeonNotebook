@@ -37,9 +37,9 @@ const CatalogGroupMembersDialog: React.FC<Props> = ({ groupLabel, initialEntryId
   };
 
   return <ModalPortal isOpen onClose={onClose} title={`Состав: ${groupLabel}`} size="wide">
-    <Toolbar><SearchBar searchTerm={search} onSearchChange={setSearch} compact aria-label="Поиск определений" /></Toolbar>
+    <Toolbar><SearchBar searchTerm={search} onSearchChange={setSearch} compact aria-label="Поиск предметов и навыков" /></Toolbar>
     <DataTable aria-label={`Состав группы ${groupLabel}`} minWidth="32rem">
-      <thead><tr><th scope="col">В группе</th><th scope="col">Определение</th><th scope="col">Тип</th></tr></thead>
+      <thead><tr><th scope="col">В группе</th><th scope="col">Предмет или навык</th><th scope="col">Тип</th></tr></thead>
       <tbody>
         {visibleEntries.map(entry => <tr key={entry.id}>
           <td><Checkbox aria-label={`Включить ${entry.name} в группу`} checked={selectedIds.has(entry.id)} disabled={disabled} onChange={event => toggle(entry.id, event.target.checked)} /></td>
@@ -47,8 +47,8 @@ const CatalogGroupMembersDialog: React.FC<Props> = ({ groupLabel, initialEntryId
           <td>{entry.kind === 'Item' ? 'Предмет' : 'Навык'}</td>
         </tr>)}
         {unavailableIds.map((entryId, index) => <tr key={`unavailable-${entryId}`}>
-          <td><Checkbox aria-label={`Убрать недоступное определение ${index + 1} из группы`} checked disabled={disabled} onChange={event => toggle(entryId, event.target.checked)} /></td>
-          <th scope="row">Недоступное определение</th>
+          <td><Checkbox aria-label={`Убрать недоступную запись ${index + 1} из группы`} checked disabled={disabled} onChange={event => toggle(entryId, event.target.checked)} /></td>
+          <th scope="row">Недоступная запись</th>
           <td>Недоступно</td>
         </tr>)}
       </tbody>

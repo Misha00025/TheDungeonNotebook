@@ -22,7 +22,7 @@ const issueLabels: Record<CharacterQuantityIssue, string> = {
   required: 'Введите количество.',
   invalid_number: 'Введите корректное число.',
   whole_required: 'Для целой единицы количества нужно целое число.',
-  negative_not_allowed: 'Отрицательное количество запрещено для этого определения.',
+  negative_not_allowed: 'Отрицательное количество запрещено для этого предмета.',
   invalid_definition: 'Для предмета не задана единица количества.',
 };
 

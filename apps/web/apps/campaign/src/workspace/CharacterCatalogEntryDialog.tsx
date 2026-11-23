@@ -451,7 +451,7 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
   const deleteEntry = async () => {
     if (busyRef.current || recoveryBusyRef.current) return;
     if (readOnly || !entry || !quantityBaseline || !catalog.canWrite || dirty || invalid || controlsDisabled || deleteBlocked) return;
-    if (!window.confirm('Удалить личную запись? Определение каталога останется.')) return;
+    if (!window.confirm('Удалить личную запись? Предмет или навык в каталоге останется.')) return;
     busyRef.current = true;
     setDeleting(true);
     setFailure(undefined);

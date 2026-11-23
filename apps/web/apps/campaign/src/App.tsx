@@ -65,10 +65,16 @@ const GuardedRoutes: React.FC = () => {
       <Route path="gm/templates" element={<Templates />} />
       <Route path="gm/formulas" element={<Formulas />} />
       <Route path="gm/views" element={<Views />} />
-      <Route path="gm/catalog" element={<Catalog kind="Item" />} />
-      <Route path="gm/catalog/skills" element={<Catalog kind="Skill" />} />
-      <Route path="player/catalog" element={<Catalog kind="Item" />} />
-      <Route path="player/catalog/skills" element={<Catalog kind="Skill" />} />
+      <Route path="gm/catalog">
+        <Route index element={<Navigate to="items" replace />} />
+        <Route path="items" element={<Catalog kind="Item" />} />
+        <Route path="skills" element={<Catalog kind="Skill" />} />
+      </Route>
+      <Route path="player/catalog">
+        <Route index element={<Navigate to="items" replace />} />
+        <Route path="items" element={<Catalog kind="Item" />} />
+        <Route path="skills" element={<Catalog kind="Skill" />} />
+      </Route>
       <Route path="templates" element={<LegacySectionEntry target="templates" />} />
       <Route path="gm/characters" element={<Characters />} />
       <Route path="gm/characters/:characterId" element={<CharacterSheetRoute />} />
