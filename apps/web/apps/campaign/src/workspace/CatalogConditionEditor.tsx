@@ -8,7 +8,7 @@ import { stringifyJson } from './json';
 import { ValueInput, validateFieldValue } from './ValueInput';
 
 type ConditionOperator = CatalogGroupCondition['operator'];
-type LeafOperator = Extract<ConditionOperator, 'exists' | 'eq' | 'gt' | 'gte' | 'lt' | 'lte'>;
+type LeafOperator = Extract<ConditionOperator, 'exists' | 'eq' | 'contains' | 'gt' | 'gte' | 'lt' | 'lte'>;
 
 export type CatalogConditionEditorProps = {
   definitions: CatalogAttributeDefinition[];
@@ -26,13 +26,14 @@ const operatorLabels: Record<ConditionOperator | 'none', string> = {
   not: 'Не соответствует условию',
   exists: 'Атрибут существует',
   eq: 'Равно',
+  contains: 'Содержит',
   gt: 'Больше',
   gte: 'Больше или равно',
   lt: 'Меньше',
   lte: 'Меньше или равно',
 };
 
-const leafOperators: LeafOperator[] = ['exists', 'eq', 'gt', 'gte', 'lt', 'lte'];
+const leafOperators: LeafOperator[] = ['exists', 'eq', 'contains', 'gt', 'gte', 'lt', 'lte'];
 const conditionOperators: ConditionOperator[] = [...leafOperators, 'all', 'any', 'not'];
 const numericOperators = new Set<ConditionOperator>(['gt', 'gte', 'lt', 'lte']);
 
@@ -100,7 +101,13 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
   const validityCallback = useRef(onValidityChange);
   validityCallback.current = onValidityChange;
   const definition = node.attributeId ? definitionById.get(node.attributeId) : undefined;
-  const currentField = catalogAttributeField(definition);
+  const currentField = node.operator === 'contains'
+    ? definition?.typeKey === 'string'
+      ? catalogAttributeField(definition)
+      : definition?.typeKey === 'multiChoice'
+        ? { valueType: 'SingleChoice' as const, options: definition.options }
+        : undefined
+    : catalogAttributeField(definition);
   const currentValueValid = node.operator === 'exists'
     ? Boolean(definition)
     : Boolean(currentField && node.value !== undefined && validateFieldValue(currentField, node.value) === undefined);
@@ -178,16 +185,22 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
     onChange({ operator: node.operator, children: children.filter((_, childIndex) => childIndex !== index) });
   };
 
-  const eligibleDefinitions = definitions;
+  const eligibleDefinitions = node.operator === 'contains'
+    ? definitions.filter(item => item.typeKey === 'string' || item.typeKey === 'multiChoice' || item.id === node.attributeId)
+    : definitions;
   const rawValue = node.value;
-  const defaultValue = definition ? defaultTypedValue(definition.typeKey, definition.options) : undefined;
+  const defaultValue = definition
+    ? node.operator === 'contains'
+      ? createConditionLeaf(node.operator, definition).value
+      : defaultTypedValue(definition.typeKey, definition.options)
+    : undefined;
   const choiceSnapshotMatches = Boolean(choiceDraft && choiceDraft.attributeId === node.attributeId
     && choiceDraft.operator === node.operator
     && choiceDraft.typeKey === definition?.typeKey
     && stringifyJson(choiceDraft.options) === stringifyJson(definition?.options));
   const choiceError = currentField && choiceDraft ? validateFieldValue(currentField, choiceDraft.value) : 'Схема атрибута недоступна.';
   const canApplyChoice = Boolean(choiceDraft && !disabled && !stale
-    && node.operator !== 'exists' && definition?.typeKey === 'multiChoice' && choiceSnapshotMatches && !choiceError);
+    && node.operator !== 'exists' && node.operator !== 'contains' && definition?.typeKey === 'multiChoice' && choiceSnapshotMatches && !choiceError);
   const applyChoice = () => {
     if (!choiceDraft || !canApplyChoice || !definition) return;
     onChange({
@@ -197,12 +210,16 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
     });
     setChoiceDraft(undefined);
   };
-  const isMultiChoice = node.operator !== 'exists' && definition?.typeKey === 'multiChoice';
+  const isMultiChoice = node.operator !== 'exists' && node.operator !== 'contains' && definition?.typeKey === 'multiChoice';
+  const formatConditionValue = (value: JsonValue, valueDefinition?: CatalogAttributeDefinition, operator: ConditionOperator = node.operator) =>
+    operator === 'contains' && valueDefinition?.typeKey === 'multiChoice' && typeof value === 'string'
+      ? valueDefinition.options.find(option => option.optionKey === value)?.title ?? 'Неизвестный вариант'
+      : catalogValueLabel(value, valueDefinition);
   const fieldValue = node.operator !== 'exists' && definition && !stale && currentField && rawValue !== undefined;
   const leafValue = fieldValue
     ? isMultiChoice
       ? <ActionRow>
-        <span>{catalogValueLabel(rawValue!, definition!) || 'Не выбрано'}</span>
+        <span>{formatConditionValue(rawValue!, definition!) || 'Не выбрано'}</span>
         <Button type="button" size="small" variant="secondary" disabled={disabled} onClick={() => setChoiceDraft({
           value: rawValue!,
           initialValue: rawValue!,
@@ -212,7 +229,16 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
           operator: node.operator,
         })}>Выбрать значения</Button>
       </ActionRow>
-      : <>
+      : node.operator === 'contains' && definition?.typeKey === 'multiChoice' && typeof rawValue === 'string'
+        ? disabled
+          ? <output aria-label={`Значение: ${definition.title}`}>{formatConditionValue(rawValue, definition)}</output>
+          : <ValueInput
+            field={currentField!}
+            value={rawValue}
+            label={`Значение: ${definition.title}`}
+            onChange={(value: JsonValue) => onChange({ operator: node.operator, attributeId: definition.id, value })}
+          />
+        : <>
         <ValueInput
           field={currentField!}
           value={rawValue!}
@@ -236,7 +262,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
         {definition!.typeKey === 'boolean' && <span>{rawValue === true ? 'Да' : 'Нет'}</span>}
       </>
     : node.operator !== 'exists' && node.value !== undefined
-      ? catalogValueLabel(node.value, definition)
+      ? formatConditionValue(node.value, definition)
       : '—';
   const nodeStatus = stale
     ? 'Условие использует устаревшую или недоступную схему и сохранено без преобразования.'

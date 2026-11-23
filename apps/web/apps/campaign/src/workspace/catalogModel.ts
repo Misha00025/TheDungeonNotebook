@@ -70,11 +70,17 @@ export function createCatalogOccurrence(
 }
 
 export function createConditionLeaf(
-  operator: 'exists' | 'eq' | 'gt' | 'gte' | 'lt' | 'lte',
+  operator: 'exists' | 'eq' | 'contains' | 'gt' | 'gte' | 'lt' | 'lte',
   definition?: CatalogAttributeDefinition,
 ): CatalogGroupCondition {
   if (operator === 'exists') return { operator, ...(definition ? { attributeId: definition.id } : {}) };
-  const value = definition && defaultTypedValue(definition.typeKey, definition.options);
+  const value = operator === 'contains'
+    ? definition?.typeKey === 'string'
+      ? ''
+      : definition?.typeKey === 'multiChoice'
+        ? definition.options[0]?.optionKey ?? ''
+        : undefined
+    : definition && defaultTypedValue(definition.typeKey, definition.options);
   return {
     operator,
     ...(definition ? { attributeId: definition.id } : {}),
