@@ -113,84 +113,71 @@ class CampaignRouteTests(unittest.TestCase):
         self.assertNotIn("/api/campaigns/{campaignId}/templates", routes)
         self.assertFalse(any(re.search(r"/templates/\{[^}]+\}", path) for path in routes))
 
-    def test_catalog_routes_are_explicit_subject_scoped_one_to_one_proxies(self):
+    def test_item_and_skill_catalog_routes_are_separate_exact_subject_scoped_proxies(self):
         config = yaml.safe_load((GATEWAY / "configs" / "routes.yaml").read_text())
         routes = {route["path"]: route for route in config["routes"] if isinstance(route, dict)}
-        expected = {
-            "/api/campaigns/{campaignId}/catalog": ["GET", "POST"],
-            "/api/campaigns/{campaignId}/catalog/{entryId}": ["GET", "PUT"],
-            "/api/campaigns/{campaignId}/catalog/{entryId}/content": ["GET", "PUT"],
-            "/api/campaigns/{campaignId}/catalog/attributes": ["GET", "PUT"],
-            "/api/campaigns/{campaignId}/catalog/groups": ["GET", "PUT"],
-            "/api/campaigns/{campaignId}/catalog/groups/configuration": ["GET"],
-            "/api/campaigns/{campaignId}/catalog/groups/{groupId}/entries": ["GET"],
+        expected_suffixes = {
+            "": ["GET", "POST"],
+            "/{entryId}": ["GET", "PUT"],
+            "/{entryId}/content": ["GET", "PUT"],
+            "/attributes": ["GET", "PUT"],
+            "/attributes/{attributeId}": ["DELETE"],
+            "/groups": ["GET", "PUT"],
+            "/groups/configuration": ["GET"],
+            "/groups/{groupId}/entries": ["GET"],
         }
-        catalog_routes = {path: route for path, route in routes.items() if "/catalog" in path}
-        self.assertEqual(set(expected), set(catalog_routes))
-        for path, methods in expected.items():
-            route = catalog_routes[path]
-            self.assertEqual(methods, route["methods"])
-            self.assertEqual(path, route["proxy"]["path"])
-            self.assertEqual("{state.x_subject}", route["proxy"]["headers"]["X-Subject"])
-            self.assertEqual("campaign_upstream", route["pre_request_handler"])
-            self.assertEqual("campaign_response", route["response_handler"])
-            self.assertEqual("required", route["auth"])
-            self.assertNotIn("params", route)
-            self.assertNotIn("access", route)
-            self.assertNotIn("query", route)
-            self.assertNotIn("body", route)
-            self.assertNotIn("DELETE", methods)
+        for scope in ("items", "skills"):
+            prefix = f"/api/campaigns/{{campaignId}}/{scope}"
+            expected = {prefix + suffix: methods for suffix, methods in expected_suffixes.items()}
+            actual = {path: route for path, route in routes.items() if path == prefix or path.startswith(prefix + "/")}
+            self.assertEqual(set(expected), set(actual))
+            for path, methods in expected.items():
+                route = actual[path]
+                self.assertEqual(methods, route["methods"])
+                self.assertEqual(path, route["proxy"]["path"])
+                self.assertEqual({"X-Subject": "{state.x_subject}"}, route["proxy"]["headers"])
+                self.assertEqual("campaign_upstream", route["pre_request_handler"])
+                self.assertEqual("campaign_response", route["response_handler"])
+                self.assertEqual("required", route["auth"])
+                for key in ("params", "query", "body", "access"):
+                    self.assertNotIn(key, route)
+                    self.assertNotIn(key, route["proxy"])
+        for path in (
+            "/api/campaigns/{campaignId}/catalog",
+            "/api/campaigns/{campaignId}/catalog/attributes",
+            "/api/campaigns/{campaignId}/catalog/groups",
+        ):
+            self.assertNotIn(path, routes)
 
-    def test_catalog_group_routes_are_exact_subject_scoped_proxies(self):
+    def test_character_item_and_skill_routes_are_separate_with_item_quantity_only(self):
         config = yaml.safe_load((GATEWAY / "configs" / "routes.yaml").read_text())
         routes = {route["path"]: route for route in config["routes"] if isinstance(route, dict)}
-        expected = {
-            "/api/campaigns/{campaignId}/catalog/groups": ["GET", "PUT"],
-            "/api/campaigns/{campaignId}/catalog/groups/configuration": ["GET"],
-            "/api/campaigns/{campaignId}/catalog/groups/{groupId}/entries": ["GET"],
+        expected_common = {
+            "": ["GET", "POST"],
+            "/create": ["POST"],
+            "/additions/{requestId}": ["GET"],
+            "/{entryId}": ["GET", "DELETE"],
+            "/{entryId}/attributes": ["PUT"],
         }
-        actual = {path: route for path, route in routes.items() if "/catalog/groups" in path}
-        self.assertEqual(set(expected), set(actual))
-        for path, methods in expected.items():
-            route = actual[path]
-            self.assertEqual(methods, route["methods"])
-            self.assertEqual(path, route["proxy"]["path"])
-            self.assertEqual({"X-Subject": "{state.x_subject}"}, route["proxy"]["headers"])
-            self.assertEqual("campaign_upstream", route["pre_request_handler"])
-            self.assertEqual("campaign_response", route["response_handler"])
-            self.assertEqual("required", route["auth"])
-            for key in ("params", "query", "body", "access"):
-                self.assertNotIn(key, route)
-                self.assertNotIn(key, route["proxy"])
-
-    def test_character_catalog_routes_are_explicit_and_delete_only_character_entries(self):
-        config = yaml.safe_load((GATEWAY / "configs" / "routes.yaml").read_text())
-        routes = {route["path"]: route for route in config["routes"] if isinstance(route, dict)}
-        prefix = "/api/campaigns/{campaignId}/characters/{characterId}/entries"
-        expected = {
-            prefix: ["GET", "POST"],
-            f"{prefix}/create": ["POST"],
-            f"{prefix}/additions/{{requestId}}": ["GET"],
-            f"{prefix}/{{entryId}}": ["GET", "DELETE"],
-            f"{prefix}/{{entryId}}/quantity": ["PUT"],
-            f"{prefix}/{{entryId}}/attributes": ["PUT"],
-        }
-        entries_routes = {path: route for path, route in routes.items() if path == prefix or path.startswith(prefix + "/")}
-        self.assertEqual(set(expected), set(entries_routes))
-        for path, methods in expected.items():
-            route = entries_routes[path]
-            self.assertEqual(methods, route["methods"])
-            self.assertEqual(path, route["proxy"]["path"])
-            self.assertEqual({"X-Subject": "{state.x_subject}"}, route["proxy"]["headers"])
-            self.assertEqual("campaign_upstream", route["pre_request_handler"])
-            self.assertEqual("campaign_response", route["response_handler"])
-            self.assertEqual("required", route["auth"])
-            for key in ("params", "query", "body", "access"):
-                self.assertNotIn(key, route)
-                self.assertNotIn(key, route["proxy"])
-        self.assertEqual({( "DELETE", f"{prefix}/{{entryId}}")}, {
-            (method, path) for path, methods in expected.items() for method in methods if method == "DELETE"
-        })
+        for scope in ("items", "skills"):
+            prefix = f"/api/campaigns/{{campaignId}}/characters/{{characterId}}/{scope}"
+            expected = {prefix + suffix: methods for suffix, methods in expected_common.items()}
+            if scope == "items":
+                expected[f"{prefix}/{{entryId}}/quantity"] = ["PUT"]
+            actual = {path: route for path, route in routes.items() if path == prefix or path.startswith(prefix + "/")}
+            self.assertEqual(set(expected), set(actual))
+            for path, methods in expected.items():
+                route = actual[path]
+                self.assertEqual(methods, route["methods"])
+                self.assertEqual(path, route["proxy"]["path"])
+                self.assertEqual({"X-Subject": "{state.x_subject}"}, route["proxy"]["headers"])
+                self.assertEqual("campaign_upstream", route["pre_request_handler"])
+                self.assertEqual("campaign_response", route["response_handler"])
+                self.assertEqual("required", route["auth"])
+                for key in ("params", "query", "body", "access"):
+                    self.assertNotIn(key, route)
+                    self.assertNotIn(key, route["proxy"])
+        self.assertNotIn("/api/campaigns/{campaignId}/characters/{characterId}/entries", routes)
 
     def test_app_configs_include_routes_without_game_systems(self):
         for filename in ("app.json", "app.test.json"):

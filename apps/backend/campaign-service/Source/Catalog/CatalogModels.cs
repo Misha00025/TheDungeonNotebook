@@ -5,17 +5,51 @@ using Tdn.Campaigns.Sheets;
 
 namespace Tdn.Campaigns.Catalog;
 
-public enum CatalogKind { Item, Skill }
+public interface ICatalogType
+{
+    static abstract string DefinitionsTable { get; }
+    static abstract string CharacterEntriesTable { get; }
+    static abstract string AdditionReceiptsTable { get; }
+    static abstract string AttributeDefinitionsCollection { get; }
+    static abstract string ContentsCollection { get; }
+    static abstract string CharacterContentsCollection { get; }
+    static abstract string GroupsCollection { get; }
+    static abstract bool HasQuantity { get; }
+}
+
+public sealed class ItemCatalog : ICatalogType
+{
+    public static string DefinitionsTable => "ItemDefinitions";
+    public static string CharacterEntriesTable => "CharacterItems";
+    public static string AdditionReceiptsTable => "ItemAdditionReceipts";
+    public static string AttributeDefinitionsCollection => "itemAttributeDefinitions";
+    public static string ContentsCollection => "itemContents";
+    public static string CharacterContentsCollection => "characterItemContents";
+    public static string GroupsCollection => "itemGroups";
+    public static bool HasQuantity => true;
+}
+
+public sealed class SkillCatalog : ICatalogType
+{
+    public static string DefinitionsTable => "SkillDefinitions";
+    public static string CharacterEntriesTable => "CharacterSkills";
+    public static string AdditionReceiptsTable => "SkillAdditionReceipts";
+    public static string AttributeDefinitionsCollection => "skillAttributeDefinitions";
+    public static string ContentsCollection => "skillContents";
+    public static string CharacterContentsCollection => "characterSkillContents";
+    public static string GroupsCollection => "skillGroups";
+    public static bool HasQuantity => false;
+}
+
 public enum QuantityUnit { Whole, Fractional, Single }
 public enum AttributeEditLevel { Definition, Character }
 
-public sealed class CatalogEntry
+public sealed class CatalogEntry<TCatalog> where TCatalog : ICatalogType
 {
     public Guid Id { get; set; }
     public int CampaignId { get; set; }
     public Tdn.Campaigns.Campaigns.Campaign Campaign { get; set; } = null!;
     public string Name { get; set; } = string.Empty;
-    public CatalogKind Kind { get; set; }
     public int? CreatorUserId { get; set; }
     public bool IsHidden { get; set; }
     public QuantityUnit? QuantityUnit { get; set; }
@@ -23,19 +57,19 @@ public sealed class CatalogEntry
     public long MetadataRevision { get; set; } = 1;
 }
 
-public sealed class CharacterCatalogEntry
+public sealed class CharacterCatalogEntry<TCatalog> where TCatalog : ICatalogType
 {
     public Guid Id { get; set; }
     public int CampaignId { get; set; }
     public Guid CharacterId { get; set; }
     public Tdn.Campaigns.Sheets.CharacterMetadata? Character { get; set; }
     public Guid CatalogEntryId { get; set; }
-    public CatalogEntry? CatalogEntry { get; set; }
+    public CatalogEntry<TCatalog>? CatalogEntry { get; set; }
     public decimal? Quantity { get; set; }
     public long MetadataRevision { get; set; } = 1;
 }
 
-public sealed class CatalogAdditionReceipt
+public sealed class CatalogAdditionReceipt<TCatalog> where TCatalog : ICatalogType
 {
     public int CampaignId { get; set; }
     public Guid CharacterId { get; set; }
@@ -44,26 +78,24 @@ public sealed class CatalogAdditionReceipt
     public Guid CatalogEntryId { get; set; }
 }
 
-public sealed record CatalogEntryDto(Guid Id, int CampaignId, string Name, CatalogKind Kind, int? CreatorUserId, bool IsHidden, QuantityUnit? QuantityUnit, bool AllowNegative, long MetadataRevision);
-public sealed record CatalogAttributeDefinition(Guid Id, string Title, string TypeKey, long TypeRevision, ChoiceOption[] Options, bool IsActive);
+public record CatalogEntryDto(Guid Id, int CampaignId, string Name, int? CreatorUserId, bool IsHidden, QuantityUnit? QuantityUnit, bool AllowNegative, long MetadataRevision);
+public sealed record CatalogAttributeDefinition(Guid Id, string Title, string TypeKey, ChoiceOption[] Options);
 public sealed record CatalogAttributeSchema(CatalogAttributeDefinition[] Definitions);
 public sealed record CatalogAttributeSchemaEnvelope(int CampaignId, long ContentRevision, CatalogAttributeSchema Data);
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record CatalogAttributeValue(
     [property: JsonRequired] Guid Id,
     [property: JsonRequired] Guid AttributeId,
-    [property: JsonRequired] string TypeKey,
-    [property: JsonRequired] long TypeRevision,
     [property: JsonRequired] JsonElement Value,
     [property: JsonRequired] AttributeEditLevel EditLevel);
 public sealed record CatalogContent(string Description, CatalogAttributeValue[] Attributes);
-public sealed record CatalogDiagnostic(Guid OccurrenceId, string Code);
-public sealed record CatalogContentEnvelope(int CampaignId, Guid ResourceId, long ContentRevision, long AttributeSchemaRevision, CatalogContent Data, CatalogDiagnostic[] Diagnostics);
+public sealed record CatalogContentEnvelope(int CampaignId, Guid ResourceId, long ContentRevision, CatalogContent Data);
 public sealed record CatalogCreateResult(CatalogEntryDto Entry, CatalogContentEnvelope Content);
-public sealed record CatalogDefinitionPreparation(CatalogEntry Entry, CatalogContent Content, CatalogAttributeSchemaEnvelope Schema);
+public sealed record CatalogDefinitionPreparation<TCatalog>(CatalogEntry<TCatalog> Entry, CatalogContent Content, CatalogAttributeSchemaEnvelope Schema) where TCatalog : ICatalogType;
 public sealed record CharacterCatalogContent(CatalogAttributeValue[] Attributes);
 public sealed record CharacterCatalogEntryDto(Guid Id, int CampaignId, Guid CharacterId, Guid CatalogEntryId, decimal? Quantity, long MetadataRevision);
 public sealed record CharacterCatalogAdditionDto(int CampaignId, Guid CharacterId, Guid RequestId, Guid EntryId, Guid CatalogEntryId);
-public sealed record CharacterCatalogEntryEnvelope(CharacterCatalogEntryDto Record, CatalogEntryDto Definition, string DefinitionDescription, CatalogAttributeValue[] EffectiveAttributes, CatalogAttributeValue[] ExplicitAttributes, CatalogDiagnostic[] Diagnostics, long SchemaRevision, long DefinitionContentRevision, long LocalContentRevision);
+public sealed record CharacterCatalogEntryEnvelope(CharacterCatalogEntryDto Record, CatalogEntryDto Definition, string DefinitionDescription, CatalogAttributeValue[] EffectiveAttributes, CatalogAttributeValue[] ExplicitAttributes, long DefinitionContentRevision, long LocalContentRevision);
 public sealed record CharacterCatalogAddResponse(Guid RequestId, CharacterCatalogEntryEnvelope Entry);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -88,7 +120,6 @@ public sealed class CharacterCatalogCreateRequest
 public sealed class CharacterCatalogDefinitionInput
 {
     [Required] public string? Name { get; init; }
-    [Required] public CatalogKind? Kind { get; init; }
     [Required] public bool? IsHidden { get; init; }
     public QuantityUnit? QuantityUnit { get; init; }
     [Required] public bool? AllowNegative { get; init; }
@@ -115,7 +146,6 @@ public sealed class CatalogCreateRequest
 {
     [Required] public Guid? RequestId { get; init; }
     [Required] public string? Name { get; init; }
-    [Required] public CatalogKind? Kind { get; init; }
     [Required] public bool? IsHidden { get; init; }
     public QuantityUnit? QuantityUnit { get; init; }
     [Required] public bool? AllowNegative { get; init; }
@@ -155,5 +185,10 @@ public sealed class CatalogAttributeDefinitionInput
     [Required] public string? Title { get; init; }
     [Required] public string? TypeKey { get; init; }
     [Required] public ChoiceOption[]? Options { get; init; }
-    [Required] public bool? IsActive { get; init; }
+}
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed class CatalogAttributeDeleteRequest
+{
+    [Required, Range(1, long.MaxValue)] public long? ExpectedRevision { get; init; }
 }

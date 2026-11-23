@@ -6,27 +6,30 @@ using Tdn.Campaigns.Sheets;
 
 namespace CampaignService.Tests;
 
-internal sealed class CharacterCatalogTestFixture
+internal sealed class CharacterCatalogTestFixture<TCatalog> where TCatalog : ICatalogType
 {
     private static readonly Subject Admin = new(SubjectType.Admin, 9);
 
     private CharacterCatalogTestFixture(SheetServiceTests.Fixture sheets)
     {
         Sheets = sheets;
-        CatalogStore = new FakeCatalogStore();
-        Store = new FakeCharacterCatalogStore(CatalogStore, (campaignId, characterId) =>
+        CatalogStore = new FakeCatalogStore<TCatalog>();
+        Store = new FakeCharacterCatalogStore<TCatalog>(CatalogStore, (campaignId, characterId) =>
             Sheets.Resources.Characters.Any(x => x.CampaignId == campaignId && x.Id == characterId), CatalogStore);
-        Catalog = new CatalogService(new Tdn.Campaigns.Campaigns.CampaignService(Sheets.Campaigns), CatalogStore, Sheets.Content, Store);
-        Service = new CharacterCatalogService(Sheets.Sheets, Catalog, CatalogStore, Store, Sheets.Content);
+        Catalog = new CatalogService<TCatalog>(new Tdn.Campaigns.Campaigns.CampaignService(Sheets.Campaigns), CatalogStore, Sheets.Content, Store);
+        Service = new CharacterCatalogService<TCatalog>(Sheets.Sheets, Catalog, CatalogStore, Store, Sheets.Content);
+        Groups = new CatalogGroupService<TCatalog>(new Tdn.Campaigns.Campaigns.CampaignService(Sheets.Campaigns), Catalog, CatalogStore, Sheets.Content);
     }
 
     public SheetServiceTests.Fixture Sheets { get; }
-    public FakeCatalogStore CatalogStore { get; }
-    public FakeCharacterCatalogStore Store { get; }
-    public CatalogService Catalog { get; }
-    public CharacterCatalogService Service { get; }
+    public FakeCatalogStore<TCatalog> CatalogStore { get; }
+    public FakeCharacterCatalogStore<TCatalog> Store { get; }
+    public CatalogService<TCatalog> Catalog { get; }
+    public CharacterCatalogService<TCatalog> Service { get; }
+    public CatalogGroupService<TCatalog> Groups { get; }
 
-    public static CharacterCatalogTestFixture Create() => new(SheetServiceTests.CreateFixture());
+    public static CharacterCatalogTestFixture<TCatalog> Create() => new(SheetServiceTests.CreateFixture());
+    public static CharacterCatalogTestFixture<TCatalog> Create(SheetServiceTests.Fixture shared) => new(shared);
 
     public async Task<Guid> AddCharacterAsync(int campaignId = 7, int userId = 200, bool canWrite = true)
     {
@@ -46,12 +49,12 @@ internal sealed class CharacterCatalogTestFixture
     public Task<CatalogAttributeSchemaEnvelope> DefineSchemaAsync(params CatalogAttributeDefinitionInput[] definitions) =>
         Catalog.UpdateAttributesAsync(Admin, 7, new CatalogAttributesUpdateRequest { ExpectedRevision = 0, Definitions = definitions }, default);
 
-    public Task<CatalogCreateResult> CreateDefinitionAsync(CatalogKind kind, bool hidden = false, QuantityUnit? unit = QuantityUnit.Whole, bool allowNegative = false,
+    public Task<CatalogCreateResult> CreateDefinitionAsync(bool hidden = false, QuantityUnit? unit = null, bool allowNegative = false,
         CatalogAttributeValue[]? attributes = null, Subject? subject = null, string name = "Test definition", Guid? requestId = null) =>
         Catalog.CreateAsync(subject ?? Admin, 7, new CatalogCreateRequest
         {
-            RequestId = requestId ?? Guid.NewGuid(), Name = name, Kind = kind, IsHidden = hidden, QuantityUnit = unit,
-            AllowNegative = allowNegative, Description = "Definition description", Attributes = attributes ?? []
+            RequestId = requestId ?? Guid.NewGuid(), Name = name, IsHidden = hidden, QuantityUnit = TCatalog.HasQuantity ? unit ?? QuantityUnit.Whole : null,
+            AllowNegative = TCatalog.HasQuantity && allowNegative, Description = "Definition description", Attributes = attributes ?? []
         }, default);
 
     internal static JsonElement Json(string json)
@@ -60,13 +63,13 @@ internal sealed class CharacterCatalogTestFixture
         return document.RootElement.Clone();
     }
 
-    internal static CatalogAttributeDefinitionInput Definition(string title, string typeKey, ChoiceOption[]? options = null) => new()
+    internal static CatalogAttributeDefinitionInput Definition(string title, string typeKey, ChoiceOption[]? options = null, Guid? id = null) => new()
     {
-        Title = title, TypeKey = typeKey, Options = options ?? [], IsActive = true
+        Id = id, Title = title, TypeKey = typeKey, Options = options ?? []
     };
 
-    internal static CatalogAttributeValue Value(Guid id, Guid attributeId, string typeKey, long revision, string json, AttributeEditLevel level = AttributeEditLevel.Character) =>
-        new(id, attributeId, typeKey, revision, Json(json), level);
+    internal static CatalogAttributeValue Value(Guid id, Guid attributeId, string json, AttributeEditLevel level = AttributeEditLevel.Character) =>
+        new(id, attributeId, Json(json), level);
 }
 
 internal interface IFakeTransactionParticipant
@@ -75,27 +78,25 @@ internal interface IFakeTransactionParticipant
     void RestoreState(object state);
 }
 
-internal sealed class FakeCatalogStore : ICatalogStore, IFakeTransactionParticipant
+internal sealed class FakeCatalogStore<TCatalog> : ICatalogStore<TCatalog>, IFakeTransactionParticipant where TCatalog : ICatalogType
 {
-    public List<CatalogEntry> Entries { get; } = [];
+    public List<CatalogEntry<TCatalog>> Entries { get; } = [];
     public int CreateCount { get; private set; }
     public int UpdateCount { get; private set; }
-    public Exception? CreateFailure { get; set; }
-    public Action<CatalogEntry>? BeforeCreate { get; set; }
-    public Action<int, Guid>? BeforeUpdate { get; set; }
+    public bool UpdateReturnsFalse { get; set; }
+    public Action<CatalogEntry<TCatalog>>? BeforeCreate { get; set; }
 
-    public Task<IReadOnlyList<CatalogEntry>> ListAsync(int campaignId, CatalogKind? kind, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<CatalogEntry>>(Entries.Where(x => x.CampaignId == campaignId && (kind is null || x.Kind == kind)).OrderBy(x => x.Name).Select(Clone).ToArray());
+    public Task<IReadOnlyList<CatalogEntry<TCatalog>>> ListAsync(int campaignId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<CatalogEntry<TCatalog>>>(Entries.Where(x => x.CampaignId == campaignId).OrderBy(x => x.Name).Select(Clone).ToArray());
 
-    public Task<CatalogEntry?> GetAsync(int campaignId, Guid id, CancellationToken cancellationToken) =>
+    public Task<CatalogEntry<TCatalog>?> GetAsync(int campaignId, Guid id, CancellationToken cancellationToken) =>
         Task.FromResult(Entries.Where(x => x.CampaignId == campaignId && x.Id == id).Select(Clone).SingleOrDefault());
 
-    public Task<CatalogEntry> CreateAsync(CatalogEntry entry, CancellationToken cancellationToken)
+    public Task<CatalogEntry<TCatalog>> CreateAsync(CatalogEntry<TCatalog> entry, CancellationToken cancellationToken)
     {
         CreateCount++;
         BeforeCreate?.Invoke(entry);
-        if (CreateFailure is not null) throw CreateFailure;
-        if (Entries.Any(x => x.Id == entry.Id)) throw new DuplicateResourceException();
+        if (Entries.Any(x => x.CampaignId == entry.CampaignId && x.Id == entry.Id)) throw new DuplicateResourceException();
         Entries.Add(Clone(entry));
         return Task.FromResult(Clone(entry));
     }
@@ -103,7 +104,7 @@ internal sealed class FakeCatalogStore : ICatalogStore, IFakeTransactionParticip
     public Task<bool> UpdateAsync(int campaignId, Guid id, string name, bool isHidden, QuantityUnit? quantityUnit, bool allowNegative, long expectedRevision, CancellationToken cancellationToken)
     {
         UpdateCount++;
-        BeforeUpdate?.Invoke(campaignId, id);
+        if (UpdateReturnsFalse) return Task.FromResult(false);
         var entry = Entries.SingleOrDefault(x => x.CampaignId == campaignId && x.Id == id && x.MetadataRevision == expectedRevision);
         if (entry is null) return Task.FromResult(false);
         entry.Name = name;
@@ -119,54 +120,52 @@ internal sealed class FakeCatalogStore : ICatalogStore, IFakeTransactionParticip
     public void RestoreState(object state)
     {
         Entries.Clear();
-        Entries.AddRange(((List<CatalogEntry>)state).Select(Clone));
+        Entries.AddRange(((List<CatalogEntry<TCatalog>>)state).Select(Clone));
     }
 
-    private static CatalogEntry Clone(CatalogEntry x) => new()
+    private static CatalogEntry<TCatalog> Clone(CatalogEntry<TCatalog> x) => new()
     {
-        Id = x.Id, CampaignId = x.CampaignId, Name = x.Name, Kind = x.Kind, CreatorUserId = x.CreatorUserId,
+        Id = x.Id, CampaignId = x.CampaignId, Name = x.Name, CreatorUserId = x.CreatorUserId,
         IsHidden = x.IsHidden, QuantityUnit = x.QuantityUnit, AllowNegative = x.AllowNegative, MetadataRevision = x.MetadataRevision
     };
 }
 
-internal sealed class FakeCharacterCatalogStore : ICharacterCatalogStore, IFakeTransactionParticipant
+internal sealed class FakeCharacterCatalogStore<TCatalog> : ICharacterCatalogStore<TCatalog>, IFakeTransactionParticipant where TCatalog : ICatalogType
 {
-    private readonly ICatalogStore catalog;
+    private readonly ICatalogStore<TCatalog> catalog;
     private readonly Func<int, Guid, bool> hasCharacter;
     private readonly IFakeTransactionParticipant[] otherParticipants;
 
-    public FakeCharacterCatalogStore(ICatalogStore catalog, Func<int, Guid, bool> hasCharacter, params IFakeTransactionParticipant[] otherParticipants)
+    public FakeCharacterCatalogStore(ICatalogStore<TCatalog> catalog, Func<int, Guid, bool> hasCharacter, params IFakeTransactionParticipant[] otherParticipants)
     {
         this.catalog = catalog;
         this.hasCharacter = hasCharacter;
         this.otherParticipants = otherParticipants;
     }
 
-    public List<CharacterCatalogEntry> Entries { get; } = [];
-    public List<CatalogAdditionReceipt> Receipts { get; } = [];
+    public List<CharacterCatalogEntry<TCatalog>> Entries { get; } = [];
+    public List<CatalogAdditionReceipt<TCatalog>> Receipts { get; } = [];
     public List<string> LockOrder { get; } = [];
     public int TransactionCount { get; private set; }
     public int WriteAttempts { get; private set; }
     public bool InsideTransaction { get; private set; }
-    public Exception? BeforeCommitFailure { get; set; }
-    public Exception? AfterCommitFailure { get; set; }
-    public Action<CharacterCatalogEntry>? BeforeRecordCreate { get; set; }
+    public Action<CharacterCatalogEntry<TCatalog>>? BeforeRecordCreate { get; set; }
 
-    public Task<IReadOnlyList<CharacterCatalogEntry>> ListAsync(int campaignId, Guid characterId, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<CharacterCatalogEntry>>(Entries.Where(x => x.CampaignId == campaignId && x.CharacterId == characterId).OrderBy(x => x.Id).Select(Clone).ToArray());
+    public Task<IReadOnlyList<CharacterCatalogEntry<TCatalog>>> ListAsync(int campaignId, Guid characterId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<CharacterCatalogEntry<TCatalog>>>(Entries.Where(x => x.CampaignId == campaignId && x.CharacterId == characterId).OrderBy(x => x.Id).Select(Clone).ToArray());
 
-    public Task<IReadOnlyList<CharacterCatalogEntry>> ListByCatalogEntryAsync(int campaignId, Guid catalogEntryId, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<CharacterCatalogEntry>>(Entries.Where(x => x.CampaignId == campaignId && x.CatalogEntryId == catalogEntryId).OrderBy(x => x.CharacterId).ThenBy(x => x.Id).Select(Clone).ToArray());
+    public Task<IReadOnlyList<CharacterCatalogEntry<TCatalog>>> ListByCatalogEntryAsync(int campaignId, Guid catalogEntryId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<CharacterCatalogEntry<TCatalog>>>(Entries.Where(x => x.CampaignId == campaignId && x.CatalogEntryId == catalogEntryId).OrderBy(x => x.CharacterId).ThenBy(x => x.Id).Select(Clone).ToArray());
 
-    public Task<CharacterCatalogEntry?> GetAsync(int campaignId, Guid characterId, Guid entryId, CancellationToken cancellationToken) =>
+    public Task<CharacterCatalogEntry<TCatalog>?> GetAsync(int campaignId, Guid characterId, Guid entryId, CancellationToken cancellationToken) =>
         Task.FromResult(Entries.Where(x => x.CampaignId == campaignId && x.CharacterId == characterId && x.Id == entryId).Select(Clone).SingleOrDefault());
 
-    public Task<CharacterCatalogEntry> CreateAsync(CharacterCatalogEntry entry, CancellationToken cancellationToken)
+    public Task<CharacterCatalogEntry<TCatalog>> CreateAsync(CharacterCatalogEntry<TCatalog> entry, CancellationToken cancellationToken)
     {
         RequireTransaction();
         WriteAttempts++;
         BeforeRecordCreate?.Invoke(entry);
-        if (Entries.Any(x => x.Id == entry.Id)) throw new DuplicateCharacterCatalogException();
+        if (Entries.Any(x => x.CampaignId == entry.CampaignId && x.Id == entry.Id)) throw new DuplicateCharacterCatalogException();
         Entries.Add(Clone(entry));
         return Task.FromResult(Clone(entry));
     }
@@ -192,32 +191,23 @@ internal sealed class FakeCharacterCatalogStore : ICharacterCatalogStore, IFakeT
         return Task.FromResult(true);
     }
 
-    public Task<CatalogAdditionReceipt?> GetAdditionAsync(int campaignId, Guid characterId, Guid requestId, CancellationToken cancellationToken) =>
+    public Task<CatalogAdditionReceipt<TCatalog>?> GetAdditionAsync(int campaignId, Guid characterId, Guid requestId, CancellationToken cancellationToken) =>
         Task.FromResult(Receipts.Where(x => x.CampaignId == campaignId && x.CharacterId == characterId && x.RequestId == requestId).Select(Clone).SingleOrDefault());
 
-    public Task<CatalogAdditionReceipt> CreateAdditionAsync(CatalogAdditionReceipt receipt, CancellationToken cancellationToken)
+    public Task<CatalogAdditionReceipt<TCatalog>> CreateAdditionAsync(CatalogAdditionReceipt<TCatalog> receipt, CancellationToken cancellationToken)
     {
         RequireTransaction();
         WriteAttempts++;
-        if (Receipts.Any(x => x.CampaignId == receipt.CampaignId && x.CharacterId == receipt.CharacterId && x.RequestId == receipt.RequestId))
-            throw new DuplicateCharacterCatalogException();
+        if (Receipts.Any(x => x.CampaignId == receipt.CampaignId && x.CharacterId == receipt.CharacterId && x.RequestId == receipt.RequestId)) throw new DuplicateCharacterCatalogException();
         Receipts.Add(Clone(receipt));
         return Task.FromResult(Clone(receipt));
     }
 
-    public Task<T> WithDefinitionLockAsync<T>(int campaignId, Guid catalogEntryId, Func<Task<T>> action, CancellationToken cancellationToken)
-    {
-        return InTransaction(async () =>
-        {
-            LockOrder.Add($"definition:{catalogEntryId}");
-            if (await catalog.GetAsync(campaignId, catalogEntryId, cancellationToken) is null) throw new DomainException(404, "not_found", "The requested resource was not found.", catalogEntryId);
-            return await action();
-        });
-    }
+    public Task<T> WithDefinitionLockAsync<T>(int campaignId, Guid catalogEntryId, Func<Task<T>> action, CancellationToken cancellationToken) =>
+        InTransaction(async () => { LockOrder.Add($"definition:{catalogEntryId}"); if (await catalog.GetAsync(campaignId, catalogEntryId, cancellationToken) is null) throw new DomainException(404, "not_found", "The requested resource was not found.", catalogEntryId); return await action(); });
 
-    public Task<T> WithCharacterLockAsync<T>(int campaignId, Guid catalogEntryId, Guid characterId, Func<Task<T>> action, CancellationToken cancellationToken)
-    {
-        return InTransaction(async () =>
+    public Task<T> WithCharacterLockAsync<T>(int campaignId, Guid catalogEntryId, Guid characterId, Func<Task<T>> action, CancellationToken cancellationToken) =>
+        InTransaction(async () =>
         {
             LockOrder.Add($"definition:{catalogEntryId}");
             if (await catalog.GetAsync(campaignId, catalogEntryId, cancellationToken) is null) throw new DomainException(404, "not_found", "The requested resource was not found.", catalogEntryId);
@@ -225,17 +215,9 @@ internal sealed class FakeCharacterCatalogStore : ICharacterCatalogStore, IFakeT
             if (!hasCharacter(campaignId, characterId)) throw new DomainException(404, "not_found", "The requested resource was not found.", characterId);
             return await action();
         });
-    }
 
-    public Task<T> WithNewDefinitionCharacterLockAsync<T>(int campaignId, Guid characterId, Func<Task<T>> action, CancellationToken cancellationToken)
-    {
-        return InTransaction(async () =>
-        {
-            LockOrder.Add($"character:{characterId}");
-            if (!hasCharacter(campaignId, characterId)) throw new DomainException(404, "not_found", "The requested resource was not found.", characterId);
-            return await action();
-        });
-    }
+    public Task<T> WithNewDefinitionCharacterLockAsync<T>(int campaignId, Guid characterId, Func<Task<T>> action, CancellationToken cancellationToken) =>
+        InTransaction(async () => { LockOrder.Add($"character:{characterId}"); if (!hasCharacter(campaignId, characterId)) throw new DomainException(404, "not_found", "The requested resource was not found.", characterId); return await action(); });
 
     public object CaptureState() => new State(Entries.Select(Clone).ToList(), Receipts.Select(Clone).ToList());
 
@@ -254,54 +236,32 @@ internal sealed class FakeCharacterCatalogStore : ICharacterCatalogStore, IFakeT
         var selfSnapshot = CaptureState();
         var otherSnapshots = otherParticipants.Select(x => (Participant: x, State: x.CaptureState())).ToArray();
         InsideTransaction = true;
-        var committed = false;
         try
         {
             var result = await callback();
-            if (BeforeCommitFailure is { } before)
-            {
-                BeforeCommitFailure = null;
-                throw before;
-            }
-            committed = true;
-            if (AfterCommitFailure is { } after)
-            {
-                AfterCommitFailure = null;
-                throw after;
-            }
             return result;
         }
         catch
         {
-            if (!committed)
-            {
-                RestoreState(selfSnapshot);
-                foreach (var (participant, state) in otherSnapshots) participant.RestoreState(state);
-            }
+            RestoreState(selfSnapshot);
+            foreach (var (participant, state) in otherSnapshots) participant.RestoreState(state);
             throw;
         }
-        finally
-        {
-            InsideTransaction = false;
-        }
+        finally { InsideTransaction = false; }
     }
 
-    private void RequireTransaction()
-    {
-        if (!InsideTransaction) throw new InvalidOperationException();
-    }
+    private void RequireTransaction() { if (!InsideTransaction) throw new InvalidOperationException(); }
 
-    private static CharacterCatalogEntry Clone(CharacterCatalogEntry x) => new()
+    private static CharacterCatalogEntry<TCatalog> Clone(CharacterCatalogEntry<TCatalog> x) => new()
     {
         Id = x.Id, CampaignId = x.CampaignId, CharacterId = x.CharacterId, CatalogEntryId = x.CatalogEntryId,
         Quantity = x.Quantity, MetadataRevision = x.MetadataRevision
     };
 
-    private static CatalogAdditionReceipt Clone(CatalogAdditionReceipt x) => new()
+    private static CatalogAdditionReceipt<TCatalog> Clone(CatalogAdditionReceipt<TCatalog> x) => new()
     {
-        CampaignId = x.CampaignId, CharacterId = x.CharacterId, RequestId = x.RequestId,
-        EntryId = x.EntryId, CatalogEntryId = x.CatalogEntryId
+        CampaignId = x.CampaignId, CharacterId = x.CharacterId, RequestId = x.RequestId, EntryId = x.EntryId, CatalogEntryId = x.CatalogEntryId
     };
 
-    private sealed record State(List<CharacterCatalogEntry> Entries, List<CatalogAdditionReceipt> Receipts);
+    private sealed record State(List<CharacterCatalogEntry<TCatalog>> Entries, List<CatalogAdditionReceipt<TCatalog>> Receipts);
 }

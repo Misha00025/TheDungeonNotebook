@@ -5,19 +5,19 @@ using Tdn.Campaigns.Catalog;
 namespace Tdn.Campaigns.Http;
 
 [ApiController]
-[Route("api/campaigns/{campaignId:int}/characters/{characterId:guid}/entries")]
-public sealed class CharacterCatalogController(CharacterCatalogService catalog) : ControllerBase
+[Route("api/campaigns/{campaignId:int}/characters/{characterId:guid}/items")]
+public sealed class CharacterCatalogController(CharacterCatalogService<ItemCatalog> catalog) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<CharacterCatalogEntryEnvelope>>> List(int campaignId, Guid characterId, [FromQuery] CatalogKind? kind, CancellationToken ct) =>
-        Ok(await catalog.ListAsync(ReadSubject(), campaignId, characterId, kind, ct));
+    public async Task<ActionResult<IReadOnlyList<CharacterCatalogEntryEnvelope>>> List(int campaignId, Guid characterId, CancellationToken ct) =>
+        Ok(await catalog.ListAsync(ReadSubject(), campaignId, characterId, ct));
 
     [HttpPost]
     public async Task<IActionResult> Add(int campaignId, Guid characterId, [FromBody] CharacterCatalogAddRequest request, CancellationToken ct)
     {
         var (result, created) = await catalog.AddAsync(ReadSubject(), campaignId, characterId, request, ct);
         if (!created) return Ok(result);
-        return Created($"/api/campaigns/{campaignId}/characters/{characterId}/entries/{result.Entry.Record.Id}", result);
+        return Created($"/api/campaigns/{campaignId}/characters/{characterId}/items/{result.Entry.Record.Id}", result);
     }
 
     [HttpGet("additions/{requestId:guid}")]
@@ -28,7 +28,7 @@ public sealed class CharacterCatalogController(CharacterCatalogService catalog) 
     public async Task<IActionResult> Create(int campaignId, Guid characterId, [FromBody] CharacterCatalogCreateRequest request, CancellationToken ct)
     {
         var result = await catalog.CreateOwnAsync(ReadSubject(), campaignId, characterId, request, ct);
-        return Created($"/api/campaigns/{campaignId}/characters/{characterId}/entries/{result.Entry.Record.Id}", result);
+        return Created($"/api/campaigns/{campaignId}/characters/{characterId}/items/{result.Entry.Record.Id}", result);
     }
 
     [HttpGet("{entryId:guid}")]

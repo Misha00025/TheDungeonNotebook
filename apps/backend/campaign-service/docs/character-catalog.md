@@ -1,54 +1,27 @@
-# Character catalog entries
+# Character items and skills
 
-Character entries attach campaign catalog items or skills to one character. SQL stores each record's identity, quantity, metadata revision, and an immutable add-request receipt. MongoDB stores only the record's explicit local `CatalogAttributeValue[]` in `characterCatalogContents`; catalog definitions and their source content remain shared campaign data. This API does not create a second inventory document or a separate attribute schema.
+Items and skills attach to a character through separate routes and separate SQL/Mongo namespaces. Shared generic service logic does not mean shared records or collections. SQL rows and add receipts are transactional together. Mongo content is independently stored and revisioned; there is no cross-database transaction.
 
-## Authentication, identity, and wire format
+Reads require character read access; writes require character `CanWrite` or campaign administrator access. Existing attached entries remain readable to an authorized character reader even when their definition is hidden from that reader. A new add requires the definition to be visible to the caller. A creator is derived from the actual User subject, never from client input. A non-administrator creating a private definition must make it hidden; campaign administrators may create hidden or public definitions.
 
-All endpoints require campaign-service's `X-Subject` JSON header with `{ "type": "User|Group|Admin", "id": integer }` and the existing campaign/character access checks. Standalone service HTTP does not authenticate cryptographically; through Gateway the existing Bearer authentication replaces client-supplied identity and forwards the verified subject. Read requires character access; every write requires character `CanWrite` or campaign administrator access.
+## Endpoints
 
-JSON names are camel case. `CatalogKind`, `QuantityUnit`, and `AttributeEditLevel` use the existing `JsonStringEnumConverter`: enum names are case-insensitive, and defined numeric enum values are accepted. Unknown enum values are rejected. Quantities are native JSON numbers parsed as CLR `decimal`; values are never accepted as numeric strings. Attribute `value` remains arbitrary native JSON, validated against the shared campaign schema.
+Items use `/api/campaigns/{campaignId}/characters/{characterId}/items`:
 
-All endpoints are under `/api/campaigns/{campaignId}/characters/{characterId}/entries`:
+| Method | Suffix | Purpose |
+| --- | --- | --- |
+| `GET`, `POST` | *(none)* | List or add an item |
+| `POST` | `/create` | Create a definition and attach its first item record |
+| `GET` | `/additions/{requestId}` | Look up an add receipt |
+| `GET`, `DELETE` | `/{entryId}` | Read or delete an attached record |
+| `PUT` | `/{entryId}/quantity` | Update an item quantity |
+| `PUT` | `/{entryId}/attributes` | Replace local attributes |
 
-| Method and path | Purpose |
-| --- | --- |
-| `GET .../entries?kind=Item\|Skill` | List character records; optional kind filter |
-| `POST .../entries` | Add a visible catalog entry or merge an identical stack |
-| `POST .../entries/create` | Create a private catalog definition and attach its first character record |
-| `GET .../entries/{entryId}` | Read one attached record, including a hidden catalog definition |
-| `GET .../entries/additions/{requestId}` | Inspect the committed result of an add request |
-| `PUT .../entries/{entryId}/quantity` | Change item quantity |
-| `PUT .../entries/{entryId}/attributes` | Replace explicit local attributes using content revision CAS |
-| `DELETE .../entries/{entryId}?expectedRevision=...` | Explicitly remove one character record |
+Skills use the same routes under `/api/campaigns/{campaignId}/characters/{characterId}/skills`, except there is no quantity PUT. Each scope has its own definition, character-content, and receipt collections/tables.
 
-`entryId` identifies a character record, not its catalog definition. A response contains:
+`entryId` identifies a character record; `catalogEntryId` identifies its definition. The response envelope contains `record`, `definition`, `definitionDescription`, `effectiveAttributes`, `explicitAttributes`, `definitionContentRevision`, and `localContentRevision`. There are no attribute diagnostics or schema revision fields in this envelope. `record` contains `id`, `campaignId`, `characterId`, `catalogEntryId`, nullable `quantity`, and `metadataRevision`; definition metadata has no `kind` field.
 
-- `record`: `id`, `campaignId`, `characterId`, `catalogEntryId`, `quantity` (nullable), `metadataRevision`.
-- `definition`: catalog metadata, including `kind`, hidden state and metadata revision.
-- `definitionDescription`, `effectiveAttributes`, and raw `explicitAttributes`.
-- `diagnostics`, `schemaRevision`, `definitionContentRevision`, and `localContentRevision`.
-
-The three content/schema revisions are independent reads, not one global snapshot. Effective values do not materialize fallbacks into Mongo. Explicit incompatible values remain present and are returned with diagnostics; the API does not convert, clear, or zero them.
-
-## List and read
-
-### `GET .../entries?kind=Item|Skill`
-
-Returns the character's records, optionally filtered by the definition kind. Every already-attached record is readable to anyone with character read access, even if the catalog definition is hidden from that caller. A definition's Mongo document or a record's local Mongo document missing after SQL publication returns `503 content_unavailable`; it is not returned as empty content. No attached records returns `[]`.
-
-### `GET .../entries/{entryId}`
-
-Returns the same entry envelope as list. The read uses campaign-scoped SQL and Mongo lookups directly after character authorization; it does not apply catalog visibility to an existing attachment.
-
-### `GET .../entries/additions/{requestId}`
-
-Returns `{ "campaignId", "characterId", "requestId", "entryId", "catalogEntryId" }` for a committed add/create receipt. Receipts remain after the character record is explicitly deleted. A request without a committed receipt returns `404`.
-
-## Add an existing catalog entry
-
-### `POST .../entries`
-
-Requires character write access. The strict request object is:
+Character add request example:
 
 ```json
 {
@@ -59,108 +32,45 @@ Requires character write access. The strict request object is:
 }
 ```
 
-`requestId` and `catalogEntryId` are required non-empty GUIDs; `attributes` is required and uses the catalog's `CatalogAttributeValue` shape. Unknown JSON properties are rejected. The definition must be visible in the campaign catalog to the caller, or the caller must administer the campaign. A hidden definition not visible to the caller is `404` for this add operation. This restriction does not affect reads of entries already attached to the character.
+`requestId`, `catalogEntryId`, and `attributes` are required; IDs must be non-empty GUIDs. The request rejects unknown JSON properties. `CatalogAttributeValue` has exactly `id`, `attributeId`, native JSON `value`, and `editLevel`; see [catalog.md](catalog.md) for validation rules. `metadataRevision` is a SQL metadata compare-and-set revision. `definitionContentRevision` and `localContentRevision` are independent Mongo compare-and-set revisions. None is an attribute type version or a global snapshot.
 
-For an Item with `Whole` or `Fractional` unit, `quantity` is required. Whole values must be integral. For `Single`, quantity may be omitted/null or equal to `1`; every add creates an independent row, and each row always has quantity 1. For a Skill, quantity must be omitted/null. Negative values are accepted only when the catalog item's `allowNegative` is true. Zero rows are retained for Whole and Fractional items. Decimal overflow returns `400 quantity_overflow`; values are not rounded.
+## Item quantities and stack rules
 
-For a new row, `attributes` are explicit Character-level values from the current shared schema. Definition-level catalog occurrences cannot be changed through character state. Existing Character-level source occurrences can receive local overrides; additional Character-level occurrences may use the shared schema. The response is `201 Created` with `Location: .../entries/{entryId}` for a new row.
+- `Whole` and `Fractional` item adds require a quantity and have at most one character row per character and definition. An add to an existing row sums the requested quantity; explicit state is not compared. A second row for that pair causes `SingleOrDefault` to fail rather than selecting an arbitrary row.
+- Stackable item adds require an empty local `attributes` array. A non-empty array returns `400 stack_state_not_supported`. Stackable rows have no local Mongo document; the response reports `localContentRevision: 0` and no explicit local attributes.
+- `Single` items always create a separate row with quantity `1`; quantity may be omitted/null or exactly `1`. Each row has local content, including when its attributes array is empty.
+- Every skill add creates a separate row, even when the definition and local state match an existing skill. Skill `quantity` must be null or omitted and is always null in the row.
 
-Example local value (the same shape is used by add, create, and the local attributes PUT):
+`Whole` quantities must be integral; `Fractional` accepts representable decimals. Zero is retained. Negative quantity is accepted only when the item's `allowNegative` is true. A stack sum that overflows or cannot be represented exactly returns `400 quantity_overflow`; values are not rounded. Quantity updates use `expectedRevision` equal to the record's `metadataRevision`; successful writes increment that revision. A stale write returns `409 revision_conflict`.
 
-```json
-{"id":"44444444-4444-4444-4444-444444444444","attributeId":"55555555-5555-5555-5555-555555555555","typeKey":"integer","typeRevision":1,"value":3,"editLevel":"Character"}
-```
+A newly created record returns `201 Created`; adding to an existing stack returns `200 OK`. Every skill add creates a new record and returns `201 Created`.
 
-For Whole/Fractional items, the service searches this character's records for the same catalog definition and **exactly the same explicit local attribute set**. Equality includes occurrence IDs, attribute IDs, type key/revision, edit level, and `JsonElement.DeepEquals` value; array order does not matter. It does not compare temporary effective values or materialize fallbacks. If a matching stack exists, its quantity is increased and the receipt points to that record; response is `200 OK`. Different explicit states stay separate.
+Switching an item's unit between `Single` and a stackable unit while attached rows exist returns `409 quantity_policy_conflict`; rows are never transformed or merged during metadata updates. A metadata change that makes an attached quantity violate the current `Whole`/`Fractional` or negative-value policy also returns `409 quantity_policy_conflict`.
 
-Skills have no quantity. Re-adding the same skill with the same exact explicit attribute set returns the existing record (`200 OK`); a different state creates another row. Single items always create a separate row.
+## Local state, overrides, and fallback
 
-For example, for a Whole item, adding quantity `2` with `attributes: []`, then adding quantity `3` with `attributes: []` and another request ID, returns `200` for the second call and raises the matching explicit-state stack to `5`. The same requests with a different explicit value or a different occurrence ID do not merge. A Single item can be added with the `quantity` field omitted (or `null`); it creates one new row with quantity `1` each time. A Skill request uses `"quantity":null` or omits quantity, and an identical skill state resolves to the existing row. Example Single and Skill bodies:
+Every `Single` item and every skill has a local Mongo document. Its attributes are explicit character-level values. A matching `Character`-level definition occurrence can be overridden locally; otherwise the current definition value remains the live fallback. Additional local Character-level occurrences are supported. Effective values are composed for the response and are not materialized as fallback copies in Mongo. A local numeric zero is an explicit value and is retained, not treated as absent. Definition-level occurrences cannot be changed locally.
 
-```json
-{"requestId":"66666666-6666-6666-6666-666666666666","catalogEntryId":"77777777-7777-7777-7777-777777777777","attributes":[]}
-```
+`PUT .../{entryId}/attributes` replaces the complete local attributes array. Its `expectedRevision` is the current `localContentRevision`; successful replacement advances that revision. Omitting a local occurrence removes that explicit override and exposes the current source/fallback value. Changed/new local values must use `editLevel: "Character"` and validate against the current schema. An unchanged stored value can be retained even if it is no longer valid under the current type/options. A stale submission for an occurrence whose attribute was deleted is discarded; it is not restored. `contentRevision` is a document CAS token, not an attribute-type version.
 
-```json
-{"requestId":"88888888-8888-8888-8888-888888888888","catalogEntryId":"99999999-9999-9999-9999-999999999999","quantity":null,"attributes":[{"id":"44444444-4444-4444-4444-444444444444","attributeId":"55555555-5555-5555-5555-555555555555","typeKey":"integer","typeRevision":1,"value":3,"editLevel":"Character"}]}
-```
+For stackable items, local attributes are unsupported and there is no local document to update. For `Single` items, a quantity PUT also runs the pruning path for known-deleted local occurrences. Reads omit occurrences whose attributes are deleted but do not write or clean Mongo. A later content write prunes known-deleted occurrences from that local document.
 
-A local quantity update can set Whole/Fractional quantity to zero, or to a negative value when `allowNegative=true`:
+If a published non-stackable item or skill has no local Mongo document, reads and local updates return `503 content_unavailable`; the service does not synthesize an empty document or revision zero. Missing definition content also returns `503 content_unavailable`.
 
-```json
-{"expectedRevision":1,"quantity":0}
-```
+## Private definition creation and add receipts
 
-```json
-{"expectedRevision":2,"quantity":-1.5}
-```
+`POST .../create` takes an outer `requestId`, a `definition` object (`name`, `isHidden`, `quantityUnit`, `allowNegative`, `description`, `attributes`), optional item quantity, and required outer local `attributes`. The request ID is the new definition ID, first record ID, and receipt request ID. For a stackable item, outer local attributes must be empty. The definition and applicable local content are prepared in Mongo before SQL publication.
 
-Each accepted request creates one SQL receipt in the same SQL transaction as its record/quantity change. Reusing an applied `requestId` returns `409 addition_already_applied`; ProblemDetails `resourceId` contains its original entry ID and `requestId` is unchanged. It does not increment a stack again, including after that row is deleted. Mongo and SQL do not share a transaction. If SQL publication returns `503 publication_outcome_unknown`, first query `GET .../entries/additions/{same requestId}`: a receipt confirms the committed result; `404` means there is no committed receipt. Do not retry with a new ID. A prepared Mongo document is not cleaned up automatically and may make a same-ID retry return `409 content_already_prepared`.
+Each accepted add/create writes one SQL receipt in the same SQL transaction as the quantity or rows. Reusing an applied request ID returns `409 addition_already_applied`; it does not apply the operation a second time, including after the row is deleted. Look up the outcome with `GET .../additions/{requestId}`. Duplicate publication returns `409`; already-prepared Mongo content returns `409 content_already_prepared`. If a SQL write/commit outcome is unknown after publication begins, the service returns `503 publication_outcome_unknown`, with the entry and catalog-entry IDs in `resourceId` and the operation ID in `requestId`. Check the receipt endpoint using that same request ID before taking further action; do not retry with a new ID. Mongo and SQL do not share a transaction, and prepared Mongo documents are not automatically removed.
 
-## Create a private definition and attach it
+Deleting an attached record requires its current SQL `metadataRevision` as `expectedRevision` and returns `204`. It removes the SQL row only; it does not remove the definition, receipt, or Mongo content. A stale revision returns `409 revision_conflict`.
 
-### `POST .../entries/create`
+## Access and common errors
 
-Requires character write access. Request:
+- `400`: malformed request, invalid quantity/unit/attribute, or `stack_state_not_supported` / `quantity_overflow`.
+- `403`: write access denied, or a non-administrator attempts to create a public character-owned definition.
+- `404`: missing record/receipt or a definition hidden from the caller during a new add.
+- `409`: stale revision, `addition_already_applied`, duplicate/prepared publication, or `quantity_policy_conflict`.
+- `503`: missing published Mongo content (`content_unavailable`) or uncertain SQL publication (`publication_outcome_unknown`).
 
-```json
-{
-  "requestId": "33333333-3333-3333-3333-333333333333",
-  "definition": {
-    "name": "Field tonic",
-    "kind": "Item",
-    "isHidden": true,
-    "quantityUnit": "Whole",
-    "allowNegative": false,
-    "description": "A character-created item.",
-    "attributes": []
-  },
-  "quantity": 1,
-  "attributes": []
-}
-```
-
-`requestId`, `definition`, and both `attributes` arrays are required. The outer `requestId` is used as the new catalog definition ID, first character record ID, and receipt request ID. The nested definition has no separate request ID. Unknown properties are rejected. A non-administrator must set `definition.isHidden=true`; attempting `false` is `403`. Creator is derived from a User subject, never from the request. Campaign administrators may create hidden or public definitions. Item and Skill metadata constraints are identical to the shared catalog contract in [catalog.md](catalog.md).
-
-Definition source values are validated against the shared schema. The separate outer `attributes` list contains local Character-level values. Both Mongo documents are prepared before SQL publication; catalog definition, character row, and receipt are committed in one SQL transaction. The response is `201 Created` with the same envelope and `Location` as a new add. Reusing the request ID after commit returns `409 addition_already_applied`; an already-published definition ID without this character's receipt is not attached and returns `409`.
-
-On `503 publication_outcome_unknown`, check the receipt endpoint using the same ID. ProblemDetails `resourceId` contains the entry and definition IDs; `requestId` is the operation ID. Do not retry with a new identifier. Mongo documents prepared before an uncertain SQL outcome are not deleted.
-
-## Quantity, local attributes, and deletion
-
-### `PUT .../entries/{entryId}/quantity`
-
-Requires character write access. Body: `{ "expectedRevision": 1, "quantity": 0 }`. `expectedRevision` is the record's SQL `metadataRevision` and must be at least 1. Only Items have quantity. Single accepts only 1; Whole requires an integral decimal; Fractional accepts any representable decimal; negative values require `allowNegative=true`. Zero is retained for Whole/Fractional. A successful update advances only `metadataRevision`, not either Mongo content revision. Stale revisions return `409 revision_conflict`.
-
-### `PUT .../entries/{entryId}/attributes`
-
-Requires character write access. Body: `{ "expectedRevision": 1, "attributes": [] }`; `expectedRevision` is this record's `localContentRevision`, not SQL metadata revision. The complete array is conditionally replaced in Mongo and advances only `localContentRevision`. Values have the same required fields, native JSON validation, and schema rules as catalog attributes. New or changed values must be Character-level and use the current shared schema. An unchanged stale local value may be preserved by a full-array PUT. A local occurrence cannot change the binding of a catalog occurrence, and Definition-level catalog values cannot be changed through this endpoint. Omitting a local occurrence removes that explicit override and exposes the current source/fallback value. No automatic stack merge occurs during state editing; separate records are not deleted or combined. Stale revision returns `409 content_revision_conflict`.
-
-Example setting one explicit value:
-
-```json
-{
-  "expectedRevision": 1,
-  "attributes": [
-    {"id":"44444444-4444-4444-4444-444444444444","attributeId":"55555555-5555-5555-5555-555555555555","typeKey":"integer","typeRevision":1,"value":3,"editLevel":"Character"}
-  ]
-}
-```
-
-If a catalog occurrence's binding changes or it becomes Definition-level, its prior local value stays in `explicitAttributes`, receives `attribute_binding_changed` or `edit_level_changed`, and cannot affect the current source value. A local occurrence whose catalog occurrence was removed may remain as a local Character-level input. Diagnostics are computed on reads and never persisted.
-
-### `DELETE .../entries/{entryId}?expectedRevision=1`
-
-Requires character write access and the record's SQL `metadataRevision >= 1`. Deletes only that character row and returns `204 No Content`. It does not delete the shared catalog definition, add receipt, or Mongo content document; Mongo orphan cleanup is not performed. A stale revision is `409 revision_conflict`.
-
-## Error outcomes and scope
-
-- `400`: invalid/unknown request property, GUID, enum, revision, quantity/unit combination, attribute binding/level/value, or `quantity_overflow`.
-- `403`: missing/invalid subject, character lacks write permission for mutation, or a non-administrator tries to create a public definition.
-- `404`: campaign/character access failure, missing row/receipt, or a hidden catalog definition unavailable for a new add.
-- `409`: stale SQL/Mongo revision, applied add receipt (`addition_already_applied`), duplicate/prepared publication, or quantity-policy conflict.
-- `503`: missing Mongo content (`content_unavailable`) or SQL commit/publication outcome unknown (`publication_outcome_unknown`).
-
-Definition unit/negative-policy updates and character quantity operations lock the same catalog definition row. A policy change that would make any existing quantity invalid returns `409 quantity_policy_conflict` without changing metadata or quantities. SQL locking order is definition then character. Create-own locks the character before publishing its new definition ID. SQL row/receipt writes are transactional; Mongo revisions remain independent and there is no cross-database transaction or global snapshot.
-
-Catalog groups are a separate navigation and selection configuration, not parties, rosters, or character ownership; see [catalog-groups.md](catalog-groups.md). This slice does not provide parties, equipment, transfer, price, or automatic effects.
+See [catalog-groups.md](catalog-groups.md) for per-scope navigation groups. This API does not provide party/roster membership, item transfer, pricing, or automatic effects.

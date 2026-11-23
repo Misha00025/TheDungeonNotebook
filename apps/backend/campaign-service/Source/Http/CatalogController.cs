@@ -5,17 +5,17 @@ using Tdn.Campaigns.Catalog;
 namespace Tdn.Campaigns.Http;
 
 [ApiController]
-[Route("api/campaigns/{campaignId:int}/catalog")]
-public sealed class CatalogController(CatalogService catalog) : ControllerBase
+[Route("api/campaigns/{campaignId:int}/items")]
+public sealed class CatalogController(CatalogService<ItemCatalog> catalog) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<CatalogEntryDto>>> List(int campaignId, [FromQuery] CatalogKind? kind, CancellationToken ct) => Ok(await catalog.ListAsync(ReadSubject(), campaignId, kind, ct));
+    public async Task<ActionResult<IReadOnlyList<CatalogEntryDto>>> List(int campaignId, CancellationToken ct) => Ok(await catalog.ListAsync(ReadSubject(), campaignId, ct));
 
     [HttpPost]
     public async Task<IActionResult> Create(int campaignId, [FromBody] CatalogCreateRequest request, CancellationToken ct)
     {
         var result = await catalog.CreateAsync(ReadSubject(), campaignId, request, ct);
-        return Created($"/api/campaigns/{campaignId}/catalog/{result.Entry.Id}", result);
+        return Created($"/api/campaigns/{campaignId}/items/{result.Entry.Id}", result);
     }
 
     [HttpGet("{entryId:guid}")]

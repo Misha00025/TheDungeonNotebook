@@ -8,8 +8,8 @@ public sealed record CatalogGroupConfiguration(CatalogGroup[] Groups);
 public sealed record CatalogGroup(Guid Id, string Title, Guid? ParentId, Guid[] EntryIds, CatalogGroupCondition? Condition);
 public sealed record CatalogGroupSummary(Guid Id, string Title, Guid? ParentId);
 public sealed record CatalogGroupsEnvelope(int CampaignId, long ContentRevision, CatalogGroupSummary[] Groups);
-public sealed record CatalogGroupConfigurationEnvelope(int CampaignId, long ContentRevision, CatalogGroupConfiguration Data, long AttributeSchemaRevision, CatalogGroupDiagnostic[] Diagnostics);
-public sealed record CatalogGroupEntriesEnvelope(int CampaignId, Guid GroupId, long ConfigurationRevision, long AttributeSchemaRevision, CatalogEntryDto[] Entries, CatalogGroupDiagnostic[] Diagnostics);
+public sealed record CatalogGroupConfigurationEnvelope(int CampaignId, long ContentRevision, CatalogGroupConfiguration Data, CatalogGroupDiagnostic[] Diagnostics);
+public sealed record CatalogGroupEntriesEnvelope(int CampaignId, Guid GroupId, long ConfigurationRevision, CatalogEntryDto[] Entries, CatalogGroupDiagnostic[] Diagnostics);
 public sealed record CatalogGroupDiagnostic(Guid GroupId, Guid? EntryId, string Code);
 
 [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
@@ -35,10 +35,6 @@ public sealed class CatalogGroupCondition
     public string? Operator { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Guid? AttributeId { get; init; }
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? TypeKey { get; init; }
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public long? TypeRevision { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public JsonElement Value { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

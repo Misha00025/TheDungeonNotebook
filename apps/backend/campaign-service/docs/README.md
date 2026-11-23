@@ -8,9 +8,9 @@ Current API contracts:
 - [Characters, assignments, and sheets](characters.md)
 - [Formulas, virtual fields, and computed sheets](formulas.md)
 - [Views and presentation contexts](views.md)
-- [Catalog entries, attribute schemas, and content](catalog.md)
-- [Character catalog entries, quantities, local attributes, and add receipts](character-catalog.md)
-- [Catalog group hierarchy and conditional membership](catalog-groups.md)
+- [Separate item and skill catalogs, schemas, and content](catalog.md)
+- [Character items and skills, quantities, local state, and add receipts](character-catalog.md)
+- [Independent item and skill groups and conditional selection](catalog-groups.md)
 - [API Gateway routing](gateway.md)
 - [Singleton-template Web handoff](singleton-template-web.md)
 

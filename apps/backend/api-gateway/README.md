@@ -18,11 +18,11 @@ Campaign Service routes are forwarded one-to-one under `/api/campaigns/...`; the
 
 The template proxy exposes only GET/PUT on `/api/campaigns/{campaignId}/template`, `/template/content`, and `/template/virtual-fields`. Plural template catalog/create routes and template-GUID routes are not active. Gateway/BFF transport and verified `X-Subject` forwarding are unchanged; see the [singleton-template Web handoff](../campaign-service/docs/singleton-template-web.md) for client contract changes.
 
-The shared item/skill catalog routes are described in the campaign-service [catalog contract](../campaign-service/docs/catalog.md).
+Separate item and skill routes use `/api/campaigns/{campaignId}/items` and `/skills`, including each scope's attribute-schema and group routes. See the campaign-service [catalog contract](../campaign-service/docs/catalog.md).
 
-Character-attached catalog entries, add receipts, quantities, and local attributes use explicit routes under `/api/campaigns/{campaignId}/characters/{characterId}/entries`; see the campaign-service [character catalog contract](../campaign-service/docs/character-catalog.md). These routes forward the verified `X-Subject` one-to-one and do not add policy hooks or parameter injection.
+Character items and skills use separate explicit routes under `/api/campaigns/{campaignId}/characters/{characterId}/items` and `/skills`; see the campaign-service [character catalog contract](../campaign-service/docs/character-catalog.md). These routes forward the verified `X-Subject` one-to-one and do not add policy hooks or parameter injection.
 
-Campaign catalog group routes are `GET|PUT /api/campaigns/{campaignId}/catalog/groups`, `GET /api/campaigns/{campaignId}/catalog/groups/configuration`, and `GET /api/campaigns/{campaignId}/catalog/groups/{groupId}/entries`. See the campaign-service [catalog groups contract](../campaign-service/docs/catalog-groups.md). They use the existing verified-subject hooks without group-specific access rules or parameter injection.
+Item and skill groups use separate route families under `/api/campaigns/{campaignId}/items/groups` and `/skills/groups`. See the campaign-service [catalog groups contract](../campaign-service/docs/catalog-groups.md). They use the existing verified-subject hooks without group-specific access rules or parameter injection.
 
 Virtual-field requests use ordinary `bindings` only; separate parent-field properties are not part of the service contract. Existing template/custom virtual-field and override routes pass bodies through without rewrites.
 

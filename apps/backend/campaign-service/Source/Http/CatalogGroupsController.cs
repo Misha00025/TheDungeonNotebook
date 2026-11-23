@@ -5,8 +5,8 @@ using Tdn.Campaigns.Catalog;
 namespace Tdn.Campaigns.Http;
 
 [ApiController]
-[Route("api/campaigns/{campaignId:int}/catalog/groups")]
-public sealed class CatalogGroupsController(CatalogGroupService groups) : ControllerBase
+[Route("api/campaigns/{campaignId:int}/items/groups")]
+public sealed class CatalogGroupsController(CatalogGroupService<ItemCatalog> groups) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<CatalogGroupsEnvelope>> List(int campaignId, CancellationToken ct) =>

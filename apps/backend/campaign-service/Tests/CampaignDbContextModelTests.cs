@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
 using Tdn.Campaigns.Campaigns;
 using Tdn.Campaigns.Catalog;
@@ -10,58 +11,101 @@ using Tdn.Campaigns.Sheets;
 
 namespace CampaignService.Tests;
 
-public class CampaignDbContextModelTests
+public sealed class CampaignDbContextModelTests
 {
     [Fact]
-    public void ModelMatchesSnapshotAndMigrationScriptCreatesAllTablesWithoutConnecting()
+    public void CurrentModelUsesSixSeparateCatalogTablesAndCurrentMigrationCreatesThemOnly()
     {
-        var options = new DbContextOptionsBuilder<CampaignDbContext>()
-            .UseMySql("Server=localhost;Database=unused;User Id=unused;Password=unused", new MySqlServerVersion(new Version(8, 0, 36)))
-            .Options;
-        using var context = new CampaignDbContext(options);
-
+        using var context = CreateContext();
         Assert.False(context.Database.HasPendingModelChanges());
-        var script = context.Database.GetService<IMigrator>().GenerateScript();
+        var model = context.Model;
+        var item = model.FindEntityType(typeof(CatalogEntry<ItemCatalog>))!;
+        var skill = model.FindEntityType(typeof(CatalogEntry<SkillCatalog>))!;
+        var characterItem = model.FindEntityType(typeof(CharacterCatalogEntry<ItemCatalog>))!;
+        var characterSkill = model.FindEntityType(typeof(CharacterCatalogEntry<SkillCatalog>))!;
+        var itemReceipt = model.FindEntityType(typeof(CatalogAdditionReceipt<ItemCatalog>))!;
+        var skillReceipt = model.FindEntityType(typeof(CatalogAdditionReceipt<SkillCatalog>))!;
+        Assert.Equal("ItemDefinitions", item.GetTableName());
+        Assert.Equal("SkillDefinitions", skill.GetTableName());
+        Assert.Equal("CharacterItems", characterItem.GetTableName());
+        Assert.Equal("CharacterSkills", characterSkill.GetTableName());
+        Assert.Equal("ItemAdditionReceipts", itemReceipt.GetTableName());
+        Assert.Equal("SkillAdditionReceipts", skillReceipt.GetTableName());
+        Assert.Null(model.FindEntityType(typeof(CatalogEntry<>)));
+        Assert.Null(model.FindEntityType(typeof(CharacterCatalogEntry<>)));
+        Assert.Null(model.FindEntityType(typeof(CatalogAdditionReceipt<>)));
+        Assert.Null(item.FindProperty("Kind"));
+        Assert.Null(skill.FindProperty("Kind"));
+        Assert.DoesNotContain(model.GetEntityTypes(), entity => entity.GetProperties().Any(property => property.Name == "CatalogKind"));
 
-        Assert.Contains("CREATE TABLE `Campaigns`", script);
-        Assert.Contains("CREATE TABLE `CampaignMembers`", script);
-        Assert.Contains("CREATE TABLE `CampaignTemplates`", script);
-        Assert.Contains("CREATE TABLE `CharacterMetadata`", script);
-        Assert.Contains("CREATE TABLE `CharacterAssignments`", script);
-        Assert.Contains("CREATE TABLE `FormulaMetadata`", script);
-        Assert.Contains("CREATE TABLE `ViewMetadata`", script);
-        Assert.Contains("CREATE TABLE `CatalogEntries`", script);
-        Assert.Contains("CREATE TABLE `CharacterCatalogEntries`", script);
-        Assert.Contains("CREATE TABLE `CatalogAdditionReceipts`", script);
+        var characterItemCatalogFk = Assert.Single(characterItem.GetForeignKeys(), x => x.PrincipalEntityType.ClrType == typeof(CatalogEntry<ItemCatalog>));
+        var characterSkillCatalogFk = Assert.Single(characterSkill.GetForeignKeys(), x => x.PrincipalEntityType.ClrType == typeof(CatalogEntry<SkillCatalog>));
+        Assert.Equal(typeof(CatalogEntry<ItemCatalog>), characterItemCatalogFk.PrincipalEntityType.ClrType);
+        Assert.Equal(typeof(CatalogEntry<SkillCatalog>), characterSkillCatalogFk.PrincipalEntityType.ClrType);
+        Assert.Equal("decimal(65,28)", characterItem.FindProperty(nameof(CharacterCatalogEntry<ItemCatalog>.Quantity))!.GetColumnType());
+        Assert.True(characterItem.FindProperty(nameof(CharacterCatalogEntry<ItemCatalog>.MetadataRevision))!.IsConcurrencyToken);
+        Assert.True(characterSkill.FindProperty(nameof(CharacterCatalogEntry<SkillCatalog>.MetadataRevision))!.IsConcurrencyToken);
+        Assert.Equal(new[] { "CampaignId", "CharacterId", "RequestId" }, itemReceipt.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Equal(new[] { "CampaignId", "CharacterId", "RequestId" }, skillReceipt.FindPrimaryKey()!.Properties.Select(x => x.Name));
 
-        var forward = context.Database.GetService<IMigrator>().GenerateScript("20261117000500_Views", "20261118000100_CampaignTemplate");
-        Assert.Contains("DROP COLUMN `TemplateId`", forward);
-        Assert.Contains("DROP TABLE `TemplateMetadata`", forward);
-        Assert.Contains("CREATE TABLE `CampaignTemplates`", forward);
-        Assert.Contains("PRIMARY KEY (`CampaignId`)", forward);
-        Assert.Contains("INSERT INTO `CampaignTemplates` (`CampaignId`, `Name`, `MetadataRevision`) SELECT `Id`, `Name`, 1 FROM `Campaigns`", forward);
+        var migrator = context.Database.GetService<IMigrator>();
+        var script = migrator.GenerateScript();
+        foreach (var table in new[] { "ItemDefinitions", "CharacterItems", "ItemAdditionReceipts", "SkillDefinitions", "CharacterSkills", "SkillAdditionReceipts" })
+            Assert.Contains($"CREATE TABLE `{table}`", script);
+        Assert.DoesNotContain("INSERT INTO `ItemDefinitions`", script);
+        Assert.DoesNotContain("INSERT INTO `SkillDefinitions`", script);
+        Assert.DoesNotContain("DROP TABLE `Campaigns`", script);
 
-        var catalogForward = context.Database.GetService<IMigrator>().GenerateScript("20261118000100_CampaignTemplate", "20261121000100_Catalog");
-        Assert.Contains("CREATE TABLE `CatalogEntries`", catalogForward);
-        Assert.DoesNotContain("DROP TABLE", catalogForward);
-        Assert.DoesNotContain("DROP COLUMN", catalogForward);
+        var newCatalog = migrator.GenerateScript("20261121000200_CharacterCatalog", "20261123000100_SeparateCatalogs");
+        Assert.Contains("CREATE TABLE `ItemDefinitions`", newCatalog);
+        Assert.Contains("CREATE TABLE `CharacterItems`", newCatalog);
+        Assert.Contains("CREATE TABLE `ItemAdditionReceipts`", newCatalog);
+        Assert.Contains("CREATE TABLE `SkillDefinitions`", newCatalog);
+        Assert.Contains("CREATE TABLE `CharacterSkills`", newCatalog);
+        Assert.Contains("CREATE TABLE `SkillAdditionReceipts`", newCatalog);
+        foreach (var table in new[] { "ItemDefinitions", "CharacterItems", "ItemAdditionReceipts", "SkillDefinitions", "CharacterSkills", "SkillAdditionReceipts" })
+            Assert.DoesNotContain($"INSERT INTO `{table}`", newCatalog);
+        foreach (var table in new[] { "CatalogEntries", "CharacterCatalogEntries", "CatalogAdditionReceipts" })
+            Assert.DoesNotContain($"FROM `{table}`", newCatalog);
+        var migrationAssembly = context.GetService<IMigrationsAssembly>();
+        var migration = migrationAssembly.Migrations["20261123000100_SeparateCatalogs"];
+        var separateCatalogs = (Migration)migrationAssembly.CreateMigration(migration, context.Database.ProviderName!);
+        Assert.All(separateCatalogs.UpOperations, operation => Assert.True(operation is CreateTableOperation or CreateIndexOperation));
+        Assert.DoesNotContain("DROP TABLE", newCatalog);
+        Assert.DoesNotContain("CampaignTemplates", newCatalog);
+        Assert.DoesNotContain("CREATE TABLE `CharacterMetadata`", newCatalog);
+        Assert.DoesNotContain("ALTER TABLE `CharacterMetadata`", newCatalog);
+        Assert.DoesNotContain("DROP TABLE `CharacterMetadata`", newCatalog);
+        Assert.Contains("REFERENCES `CharacterMetadata`", newCatalog);
 
-        var characterCatalogForward = context.Database.GetService<IMigrator>().GenerateScript("20261121000100_Catalog", "20261121000200_CharacterCatalog");
-        Assert.Contains("CREATE TABLE `CharacterCatalogEntries`", characterCatalogForward);
-        Assert.Contains("CREATE TABLE `CatalogAdditionReceipts`", characterCatalogForward);
-        Assert.DoesNotContain("DROP TABLE", characterCatalogForward);
-        Assert.DoesNotContain("DROP COLUMN", characterCatalogForward);
-        Assert.Contains("decimal(65,28)", characterCatalogForward);
-        Assert.Contains("CK_CharacterCatalogEntries_MetadataRevision", characterCatalogForward);
+        var historical = migrator.GenerateScript("20261118000100_CampaignTemplate", "20261121000200_CharacterCatalog");
+        Assert.Contains("CREATE TABLE `CatalogEntries`", historical);
+        Assert.Contains("CREATE TABLE `CharacterCatalogEntries`", historical);
+        Assert.Contains("CREATE TABLE `CatalogAdditionReceipts`", historical);
+        Assert.DoesNotContain("DROP TABLE", historical);
     }
 
     [Fact]
-    public void ModelDefinesKeysIndexesConcurrencyAndRestrictRelationship()
+    public void SeparateCatalogMigrationTargetModelIsFrozenAndMatchesSnapshot()
     {
-        var options = new DbContextOptionsBuilder<CampaignDbContext>()
-            .UseMySql("Server=localhost;Database=unused;User Id=unused;Password=unused", new MySqlServerVersion(new Version(8, 0, 36)))
-            .Options;
-        using var context = new CampaignDbContext(options);
+        using var context = CreateContext();
+        var migrations = context.GetService<IMigrationsAssembly>();
+        var migration = migrations.Migrations["20261123000100_SeparateCatalogs"];
+        var instance = migrations.CreateMigration(migration, context.Database.ProviderName!);
+        var frozenTarget = instance.TargetModel;
+        var snapshot = context.GetService<IDesignTimeModel>().Model;
+        foreach (var type in new[] { typeof(CatalogEntry<ItemCatalog>), typeof(CatalogEntry<SkillCatalog>), typeof(CharacterCatalogEntry<ItemCatalog>), typeof(CharacterCatalogEntry<SkillCatalog>), typeof(CatalogAdditionReceipt<ItemCatalog>), typeof(CatalogAdditionReceipt<SkillCatalog>) })
+            Assert.Equal(snapshot.FindEntityType(type)!.GetTableName(), frozenTarget.FindEntityType(type)!.GetTableName());
+        Assert.NotSame(snapshot, frozenTarget);
+        Assert.Null(frozenTarget.FindEntityType(typeof(CatalogEntry<>)));
+        Assert.Null(frozenTarget.FindEntityType(typeof(CharacterCatalogEntry<>)));
+        Assert.Null(frozenTarget.FindEntityType(typeof(CatalogAdditionReceipt<>)));
+    }
+
+    [Fact]
+    public void UnaffectedCampaignSheetFormulaAndViewMappingsRemainPresent()
+    {
+        using var context = CreateContext();
         var model = context.Model;
         var campaign = model.FindEntityType(typeof(Campaign))!;
         var member = model.FindEntityType(typeof(CampaignMember))!;
@@ -70,92 +114,94 @@ public class CampaignDbContextModelTests
         var assignment = model.FindEntityType(typeof(CharacterAssignment))!;
         var formula = model.FindEntityType(typeof(FormulaMetadata))!;
         var view = model.FindEntityType(typeof(ViewMetadata))!;
-        var catalogEntry = model.FindEntityType(typeof(CatalogEntry))!;
-        var characterCatalogEntry = model.FindEntityType(typeof(CharacterCatalogEntry))!;
-        var additionReceipt = model.FindEntityType(typeof(CatalogAdditionReceipt))!;
-
-        Assert.Equal(new[] { "Id" }, campaign.FindPrimaryKey()!.Properties.Select(x => x.Name));
-        Assert.Contains(campaign.GetIndexes(), index => index.IsUnique && index.Properties.Select(x => x.Name).SequenceEqual(new[] { "CreationRequestId" }));
-        Assert.True(campaign.FindProperty(nameof(Campaign.MetadataRevision))!.IsConcurrencyToken);
-        Assert.Equal(new[] { "CampaignId", "UserId" }, member.FindPrimaryKey()!.Properties.Select(x => x.Name));
-        Assert.Contains(member.GetIndexes(), index => index.Properties.Select(x => x.Name).SequenceEqual(new[] { "UserId" }));
-        Assert.True(member.FindProperty(nameof(CampaignMember.MetadataRevision))!.IsConcurrencyToken);
+        Assert.Equal("Campaigns", campaign.GetTableName());
+        Assert.Equal("CampaignMembers", member.GetTableName());
+        Assert.Equal("CampaignTemplates", template.GetTableName());
+        Assert.Equal("CharacterMetadata", character.GetTableName());
+        Assert.Equal("CharacterAssignments", assignment.GetTableName());
+        Assert.Equal("FormulaMetadata", formula.GetTableName());
+        Assert.Equal("ViewMetadata", view.GetTableName());
+        Assert.Equal(new[] { nameof(Campaign.Id) }, campaign.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Equal(new[] { nameof(CampaignMember.CampaignId), nameof(CampaignMember.UserId) }, member.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Equal(new[] { nameof(TemplateMetadata.CampaignId) }, template.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Equal(new[] { nameof(CharacterMetadata.Id) }, character.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Equal(new[] { nameof(CharacterMetadata.CampaignId), nameof(CharacterMetadata.Id) }, character.GetKeys().Single(x => !x.IsPrimaryKey()).Properties.Select(x => x.Name));
+        Assert.Equal(new[] { nameof(CharacterAssignment.CampaignId), nameof(CharacterAssignment.CharacterId), nameof(CharacterAssignment.UserId) }, assignment.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Equal(new[] { nameof(FormulaMetadata.Id) }, formula.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Equal(new[] { nameof(FormulaMetadata.CampaignId), nameof(FormulaMetadata.Id) }, formula.GetKeys().Single(x => !x.IsPrimaryKey()).Properties.Select(x => x.Name));
+        Assert.Equal(new[] { nameof(ViewMetadata.Id) }, view.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Equal(new[] { nameof(ViewMetadata.CampaignId), nameof(ViewMetadata.Id) }, view.GetKeys().Single(x => !x.IsPrimaryKey()).Properties.Select(x => x.Name));
+        Assert.True(Assert.Single(campaign.GetIndexes()).IsUnique);
+        Assert.Equal(new[] { nameof(Campaign.CreationRequestId) }, Assert.Single(campaign.GetIndexes()).Properties.Select(x => x.Name));
+        Assert.Contains(member.GetIndexes(), x => x.Properties.Select(p => p.Name).SequenceEqual([nameof(CampaignMember.UserId)]));
         Assert.Equal(DeleteBehavior.Restrict, Assert.Single(member.GetForeignKeys()).DeleteBehavior);
-
-        Assert.Equal(new[] { "CampaignId" }, template.FindPrimaryKey()!.Properties.Select(x => x.Name));
-        Assert.Equal(ValueGenerated.Never, template.FindProperty(nameof(TemplateMetadata.CampaignId))!.ValueGenerated);
-        Assert.Null(template.FindProperty("Id"));
-        Assert.True(template.FindProperty(nameof(TemplateMetadata.MetadataRevision))!.IsConcurrencyToken);
-        var templateCampaign = Assert.Single(template.GetForeignKeys());
-        Assert.Equal(typeof(Campaign), templateCampaign.PrincipalEntityType.ClrType);
-        Assert.Equal(new[] { "CampaignId" }, templateCampaign.Properties.Select(x => x.Name));
-        Assert.True(templateCampaign.IsUnique);
-        Assert.Equal(DeleteBehavior.Restrict, templateCampaign.DeleteBehavior);
-        Assert.Same(template, campaign.FindNavigation(nameof(Campaign.Template))!.TargetEntityType);
-
-        Assert.Equal(new[] { "Id" }, character.FindPrimaryKey()!.Properties.Select(x => x.Name));
-        Assert.Contains(character.GetKeys(), key => key.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }));
-        Assert.True(character.FindProperty(nameof(CharacterMetadata.MetadataRevision))!.IsConcurrencyToken);
-        Assert.Single(character.GetForeignKeys());
-        Assert.All(character.GetForeignKeys(), foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
-        Assert.DoesNotContain(character.GetForeignKeys(), foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(TemplateMetadata));
-        Assert.Null(character.FindProperty("TemplateId"));
-        Assert.Null(character.FindNavigation("Template"));
-
-        Assert.Equal(new[] { "CampaignId", "CharacterId", "UserId" }, assignment.FindPrimaryKey()!.Properties.Select(x => x.Name));
-        Assert.True(assignment.FindProperty(nameof(CharacterAssignment.MetadataRevision))!.IsConcurrencyToken);
+        Assert.Equal(new[] { nameof(CampaignMember.CampaignId) }, Assert.Single(member.GetForeignKeys()).Properties.Select(x => x.Name));
+        Assert.Equal(DeleteBehavior.Restrict, Assert.Single(template.GetForeignKeys()).DeleteBehavior);
+        Assert.Equal(new[] { nameof(TemplateMetadata.CampaignId) }, Assert.Single(template.GetForeignKeys()).Properties.Select(x => x.Name));
+        Assert.Equal(DeleteBehavior.Restrict, Assert.Single(character.GetForeignKeys()).DeleteBehavior);
+        Assert.Equal(new[] { nameof(CharacterMetadata.CampaignId) }, Assert.Single(character.GetForeignKeys()).Properties.Select(x => x.Name));
         Assert.Equal(2, assignment.GetForeignKeys().Count());
-        Assert.All(assignment.GetForeignKeys(), foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
-        Assert.Contains(assignment.GetForeignKeys(), foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(CampaignMember) &&
-            foreignKey.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "UserId" }));
-        Assert.Contains(assignment.GetForeignKeys(), foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(CharacterMetadata) &&
-            foreignKey.PrincipalKey.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }));
-        Assert.Contains(assignment.GetIndexes(), index => index.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "UserId" }));
-
-        Assert.Equal(new[] { "Id" }, formula.FindPrimaryKey()!.Properties.Select(x => x.Name));
-        Assert.Contains(formula.GetKeys(), key => key.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }));
-        Assert.True(formula.FindProperty(nameof(FormulaMetadata.MetadataRevision))!.IsConcurrencyToken);
+        Assert.All(assignment.GetForeignKeys(), x => Assert.Equal(DeleteBehavior.Restrict, x.DeleteBehavior));
+        Assert.Contains(assignment.GetForeignKeys(), x => x.PrincipalEntityType.ClrType == typeof(CharacterMetadata) && x.Properties.Select(p => p.Name).SequenceEqual([nameof(CharacterAssignment.CampaignId), nameof(CharacterAssignment.CharacterId)]));
+        Assert.Contains(assignment.GetForeignKeys(), x => x.PrincipalEntityType.ClrType == typeof(CampaignMember) && x.Properties.Select(p => p.Name).SequenceEqual([nameof(CharacterAssignment.CampaignId), nameof(CharacterAssignment.UserId)]));
         Assert.Equal(DeleteBehavior.Restrict, Assert.Single(formula.GetForeignKeys()).DeleteBehavior);
-
-        Assert.Equal(new[] { "Id" }, view.FindPrimaryKey()!.Properties.Select(x => x.Name));
-        Assert.Contains(view.GetKeys(), key => key.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }));
-        Assert.True(view.FindProperty(nameof(ViewMetadata.MetadataRevision))!.IsConcurrencyToken);
+        Assert.Equal(new[] { nameof(FormulaMetadata.CampaignId) }, Assert.Single(formula.GetForeignKeys()).Properties.Select(x => x.Name));
         Assert.Equal(DeleteBehavior.Restrict, Assert.Single(view.GetForeignKeys()).DeleteBehavior);
+        Assert.Equal(new[] { nameof(ViewMetadata.CampaignId) }, Assert.Single(view.GetForeignKeys()).Properties.Select(x => x.Name));
+        Assert.True(campaign.FindProperty(nameof(Campaign.MetadataRevision))!.IsConcurrencyToken);
+        Assert.True(member.FindProperty(nameof(CampaignMember.MetadataRevision))!.IsConcurrencyToken);
+        Assert.True(template.FindProperty(nameof(TemplateMetadata.MetadataRevision))!.IsConcurrencyToken);
+        Assert.True(character.FindProperty(nameof(CharacterMetadata.MetadataRevision))!.IsConcurrencyToken);
+        Assert.True(assignment.FindProperty(nameof(CharacterAssignment.MetadataRevision))!.IsConcurrencyToken);
+        Assert.True(formula.FindProperty(nameof(FormulaMetadata.MetadataRevision))!.IsConcurrencyToken);
+        Assert.True(view.FindProperty(nameof(ViewMetadata.MetadataRevision))!.IsConcurrencyToken);
 
-        Assert.Equal(new[] { "Id" }, catalogEntry.FindPrimaryKey()!.Properties.Select(x => x.Name));
-        Assert.Contains(catalogEntry.GetKeys(), key => key.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }));
-        Assert.True(catalogEntry.FindProperty(nameof(CatalogEntry.MetadataRevision))!.IsConcurrencyToken);
-        Assert.True(catalogEntry.FindProperty(nameof(CatalogEntry.CreatorUserId))!.IsNullable);
-        Assert.True(catalogEntry.FindProperty(nameof(CatalogEntry.QuantityUnit))!.IsNullable);
-        Assert.Contains(catalogEntry.GetIndexes(), index => index.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Kind" }));
-        var catalogCampaign = Assert.Single(catalogEntry.GetForeignKeys());
-        Assert.Equal(typeof(Campaign), catalogCampaign.PrincipalEntityType.ClrType);
-        Assert.Equal(new[] { "CampaignId" }, catalogCampaign.Properties.Select(x => x.Name));
-        Assert.Equal(DeleteBehavior.Restrict, catalogCampaign.DeleteBehavior);
+        AssertCatalogMappings<ItemCatalog>(model);
+        AssertCatalogMappings<SkillCatalog>(model);
+    }
 
-        Assert.Equal(new[] { "Id" }, characterCatalogEntry.FindPrimaryKey()!.Properties.Select(x => x.Name));
-        Assert.Equal(ValueGenerated.Never, characterCatalogEntry.FindProperty(nameof(CharacterCatalogEntry.Id))!.ValueGenerated);
-        Assert.True(characterCatalogEntry.FindProperty(nameof(CharacterCatalogEntry.MetadataRevision))!.IsConcurrencyToken);
-        var designTimeCharacterCatalogEntry = context.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(CharacterCatalogEntry))!;
-        Assert.Contains(designTimeCharacterCatalogEntry.GetCheckConstraints(), check => check.Name == "CK_CharacterCatalogEntries_MetadataRevision" && check.Sql == "MetadataRevision >= 1");
-        Assert.True(characterCatalogEntry.FindProperty(nameof(CharacterCatalogEntry.Quantity))!.IsNullable);
-        Assert.Equal("decimal(65,28)", characterCatalogEntry.FindProperty(nameof(CharacterCatalogEntry.Quantity))!.GetColumnType());
-        Assert.Contains(characterCatalogEntry.GetIndexes(), index => index.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "CharacterId", "CatalogEntryId" }));
-        Assert.Contains(characterCatalogEntry.GetIndexes(), index => index.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "CatalogEntryId" }));
-        Assert.Contains(characterCatalogEntry.GetForeignKeys(), foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(CharacterMetadata) &&
-            foreignKey.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "CharacterId" }) &&
-            foreignKey.PrincipalKey.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }) && foreignKey.DeleteBehavior == DeleteBehavior.Restrict);
-        Assert.Contains(characterCatalogEntry.GetForeignKeys(), foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(CatalogEntry) &&
-            foreignKey.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "CatalogEntryId" }) &&
-            foreignKey.PrincipalKey.Properties.Select(x => x.Name).SequenceEqual(new[] { "CampaignId", "Id" }) && foreignKey.DeleteBehavior == DeleteBehavior.Restrict);
+    private static void AssertCatalogMappings<TCatalog>(IModel model) where TCatalog : ICatalogType
+    {
+        var definition = model.FindEntityType(typeof(CatalogEntry<TCatalog>))!;
+        var local = model.FindEntityType(typeof(CharacterCatalogEntry<TCatalog>))!;
+        var receipt = model.FindEntityType(typeof(CatalogAdditionReceipt<TCatalog>))!;
+        Assert.Equal(new[] { nameof(CatalogEntry<TCatalog>.Id) }, definition.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Equal(new[] { nameof(CatalogEntry<TCatalog>.CampaignId), nameof(CatalogEntry<TCatalog>.Id) }, definition.GetKeys().Single(x => !x.IsPrimaryKey()).Properties.Select(x => x.Name));
+        Assert.Equal(new[] { nameof(CharacterCatalogEntry<TCatalog>.Id) }, local.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Equal(new[] { nameof(CatalogAdditionReceipt<TCatalog>.CampaignId), nameof(CatalogAdditionReceipt<TCatalog>.CharacterId), nameof(CatalogAdditionReceipt<TCatalog>.RequestId) }, receipt.FindPrimaryKey()!.Properties.Select(x => x.Name));
+        Assert.Equal(new[] { nameof(CharacterCatalogEntry<TCatalog>.CampaignId), nameof(CharacterCatalogEntry<TCatalog>.CharacterId), nameof(CharacterCatalogEntry<TCatalog>.CatalogEntryId) }, local.GetIndexes().Single(x => x.Properties.Select(p => p.Name).SequenceEqual([nameof(CharacterCatalogEntry<TCatalog>.CampaignId), nameof(CharacterCatalogEntry<TCatalog>.CharacterId), nameof(CharacterCatalogEntry<TCatalog>.CatalogEntryId)])).Properties.Select(x => x.Name));
+        Assert.Contains(local.GetIndexes(), x => x.Properties.Select(p => p.Name).SequenceEqual([nameof(CharacterCatalogEntry<TCatalog>.CampaignId), nameof(CharacterCatalogEntry<TCatalog>.CatalogEntryId)]));
+        Assert.Contains(definition.GetIndexes(), x => x.Properties.Select(p => p.Name).SequenceEqual([nameof(CatalogEntry<TCatalog>.CampaignId)]));
+        var definitionCampaignFk = Assert.Single(definition.GetForeignKeys());
+        Assert.Equal(typeof(Campaign), definitionCampaignFk.PrincipalEntityType.ClrType);
+        Assert.Equal(new[] { nameof(CatalogEntry<TCatalog>.CampaignId) }, definitionCampaignFk.Properties.Select(x => x.Name));
+        Assert.Equal(DeleteBehavior.Restrict, definitionCampaignFk.DeleteBehavior);
+        Assert.Equal(2, local.GetForeignKeys().Count());
+        var definitionFk = Assert.Single(local.GetForeignKeys(), x => x.PrincipalEntityType.ClrType == typeof(CatalogEntry<TCatalog>));
+        Assert.Equal(new[] { nameof(CharacterCatalogEntry<TCatalog>.CampaignId), nameof(CharacterCatalogEntry<TCatalog>.CatalogEntryId) }, definitionFk.Properties.Select(x => x.Name));
+        Assert.Equal(DeleteBehavior.Restrict, definitionFk.DeleteBehavior);
+        var characterFk = Assert.Single(local.GetForeignKeys(), x => x.PrincipalEntityType.ClrType == typeof(CharacterMetadata));
+        Assert.Equal(new[] { nameof(CharacterCatalogEntry<TCatalog>.CampaignId), nameof(CharacterCatalogEntry<TCatalog>.CharacterId) }, characterFk.Properties.Select(x => x.Name));
+        Assert.Equal(DeleteBehavior.Restrict, characterFk.DeleteBehavior);
+        Assert.Equal("decimal(65,28)", local.FindProperty(nameof(CharacterCatalogEntry<TCatalog>.Quantity))!.GetColumnType());
+        Assert.True(definition.FindProperty(nameof(CatalogEntry<TCatalog>.MetadataRevision))!.IsConcurrencyToken);
+        Assert.True(local.FindProperty(nameof(CharacterCatalogEntry<TCatalog>.MetadataRevision))!.IsConcurrencyToken);
+        Assert.DoesNotContain(receipt.GetForeignKeys(), x => x.PrincipalEntityType.ClrType == typeof(CatalogEntry<TCatalog>));
+        Assert.Single(receipt.GetForeignKeys());
+        var receiptCharacterFk = Assert.Single(receipt.GetForeignKeys());
+        Assert.Equal(typeof(CharacterMetadata), receiptCharacterFk.PrincipalEntityType.ClrType);
+        Assert.Equal(new[] { nameof(CatalogAdditionReceipt<TCatalog>.CampaignId), nameof(CatalogAdditionReceipt<TCatalog>.CharacterId) }, receiptCharacterFk.Properties.Select(x => x.Name));
+        Assert.Equal(DeleteBehavior.Restrict, receiptCharacterFk.DeleteBehavior);
+        Assert.Null(definition.FindProperty("Kind"));
+        Assert.Null(local.FindProperty("Kind"));
+        Assert.Null(receipt.FindProperty("Kind"));
+    }
 
-        Assert.Equal(new[] { "CampaignId", "CharacterId", "RequestId" }, additionReceipt.FindPrimaryKey()!.Properties.Select(x => x.Name));
-        var receiptCharacter = Assert.Single(additionReceipt.GetForeignKeys());
-        Assert.Equal(typeof(CharacterMetadata), receiptCharacter.PrincipalEntityType.ClrType);
-        Assert.Equal(new[] { "CampaignId", "CharacterId" }, receiptCharacter.Properties.Select(x => x.Name));
-        Assert.Equal(new[] { "CampaignId", "Id" }, receiptCharacter.PrincipalKey.Properties.Select(x => x.Name));
-        Assert.Equal(DeleteBehavior.Restrict, receiptCharacter.DeleteBehavior);
-        Assert.DoesNotContain(additionReceipt.GetForeignKeys(), foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(CatalogEntry));
-        Assert.DoesNotContain(additionReceipt.GetForeignKeys(), foreignKey => foreignKey.PrincipalEntityType.ClrType == typeof(CharacterCatalogEntry));
+    private static CampaignDbContext CreateContext()
+    {
+        var options = new DbContextOptionsBuilder<CampaignDbContext>()
+            .UseMySql("Server=127.0.0.1;Database=unit_unused;User ID=unit_placeholder;", new MySqlServerVersion(new Version(8, 0, 36)))
+            .Options;
+        return new CampaignDbContext(options);
     }
 }

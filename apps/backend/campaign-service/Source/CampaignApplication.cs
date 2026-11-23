@@ -91,20 +91,21 @@ public static class CampaignApplication
         builder.Services.AddSingleton<IMongoClient>(services => new MongoClient(services.GetRequiredService<IOptions<MongoOptions>>().Value.ConnectionString));
         builder.Services.AddSingleton<IMongoDatabase>(services => services.GetRequiredService<IMongoClient>().GetDatabase(services.GetRequiredService<IOptions<MongoOptions>>().Value.Database));
         builder.Services.AddScoped<IResourceStore, EfResourceStore>();
-        builder.Services.AddScoped<ICatalogStore, EfCatalogStore>();
-        builder.Services.AddScoped<ICharacterCatalogStore, EfCharacterCatalogStore>();
+        builder.Services.AddScoped(typeof(ICatalogStore<>), typeof(EfCatalogStore<>));
+        builder.Services.AddScoped(typeof(ICharacterCatalogStore<>), typeof(EfCharacterCatalogStore<>));
         builder.Services.AddScoped<IContentStore, MongoContentStore>();
-        builder.Services.AddScoped<CatalogService>();
-        builder.Services.AddScoped<CharacterCatalogService>();
-        builder.Services.AddScoped<CatalogGroupService>();
+        builder.Services.AddScoped(typeof(CatalogService<>));
+        builder.Services.AddScoped(typeof(CharacterCatalogService<>));
+        builder.Services.AddScoped(typeof(CatalogGroupService<>));
         builder.Services.AddScoped<SheetService>();
         builder.Services.AddScoped<FormulaService>();
         builder.Services.AddScoped<VirtualFieldService>();
         builder.Services.AddScoped<ComputedSheetService>();
         builder.Services.AddScoped<ViewService>();
         builder.Services.AddScoped<PresentationService>();
-        if (applyMigrations)
-            builder.Services.AddHostedService<DatabaseMigrationService>();
+        builder.Services.AddScoped<ILegacyCatalogCleanup, LegacyCatalogCleanup>();
+        if (applyMigrations) builder.Services.AddHostedService<DatabaseMigrationService>();
+        builder.Services.AddHostedService<LegacyCatalogCleanupService>();
 
         var app = builder.Build();
         app.UseExceptionHandler();

@@ -4,11 +4,9 @@ Gateway exposes the campaign-service API one-to-one: the external path and upstr
 
 Template routes are singleton paths: `GET`/`PUT /api/campaigns/{campaignId}/template`, `GET`/`PUT .../template/content`, and `GET`/`PUT .../template/virtual-fields`. No plural template catalog, create POST, or template-GUID route is proxied. This is a route-contract change only; Gateway/BFF authentication, verified identity forwarding, request/response passthrough, and body/query transport are unchanged.
 
-Catalog endpoints have explicit one-to-one routes and are listed in the [catalog contract](catalog.md). They use the same verified subject and response forwarding.
+Item routes are explicitly proxied one-to-one under `/api/campaigns/{campaignId}/items`, including `/attributes`, `/attributes/{attributeId}`, and `/groups` with its `configuration` and `{groupId}/entries` reads. Skill routes have the same shape under `/api/campaigns/{campaignId}/skills`. Character item and skill routes are respectively under `/api/campaigns/{campaignId}/characters/{characterId}/items` and `/skills`; each has its own `create`, `additions/{requestId}`, and record routes. Only item records have a `quantity` route. These routes forward the verified subject and response without parameter injection; detailed contracts are in [catalog.md](catalog.md), [character-catalog.md](character-catalog.md), and [catalog-groups.md](catalog-groups.md).
 
-Character catalog endpoints are also explicit one-to-one routes under `/api/campaigns/{campaignId}/characters/{characterId}/entries`; exact methods and request contracts are in [character-catalog.md](character-catalog.md). The receipt check, `create`, `quantity`, `attributes`, and explicit record deletion paths use the same verified subject and response forwarding.
-
-Catalog group routes are explicit one-to-one proxies: `GET|PUT /api/campaigns/{campaignId}/catalog/groups`, `GET /api/campaigns/{campaignId}/catalog/groups/configuration`, and `GET /api/campaigns/{campaignId}/catalog/groups/{groupId}/entries`. Details are in [catalog-groups.md](catalog-groups.md). Full raw group configuration is administrator-only in campaign-service; Gateway applies no group-specific access hook or parameter injection.
+Full group configuration is administrator-only in campaign-service; Gateway applies no group-specific access hook or parameter injection. The two scopes have separate group configuration and revisions.
 
 Virtual-field inputs use ordinary `bindings` only; the separate parent-field properties are not part of the service contract. Existing template/custom virtual-field and override proxy routes pass their request bodies through without rewrites.
 

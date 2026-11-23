@@ -1,115 +1,57 @@
-# Campaign catalog API
+# Campaign item and skill catalogs
 
-The campaign catalog is one campaign-scoped collection of item and skill definitions. SQL stores catalog metadata; MongoDB stores the shared attribute schema and each entry's native JSON content. The standalone service uses HTTP and parses the `X-Subject` JSON header `{ "type": "User|Group|Admin", "id": integer }`; it does not itself provide Bearer or cryptographic authentication. When called through API Gateway, Gateway applies its existing Bearer authentication, replaces any client-supplied subject with the verified context, and forwards that `X-Subject`. Clients must not construct or override the trusted Gateway header. Gateway forwards paths, query, and bodies without rewriting them.
+Items and skills have separate campaign-scoped APIs and persistence namespaces. The application shares generic catalog models and validation algorithms, but item and skill data are not stored in shared catalog tables or collections. SQL uses six tables: `ItemDefinitions`, `CharacterItems`, `ItemAdditionReceipts`, `SkillDefinitions`, `CharacterSkills`, and `SkillAdditionReceipts`. MongoDB uses eight collections: `itemAttributeDefinitions`, `itemContents`, `characterItemContents`, `itemGroups`, `skillAttributeDefinitions`, `skillContents`, `characterSkillContents`, and `skillGroups`.
 
-Endpoint paths and methods are: `GET /api/campaigns/{campaignId}/catalog?kind=...`, `POST /api/campaigns/{campaignId}/catalog`, `GET|PUT /api/campaigns/{campaignId}/catalog/{entryId}`, `GET|PUT /api/campaigns/{campaignId}/catalog/{entryId}/content`, and `GET|PUT /api/campaigns/{campaignId}/catalog/attributes`. The only query parameter is optional `kind` on list. No endpoint-specific query or body parameter injection is used.
+The standalone service reads the `X-Subject` JSON header `{ "type": "User|Group|Admin", "id": integer }`. It does not itself provide cryptographic authentication. Through API Gateway, the existing Bearer authentication supplies the verified subject; Gateway forwards requests and responses one-to-one without rewriting the body or query.
 
-## Wire conventions and response shapes
+## Endpoints
 
-`campaignId` is an integer and `entryId` is a GUID. JSON property names are camel case. `JsonStringEnumConverter` emits enum names such as `"Item"`, `"Skill"`, `"Whole"`, and `"Definition"`; it accepts these strings case-insensitively and also accepts numeric enum values. Numeric values are valid only when they identify a defined enum member; unknown values are rejected with `400`. For example, `CatalogKind` ordinals are `0=Item`, `1=Skill`; `QuantityUnit` are `0=Whole`, `1=Fractional`, `2=Single`; `AttributeEditLevel` are `0=Definition`, `1=Character`. The `kind` query binder also accepts enum names case-insensitively or defined numeric values; an unknown numeric value returns `400 invalid_kind`.
+The item catalog routes are:
 
-All revision values are JSON integers (`long`). Metadata updates require `expectedRevision >= 1`; content writes use their current `contentRevision >= 1`; schema writes allow `expectedRevision >= 0`, with zero meaning the singleton does not yet exist. A successful conditional write increments its revision by one. Stale writes return `409`.
+| Method | Path |
+| --- | --- |
+| `GET`, `POST` | `/api/campaigns/{campaignId}/items` |
+| `GET`, `PUT` | `/api/campaigns/{campaignId}/items/{entryId}` |
+| `GET`, `PUT` | `/api/campaigns/{campaignId}/items/{entryId}/content` |
+| `GET`, `PUT` | `/api/campaigns/{campaignId}/items/attributes` |
+| `DELETE` | `/api/campaigns/{campaignId}/items/attributes/{attributeId}?expectedRevision=...` |
+| `GET`, `PUT` | `/api/campaigns/{campaignId}/items/groups` |
+| `GET` | `/api/campaigns/{campaignId}/items/groups/configuration` |
+| `GET` | `/api/campaigns/{campaignId}/items/groups/{groupId}/entries` |
 
-Entry metadata has `id`, `campaignId`, `name`, `kind`, `creatorUserId`, `isHidden`, `quantityUnit`, `allowNegative`, and `metadataRevision`. A content envelope has `campaignId`, `resourceId`, `contentRevision`, `attributeSchemaRevision`, `data`, and `diagnostics`. `data` is returned as stored: JSON values are not stringified, coerced, or cleaned. `attributeSchemaRevision` is the schema revision read for this response; it is not a global snapshot/transaction guarantee. Diagnostics contain `occurrenceId` and one of `unknown_attribute`, `incompatible_attribute_type`, or `invalid_attribute_value`.
+The skill catalog has the same methods and route shapes under `/api/campaigns/{campaignId}/skills`. Item and skill schemas, contents, and groups are independent.
 
-## Attribute schema
+`campaignId` is an integer; resource IDs are GUIDs. JSON properties are camel case. Enums are emitted as names (for example, `Whole`, `Single`, `Definition`, `Character`); defined numeric enum values are also accepted. JSON values remain native JSON, not strings coerced from numbers or booleans.
 
-### `GET /api/campaigns/{campaignId}/catalog/attributes`
+## Attribute schema and content
 
-Any campaign participant or administrator may read the schema. If no Mongo singleton exists, the response is revision zero with an empty definition list:
+Any campaign member may read the scope's schema. If it does not exist, the response has `contentRevision: 0` and an empty `definitions` array. Only campaign administrators may replace it. Each definition is `{ "id", "title", "typeKey", "options" }`. `typeKey` is one of `integer`, `number`, `string`, `boolean`, `singleChoice`, or `multiChoice`; only choice types accept options, whose keys must be unique and non-empty.
 
-```json
-{"campaignId":42,"contentRevision":0,"data":{"definitions":[]}}
-```
+Schema replacement is a full replacement. Omitted definitions are deleted; `DELETE .../attributes/{attributeId}?expectedRevision=...` explicitly deletes one definition. Deletion takes effect immediately in all item/skill content, character entry, and group responses: occurrences referencing an attribute no longer in that scope's schema are omitted from reads. GETs do not write or clean documents. The next write to the corresponding object prunes known-deleted occurrences from its current document: catalog content PUT, catalog metadata PUT, character local-attributes PUT, or a Single-item quantity PUT. Stackable items have no local content document to prune. Pruning occurs as part of that subsequent write path; it is not a scan or a background migration.
 
-For a populated schema, `data.definitions` contains `{ "id": GUID, "title": string, "typeKey": string, "typeRevision": long, "options": [{ "optionKey": string, "title": string }], "isActive": boolean }` entries.
+There is no attribute version/history or value conversion. `contentRevision` is a Mongo document compare-and-set revision; `metadataRevision` is a SQL metadata compare-and-set revision. Neither is an attribute type version. When an existing value is unchanged, its exact stored value may be retained even if it no longer validates against the current definition. Changed values are validated against the current type/options. A new value referring to an unknown/deleted attribute returns `400 unknown_attribute`. A stale full-replacement submission containing a previously stored occurrence bound to a now-deleted attribute is discarded rather than reintroduced.
 
-### `PUT /api/campaigns/{campaignId}/catalog/attributes`
-
-Only a campaign administrator may write. Request body:
-
-```json
-{
-  "expectedRevision": 0,
-  "definitions": [
-    {"title":"Rarity","typeKey":"singleChoice","options":[{"optionKey":"common","title":"Common"}],"isActive":true}
-  ]
-}
-```
-
-Definition fields: optional `id` (omission creates a new GUID), required non-empty `title` and `typeKey`, required `options` array, and required `isActive` boolean. Existing IDs must belong to this schema; unknown IDs, empty/duplicate IDs, and invalid option keys return `400`. Type keys are exactly `integer`, `number`, `string`, `boolean`, `singleChoice`, and `multiChoice`. Non-choice types require an empty options array. Choice option keys must be non-empty and unique; titles may be empty.
-
-Omitting an existing definition does not delete it: it is retained with `isActive=false`. Explicit deactivation also retains it. New occurrences cannot reference inactive definitions, but existing occurrences may be carried or edited using the current type/revision. Deactivation alone does not make stored values incompatible. Changing a type key or removing any existing option key increments `typeRevision`; adding options, changing titles, or reordering options does not. Reverting to a previous type increments from the current revision; revisions never roll back. Schema changes do not rewrite or scan catalog content.
-
-First write uses `expectedRevision: 0` and creates the singleton. Concurrent creation or stale replacement returns `409 content_revision_conflict`. Mongo is not transactionally coordinated with SQL; schema writes are Mongo-only.
-
-## Entries and metadata
-
-### `GET /api/campaigns/{campaignId}/catalog?kind=Item|Skill`
-
-Lists visible entries, optionally filtered by `kind`. `kind` is optional. Hidden entries are omitted unless the caller is a campaign administrator or the entry's creator user. The response is an array of metadata objects.
-
-### `POST /api/campaigns/{campaignId}/catalog`
-
-Only a campaign administrator may create. Required request fields are `requestId` (non-empty GUID), `name` (non-whitespace), `kind`, `isHidden` (boolean), `allowNegative` (boolean), `description` (string; empty allowed), and `attributes` (array). `quantityUnit` is nullable and may be omitted or null for `Skill`; for `Item` it must be supplied as a defined unit. Unknown body properties are rejected, including `creatorUserId`, `price`, and any attempt to submit kind-update fields elsewhere.
-
-This shared-catalog POST remains administrator-only. A character writer can create a private definition and attach it through `POST /api/campaigns/{campaignId}/characters/{characterId}/entries/create`; see [character-catalog.md](character-catalog.md).
-
-For `Item`, `quantityUnit` must be `Whole`, `Fractional`, or `Single`. For `Skill`, it must be absent or `null` and `allowNegative` must be false. No quantity magnitude or economic constraints are imposed. Creator is derived only from a User subject; Admin and Group subjects produce `creatorUserId: null`.
-
-Content attributes use the shared value shape described below. Initial attributes are validated against the current schema. On success, the response contains `entry` metadata and `content` (the published content envelope); `Location` is `/api/campaigns/{campaignId}/catalog/{requestId}`. Example:
+Attribute occurrences have exactly these four fields:
 
 ```json
 {
-  "requestId":"11111111-1111-1111-1111-111111111111",
-  "name":"Healing potion",
-  "kind":"Item",
-  "isHidden":false,
-  "quantityUnit":"Whole",
-  "allowNegative":false,
-  "description":"Restores health.",
-  "attributes":[{"id":"22222222-2222-2222-2222-222222222222","attributeId":"33333333-3333-3333-3333-333333333333","typeKey":"integer","typeRevision":1,"value":2,"editLevel":"Definition"}]
+  "id": "22222222-2222-2222-2222-222222222222",
+  "attributeId": "33333333-3333-3333-3333-333333333333",
+  "value": 2,
+  "editLevel": "Definition"
 }
 ```
 
-The content document is prepared in Mongo before SQL metadata publication. `409 already_published` means metadata already exists; `409 content_already_prepared` means the same resource ID has an unpublished/prepared document. On SQL write uncertainty the service returns `503 publication_outcome_unknown`, with resource and request IDs. Mongo content is not deleted and the request must not be retried with a new ID. Resolve by querying `GET /api/campaigns/{campaignId}/catalog/{same requestId}` and, when published, its `/content` endpoint. Prepared orphan content remains unavailable through public reads.
+Occurrence `id` is unique within the values array; several occurrences may refer to one `attributeId`. `value` is native JSON. `integer` accepts integral values representable as Int64; `number` accepts finite JSON numbers; `string` and `boolean` require the corresponding primitive; `singleChoice` accepts a current option key; `multiChoice` accepts an array of unique current option keys. `editLevel` is `Definition` or `Character`.
 
-### `GET /api/campaigns/{campaignId}/catalog/{entryId}`
+## Definitions and publication
 
-Returns metadata when the entry is public, the caller is its creator user, or the caller administers the campaign. A hidden entry belonging to someone else is reported as `404`.
+Creating a shared definition is administrator-only. `POST /items` and `POST /skills` require `requestId`, `name`, `isHidden`, `allowNegative`, `description`, and `attributes`; items also require a defined `quantityUnit` (`Whole`, `Fractional`, or `Single`). Skills require `quantityUnit: null` and `allowNegative: false`. Unknown request fields are rejected. `creatorUserId` is derived from a User subject, not supplied by the client.
 
-### `PUT /api/campaigns/{campaignId}/catalog/{entryId}`
+The definition content is prepared in its scope's Mongo collection before SQL metadata is published. `409 already_published` means the SQL definition exists; `409 content_already_prepared` means content for that resource ID already exists without a confirmed publication. SQL publication uncertainty returns `503 publication_outcome_unknown`; use the same ID to query the definition before deciding what to do. Mongo and SQL do not share a transaction.
 
-Administrators and the creator user can update metadata; other callers who can see the entry receive `403`. Hidden entries owned by someone else remain `404`. Required: `name`, `expectedRevision`; optional metadata fields are `isHidden`, `quantityUnit`, and `allowNegative`. `kind` and `creatorUserId` are not accepted. Only administrators may change `isHidden`; a creator may submit its unchanged value. Item quantity unit remains required and Skill constraints remain fixed. Example:
+Visible definitions can be read by campaign members; hidden definitions are visible only to an administrator or their creator User. Administrators and the creator User may update metadata/content, subject to the existing visibility and ownership checks. A metadata update uses `expectedRevision` from `metadataRevision`; content PUT uses `expectedRevision` from `contentRevision`. Successful conditional writes increment the corresponding revision. Stale writes return `409`.
 
-```json
-{"name":"Greater healing potion","expectedRevision":1,"quantityUnit":"Whole","allowNegative":false}
-```
+For content PUT, `description` and the complete `attributes` array are supplied. Omitting an occurrence removes it. An unchanged stored occurrence is allowed even if it is invalid under the current schema; a changed occurrence must be valid under the current schema. Unknown new attribute references return `400`. Public content reads return only occurrences whose `attributeId` remains in the current schema; reads do not mutate Mongo documents.
 
-## Content
-
-### `GET /api/campaigns/{campaignId}/catalog/{entryId}/content`
-
-Uses the same visibility rules as metadata GET. Returns raw `data` and per-occurrence diagnostics; it does not remove or convert invalid/stale stored values. A published SQL entry with missing Mongo content returns `503 content_unavailable`, never an empty content document.
-
-### `PUT /api/campaigns/{campaignId}/catalog/{entryId}/content`
-
-Administrators and creator users may update content under the metadata visibility rules. Request body requires `expectedRevision`, `description` (empty allowed), and `attributes` array. Each attribute is the same object used at creation:
-
-```json
-{"expectedRevision":1,"description":"Restores health.","attributes":[{"id":"22222222-2222-2222-2222-222222222222","attributeId":"33333333-3333-3333-3333-333333333333","typeKey":"integer","typeRevision":1,"value":2,"editLevel":"Definition"}]}
-```
-
-`id` identifies an occurrence, so multiple occurrences may share `attributeId`; occurrence IDs must be unique and non-empty. `value` is native JSON. `integer` accepts only integral JSON numbers representable as Int64; `number` accepts finite JSON numbers; `string` and `boolean` require corresponding JSON primitives; `singleChoice` requires a current option key string; `multiChoice` requires an array of unique current option key strings. `editLevel` is `Definition` or `Character`; it records the allowed-edit level of that application, not a value type. Character-level values may be overridden or added on an attached character record through the [character catalog API](character-catalog.md); Definition-level values remain catalog-controlled.
-
-New or changed occurrences require a known attribute, current matching `typeKey` and `typeRevision`, and a valid native JSON value. An identical existing occurrence (including `JsonElement.DeepEquals` value) can be retained even if its schema is stale, so a description-only edit does not erase/block it. Changing its value or attribute binding requires current validation. Individual occurrences can be removed by omitting their occurrence ID. Unknown attribute, incompatible type, invalid value, empty/duplicate occurrence ID, undefined JSON value, or invalid edit level returns `400`. No diagnostics are persisted.
-
-## Status codes, permissions, and exclusions
-
-- `400`: malformed/unknown request properties, required fields or enum values, invalid metadata, schema, occurrence, or native value.
-- `403`: missing/invalid subject, non-administrator schema write/create, or a visible entry write by a non-owner/non-administrator.
-- `404`: campaign access failure via the existing campaign service, missing entry, or hidden entry not visible to caller.
-- `409`: stale schema/content/metadata revision, duplicate publication, or content already prepared for that ID.
-- `503`: published content missing (`content_unavailable`) or SQL publication outcome not confirmable (`publication_outcome_unknown`).
-
-There is no delete endpoint for attribute definitions or shared catalog entries: definitions are deactivated by schema replacement, and shared catalog entries have no delete/archive operation. Attached character records can be explicitly deleted through the [character catalog API](character-catalog.md). Catalog group hierarchy and membership predicates are documented in [catalog-groups.md](catalog-groups.md); these are navigation/selection configuration, not parties or rosters. Equipment, transfer, price, and automatic effects are out of scope.
+Per-item quantity semantics, character attachment APIs, and group behavior are described in [character-catalog.md](character-catalog.md) and [catalog-groups.md](catalog-groups.md). This contract does not provide equipment transfer, pricing, or automatic effects.
