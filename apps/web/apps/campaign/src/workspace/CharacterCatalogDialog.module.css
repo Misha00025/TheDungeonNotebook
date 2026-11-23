@@ -1,0 +1,106 @@
+.content {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.section {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.description {
+  min-width: 0;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.footerLeft,
+.footerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.context {
+  min-width: 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.warning {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.modeActions,
+.section {
+  min-width: 0;
+}
+
+.pickerList {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pickerList li {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.selectedHeader {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.selectedHeader h3,
+.selectedHeader p {
+  min-width: 0;
+  margin: 0;
+}
+
+.advanced {
+  min-width: 0;
+}
+
+.advancedBody {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  padding-block: 0.75rem;
+}
+
+.advancedBody > p {
+  margin: 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 36rem) {
+  .footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .footerLeft,
+  .footerActions {
+    justify-content: flex-start;
+  }
+}

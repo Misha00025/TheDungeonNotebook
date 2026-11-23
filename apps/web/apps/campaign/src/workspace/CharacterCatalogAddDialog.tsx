@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, ModalPortal, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
+import { ActionRow, Button, FieldSet, ModalPortal, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
 import { compareNumber } from 'lossless-json';
 import { useResource } from './hooks';
 import { useWorkspace, useDirtyDraft } from './Workspace';
@@ -8,13 +8,15 @@ import { CampaignApiError } from './api';
 import { ApiError } from './Feedback';
 import CatalogGroupTree from './CatalogGroupTree';
 import { CatalogAttributeValuesEditor } from './CatalogAttributeValuesEditor';
-import { CatalogDefinitionFields, createCatalogDefinitionDraft } from './CatalogDefinitionFields';
+import { CatalogDefinitionBasics, CatalogDefinitionSettings, createCatalogDefinitionDraft } from './CatalogDefinitionFields';
 import type { CatalogDefinitionDraft } from './CatalogDefinitionFields';
 import { CharacterQuantityInput } from './CharacterQuantityInput';
 import { catalogValueType } from './catalogModel';
 import { validateCharacterQuantity } from './characterCatalogModel';
 import { validateFieldValue } from './ValueInput';
 import { stringifyJson } from './json';
+import CharacterCatalogAttributes from './CharacterCatalogAttributes';
+import styles from './CharacterCatalogDialog.module.css';
 import type { CatalogAttributeOccurrence, CatalogKind, CatalogMetadata, CatalogContentEnvelope, CatalogGroupEntriesEnvelope, CharacterCatalogAddRequest, CharacterCatalogCreateRequest, CharacterCatalogEntryEnvelope } from './catalogTypes';
 import type { JsonNumber } from './types';
 
@@ -24,23 +26,18 @@ type PickerData = Pick<CatalogGroupEntriesEnvelope, 'entries' | 'diagnostics'>;
 export type CharacterCatalogAddDialogProps = {
   kind: CatalogKind;
   canPublishDefinition?: boolean;
+  characterName?: string;
+  definitionPermissionsPending?: boolean;
   onClose: () => void;
-};
-
-const pickerDiagnosticLabels: Record<string, string> = {
-  invalid_condition: 'Условие группы некорректно; автоматический отбор отключён.',
-  unknown_attribute: 'Условие ссылается на отсутствующий атрибут.',
-  incompatible_attribute_type: 'Условие использует устаревший тип атрибута.',
-  invalid_attribute_value: 'Значение условия не соответствует схеме.',
 };
 
 function safeErrorMessage(error: unknown): string {
   if (!(error instanceof CampaignApiError)) return 'Не удалось выполнить операцию. Попробуйте ещё раз.';
-  if (error.unknownOutcome || error.status === 0) return 'Результат добавления неизвестен. Проверьте подтверждение перед продолжением.';
-  if (error.status === 400) return 'Проверьте количество, атрибуты и данные предмета или навыка.';
+  if (error.unknownOutcome || error.status === 0) return 'Не удалось подтвердить добавление. Сначала проверьте результат, чтобы не добавить повторно.';
+  if (error.status === 400) return 'Проверьте количество и характеристики предмета или навыка.';
   if (error.status === 403) return 'Право записи персонажа больше недоступно.';
   if (error.status === 404) return 'Запись каталога больше недоступна.';
-  if (error.status === 409) return 'Добавление уже выполнялось или публикацию нельзя подтвердить. Проверьте результат.';
+  if (error.status === 409) return 'Не удалось подтвердить добавление. Проверьте результат, прежде чем продолжить.';
   if (error.status === 503) return 'Сервис временно недоступен.';
   return 'Не удалось выполнить операцию. Попробуйте ещё раз.';
 }
@@ -76,6 +73,8 @@ function sameNumericValue(left: JsonNumber | null | undefined, right: JsonNumber
 const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   kind,
   canPublishDefinition = false,
+  characterName,
+  definitionPermissionsPending = false,
   onClose,
 }) => {
   const { api, sessionKey } = useWorkspace();
@@ -91,6 +90,7 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   if (!requestIdRef.current) requestIdRef.current = crypto.randomUUID();
 
   const [mode, setMode] = useState<Mode>('catalog');
+  const [choosing, setChoosing] = useState(true);
   const [groupId, setGroupId] = useState('');
   const [search, setSearch] = useState('');
   const [selectedEntryId, setSelectedEntryId] = useState<string>();
@@ -104,6 +104,7 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   const [quantityRaw, setQuantityRaw] = useState(defaultQuantityRaw({ kind, quantityUnit: kind === 'Item' ? 'Whole' : null }));
   const [quantityInitialRaw, setQuantityInitialRaw] = useState(defaultQuantityRaw({ kind, quantityUnit: kind === 'Item' ? 'Whole' : null }));
   const [sourceFieldsInvalid, setSourceFieldsInvalid] = useState(false);
+  const [ownBaseInvalid, setOwnBaseInvalid] = useState(false);
   const [localAttributesInvalid, setLocalAttributesInvalid] = useState(false);
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(false);
@@ -207,7 +208,7 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
     if (attribute.typeKey !== value.typeKey || String(attribute.typeRevision) !== String(value.typeRevision)) return true;
     return validateFieldValue({ valueType, options: attribute.options }, value.value) !== undefined;
   });
-  const invalid = (mode === 'own' && sourceFieldsInvalid)
+  const invalid = (mode === 'own' && (sourceFieldsInvalid || ownBaseInvalid))
     || localAttributesInvalid
     || localRowsInvalid
     || Boolean(quantityDirty && quantityValidation?.issue)
@@ -216,18 +217,7 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   const sourceDirty = mode === 'catalog' && Boolean(selectedEntryId) && (localAttributesDirty || quantityDirty);
   const dirty = !confirmedRemoved && (ownDirty || sourceDirty);
 
-  const sourceAttributes = mode === 'own' ? ownDraft.attributes : selectedSource?.content.data.attributes ?? [];
   const sourceDiagnostics = mode === 'catalog' ? selectedSource?.content.diagnostics ?? [] : [];
-  const diagnosticOccurrenceIds = new Set(sourceDiagnostics.map(diagnostic => diagnostic.occurrenceId));
-  const overrideCandidates = sourceAttributes.filter(value => {
-    if (value.editLevel !== 'Character' || localAttributes.some(local => local.id === value.id) || diagnosticOccurrenceIds.has(value.id)) return false;
-    const attribute = definitions.find(definition => definition.id === value.attributeId);
-    const valueType = attribute ? catalogValueType(attribute.typeKey) : undefined;
-    if (!attribute || !attribute.isActive || !valueType) return false;
-    if (attribute.typeKey !== value.typeKey || String(attribute.typeRevision) !== String(value.typeRevision)) return false;
-    return validateFieldValue({ valueType, options: attribute.options }, value.value) === undefined;
-  });
-  const immutableBindingIds = sourceAttributes.map(value => value.id);
   const lockedOccurrenceIds = [...new Set([
     ...localBindingMismatches.map(value => value.id),
     ...localEditLevelMismatches.map(value => value.id),
@@ -238,8 +228,8 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   ];
   const visibleEntries = (picker.data?.entries ?? []).filter(entry =>
     entry.kind === kind && entry.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
-  const fieldsDisabled = busy || blocked || confirmedRemoved || !canWriteRef.current || catalog.permissionsPending;
-  const canPublish = canPublishDefinition && canWriteRef.current && !catalog.permissionsPending;
+  const fieldsDisabled = busy || blocked || confirmedRemoved || !canWriteRef.current || catalog.permissionsPending || definitionPermissionsPending;
+  const canPublish = canPublishDefinition && canWriteRef.current && !catalog.permissionsPending && !definitionPermissionsPending;
   useDirtyDraft(`character-catalog-add-${scope}-${requestIdRef.current}`, dirty || blocked && !confirmedRemoved);
 
   const acceptConfirmedEntry = (entry: CharacterCatalogEntryEnvelope) => {
@@ -288,13 +278,13 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
       if (!mountedRef.current) return;
       if ((error as { status?: number })?.status === 403) catalog.reportAccessFailure(error);
       if ((error as { status?: number })?.status === 404) {
-        setVerificationMessage('Подтверждение пока не найдено. Повторная проверка выполнит только чтения.');
+          setVerificationMessage('Добавление пока не подтверждено. Проверку можно повторить.');
       } else setVerificationError(error);
     }
   };
 
   const submit = async () => {
-    if (busyRef.current || blocked || confirmedRemoved || !canWriteRef.current || catalog.permissionsPending || invalid || !schemaReady) return;
+    if (busyRef.current || blocked || confirmedRemoved || !canWriteRef.current || catalog.permissionsPending || definitionPermissionsPending || invalid || !schemaReady) return;
     if (mode === 'own' && !ownDraft.name.trim()) return;
     const requestId = requestIdRef.current;
     if (!requestId) return;
@@ -380,6 +370,8 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
     setLocalAttributes([]);
     setLocalAttributesInvalid(false);
     setSourceFieldsInvalid(false);
+    setOwnBaseInvalid(false);
+    setChoosing(true);
     const initialQuantity = defaultQuantityRaw({ kind, quantityUnit: kind === 'Item' ? 'Whole' : null });
     setQuantityRaw(initialQuantity);
     setQuantityInitialRaw(initialQuantity);
@@ -394,7 +386,11 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   };
 
   const chooseEntry = (metadata: CatalogMetadata) => {
-    if (busyRef.current || blocked || confirmedRemoved || !canWriteRef.current || selectedEntryId === metadata.id) return;
+    if (busyRef.current || blocked || confirmedRemoved || !canWriteRef.current || catalog.permissionsPending || definitionPermissionsPending) return;
+    if (selectedEntryId === metadata.id) {
+      setChoosing(false);
+      return;
+    }
     if (dirty && !window.confirm('Отменить черновик выбранной записи и выбрать другую?')) return;
     sourceReadGeneration.current += 1;
     requestIdRef.current = crypto.randomUUID();
@@ -407,11 +403,13 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
     setLocalAttributes([]);
     setLocalAttributesInvalid(false);
     setSourceFieldsInvalid(false);
+    setOwnBaseInvalid(false);
     const initialQuantity = defaultQuantityRaw(metadata);
     setQuantityRaw(initialQuantity);
     setQuantityInitialRaw(initialQuantity);
     setSourceLoading(true);
     setSelectedEntryId(metadata.id);
+    setChoosing(false);
   };
 
   const changeSourceRetry = () => setSourceRetry(value => value + 1);
@@ -432,207 +430,140 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   };
 
   const title = kind === 'Item' ? 'Добавить предмет' : 'Добавить навык';
+  const footer = <div className={styles.footer}>
+    <span />
+    <ActionRow className={styles.footerActions} justify="end">
+      {confirmedRemoved
+        ? <Button type="button" variant="secondary" onClick={close}>Закрыть</Button>
+        : <>
+          <Button type="button" variant="secondary" disabled={busy} onClick={close}>Отмена</Button>
+          <Button
+            type="button"
+            disabled={busy || blocked || !catalog.canWrite || catalog.permissionsPending || definitionPermissionsPending
+              || !schemaReady || invalid || (mode === 'catalog' ? !selectedSource || choosing : !ownDraft.name.trim())}
+            onClick={() => void submit()}
+          >{busy ? 'Добавление…' : mode === 'catalog' ? 'Добавить персонажу' : 'Создать и добавить'}</Button>
+        </>}
+    </ActionRow>
+  </div>;
+  const subtitle = characterName ? `У персонажа «${characterName}»` : undefined;
 
-  return <ModalPortal isOpen onClose={close} title={title} size="wide" dismissDisabled={busy}>
+  return <ModalPortal isOpen onClose={close} title={title} subtitle={subtitle} footer={footer} size="wide" dismissDisabled={busy}>
     {confirmedRemoved
       ? <section>
         <p role="status">{verificationMessage}</p>
-        <Button type="button" variant="secondary" onClick={close}>Закрыть</Button>
       </section>
-      : <>
-        <div>
-          <Button
-            type="button"
-            variant={mode === 'catalog' ? 'primary' : 'secondary'}
-            disabled={busy || blocked || confirmedRemoved || !canWriteRef.current}
-            onClick={() => changeMode('catalog')}
-          >Из каталога</Button>
-          <Button
-            type="button"
-            variant={mode === 'own' ? 'primary' : 'secondary'}
-            disabled={busy || blocked || confirmedRemoved || !canWriteRef.current}
-            onClick={() => changeMode('own')}
-          >Создать своё</Button>
-        </div>
+      : <div className={styles.content}>
+        <ActionRow className={styles.modeActions}>
+          <Button type="button" size="small" variant={mode === 'catalog' ? 'primary' : 'secondary'} disabled={busy || blocked || confirmedRemoved || !canWriteRef.current} onClick={() => changeMode('catalog')}>Из каталога</Button>
+          <Button type="button" size="small" variant={mode === 'own' ? 'primary' : 'secondary'} disabled={busy || blocked || confirmedRemoved || !canWriteRef.current} onClick={() => changeMode('own')}>Создать своё</Button>
+        </ActionRow>
 
         {catalog.permissionsPending && <p role="status">Проверка прав. Запись до её завершения отключена.</p>}
+        {definitionPermissionsPending && <p role="status">Проверка прав каталога. Добавление пока недоступно.</p>}
         {!catalog.canRead && <StatePanel kind="error">Нет доступа к записям этого персонажа.</StatePanel>}
         {Boolean(catalog.schemaError) && <>
           <ApiError error={catalog.schemaError} />
-          <Button type="button" disabled={busy || blocked} onClick={catalog.reload}>Повторить чтение схемы</Button>
+          <Button type="button" disabled={busy || blocked || definitionPermissionsPending} onClick={catalog.reload}>Повторить чтение схемы</Button>
         </>}
 
-        {mode === 'catalog' && catalog.canRead && !blocked && <section>
+        {mode === 'catalog' && catalog.canRead && !blocked && choosing && <section className={styles.section}>
           <Toolbar><SearchBar searchTerm={search} onSearchChange={setSearch} compact aria-label="Поиск по названию" /></Toolbar>
           {groups.loading && !groups.data && <StatePanel kind="loading">Загрузка групп каталога…</StatePanel>}
           {Boolean(groups.error) && <ApiError error={groups.error} onRetry={groups.reload} />}
-          {groups.data ? <CatalogGroupTree
-            groups={groups.data.groups}
-            selectedId={groupId}
-            onSelect={setGroupId}
-          /> : null}
-          {groupId && <Button type="button" variant="secondary" disabled={busy} onClick={() => setGroupId('')}>Сбросить группу</Button>}
+          {groups.data && <CatalogGroupTree groups={groups.data.groups} selectedId={groupId} onSelect={setGroupId} />}
+          {groupId && <Button type="button" size="small" variant="secondary" disabled={busy} onClick={() => setGroupId('')}>Сбросить группу</Button>}
+          {selectedSource && <Button type="button" size="small" variant="secondary" onClick={() => setChoosing(false)}>К выбранному {kind === 'Item' ? 'предмету' : 'навыку'}</Button>}
           {picker.loading && !picker.data && <StatePanel kind="loading">Загрузка {kind === 'Item' ? 'предметов' : 'навыков'}…</StatePanel>}
           {Boolean(picker.error) && <ApiError error={picker.error} onRetry={picker.reload} />}
-          {picker.data ? picker.data.diagnostics.map((diagnostic, index) => <p role="status" key={`${diagnostic.groupId}-${diagnostic.entryId ?? 'group'}-${index}`}>
-            {pickerDiagnosticLabels[diagnostic.code] ?? 'Сервер обнаружил проблему при вычислении состава группы.'}
-          </p>) : null}
-          {picker.data
-            ? visibleEntries.length === 0
-               ? <StatePanel kind="empty">Ничего не найдено</StatePanel>
-              : <ul>
-                {visibleEntries.map(item => <li key={item.id}>
-                  <Button
-                    type="button"
-                    variant={selectedEntryId === item.id ? 'primary' : 'secondary'}
-                    disabled={busy || blocked || confirmedRemoved || !canWriteRef.current}
-                    onClick={() => chooseEntry(item)}
-                  >{item.name}</Button>
-                  <small>{item.kind === 'Item' ? 'Предмет' : 'Навык'}</small>
-                </li>)}
-              </ul>
-            : null}
+          {picker.data?.diagnostics.length ? <p className={styles.warning} role="status">Часть записей группы может быть недоступна. Можно повторить поиск в общем каталоге.</p> : null}
+          {picker.data && !picker.error && visibleEntries.length === 0 && <StatePanel kind="empty">Ничего не найдено</StatePanel>}
+          {picker.data && visibleEntries.length > 0 && <ul className={styles.pickerList}>
+            {visibleEntries.map(item => <li key={item.id}>
+              <Button type="button" size="small" variant="ghost" disabled={busy || blocked || confirmedRemoved || !canWriteRef.current || definitionPermissionsPending} onClick={() => chooseEntry(item)}>{item.name}</Button>
+            </li>)}
+          </ul>}
         </section>}
 
-        {mode === 'catalog' && selectedEntryId && <section>
+        {mode === 'catalog' && selectedEntryId && !choosing && <section className={styles.section}>
+          <Button type="button" size="small" variant="secondary" disabled={busy || blocked} onClick={() => setChoosing(true)}>Выбрать другой {kind === 'Item' ? 'предмет' : 'навык'}</Button>
           {sourceLoading && <StatePanel kind="loading">Загрузка {kind === 'Item' ? 'предмета' : 'навыка'}…</StatePanel>}
           {Boolean(sourceError) && <>
             <ApiError error={sourceError} />
             <p role="alert">{safeErrorMessage(sourceError)}</p>
             <Button type="button" disabled={busy || blocked} onClick={changeSourceRetry}>Повторить загрузку {kind === 'Item' ? 'предмета' : 'навыка'}</Button>
           </>}
-          {!sourceLoading && !sourceError && selectedSource ? <>
-            {!schemaReady
-              ? catalog.schemaError
-                ? <p role="alert">Схема атрибутов недоступна. Добавление невозможно.</p>
-                : <StatePanel kind="loading">Загрузка схемы атрибутов…</StatePanel>
-              : <>
-                <section>
-                  <h3>{selectedSource.metadata.name}</h3>
-                  <p>{selectedSource.metadata.kind === 'Item' ? 'Предмет' : 'Навык'}</p>
-                  <p>{selectedSource.content.data.description || 'Описание отсутствует.'}</p>
-                </section>
-                <section>
-                  <h3>Атрибуты {kind === 'Item' ? 'предмета' : 'навыка'}</h3>
-                  <CatalogAttributeValuesEditor
-                    definitions={definitions}
-                    values={[]}
-                    onChange={() => undefined}
-                    readOnly
-                    diagnostics={selectedSource.content.diagnostics}
-                    sourceValues={selectedSource.content.data.attributes}
-                  />
-                </section>
-                {overrideCandidates.length > 0 && <section>
-                  <h3>Собственные переопределения</h3>
-                  {overrideCandidates.map(value => {
-                    const attribute = definitions.find(item => item.id === value.attributeId);
-                    return <Button
-                      key={value.id}
-                      type="button"
-                      variant="secondary"
-                      disabled={fieldsDisabled}
-                      onClick={() => setLocalAttributes(current => current.some(row => row.id === value.id) ? current : [...current, {
-                        ...value,
-                        editLevel: 'Character',
-                      }])}
-                    >Задать собственное значение: {attribute?.title ?? 'атрибут'}</Button>;
-                  })}
-                </section>}
-                <section>
-                  <h3>Собственные атрибуты записи</h3>
-                  {selectedSource.metadata.kind === 'Item' && <CharacterQuantityInput
-                    metadata={selectedSource.metadata}
-                    raw={quantityRaw}
-                    onRawChange={setQuantityRaw}
-                    required
-                    disabled={fieldsDisabled}
-                    serverError={isQuantityServerError(failure) ? failure : undefined}
-                  />}
-                  <CatalogAttributeValuesEditor
-                    definitions={definitions}
-                    values={localAttributes}
-                    onChange={setLocalAttributes}
-                    onValidityChange={setLocalAttributesInvalid}
-                    mode="character"
-                    disabled={fieldsDisabled}
-                    immutableBindingIds={selectedSource.content.data.attributes.map(value => value.id)}
-                    lockedOccurrenceIds={localBindingMismatches.map(value => value.id)}
-                    diagnostics={localDiagnostics}
-                  />
-                </section>
-              </>}
-          </> : null}
-        </section>}
-
-        {mode === 'own' && <section>
-          {!schemaReady
+          {!sourceLoading && !sourceError && selectedSource && (!schemaReady
             ? catalog.schemaError
-              ? <p role="alert">Схема атрибутов недоступна. Создание невозможно.</p>
-              : <StatePanel kind="loading">Загрузка схемы атрибутов…</StatePanel>
+              ? <p role="alert">Схема характеристик недоступна. Добавление невозможно.</p>
+              : <StatePanel kind="loading">Загрузка {kind === 'Item' ? 'предмета' : 'навыка'}…</StatePanel>
             : <>
-              <CatalogDefinitionFields
-                draft={ownDraft}
-                onChange={setOwnDraft}
-                definitions={definitions}
-                canPublish={canPublish}
-                readOnly={!catalog.canWrite}
-                disabled={fieldsDisabled}
-                onValidityChange={setSourceFieldsInvalid}
-              />
-              {overrideCandidates.length > 0 && <section>
-                <h3>Собственные переопределения</h3>
-                {overrideCandidates.map(value => {
-                  const attribute = definitions.find(item => item.id === value.attributeId);
-                  return <Button
-                    key={value.id}
-                    type="button"
-                    variant="secondary"
-                    disabled={fieldsDisabled}
-                    onClick={() => setLocalAttributes(current => current.some(row => row.id === value.id) ? current : [...current, {
-                      ...value,
-                      editLevel: 'Character',
-                    }])}
-                  >Задать собственное значение: {attribute?.title ?? 'атрибут'}</Button>;
-                })}
-              </section>}
-              <section>
-                <h3>Собственные атрибуты записи</h3>
-                {kind === 'Item' && <CharacterQuantityInput
-                  metadata={ownDraft}
-                  raw={quantityRaw}
-                  onRawChange={setQuantityRaw}
-                  required
-                  disabled={fieldsDisabled}
-                  serverError={isQuantityServerError(failure) ? failure : undefined}
-                />}
-                <CatalogAttributeValuesEditor
+              <div className={styles.selectedHeader}>
+                <h3>{selectedSource.metadata.name}</h3>
+                <p className={styles.description}>{selectedSource.content.data.description || 'Описание отсутствует.'}</p>
+              </div>
+              {selectedSource.metadata.kind === 'Item' && <CharacterQuantityInput metadata={selectedSource.metadata} raw={quantityRaw} onRawChange={setQuantityRaw} required disabled={fieldsDisabled} serverError={isQuantityServerError(failure) ? failure : undefined} />}
+              <section className={styles.section}>
+                <h3>Характеристики</h3>
+                <CharacterCatalogAttributes
                   definitions={definitions}
+                  sourceValues={selectedSource.content.data.attributes}
                   values={localAttributes}
+                  savedValues={[]}
+                  diagnostics={[...selectedSource.content.diagnostics, ...localDiagnostics]}
+                  lockedOccurrenceIds={lockedOccurrenceIds}
+                  readOnly={!catalog.canWrite}
+                  disabled={fieldsDisabled}
                   onChange={setLocalAttributes}
                   onValidityChange={setLocalAttributesInvalid}
-                  mode="character"
-                  disabled={fieldsDisabled}
-                  immutableBindingIds={ownDraft.attributes.map(value => value.id)}
-                  lockedOccurrenceIds={localBindingMismatches.map(value => value.id)}
-                  diagnostics={localDiagnostics}
                 />
               </section>
+            </>)}
+        </section>}
+
+        {mode === 'own' && <section className={styles.section}>
+          {!schemaReady
+            ? catalog.schemaError
+              ? <p role="alert">Схема характеристик недоступна. Создание невозможно.</p>
+              : <StatePanel kind="loading">Загрузка {kind === 'Item' ? 'предмета' : 'навыка'}…</StatePanel>
+            : <>
+              <CatalogDefinitionBasics draft={ownDraft} onChange={setOwnDraft} readOnly={!catalog.canWrite} disabled={fieldsDisabled} onValidityChange={setSourceFieldsInvalid} />
+              {kind === 'Item' && <CharacterQuantityInput metadata={ownDraft} raw={quantityRaw} onRawChange={setQuantityRaw} required disabled={fieldsDisabled} serverError={isQuantityServerError(failure) ? failure : undefined} />}
+              {!canPublishDefinition && <p className={styles.context}>Не публикуется в общем каталоге</p>}
+              <section className={styles.section}>
+                <h3>Характеристики</h3>
+                <CharacterCatalogAttributes
+                  definitions={definitions}
+                  sourceValues={ownDraft.attributes}
+                  values={localAttributes}
+                  savedValues={[]}
+                  diagnostics={localDiagnostics}
+                  lockedOccurrenceIds={lockedOccurrenceIds}
+                  readOnly={!catalog.canWrite}
+                  disabled={fieldsDisabled}
+                  onChange={setLocalAttributes}
+                  onValidityChange={setLocalAttributesInvalid}
+                />
+              </section>
+              <details className={styles.advanced}>
+                <summary>Настройки {kind === 'Item' ? 'предмета' : 'навыка'}</summary>
+                <div className={styles.advancedBody}>
+                  <p>{kind === 'Item' ? 'Базовые характеристики относятся к самому предмету; личные значения выше — к этому персонажу.' : 'Базовые характеристики относятся к самому навыку; личные значения выше — к этому персонажу.'}</p>
+                  <CatalogDefinitionSettings draft={ownDraft} onChange={setOwnDraft} canPublish={canPublish} readOnly={!catalog.canWrite} disabled={fieldsDisabled} />
+                  <FieldSet legend="Базовые характеристики">
+                    <CatalogAttributeValuesEditor definitions={definitions} values={ownDraft.attributes} onChange={attributes => setOwnDraft(current => ({ ...current, attributes }))} onValidityChange={setOwnBaseInvalid} disabled={fieldsDisabled} readOnly={!catalog.canWrite} />
+                  </FieldSet>
+                </div>
+              </details>
             </>}
         </section>}
 
-      {Boolean(failure) && <>
-          <ApiError error={failure} />
-          <p role="alert">{safeErrorMessage(failure)}</p>
-        </>}
-        {Boolean(verificationError) && <>
-          <ApiError error={verificationError} />
-          <p role="alert">{safeErrorMessage(verificationError)}</p>
-        </>}
+        {Boolean(failure) && <><ApiError error={failure} /><p role="alert">{safeErrorMessage(failure)}</p></>}
+        {Boolean(verificationError) && <><ApiError error={verificationError} /><p role="alert">{safeErrorMessage(verificationError)}</p></>}
         {verificationMessage && <p role="status">{verificationMessage}</p>}
-        {blocked && <section>
+        {blocked && <section className={styles.section}>
           <h3>Проверка добавления</h3>
-          <p>Повторная отправка заблокирована. Проверка использует только исходный идентификатор операции.</p>
+          <p>Не удалось подтвердить добавление. Сначала проверьте результат, чтобы не добавить повторно.</p>
           <Button type="button" disabled={busy} onClick={() => {
             if (busyRef.current) return;
             busyRef.current = true;
@@ -643,16 +574,7 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
             });
           }}>Проверить результат добавления</Button>
         </section>}
-        {!confirmedRemoved && <div>
-          <Button
-            type="button"
-            disabled={busy || blocked || !catalog.canWrite || catalog.permissionsPending || !schemaReady || invalid
-              || (mode === 'catalog' ? !selectedSource : !ownDraft.name.trim())}
-            onClick={() => void submit()}
-          >{busy ? 'Добавление…' : mode === 'catalog' ? 'Добавить запись' : 'Создать и добавить'}</Button>
-          <Button type="button" variant="secondary" disabled={busy} onClick={close}>Отмена</Button>
-        </div>}
-      </>}
+      </div>}
   </ModalPortal>;
 };
 

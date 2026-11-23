@@ -4,6 +4,8 @@ import { useDirtyDraft } from './Workspace';
 import type { CatalogAttributeDefinition, CatalogAttributeOccurrence, CatalogEditLevel } from './catalogTypes';
 import { catalogValueLabel, catalogValueType, createCatalogOccurrence, defaultTypedValue } from './catalogModel';
 import { ValueInput, validateFieldValue } from './ValueInput';
+import CatalogAttributeReadout from './CatalogAttributeReadout';
+import styles from './CatalogDefinitionFields.module.css';
 
 export type CatalogAttributeDiagnostic = { occurrenceId: string; code: string };
 
@@ -85,6 +87,8 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
       setNewAttributeId(definitions.find(item => item.isActive)?.id ?? '');
     }
   }, [definitions, newAttributeId]);
+
+  if (readOnly) return <CatalogAttributeReadout definitions={definitions} values={[...sourceValues, ...values]} diagnostics={diagnostics} showEditRules={mode === 'definition'} />;
 
   const addOccurrence = () => {
     const definition = definitions.find(item => item.id === newAttributeId && item.isActive)
@@ -168,7 +172,7 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
           {definitions.filter(item => item.isActive).map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
         </Select>
         : attributeLabel}{stale && <small> Значение сохранено без изменения. Оно не будет преобразовано автоматически.</small>}{errorMessage && <small role="status">{errorMessage}</small>}</th>
-      <td>{rowReadOnly
+      <td data-label="Значение">{rowReadOnly
         ? catalogValueLabel(row.value, definition)
         : multipleChoice
           ? <><span>{catalogValueLabel(row.value, definition) || 'Не выбрано'}</span> <Button type="button" size="small" variant="secondary" disabled={disabled} onClick={() => setChoiceDraft({ row, value: row.value, error: validateFieldValue(field!, row.value) })}>Выбрать значения</Button></>
@@ -186,7 +190,7 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
             />
             : catalogValueLabel(row.value, definition)}
       </td>
-      <td>{mode === 'definition'
+      <td data-label="Можно менять у персонажа">{mode === 'definition'
         ? !rowReadOnly
           ? <Select aria-label={`Где разрешено менять: ${definition?.title ?? 'атрибут'}`} value={row.editLevel} disabled={stale} onChange={event => updateRow(row.id, { ...row, editLevel: event.target.value as CatalogEditLevel })}>
           <option value="Definition">Только в каталоге</option><option value="Character">Можно менять у персонажа</option>
@@ -194,7 +198,7 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
           : <>{row.editLevel === 'Character' ? 'Можно менять у персонажа' : 'Только в каталоге'}</>
         : <>{row.editLevel === 'Character' ? 'Можно менять у персонажа' : 'Только в каталоге'}</>}
       </td>
-      <td><ActionRow>
+      <td data-label="Действия"><ActionRow className={styles.attributeActions}>
         {mode === 'character' && rowReadOnly && !readOnly && !source && <IconButton
           icon="delete"
           size="small"
@@ -221,21 +225,20 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
   };
 
   return <section>
-    <h3>Атрибуты</h3>
-    <DataTable aria-label="Атрибуты" minWidth="42rem">
-      <thead><tr><th scope="col">Атрибут</th><th scope="col">Значение</th><th scope="col">Изменение</th><th scope="col">Действия</th></tr></thead>
+    <DataTable className={styles.attributeTable} wrapperClassName={styles.attributeTableWrapper} aria-label="Характеристики" minWidth="0">
+      <thead><tr><th scope="col">Характеристика</th><th scope="col">Значение</th><th scope="col">Можно менять у персонажа</th><th scope="col">Действия</th></tr></thead>
       <tbody>{sourceValues.map(row => renderRow(row, true))}{values.map(row => renderRow(row, false))}</tbody>
     </DataTable>
     {!readOnly && !disabled && <div>
-      <ActionRow>
-      <Field label="Новый атрибут" htmlFor={`${idPrefix}-catalog-new-attribute`}>
+      <ActionRow className={styles.addAttributeRow}>
+      <Field label="Новая характеристика" htmlFor={`${idPrefix}-catalog-new-attribute`}>
         <Select id={`${idPrefix}-catalog-new-attribute`} value={newAttributeId} onChange={event => setNewAttributeId(event.target.value)}>
-          <option value="">Выберите атрибут</option>
+          <option value="">Выберите характеристику</option>
           {definitions.filter(item => item.isActive).map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
         </Select>
       </Field>
       <Button type="button" onClick={addOccurrence} disabled={!newAttributeId || !definitions.some(item => item.id === newAttributeId && item.isActive && defaultTypedValue(item.typeKey, item.options) !== undefined)}>
-        Добавить атрибут
+        Добавить характеристику
       </Button></ActionRow>
     </div>}
     {hasInvalidInput && <p role="alert">Исправьте некорректные значения перед сохранением.</p>}

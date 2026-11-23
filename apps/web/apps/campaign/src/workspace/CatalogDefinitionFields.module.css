@@ -1,0 +1,155 @@
+.editor,
+.ownEditor,
+.basics,
+.settings,
+.details {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: 0.4rem 1rem;
+  margin: 0;
+}
+
+.summary dt,
+.summary dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.summary dt {
+  color: var(--text-secondary);
+}
+
+.topGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(13rem, 1fr);
+  gap: 1rem;
+  min-width: 0;
+}
+
+.viewGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(13rem, 0.32fr);
+  align-items: start;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.attributes {
+  min-width: 0;
+}
+
+.description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.readout {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  min-width: 0;
+}
+
+.readoutRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.readoutRow dt,
+.readoutRow dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.readoutRow dt {
+  font-weight: 600;
+}
+
+.readoutRow dd {
+  text-align: right;
+}
+
+.readoutNote {
+  display: block;
+  color: var(--text-secondary);
+}
+
+.attributeTableWrapper {
+  min-width: 0;
+  overflow-x: visible;
+}
+
+.attributeTable {
+  min-width: 0;
+}
+
+.attributeActions {
+  gap: 0.25rem;
+}
+
+.addAttributeRow {
+  align-items: end;
+  gap: 0.5rem;
+}
+
+@media (max-width: 48rem) {
+  .attributeTable thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .attributeTable tbody,
+  .attributeTable tr,
+  .attributeTable th,
+  .attributeTable td {
+    display: block;
+    width: auto;
+  }
+
+  .attributeTable tr {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .attributeTable td::before {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.875em;
+    content: attr(data-label);
+  }
+}
+
+@media (max-width: 42rem) {
+  .topGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .viewGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .readoutRow {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .readoutRow dd {
+    text-align: left;
+  }
+}

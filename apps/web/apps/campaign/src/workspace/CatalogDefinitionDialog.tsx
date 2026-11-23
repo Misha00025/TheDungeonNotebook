@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, ModalPortal, Notification, StatePanel, useAuth } from '@tdn/shared';
+import { ActionRow, Button, ModalPortal, Notification, Panel, StatePanel, useAuth } from '@tdn/shared';
 import type { CatalogAttributeSchemaEnvelope, CatalogContentEnvelope, CatalogCreateResult, CatalogKind, CatalogMetadata } from './catalogTypes';
 import type { Revision } from './types';
 import { CampaignApiError } from './api';
@@ -8,6 +8,9 @@ import { ApiError } from './Feedback';
 import { stringifyJson } from './json';
 import { CatalogDefinitionFields, createCatalogDefinitionDraft } from './CatalogDefinitionFields';
 import type { CatalogDefinitionDraft } from './CatalogDefinitionFields';
+import OwnCatalogDefinitionFields from './OwnCatalogDefinitionFields';
+import CatalogEntryDetails from './CatalogEntryDetails';
+import styles from './CatalogDefinitionFields.module.css';
 
 type Domain = 'metadata' | 'content';
 type RecoverySnapshot = { metadata: CatalogMetadata; content: CatalogContentEnvelope };
@@ -17,6 +20,7 @@ export type CatalogDefinitionDialogProps = {
   entryId?: string;
   initialKind?: CatalogKind;
   canAdmin: boolean;
+  audience?: 'gm' | 'player';
   permissionsPending?: boolean;
   onClose: () => void;
   onSaved: (metadata: CatalogMetadata, content?: CatalogContentEnvelope) => void;
@@ -76,6 +80,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
   entryId,
   initialKind = 'Item',
   canAdmin,
+  audience = canAdmin ? 'gm' : 'player',
   permissionsPending = false,
   onClose,
   onSaved,
@@ -113,6 +118,8 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
   const [recoverySnapshots, setRecoverySnapshots] = useState<Partial<Record<Domain, RecoverySnapshot>>>({});
   const [creationBlocked, setCreationBlocked] = useState(false);
   const [creationCheckFailed, setCreationCheckFailed] = useState(false);
+  const [editing, setEditing] = useState(!entryId);
+  const [autoFocusName, setAutoFocusName] = useState(!entryId);
 
   const userId = Number(auth.userId);
   const isOwner = Boolean(metadataBaseline && metadataBaseline.creatorUserId !== null && metadataBaseline.creatorUserId === userId);
@@ -176,6 +183,10 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
       readGeneration.current += 1;
     };
   }, [loadInitial]);
+
+  useEffect(() => {
+    if (autoFocusName && editing && !loading && !loadingError && schema) setAutoFocusName(false);
+  }, [autoFocusName, editing, loading, loadingError, schema]);
 
   const close = () => {
     if (busyRef.current || recoveryBusyRef.current || recovering) return;
@@ -249,7 +260,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
   };
 
   const saveExisting = async () => {
-    if (!entryId || !metadataBaseline || !contentBaseline || !canEdit || invalid || busyRef.current || recoveryBusyRef.current || blockedDomains.size > 0) return;
+    if (!entryId || !editing || !metadataBaseline || !contentBaseline || !canEdit || invalid || busyRef.current || recoveryBusyRef.current || blockedDomains.size > 0) return;
     if (!metadataDirty && !contentDirty) return;
     busyRef.current = true;
     setBusy(true);
@@ -279,13 +290,13 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
           allowNegative: result.allowNegative,
         }));
         onSavedRef.current(result);
-        setStatus('Метаданные подтверждённо сохранены.');
+        setStatus('Название и настройки сохранены.');
       }
       if (contentDirty && mountedRef.current) {
         if (!writeAllowedRef.current) {
           setStatus(metadataSaved
-            ? 'Метаданные подтверждённо сохранены. Запись содержимого остановлена, так как право доступа изменилось.'
-            : 'Запись содержимого остановлена, так как право доступа изменилось.');
+            ? 'Название и настройки сохранены. Запись описания и характеристик остановлена, так как право доступа изменилось.'
+            : 'Запись описания и характеристик остановлена, так как право доступа изменилось.');
           return;
         }
         activeDomain = 'content';
@@ -299,11 +310,13 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
         setDraft(current => ({ ...current, description: result.data.description, attributes: result.data.attributes }));
         setFieldsGeneration(value => value + 1);
         onSavedRef.current(savedMetadataBaseline, result);
-        setStatus(metadataSaved ? 'Метаданные и содержимое подтверждённо сохранены.' : 'Содержимое подтверждённо сохранено.');
+        setStatus(metadataSaved ? 'Изменения сохранены.' : 'Описание и характеристики сохранены.');
       }
+      if (mountedRef.current && !blockedDomains.size) setEditing(false);
     } catch (error) {
       if (!mountedRef.current) return;
       setFailure(error);
+      if (metadataSaved) setStatus('Название и настройки сохранены. Описание и характеристики сохранить не удалось; черновик остался.');
       if ((error as { status?: number })?.status === 403) reportForbidden();
       if (isRecoverableWriteFailure(error)) setBlockedDomains(current => new Set(current).add(activeDomain));
     } finally {
@@ -379,8 +392,8 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
     });
     setFailure(undefined);
     setStatus(action === 'accept'
-      ? `Принята серверная версия: ${domain === 'metadata' ? 'метаданные' : 'содержимое'}.`
-      : `Черновик сохранён локально; актуальная ревизия принята для следующего явного сохранения: ${domain === 'metadata' ? 'метаданные' : 'содержимое'}.`);
+      ? `Использованы актуальные значения: ${domain === 'metadata' ? 'названия и настроек' : 'описания и характеристик'}.`
+      : `Черновик сохранён локально; актуальные значения приняты для следующего явного сохранения: ${domain === 'metadata' ? 'названия и настроек' : 'описания и характеристик'}.`);
   };
 
   const entryKind = metadataBaseline?.kind ?? initialKind;
@@ -389,9 +402,41 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
   const title = entryId ? metadataBaseline?.name ?? (entryKind === 'Item' ? 'Предмет' : 'Навык') : `Новый ${kindName}`;
   const fieldReadOnly = !canEdit || loading || Boolean(loadingError);
   const fieldDisabled = busy || recovering || permissionsPending || revoked;
+  const cancelEditing = () => {
+    if (busyRef.current || recoveryBusyRef.current || recovering || blockedDomains.size > 0 || creationBlocked) return;
+    if (dirty && !window.confirm('Отменить несохранённые изменения?')) return;
+    if (metadataBaseline && contentBaseline) setDraft(draftFromServer(metadataBaseline, contentBaseline));
+    else setDraft(createCatalogDefinitionDraft(initialKind));
+    setInvalid(false);
+    setFieldsGeneration(value => value + 1);
+    setFailure(undefined);
+    setStatus('');
+    setEditing(false);
+  };
 
-  return <ModalPortal isOpen onClose={close} title={title} size="wide" dismissDisabled={busy || recovering}>
-    {loading && <StatePanel kind="loading">Загрузка {kindGenitive} и схемы атрибутов…</StatePanel>}
+  const subtitle = audience === 'gm'
+    ? `${entryKind === 'Item' ? 'Предмет' : 'Навык'} · Каталог кампании`
+    : entryKind === 'Item' ? 'Предмет' : 'Навык';
+  const footer = <ActionRow justify="end">
+    {!loading && !loadingError && schema && (!entryId || Boolean(metadataBaseline && contentBaseline)) && (entryId
+      ? editing
+        ? <>
+          <Button type="button" variant="secondary" disabled={busy || recovering || blockedDomains.size > 0 || creationBlocked} onClick={cancelEditing}>Отменить изменения</Button>
+          {canEdit && <Button type="button" disabled={busy || recovering || invalid || !metadataDirty && !contentDirty || blockedDomains.size > 0} onClick={save}>{busy ? 'Сохранение…' : 'Сохранить'}</Button>}
+        </>
+        : <>
+          <Button type="button" variant="secondary" disabled={busy || recovering} onClick={close}>Закрыть</Button>
+          {canEdit && <Button type="button" onClick={() => { setAutoFocusName(true); setEditing(true); }}>Редактировать</Button>}
+        </>
+      : <>
+        <Button type="button" variant="secondary" disabled={busy || recovering} onClick={close}>Отмена</Button>
+        {canPublish && <Button type="button" disabled={busy || recovering || invalid || !draft.name.trim() || creationBlocked} onClick={save}>{busy ? 'Создание…' : `Создать ${kindName}`}</Button>}
+      </>)}
+    {(loading || loadingError || !schema) && <Button type="button" variant="secondary" disabled={busy || recovering} onClick={close}>Закрыть</Button>}
+  </ActionRow>;
+
+  return <ModalPortal isOpen onClose={close} title={title} subtitle={subtitle} footer={footer} size="wide" dismissDisabled={busy || recovering}>
+    {loading && <StatePanel kind="loading">Загрузка {kindGenitive}…</StatePanel>}
     {!loading && Boolean(loadingError) && <>
       <ApiError error={loadingError} />
       <p role="alert">Не удалось загрузить полные данные {entryKind === 'Item' ? 'предмета' : 'навыка'}. Редактирование недоступно.</p>
@@ -400,17 +445,21 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
     {!loading && !loadingError && schema && (!entryId || Boolean(metadataBaseline && contentBaseline)) ? <>
       {permissionsPending && <p role="status">Проверка прав. До её завершения доступно только чтение.</p>}
       {revoked && <p role="alert">Запись заблокирована после отказа сервера. Проверьте права кампании.</p>}
-      <CatalogDefinitionFields
-        key={fieldsGeneration}
-        draft={draft}
-        onChange={setDraft}
-        definitions={schema.data.definitions}
-        canPublish={canPublish}
-        readOnly={fieldReadOnly}
-        disabled={fieldDisabled}
-        diagnostics={contentBaseline?.diagnostics}
-        onValidityChange={setInvalid}
-      />
+      {entryId && !editing && metadataBaseline && contentBaseline && <>
+        <div className={audience === 'gm' ? styles.viewGrid : undefined}>
+          <CatalogEntryDetails description={contentBaseline.data.description} definitions={schema.data.definitions} values={contentBaseline.data.attributes} diagnostics={contentBaseline.diagnostics} showEditRules={audience === 'gm'} />
+          {audience === 'gm' && <Panel title="Настройки каталога" density="compact"><dl className={styles.summary}>
+          <dt>Видимость</dt><dd>{metadataBaseline.isHidden ? 'Скрыт из общего каталога' : 'Доступен в общем каталоге'}</dd>
+          {entryKind === 'Item' && <><dt>Единица количества</dt><dd>{metadataBaseline.quantityUnit === 'Whole' ? 'Целое' : metadataBaseline.quantityUnit === 'Fractional' ? 'Дробное' : 'Единичное'}</dd><dt>Отрицательное количество</dt><dd>{metadataBaseline.allowNegative ? 'Разрешено' : 'Запрещено'}</dd></>}
+          </dl></Panel>}
+        </div>
+      </>}
+      {(!entryId || editing) && <>
+        {entryId && isOwner && !canAdmin && <p>Изменения затрагивают {entryKind === 'Item' ? 'предмет' : 'навык'} в каталоге, а не только запись у персонажа.</p>}
+        {entryId && isOwner && !canAdmin
+          ? <OwnCatalogDefinitionFields key={fieldsGeneration} draft={draft} onChange={setDraft} definitions={schema.data.definitions} diagnostics={contentBaseline?.diagnostics} readOnly={fieldReadOnly} disabled={fieldDisabled} onValidityChange={setInvalid} autoFocusName={autoFocusName} />
+          : <CatalogDefinitionFields key={fieldsGeneration} draft={draft} onChange={setDraft} definitions={schema.data.definitions} canPublish={canPublish} readOnly={fieldReadOnly} disabled={fieldDisabled} diagnostics={contentBaseline?.diagnostics} onValidityChange={setInvalid} autoFocusName={autoFocusName} />}
+      </>}
       {Boolean(failure) && <>
         <ApiError error={failure} />
         <p role="alert">{safeFailureMessage(failure)}</p>
@@ -418,8 +467,8 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
       {status && <p role="status">{status}</p>}
       {creationBlocked && <section>
         <h3>Проверка публикации</h3>
-        <p>Повторная отправка заблокирована. Проверьте результат запроса тем же идентификатором; выполняются только чтения.</p>
-        {creationCheckFailed && <p role="alert">Создание {kindGenitive} пока не подтверждено. Проверку можно повторить.</p>}
+        <p>Не удалось подтвердить создание. Сначала проверьте результат, чтобы не создать дубликат.</p>
+        {creationCheckFailed && <p role="alert">Результат создания пока не удалось проверить. Проверку можно повторить.</p>}
         <Button type="button" disabled={busy} onClick={() => {
           if (busyRef.current) return;
           busyRef.current = true;
@@ -434,23 +483,19 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
         <h3>Восстановление сохранения</h3>
         {[...blockedDomains].map(domain => {
           const snapshot = recoverySnapshots[domain];
-          const label = domain === 'metadata' ? 'метаданных' : 'содержимого';
+          const label = domain === 'metadata' ? 'названия и настроек' : 'описания и характеристик';
           return <div key={domain}>
-            <p>Запись {label} остановлена до явного перечитывания актуальной версии.</p>
+            <p>Изменения {label} не сохранены. Проверьте актуальные данные перед продолжением.</p>
             {!snapshot
-              ? <Button type="button" disabled={recovering || busy} onClick={() => void readRecovery(domain)}>Перечитать серверные данные</Button>
+              ? <Button type="button" disabled={recovering || busy} onClick={() => void readRecovery(domain)}>Проверить актуальные данные</Button>
               : <>
-                <p>Серверная версия прочитана. Выберите, как продолжить.</p>
-                <Button type="button" disabled={recovering || busy} onClick={() => resolveRecovery(domain, 'accept')}>Принять серверную версию</Button>
+                <p>Актуальные данные загружены. Выберите, как продолжить.</p>
+                <Button type="button" disabled={recovering || busy} onClick={() => resolveRecovery(domain, 'accept')}>Использовать актуальные значения</Button>
                 <Button type="button" variant="secondary" disabled={recovering || busy} onClick={() => resolveRecovery(domain, 'keep')}>Оставить мой черновик</Button>
               </>}
           </div>;
         })}
       </section>}
-      {!fieldReadOnly && <Button type="button" disabled={busy || recovering || invalid || !draft.name.trim() || blockedDomains.size > 0 || creationBlocked || (entryId ? !metadataDirty && !contentDirty : !canPublish)} onClick={save}>
-        {busy ? 'Сохранение…' : 'Сохранить'}
-      </Button>}
-      <Button type="button" variant="secondary" disabled={busy || recovering} onClick={close}>Отмена</Button>
     </> : null}
     {!loading && !loadingError && !schema && <Notification kind="error">Схема атрибутов недоступна. Сохранение невозможно.</Notification>}
   </ModalPortal>;

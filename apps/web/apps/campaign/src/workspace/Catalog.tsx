@@ -228,6 +228,7 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
       entryId={definitionDialog.entryId}
       initialKind={definitionDialog.initialKind}
       canAdmin={canManage}
+      audience={mode}
       permissionsPending={permissionsLoading}
       onClose={() => setDefinitionDialog(undefined)}
       onSaved={acceptSavedMetadata}

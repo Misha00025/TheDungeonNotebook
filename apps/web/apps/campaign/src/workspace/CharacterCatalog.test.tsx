@@ -102,13 +102,13 @@ const auth = (request: (url: string, options?: RequestInit) => Promise<Response>
 }) as unknown as HubRemoteProps['auth'];
 
 type PermissionProps = { canRead?: boolean; canWrite?: boolean; permissionsPending?: boolean };
-function catalogTree(request: (url: string, options?: RequestInit) => Promise<Response>, permissions: PermissionProps = {}, kind: CatalogKind = 'Item') {
+function catalogTree(request: (url: string, options?: RequestInit) => Promise<Response>, permissions: PermissionProps = {}, kind: CatalogKind = 'Item', panel: Partial<React.ComponentProps<typeof CharacterCatalogPanel>> = {}) {
   return <RemoteAuthProvider auth={auth(request)}>
     <MemoryRouter initialEntries={[`/groups/12/gm/characters/${characterId}/inventory`]}>
       <WorkspaceProvider mountPath="/groups/12">
         <DirtyProvider>
           <CharacterCatalogProvider campaignId={12} characterId={characterId} canRead={permissions.canRead ?? true} canWrite={permissions.canWrite ?? false} permissionsPending={permissions.permissionsPending ?? false}>
-            <CharacterCatalogPanel kind={kind} />
+             <CharacterCatalogPanel kind={kind} {...panel} />
           </CharacterCatalogProvider>
         </DirtyProvider>
       </WorkspaceProvider>
@@ -133,15 +133,19 @@ describe('character catalog consumer', () => {
     expect(screen.queryByRole('button', { name: 'Добавить предмет' })).not.toBeInTheDocument();
     expect(screen.getByText('0')).toBeInTheDocument();
     fireEvent.click(recordButton);
-    expect(await screen.findByRole('dialog', { name: 'Тайный паёк' })).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog', { name: 'Тайный паёк' });
     expect(screen.queryByRole('textbox', { name: 'Количество' })).not.toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Значение: Заметка A' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: 'Атрибут: Заметка A' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Убрать собственное значение' })).not.toBeInTheDocument();
+    expect(within(dialog).getByText('0')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Изменить' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Убрать у персонажа' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Изменить: Заметка A' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Сбросить к каталогу: Заметка A' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('Единица количества')).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('checkbox', { name: 'Разрешить отрицательное количество' })).not.toBeInTheDocument();
     expect(screen.getAllByText('read-only')[0]).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Сохранить изменения' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Удалить личную запись' })).not.toBeInTheDocument();
-    expect(calls.some(([url]) => url === `/api/campaigns/12/catalog/${sourceId}/content`)).toBe(false);
+    expect(calls.some(([url]) => url === `/api/campaigns/12/catalog/${sourceId}` || url === `/api/campaigns/12/catalog/${sourceId}/content`)).toBe(false);
     expect(calls.some(([, options]) => ['POST', 'PUT', 'DELETE'].includes(options?.method ?? ''))).toBe(false);
   });
 
@@ -159,15 +163,25 @@ describe('character catalog consumer', () => {
     });
     render(catalogTree(request, { canWrite: true }));
     fireEvent.click(await screen.findByRole('button', { name: 'Тайный паёк' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Тайный паёк' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Изменить' }));
     const value = await screen.findByRole('textbox', { name: 'Значение: Заметка A' });
-    const row = value.closest('tr') as HTMLElement;
-    fireEvent.click(within(row).getByRole('button', { name: 'Сбросить к каталогу' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Сбросить к каталогу: Заметка A' }));
+    expect(within(dialog).getByText(/Сброс ожидает сохранения/)).toBeInTheDocument();
+    expect(calls.filter(([url, options]) => url.endsWith('/attributes') && options?.method === 'PUT')).toHaveLength(0);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Отменить сброс' }));
+    expect(within(dialog).getByRole('button', { name: 'Сохранить изменения' })).toBeDisabled();
+    expect(await screen.findByRole('textbox', { name: 'Значение: Заметка A' })).toHaveValue('remove');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Сбросить к каталогу: Заметка A' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить изменения' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить изменения' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить изменения' }));
 
     await waitFor(() => expect(calls.some(([url, options]) => url.endsWith('/attributes') && options?.method === 'PUT')).toBe(true));
     const write = calls.find(([url, options]) => url.endsWith('/attributes') && options?.method === 'PUT');
     expect(parseJson(String(write?.[1]?.body))).toEqual({ expectedRevision: 7, attributes: [attribute('note-b', 'keep')] });
+    expect(await screen.findByText('Характеристики сохранены.')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('textbox', { name: 'Значение: Заметка B' })).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Изменить' }));
     expect(await screen.findByRole('textbox', { name: 'Значение: Заметка B' })).toHaveValue('keep');
     expect(within(screen.getByRole('table', { name: 'Инвентарь персонажа' })).getByText('0')).toBeInTheDocument();
     expect(calls.filter(([, options]) => options?.method === 'DELETE')).toHaveLength(0);
@@ -197,9 +211,11 @@ describe('character catalog consumer', () => {
     });
     render(catalogTree(request, { canWrite: true }));
     fireEvent.click(await screen.findByRole('button', { name: 'Тайный паёк' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Тайный паёк' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Изменить' }));
     fireEvent.change(await screen.findByRole('textbox', { name: 'Количество' }), { target: { value: '2' } });
     const value = await screen.findByRole('textbox', { name: 'Значение: Заметка A' });
-    fireEvent.click(within(value.closest('tr') as HTMLElement).getByRole('button', { name: 'Сбросить к каталогу' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Сбросить к каталогу: Заметка A' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Сохранить изменения' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить изменения' }));
     expect(await screen.findByRole('heading', { name: 'Восстановление записи' })).toBeInTheDocument();
@@ -207,8 +223,9 @@ describe('character catalog consumer', () => {
     expect(screen.getByRole('button', { name: 'Сохранить изменения' })).toBeDisabled();
     expect(calls.filter(([url, options]) => url.endsWith('/quantity') && options?.method === 'PUT')).toHaveLength(1);
     expect(calls.filter(([url, options]) => url.endsWith('/attributes') && options?.method === 'PUT')).toHaveLength(1);
+    expect(screen.getByRole('cell', { name: '2' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Перечитать серверные данные' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Проверить актуальные данные' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Оставить мой черновик' }));
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить изменения' }));
     await waitFor(() => expect(attributeWrites).toBe(2));
@@ -233,9 +250,9 @@ describe('character catalog consumer', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Добавить навык' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Создать своё' }));
     fireEvent.change(await screen.findByRole('textbox', { name: 'Название' }), { target: { value: 'Моя проверка' } });
-    const characterAttributes = within((await screen.findByRole('heading', { name: 'Собственные атрибуты записи' })).parentElement!);
-    fireEvent.change(characterAttributes.getByLabelText('Новый атрибут'), { target: { value: 'note-a' } });
-    fireEvent.click(characterAttributes.getByRole('button', { name: 'Добавить атрибут' }));
+    const characterAttributes = within((await screen.findByRole('heading', { name: 'Характеристики' })).parentElement!);
+    fireEvent.change(characterAttributes.getByLabelText('Новая характеристика'), { target: { value: 'note-a' } });
+    fireEvent.click(characterAttributes.getByRole('button', { name: 'Добавить характеристику' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Создать и добавить' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Создать и добавить' }));
 
@@ -247,6 +264,81 @@ describe('character catalog consumer', () => {
     expect(submitted.quantity).toBeNull();
     expect(await screen.findByRole('button', { name: 'Моя проверка' })).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Добавить навык' })).not.toBeInTheDocument();
+  });
+
+  it('adds only an explicitly selected editable source occurrence to the character', async () => {
+    const definition = { id: 'shared-type', title: 'Тип', typeKey: 'string' as const, typeRevision: 3, options: [], isActive: true };
+    const fixed = { id: 'fixed-type', attributeId: definition.id, typeKey: 'string', typeRevision: 3, value: 'базовый', editLevel: 'Definition' as const };
+    const editable = { id: 'personal-type', attributeId: definition.id, typeKey: 'string', typeRevision: 3, value: 'личный', editLevel: 'Character' as const };
+    const source = { ...sourceDefinition, quantityUnit: 'Whole' as const };
+    const { request, calls } = makeRequest((url, options) => {
+      if (url === '/api/campaigns/12/catalog/attributes') return response({ campaignId: 12, contentRevision: 1, data: { definitions: [definition] } });
+      if (url === '/api/campaigns/12/catalog' || url.startsWith('/api/campaigns/12/catalog?')) return response([source]);
+      if (url === `/api/campaigns/12/catalog/${sourceId}`) return response(source);
+      if (url === `/api/campaigns/12/catalog/${sourceId}/content`) return response({ ...sourceContent, data: { description: 'Два вхождения.', attributes: [fixed, editable] } });
+      if (url === `/api/campaigns/12/characters/${characterId}/entries` && options?.method === 'POST') {
+        const body = parseJson(String(options.body)) as any;
+        return response({ requestId: body.requestId, entry: makeEntry({ id: 'added-record', quantity: 0, attributes: body.attributes }) });
+      }
+      return undefined;
+    });
+    render(catalogTree(request, { canWrite: true }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Добавить предмет' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Добавить предмет' });
+    fireEvent.click(await within(dialog).findByRole('button', { name: source.name }));
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'Изменить: Тип' }));
+    const value = await within(dialog).findByRole('textbox', { name: 'Значение: Тип' });
+    fireEvent.change(value, { target: { value: 'новый личный тип' } });
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Количество' }), { target: { value: '0' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Добавить персонажу' }));
+
+    await waitFor(() => expect(calls.some(([url, options]) => url.endsWith('/entries') && options?.method === 'POST')).toBe(true));
+    const post = calls.find(([url, options]) => url.endsWith('/entries') && options?.method === 'POST');
+    expect(parseJson(String(post?.[1]?.body))).toMatchObject({
+      catalogEntryId: sourceId,
+      quantity: 0,
+      attributes: [{ id: 'personal-type', attributeId: 'shared-type', typeKey: 'string', typeRevision: 3, value: 'новый личный тип', editLevel: 'Character' }],
+    });
+    expect(calls.some(([, options]) => options?.method === 'PUT')).toBe(false);
+  });
+
+  it('lets a definition owner edit the catalog from a read-only character entry', async () => {
+    let definition = { ...sourceDefinition, creatorUserId: 4 };
+    let entry = makeEntry();
+    const { request, calls } = makeRequest((url, options) => {
+      if (url === `/api/campaigns/12/characters/${characterId}/entries` && options?.method !== 'POST') return response([entry]);
+      if (url === `/api/campaigns/12/characters/${characterId}/entries/${recordId}` && options?.method === 'GET') return response({ ...entry, definition });
+      if (url === `/api/campaigns/12/catalog/${sourceId}` && options?.method === 'GET') return response(definition);
+      if (url === `/api/campaigns/12/catalog/${sourceId}/content`) return response(sourceContent);
+      if (url === `/api/campaigns/12/catalog/${sourceId}` && options?.method === 'PUT') {
+        const body = parseJson(String(options.body)) as any;
+        definition = { ...definition, name: body.name, metadataRevision: 3 };
+        entry = { ...entry, definition };
+        return response(definition);
+      }
+      return undefined;
+    });
+    render(catalogTree(request, { canWrite: false }, 'Item', { audience: 'player' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Тайный паёк' }));
+    const entryDialog = await screen.findByRole('dialog', { name: 'Тайный паёк' });
+    expect(within(entryDialog).queryByRole('textbox', { name: 'Название' })).not.toBeInTheDocument();
+    fireEvent.click(within(entryDialog).getByRole('button', { name: 'Изменить мой предмет' }));
+    await screen.findByRole('button', { name: 'Редактировать' });
+    const definitionDialogs = await screen.findAllByRole('dialog', { name: 'Тайный паёк' });
+    const definitionDialog = definitionDialogs.find(candidate => within(candidate).queryByRole('button', { name: 'Редактировать' }))!;
+    expect(within(definitionDialog).queryByRole('textbox', { name: 'Название' })).not.toBeInTheDocument();
+    fireEvent.click(await within(definitionDialog).findByRole('button', { name: 'Редактировать' }));
+    fireEvent.change(await within(definitionDialog).findByRole('textbox', { name: 'Название' }), { target: { value: 'Обновлённый паёк' } });
+    fireEvent.click(within(definitionDialog).getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => expect(calls.some(([url, options]) => url.endsWith(`/catalog/${sourceId}`) && options?.method === 'PUT')).toBe(true));
+    const metadataPut = calls.find(([url, options]) => url.endsWith(`/catalog/${sourceId}`) && options?.method === 'PUT');
+    expect(parseJson(String(metadataPut?.[1]?.body))).toMatchObject({ name: 'Обновлённый паёк', expectedRevision: 2 });
+    expect(calls.filter(([, options]) => options?.method === 'PUT')).toHaveLength(1);
+    expect(calls.some(([url, options]) => url.includes(`/characters/${characterId}/entries/`) && options?.method === 'PUT')).toBe(false);
+    await within(definitionDialog).findByText('Название и настройки сохранены.');
+    fireEvent.click(within(definitionDialog).getByText('Закрыть', { selector: 'button' }));
+    expect(await screen.findByRole('button', { name: 'Обновлённый паёк' })).toBeInTheDocument();
+    expect(calls.filter(([url, options]) => url === `/api/campaigns/12/catalog/${sourceId}/content` && options?.method === 'GET')).toHaveLength(1);
   });
 
   it('retains an uncertain add operation across permission refresh and confirms it without reposting', async () => {
@@ -272,9 +364,9 @@ describe('character catalog consumer', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Добавить предмет' }));
     const addDialog = screen.getByRole('dialog', { name: 'Добавить предмет' });
     fireEvent.click(await within(addDialog).findByRole('button', { name: sourceDefinition.name }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Добавить запись' })).toBeEnabled());
-    fireEvent.click(await screen.findByRole('button', { name: 'Добавить запись' }));
-    expect(await screen.findByText('Подтверждение пока не найдено. Повторная проверка выполнит только чтения.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Добавить персонажу' })).toBeEnabled());
+    fireEvent.click(await screen.findByRole('button', { name: 'Добавить персонажу' }));
+    expect(await screen.findByText('Добавление пока не подтверждено. Проверку можно повторить.')).toBeInTheDocument();
 
     mounted.rerender(catalogTree(request, { canRead: true, canWrite: false, permissionsPending: true }));
     expect(screen.getByRole('dialog', { name: 'Добавить предмет' })).toBeInTheDocument();

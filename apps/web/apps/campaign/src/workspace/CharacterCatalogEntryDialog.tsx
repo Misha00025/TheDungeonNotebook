@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, DataTable, ModalPortal, StatePanel } from '@tdn/shared';
+import { ActionRow, Button, ModalPortal, StatePanel, useAuth } from '@tdn/shared';
 import { compareNumber } from 'lossless-json';
 import type { JsonNumber } from './types';
 import type { CatalogAttributeDefinition, CatalogAttributeOccurrence, CatalogDiagnostic, CharacterCatalogEntryEnvelope } from './catalogTypes';
@@ -7,12 +7,12 @@ import { useCharacterCatalog } from './CharacterCatalogContext';
 import { CampaignApiError } from './api';
 import { useDirtyDraft, useWorkspace } from './Workspace';
 import { ApiError } from './Feedback';
-import { CatalogAttributeValuesEditor } from './CatalogAttributeValuesEditor';
+import CharacterCatalogAttributes from './CharacterCatalogAttributes';
 import { CharacterQuantityInput } from './CharacterQuantityInput';
-import { catalogValueLabel, catalogValueType } from './catalogModel';
+import CatalogDefinitionDialog from './CatalogDefinitionDialog';
 import { stringifyJson } from './json';
-import { validateFieldValue } from './ValueInput';
 import { validateCharacterQuantity, characterQuantityToRaw } from './characterCatalogModel';
+import styles from './CharacterCatalogDialog.module.css';
 
 type QuantityBaseline = { value: JsonNumber | null; revision: CharacterCatalogEntryEnvelope['record']['metadataRevision'] };
 type AttributesBaseline = { values: CatalogAttributeOccurrence[]; revision: CharacterCatalogEntryEnvelope['localContentRevision'] };
@@ -23,24 +23,23 @@ type SnapshotReadResult = { ok: true; snapshot: EntrySnapshot } | { ok: false; s
 export type CharacterCatalogEntryDialogProps = {
   entryId: string;
   readOnly?: boolean;
+  characterName?: string;
+  audience?: 'gm' | 'player';
+  canAdminDefinition?: boolean;
+  definitionPermissionsPending?: boolean;
+  onDefinitionForbidden?: () => void;
   onClose: () => void;
 };
 
-const diagnosticLabels: Record<string, string> = {
-  unknown_attribute: 'Атрибут отсутствует в текущей схеме.',
-  incompatible_attribute_type: 'Тип или версия атрибута устарели.',
-  invalid_attribute_value: 'Значение не соответствует текущей схеме.',
-  attribute_binding_changed: 'Связь собственного значения с атрибутом изменилась; значение не применяется.',
-  edit_level_changed: 'Уровень редактирования значения изменился; значение не применяется.',
-};
+const noop = () => {};
 
 function safeErrorMessage(error: unknown): string {
   if (!(error instanceof CampaignApiError)) return 'Не удалось выполнить операцию. Попробуйте ещё раз.';
-  if (error.unknownOutcome || error.status === 0) return 'Результат записи неизвестен. Перечитайте запись перед продолжением.';
-  if (error.status === 400) return 'Сервер не принял количество или собственные атрибуты. Проверьте введённые данные.';
+  if (error.unknownOutcome || error.status === 0) return 'Не удалось подтвердить сохранение. Проверьте актуальные данные перед продолжением.';
+  if (error.status === 400) return 'Сервер не принял количество или характеристики. Проверьте введённые данные.';
   if (error.status === 403) return 'Право записи больше недоступно.';
   if (error.status === 404) return 'Личная запись больше недоступна.';
-  if (error.status === 409) return 'Данные записи изменились на сервере. Перечитайте актуальную версию.';
+  if (error.status === 409) return 'Данные изменились на сервере. Проверьте актуальные данные перед продолжением.';
   if (error.status === 503) return 'Сервис временно недоступен.';
   return 'Не удалось выполнить операцию. Попробуйте ещё раз.';
 }
@@ -66,9 +65,10 @@ function isBindingDiagnostic(diagnostic: CatalogDiagnostic): boolean {
   return diagnostic.code === 'attribute_binding_changed' || diagnostic.code === 'edit_level_changed';
 }
 
-const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = ({ entryId, readOnly = false, onClose }) => {
+const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = ({ entryId, readOnly = false, characterName, audience = 'player', canAdminDefinition = false, definitionPermissionsPending = false, onDefinitionForbidden = noop, onClose }) => {
   const { api, sessionKey } = useWorkspace();
   const catalog = useCharacterCatalog();
+  const auth = useAuth();
   const mountedRef = useRef(false);
   const busyRef = useRef(false);
   const recoveryBusyRef = useRef(false);
@@ -102,6 +102,9 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
   const [blockedDomains, setBlockedDomains] = useState<Set<Domain>>(() => new Set());
   const [recoverySnapshots, setRecoverySnapshots] = useState<Partial<Record<Domain, EntrySnapshot>>>({});
   const [deleteBlocked, setDeleteBlocked] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [definitionDialogOpen, setDefinitionDialogOpen] = useState(false);
+  const definitionChangedRef = useRef(false);
 
   const quantityPolicy = useMemo(() => entry ? ({
     kind: entry.definition.kind,
@@ -126,14 +129,11 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
   const dirty = quantityDirty || attributesDirty;
   const invalid = Boolean(quantityDirty && quantityValidation.issue) || attributesInvalid;
   const writeBlocked = blockedDomains.size > 0 || deleteBlocked;
-  const controlsDisabled = busy || recovering || deleting || writeBlocked || readOnly || !catalog.canWrite;
+  const controlsDisabled = busy || recovering || deleting || writeBlocked || readOnly || !catalog.canWrite || catalog.permissionsPending;
   const owner = `character-catalog-entry-${sessionKey}-${catalog.campaignId}-${catalog.characterId}-${entryId}`;
   useDirtyDraft(owner, dirty || invalid || writeBlocked || missingDraft);
 
-  const definitionById = useMemo(() => new Map(definitions.map(definition => [definition.id, definition])), [definitions]);
-  const serverExplicitById = useMemo(() => new Map((entry?.explicitAttributes ?? []).map(value => [value.id, value])), [entry?.explicitAttributes]);
   const bindingDiagnosticIds = useMemo(() => new Set((entry?.diagnostics ?? []).filter(isBindingDiagnostic).map(value => value.occurrenceId)), [entry?.diagnostics]);
-  const immutableBindingIds = useMemo(() => (entry?.effectiveAttributes ?? []).map(value => value.id), [entry?.effectiveAttributes]);
   const lockedOccurrenceIds = useMemo(() => {
     const locked = attributesDraft.filter(value => value.editLevel !== 'Character').map(value => value.id);
     for (const diagnostic of entry?.diagnostics ?? []) {
@@ -238,12 +238,6 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
     void loadInitial();
   }, [loadInitial, catalog.permissionsPending, notFound]);
 
-  const close = () => {
-    if (busyRef.current || recoveryBusyRef.current || deleting) return;
-    if ((dirty || invalid || writeBlocked) && !window.confirm('Есть несохранённые изменения. Закрыть и потерять их?')) return;
-    onCloseRef.current();
-  };
-
   const acceptEntrySnapshot = (snapshot: EntrySnapshot) => {
     entryRef.current = snapshot.entry;
     setEntry(snapshot.entry);
@@ -261,7 +255,7 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
 
   const save = async () => {
     if (busyRef.current || recoveryBusyRef.current) return;
-    if (readOnly || !entry || !quantityBaseline || !attributesBaseline || !catalog.canWrite || controlsDisabled || invalid || !dirty) return;
+    if (!editing || readOnly || !entry || !quantityBaseline || !attributesBaseline || !catalog.canWrite || controlsDisabled || invalid || !dirty) return;
     const quantityWasDirty = quantityDirty;
     const attributesWereDirty = attributesDirty;
     busyRef.current = true;
@@ -270,6 +264,7 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
     setFailureDomain(undefined);
     setStatus('');
     let activeDomain: Domain = quantityWasDirty ? 'quantity' : 'attributes';
+    let quantityConfirmed = false;
     try {
       if (quantityWasDirty) {
         if (quantityValidation.value === undefined || quantityValidation.value === null) return;
@@ -284,20 +279,21 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
         setEntry(updated);
         setQuantityBaseline({ value: updated.record.quantity, revision: updated.record.metadataRevision });
         setQuantityRaw(characterQuantityToRaw(updated.record.quantity));
+        quantityConfirmed = true;
         if (!attributesWereDirty) {
           setAttributesBaseline({ values: updated.explicitAttributes, revision: updated.localContentRevision });
           setAttributesDraft(updated.explicitAttributes);
           setAttributesEditorGeneration(value => value + 1);
         }
         catalog.upsert(updated);
-        setStatus('Количество подтверждённо сохранено.');
+        setStatus('Количество сохранено.');
       }
 
       if (attributesWereDirty && mountedRef.current) {
         if (!canWriteRef.current) {
           setStatus(quantityWasDirty
-            ? 'Количество подтверждённо сохранено. Запись атрибутов остановлена, так как право доступа изменилось.'
-            : 'Запись атрибутов остановлена, так как право доступа изменилось.');
+            ? 'Количество сохранено. Запись характеристик остановлена, так как право доступа изменилось.'
+            : 'Запись характеристик остановлена, так как право доступа изменилось.');
           return;
         }
         activeDomain = 'attributes';
@@ -316,13 +312,13 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
         setQuantityBaseline({ value: updated.record.quantity, revision: updated.record.metadataRevision });
         setQuantityRaw(characterQuantityToRaw(updated.record.quantity));
         catalog.upsert(updated);
-        setStatus(quantityWasDirty
-          ? 'Количество и собственные атрибуты подтверждённо сохранены.'
-          : 'Собственные атрибуты подтверждённо сохранены.');
+        setStatus(quantityWasDirty ? 'Изменения сохранены.' : 'Характеристики сохранены.');
       }
+      if (mountedRef.current) setEditing(false);
     } catch (error) {
       if (!mountedRef.current) return;
       setFailure(error);
+      if (quantityConfirmed) setStatus('Количество сохранено. Характеристики сохранить не удалось; черновик остался.');
       const statusCode = (error as { status?: number })?.status;
       if (statusCode === 403) {
         setFailureDomain(activeDomain);
@@ -372,7 +368,7 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
   const resolveRecovery = (domain: Domain, action: 'accept' | 'keep') => {
     const snapshot = recoverySnapshots[domain];
     if (!snapshot || !blockedDomains.has(domain)) return;
-    if (action === 'accept' && !window.confirm(`Заменить черновик ${domain === 'quantity' ? 'количества' : 'собственных атрибутов'} серверной версией?`)) return;
+    if (action === 'accept' && !window.confirm(`Заменить черновик ${domain === 'quantity' ? 'количества' : 'характеристик'} актуальными значениями?`)) return;
 
     entryRef.current = snapshot.entry;
     setEntry(snapshot.entry);
@@ -411,7 +407,7 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
     setFailureDomain(undefined);
     setMissingDraft(false);
     setStatus(action === 'accept'
-      ? `Принята серверная версия: ${domain === 'quantity' ? 'количества' : 'собственных атрибутов'}.`
+      ? `Использованы актуальные значения: ${domain === 'quantity' ? 'количества' : 'характеристик'}.`
       : 'Черновик оставлен. Для сохранения нажмите «Сохранить изменения».');
     catalog.upsert(snapshot.entry);
   };
@@ -487,38 +483,60 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
     }
   };
 
-  const definition = entry?.definition;
-  const sourceExplicitIds = new Set((entry?.explicitAttributes ?? []).map(value => value.id));
-  const currentExplicitIds = new Set(attributesDraft.map(value => value.id));
-  const resetPending = Boolean(attributesBaseline?.values.some(value => !currentExplicitIds.has(value.id)));
-  const overrideableSources = (entry?.effectiveAttributes ?? []).filter(value => {
-    if (sourceExplicitIds.has(value.id) || currentExplicitIds.has(value.id) || value.editLevel !== 'Character') return false;
-    const attribute = definitions.find(candidate => candidate.id === value.attributeId);
-    const valueType = attribute ? catalogValueType(attribute.typeKey) : undefined;
-    if (!attribute || !attribute.isActive || !valueType || bindingDiagnosticIds.has(value.id)) return false;
-    if (attribute.typeKey !== value.typeKey || String(attribute.typeRevision) !== String(value.typeRevision)) return false;
-    return validateFieldValue({ valueType, options: attribute.options }, value.value) === undefined;
-  });
-  const effectiveRows = (entry?.effectiveAttributes ?? []).map(value => {
-    const explicit = serverExplicitById.get(value.id);
-    const appliesLocally = Boolean(explicit
-      && explicit.editLevel === 'Character'
-      && explicit.attributeId === value.attributeId
-      && !bindingDiagnosticIds.has(value.id));
-    return { value, label: appliesLocally ? 'Собственное значение' : 'Из каталога' };
-  });
-
   const handleClose = () => {
-    if (busyRef.current || recoveryBusyRef.current || recovering || deleting) return;
+    if (busyRef.current || recoveryBusyRef.current || recovering || deleting || definitionDialogOpen) return;
     if ((dirty || invalid || blockedDomains.size > 0 || deleteBlocked || missingDraft)
       && !window.confirm('Есть несохранённые изменения или незавершённое восстановление. Закрыть и потерять их?')) return;
     onCloseRef.current();
   };
 
+  const cancelEditing = () => {
+    if (busyRef.current || recoveryBusyRef.current || recovering || deleting || writeBlocked) return;
+    if ((dirty || invalid) && !window.confirm('Отменить несохранённые изменения?')) return;
+    if (quantityBaseline) setQuantityRaw(characterQuantityToRaw(quantityBaseline.value));
+    if (attributesBaseline) setAttributesDraft(attributesBaseline.values);
+    setAttributesInvalid(false);
+    setAttributesEditorGeneration(value => value + 1);
+    setFailure(undefined);
+    setFailureDomain(undefined);
+    setStatus('');
+    setEditing(false);
+  };
+
+  const definition = entry?.definition;
+  const userId = Number(auth.userId);
+  const isDefinitionOwner = Boolean(definition && definition.creatorUserId !== null && definition.creatorUserId === userId);
+  const canEditDefinition = !definitionPermissionsPending && (canAdminDefinition || isDefinitionOwner);
+  const canOpenDefinition = Boolean(catalog.canRead && !loading && !readError && !notFound && entry && !editing && canEditDefinition && !dirty && !invalid && !busy && !recovering && !deleting
+    && blockedDomains.size === 0 && !deleteBlocked && !missingDraft);
+  const subtitle = definition
+    ? `${definition.kind === 'Item' ? 'Предмет' : 'Навык'}${characterName ? ` · У персонажа «${characterName}»` : ''}`
+    : undefined;
+  const unmatchedDiagnostics = Boolean(entry && entry.diagnostics.some(diagnostic =>
+    ![...entry.effectiveAttributes, ...entry.explicitAttributes].some(value => value.id === diagnostic.occurrenceId)));
+
+  const footer = <div className={styles.footer}>
+    <div className={styles.footerLeft}>
+      {!loading && !readError && !notFound && entry && !editing && catalog.canWrite && !readOnly && <Button type="button" variant="secondary" disabled={controlsDisabled || dirty || invalid || blockedDomains.size > 0 || deleteBlocked} onClick={() => void deleteEntry()}>Убрать у персонажа</Button>}
+      {canOpenDefinition && <Button type="button" variant="secondary" onClick={() => { definitionChangedRef.current = false; setDefinitionDialogOpen(true); }}>{audience === 'gm' ? `Изменить ${definition?.kind === 'Skill' ? 'навык' : 'предмет'} в каталоге` : `Изменить мой ${definition?.kind === 'Skill' ? 'навык' : 'предмет'}`}</Button>}
+    </div>
+    <ActionRow className={styles.footerActions} justify="end">
+      {!loading && !readError && !notFound && entry && editing
+        ? <>
+          <Button type="button" variant="secondary" disabled={busy || recovering || deleting || writeBlocked} onClick={cancelEditing}>Отменить изменения</Button>
+          {catalog.canWrite && !readOnly && <Button type="button" disabled={controlsDisabled || invalid || !dirty} onClick={() => void save()}>{busy ? 'Сохранение…' : 'Сохранить изменения'}</Button>}
+        </>
+        : <>
+          <Button type="button" variant="secondary" disabled={busy || recovering || deleting} onClick={handleClose}>Закрыть</Button>
+          {!loading && !readError && !notFound && entry && catalog.canWrite && !catalog.permissionsPending && !readOnly && <Button type="button" onClick={() => setEditing(true)}>Изменить</Button>}
+        </>}
+    </ActionRow>
+  </div>;
+
   const header = catalog.canRead && !notFound ? definition?.name ?? 'Личная запись' : 'Личная запись';
   const visible = catalog.canRead && !notFound;
 
-  return <ModalPortal isOpen onClose={handleClose} title={header} size="wide" dismissDisabled={busy || recovering || deleting}>
+  return <ModalPortal isOpen onClose={handleClose} title={header} subtitle={subtitle} footer={footer} size="wide" dismissDisabled={busy || recovering || deleting || definitionDialogOpen}>
     {loading && <StatePanel kind="loading">Загрузка личной записи…</StatePanel>}
     {!loading && Boolean(readError) && <>
       <ApiError error={readError} />
@@ -528,90 +546,39 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
     {!loading && notFound && <>
       <p role="status">Личная запись удалена или больше недоступна. Остальные записи персонажа не затронуты.</p>
       {missingDraft && <p role="alert">Черновик относится к отсутствующей записи и не может быть сохранён.</p>}
-      <Button type="button" variant="secondary" onClick={handleClose}>Закрыть</Button>
     </>}
     {!loading && !readError && !notFound && entry && visible ? <>
-      {catalog.permissionsPending && <p role="status">Проверка прав. Изменения пока отключены.</p>}
-      {(readOnly || !catalog.canWrite) && <p role="status">Доступен просмотр записи; редактирование отключено.</p>}
-      <section>
-        <h3>{entry.definition.name}</h3>
-        <p>{entry.definition.kind === 'Item' ? 'Предмет' : 'Навык'}</p>
-        <p>{entry.definitionDescription || 'Описание отсутствует.'}</p>
-      </section>
-
-      {entry.definition.kind === 'Item' && <CharacterQuantityInput
-        metadata={entry.definition}
-        raw={quantityRaw}
-        onRawChange={setQuantityRaw}
-        required
-        readOnly={readOnly || !catalog.canWrite}
-        disabled={controlsDisabled}
-        serverError={failureDomain === 'quantity' ? failure : undefined}
-      />}
-
-      <section>
-        <h3>Текущие значения</h3>
-        <p>Показаны подтверждённые значения; черновик собственных атрибутов — ниже.</p>
-        {effectiveRows.length === 0
-          ? <p>Атрибутов пока нет.</p>
-          : <DataTable aria-label="Текущие значения" minWidth="24rem">
-            <thead><tr><th scope="col">Атрибут</th><th scope="col">Значение</th><th scope="col">Источник</th></tr></thead>
-            <tbody>{effectiveRows.map(({ value, label }) => {
-              const attribute = definitions.find(candidate => candidate.id === value.attributeId);
-              return <tr key={value.id}>
-                <th scope="row">{attribute?.title ?? 'Неизвестный атрибут'}</th>
-                <td>{catalogValueLabel(value.value, attribute)}</td>
-                <td>{label}</td>
-              </tr>;
-            })}</tbody>
-          </DataTable>}
-      </section>
-      {catalog.canWrite && !readOnly && overrideableSources.length > 0 && <section>
-        <h3>Собственные переопределения</h3>
-        {overrideableSources.map(value => {
-          const attribute = definitions.find(candidate => candidate.id === value.attributeId);
-          return <Button
-            key={value.id}
-            type="button"
-            variant="secondary"
-            disabled={controlsDisabled}
-            onClick={() => setAttributesDraft(current => current.some(row => row.id === value.id) ? current : [...current, {
-              ...value,
-              editLevel: 'Character',
-            }])}
-          >Задать собственное значение: {attribute?.title ?? 'атрибут'}</Button>;
-        })}
-      </section>}
-
-      <section>
-        <h3>Собственные атрибуты</h3>
-        <CatalogAttributeValuesEditor
-          key={attributesEditorGeneration}
-          definitions={definitions}
-          values={attributesDraft}
-          onChange={setAttributesDraft}
-          onValidityChange={setAttributesInvalid}
-          mode="character"
-          readOnly={readOnly || !catalog.canWrite}
-          disabled={controlsDisabled}
-          diagnostics={entry.diagnostics}
-          immutableBindingIds={immutableBindingIds}
-          lockedOccurrenceIds={lockedOccurrenceIds}
-        />
-        {resetPending && <p role="status">После подтверждения будет показано актуальное значение из каталога, если источник существует; старое значение заранее не подставляется.</p>}
-      </section>
-
-      {entry.diagnostics.length > 0 && <section>
-        <h3>Диагностика</h3>
-        <ul>{entry.diagnostics.map((diagnostic, index) => {
-          const occurrence = [...entry.effectiveAttributes, ...entry.explicitAttributes].find(value => value.id === diagnostic.occurrenceId);
-          const attribute = occurrence ? definitions.find(value => value.id === occurrence.attributeId) : undefined;
-          return <li key={`${diagnostic.occurrenceId}-${diagnostic.code}-${index}`}>
-            {diagnosticLabels[diagnostic.code] ?? 'Сервер обнаружил проблему в атрибуте.'}
-            {attribute ? ` Атрибут: ${attribute.title}.` : ''}
-          </li>;
-        })}</ul>
-      </section>}
+      <div className={styles.content}>
+        <p className={styles.description}>{entry.definitionDescription || 'Описание отсутствует.'}</p>
+        {entry.definition.kind === 'Item' && <section className={styles.section}>
+          <CharacterQuantityInput
+            metadata={entry.definition}
+            raw={quantityRaw}
+            onRawChange={setQuantityRaw}
+            required
+            readOnly={!editing || readOnly || !catalog.canWrite}
+            disabled={editing && controlsDisabled}
+            serverError={failureDomain === 'quantity' ? failure : undefined}
+          />
+        </section>}
+        <section className={styles.section}>
+          <h3>Характеристики</h3>
+          <CharacterCatalogAttributes
+            key={attributesEditorGeneration}
+            definitions={definitions}
+            sourceValues={entry.effectiveAttributes}
+            values={editing ? attributesDraft : entry.explicitAttributes}
+            savedValues={editing ? attributesBaseline?.values ?? [] : entry.explicitAttributes}
+            diagnostics={entry.diagnostics}
+            lockedOccurrenceIds={lockedOccurrenceIds}
+            readOnly={!editing || readOnly || !catalog.canWrite}
+            disabled={editing && controlsDisabled}
+            onChange={setAttributesDraft}
+            onValidityChange={setAttributesInvalid}
+          />
+          {unmatchedDiagnostics && <p className={styles.warning} role="status">Часть характеристик требует проверки.</p>}
+        </section>
+      </div>
 
       {Boolean(failure) && <>
         <ApiError error={failure} />
@@ -624,12 +591,12 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
         {[...blockedDomains].map(domain => {
           const snapshot = recoverySnapshots[domain];
           return <div key={domain}>
-            <p>{domain === 'quantity' ? 'Количество' : 'Собственные атрибуты'} не сохранены. Перечитайте запись перед продолжением.</p>
+            <p>{domain === 'quantity' ? 'Количество' : 'Характеристики'} не сохранены. Проверьте актуальные данные перед продолжением.</p>
             {!snapshot
-              ? <Button type="button" disabled={recovering || busy || !catalog.canRead} onClick={() => void readRecovery(domain)}>Перечитать серверные данные</Button>
+              ? <Button type="button" disabled={recovering || busy || !catalog.canRead} onClick={() => void readRecovery(domain)}>Проверить актуальные данные</Button>
               : <>
-                <p>Выберите, принять прочитанное значение или сохранить свой черновик для следующей явной записи.</p>
-                <Button type="button" disabled={recovering || busy} onClick={() => resolveRecovery(domain, 'accept')}>Принять серверную версию</Button>
+                <p>Выберите, использовать актуальные значения или оставить свой черновик.</p>
+                <Button type="button" disabled={recovering || busy} onClick={() => resolveRecovery(domain, 'accept')}>Использовать актуальные значения</Button>
                 <Button type="button" variant="secondary" disabled={recovering || busy} onClick={() => resolveRecovery(domain, 'keep')}>Оставить мой черновик</Button>
               </>}
           </div>;
@@ -642,17 +609,25 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
         <Button type="button" disabled={recovering || busy || !catalog.canRead} onClick={() => void recoverDelete()}>Проверить запись</Button>
       </section>}
 
-      {catalog.canWrite && !readOnly && <div>
-        <Button type="button" disabled={controlsDisabled || invalid || blockedDomains.size > 0 || deleteBlocked || !dirty} onClick={() => void save()}>
-          {busy ? 'Сохранение…' : 'Сохранить изменения'}
-        </Button>
-        <Button type="button" variant="secondary" disabled={controlsDisabled || dirty || invalid || blockedDomains.size > 0 || deleteBlocked} onClick={() => void deleteEntry()}>
-          Удалить личную запись
-        </Button>
-      </div>}
-      <Button type="button" variant="secondary" disabled={busy || recovering || deleting} onClick={handleClose}>Отмена</Button>
     </> : null}
     {!loading && !readError && !notFound && !entry && !catalog.canRead && <StatePanel kind="error">Доступ к личной записи недоступен.</StatePanel>}
+    {definitionDialogOpen && definition && <CatalogDefinitionDialog
+      campaignId={catalog.campaignId}
+      entryId={definition.id}
+      initialKind={definition.kind}
+      canAdmin={canAdminDefinition}
+      audience={audience}
+      permissionsPending={definitionPermissionsPending}
+      onSaved={() => { definitionChangedRef.current = true; }}
+      onForbidden={onDefinitionForbidden}
+      onClose={() => {
+        setDefinitionDialogOpen(false);
+        if (definitionChangedRef.current) {
+          definitionChangedRef.current = false;
+          void loadInitial();
+        }
+      }}
+    />}
   </ModalPortal>;
 };
 

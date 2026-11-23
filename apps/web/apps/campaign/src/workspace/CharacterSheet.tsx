@@ -664,7 +664,14 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
         permissionsPending={catalogPermissionsPending}
         onForbidden={() => { permissionResource.reload(); campaignWorkspace?.reloadPermissions(); }}
       >
-        <CharacterCatalogPanel kind={pageKey === 'inventory' ? 'Item' : 'Skill'} canPublishDefinition={canPublishDefinition} />
+        <CharacterCatalogPanel
+          kind={pageKey === 'inventory' ? 'Item' : 'Skill'}
+          canPublishDefinition={canPublishDefinition}
+          audience="gm"
+          characterName={metadata?.name}
+          definitionPermissionsPending={campaignWorkspace?.permissionsLoading ?? false}
+          onDefinitionForbidden={() => campaignWorkspace?.reloadPermissions()}
+        />
       </CharacterCatalogProvider>
       {!metadata && !metadataResource.loading && !metadataResource.error && <Button type="button" variant="secondary" onClick={retryCatalogAccess}>Повторить загрузку</Button>}
     </section>;

@@ -10,9 +10,13 @@ export type CharacterCatalogPanelProps = {
   kind: CatalogKind;
   canPublishDefinition?: boolean;
   readOnly?: boolean;
+  characterName?: string;
+  audience?: 'gm' | 'player';
+  definitionPermissionsPending?: boolean;
+  onDefinitionForbidden?: () => void;
 };
 
-const CharacterCatalogPanel: React.FC<CharacterCatalogPanelProps> = ({ kind, canPublishDefinition = false, readOnly = false }) => {
+const CharacterCatalogPanel: React.FC<CharacterCatalogPanelProps> = ({ kind, canPublishDefinition = false, readOnly = false, characterName, audience = 'player', definitionPermissionsPending = false, onDefinitionForbidden }) => {
   const catalog = useCharacterCatalog();
   const [search, setSearch] = useState('');
   const [selectedEntryId, setSelectedEntryId] = useState<string>();
@@ -36,8 +40,8 @@ const CharacterCatalogPanel: React.FC<CharacterCatalogPanelProps> = ({ kind, can
         {kind === 'Item' && <td>{entry.record.quantity === null ? '—' : String(entry.record.quantity)}</td>}
       </tr>)}</tbody>
     </DataTable>}
-    {selectedEntryId && <CharacterCatalogEntryDialog entryId={selectedEntryId} readOnly={readOnly || !catalog.canWrite} onClose={() => setSelectedEntryId(undefined)} />}
-    {adding && <CharacterCatalogAddDialog kind={kind} canPublishDefinition={canPublishDefinition} onClose={() => setAdding(false)} />}
+    {selectedEntryId && <CharacterCatalogEntryDialog entryId={selectedEntryId} readOnly={readOnly || !catalog.canWrite} characterName={characterName} audience={audience} canAdminDefinition={canPublishDefinition} definitionPermissionsPending={definitionPermissionsPending} onDefinitionForbidden={onDefinitionForbidden} onClose={() => setSelectedEntryId(undefined)} />}
+    {adding && <CharacterCatalogAddDialog kind={kind} canPublishDefinition={canPublishDefinition} characterName={characterName} definitionPermissionsPending={definitionPermissionsPending} onClose={() => setAdding(false)} />}
   </section>;
 };
 

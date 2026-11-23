@@ -168,6 +168,15 @@ describe('campaign catalog', () => {
   beforeEach(resetApi);
 
   it('lets a player browse server-visible metadata without admin configuration access and opens another creator’s entry read-only', async () => {
+    const definitions = [
+      { id: 'charge', title: 'Заряды', typeKey: 'integer' as const, typeRevision: 1, options: [], isActive: true },
+      { id: 'bound', title: 'Связан', typeKey: 'boolean' as const, typeRevision: 1, options: [], isActive: true },
+    ];
+    state.api.getCatalogAttributes.mockResolvedValue({ campaignId: 12, contentRevision: 1, data: { definitions } });
+    state.api.getCatalogContent.mockResolvedValue({ ...content, data: { description: content.data.description, attributes: [
+      { id: 'charge-value', attributeId: 'charge', typeKey: 'integer', typeRevision: 1, value: 0, editLevel: 'Definition' },
+      { id: 'bound-value', attributeId: 'bound', typeKey: 'boolean', typeRevision: 1, value: false, editLevel: 'Definition' },
+    ] } });
     renderCatalog();
 
     await screen.findByText('Без группы');
@@ -175,8 +184,16 @@ describe('campaign catalog', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Public tonic/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Public tonic' });
     expect(within(dialog).getByText('Restores a little health.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Заряды')).toBeInTheDocument();
+    expect(within(dialog).getByText('Связан')).toBeInTheDocument();
+    expect(within(dialog).getByText('0')).toBeInTheDocument();
+    expect(within(dialog).getByText('Нет')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Единица количества')).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('checkbox', { name: 'Разрешить отрицательное количество' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('Можно менять у персонажа')).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('textbox', { name: 'Название' })).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole('button', { name: 'Сохранить' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Редактировать' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('Настройки каталога')).not.toBeInTheDocument();
     expect(state.api.listCatalog).toHaveBeenCalledWith(12);
     expect(screen.queryByRole('button', { name: 'Создать предмет' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Создать навык' })).not.toBeInTheDocument();
@@ -260,7 +277,7 @@ describe('campaign catalog', () => {
     fireEvent.change(within(itemDialog).getByRole('textbox', { name: 'Название' }), { target: { value: 'Created tonic' } });
     fireEvent.change(within(itemDialog).getByRole('combobox', { name: 'Единица количества' }), { target: { value: 'Fractional' } });
     fireEvent.click(within(itemDialog).getByRole('checkbox', { name: 'Разрешить отрицательное количество' }));
-    fireEvent.click(within(itemDialog).getByRole('button', { name: 'Сохранить' }));
+    fireEvent.click(within(itemDialog).getByRole('button', { name: 'Создать предмет' }));
     await waitFor(() => expect(state.api.createCatalogEntry).toHaveBeenCalledTimes(1));
     expect(state.api.createCatalogEntry.mock.calls[0][1]).toMatchObject({
       name: 'Created tonic',
@@ -281,7 +298,7 @@ describe('campaign catalog', () => {
     expect(within(skillDialog).queryByRole('combobox', { name: 'Единица количества' })).not.toBeInTheDocument();
     expect(within(skillDialog).queryByRole('checkbox', { name: 'Разрешить отрицательное количество' })).not.toBeInTheDocument();
     fireEvent.change(within(skillDialog).getByRole('textbox', { name: 'Название' }), { target: { value: 'Created skill' } });
-    fireEvent.click(within(skillDialog).getByRole('button', { name: 'Сохранить' }));
+    fireEvent.click(within(skillDialog).getByRole('button', { name: 'Создать навык' }));
     await waitFor(() => expect(state.api.createCatalogEntry).toHaveBeenCalledTimes(2));
     expect(state.api.createCatalogEntry.mock.calls[1][1]).toMatchObject({
       name: 'Created skill',
@@ -426,6 +443,21 @@ describe('campaign catalog', () => {
     expect(await within(entryButton).findByText('Тип: Старое значение')).toBeInTheDocument();
     fireEvent.click(entryButton);
     const dialog = await screen.findByRole('dialog', { name: 'Old tonic' });
+    expect(within(dialog).queryByRole('textbox', { name: 'Название' })).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Редактировать' }));
+    await within(dialog).findByRole('textbox', { name: 'Название' });
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Название' }), { target: { value: 'Renamed tonic' } });
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Значение: Тип' }), { target: { value: 'Новое значение' } });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Отменить изменения' }));
+    expect(confirm).toHaveBeenCalled();
+    expect(within(dialog).queryByRole('textbox', { name: 'Название' })).not.toBeInTheDocument();
+    expect(within(dialog).getByText('Old tonic')).toBeInTheDocument();
+    expect(state.api.putCatalogMetadata).not.toHaveBeenCalled();
+    expect(state.api.putCatalogContent).not.toHaveBeenCalled();
+    confirm.mockRestore();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Редактировать' }));
+    await within(dialog).findByRole('textbox', { name: 'Название' });
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Название' }), { target: { value: 'Renamed tonic' } });
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Значение: Тип' }), { target: { value: 'Новое значение' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
@@ -434,8 +466,8 @@ describe('campaign catalog', () => {
     await waitFor(() => expect(state.api.putCatalogContent).toHaveBeenCalledTimes(1));
     expect(state.api.putCatalogMetadata.mock.calls[0][2]).toMatchObject({ name: 'Renamed tonic', expectedRevision: 1 });
     expect(state.api.putCatalogContent.mock.calls[0][2]).toMatchObject({ attributes: [expect.objectContaining({ value: 'Новое значение' })] });
-    await within(dialog).findByText('Метаданные и содержимое подтверждённо сохранены.');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Закрыть' }));
+    await within(dialog).findByText('Изменения сохранены.');
+    fireEvent.click(within(dialog).getByText('Закрыть', { selector: 'button' }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Renamed tonic' })).not.toBeInTheDocument());
     const updatedEntryButton = await screen.findByRole('button', { name: 'Renamed tonic' });
     expect(await within(updatedEntryButton).findByText('Тип: Новое значение')).toBeInTheDocument();
@@ -467,11 +499,13 @@ describe('catalog definition recovery and group editing', () => {
 
     renderDefinition({ entryId: ownedEntry.id });
     const dialog = await screen.findByRole('dialog', { name: 'Old tonic' });
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'Редактировать' }));
+    await within(dialog).findByRole('textbox', { name: 'Название' });
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Название' }), { target: { value: 'Renamed tonic' } });
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Описание' }), { target: { value: 'My content draft' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
 
-    expect(await within(dialog).findByRole('button', { name: 'Перечитать серверные данные' })).toBeInTheDocument();
+    expect(await within(dialog).findByRole('button', { name: 'Проверить актуальные данные' })).toBeInTheDocument();
     expect(state.api.putCatalogMetadata).toHaveBeenCalledTimes(1);
     expect(state.api.putCatalogContent).toHaveBeenCalledTimes(1);
     expect(state.api.putCatalogMetadata.mock.calls[0][2]).toMatchObject({
@@ -483,7 +517,7 @@ describe('catalog definition recovery and group editing', () => {
       description: 'My content draft',
     });
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Перечитать серверные данные' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Проверить актуальные данные' }));
     fireEvent.click(await within(dialog).findByRole('button', { name: 'Оставить мой черновик' }));
     expect(within(dialog).getByRole('textbox', { name: 'Описание' })).toHaveValue('My content draft');
     expect(state.api.putCatalogContent).toHaveBeenCalledTimes(1);
@@ -505,7 +539,7 @@ describe('catalog definition recovery and group editing', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Новый предмет' });
     fireEvent.change(within(dialog).getByRole('textbox', { name: 'Название' }), { target: { value: 'New tonic' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Создать предмет' }));
 
     const checkButton = await within(dialog).findByRole('button', { name: 'Проверить результат' });
     await waitFor(() => expect(state.api.createCatalogEntry).toHaveBeenCalledTimes(1));

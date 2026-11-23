@@ -9,11 +9,13 @@ export type ModalPortalProps = {
   onClose: () => void;
   children: React.ReactNode;
   title?: string;
+  subtitle?: React.ReactNode;
+  footer?: React.ReactNode;
   size?: 'compact' | 'wide';
   dismissDisabled?: boolean;
 };
 
-function NativeModal({ title, size = 'compact', dismissDisabled = false, onClose, children }: Omit<ModalPortalProps, 'isOpen' | 'title'> & { title: string }) {
+function NativeModal({ title, subtitle, footer, size = 'compact', dismissDisabled = false, onClose, children }: Omit<ModalPortalProps, 'isOpen' | 'title'> & { title: string }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const onCloseRef = useRef(onClose);
   const openerRef = useRef<HTMLElement | null>(typeof document !== 'undefined' && document.activeElement instanceof HTMLElement ? document.activeElement : null);
@@ -57,24 +59,25 @@ function NativeModal({ title, size = 'compact', dismissDisabled = false, onClose
       onClick={handleClick}
     >
       <header className={styles.header}>
-        <h2 id={titleId} className={styles.title}>{title}</h2>
+        <div className={styles.heading}><h2 id={titleId} className={styles.title}>{title}</h2>{subtitle != null && <div className={styles.subtitle}>{subtitle}</div>}</div>
         <Button variant="secondary" type="button" aria-label="Закрыть" disabled={dismissDisabled} onClick={() => onCloseRef.current()}>×</Button>
       </header>
       <div className={styles.body}>{children}</div>
+      {footer != null && <footer className={styles.footer}>{footer}</footer>}
     </dialog>,
     document.body
   );
 }
 
-const ModalPortal: React.FC<ModalPortalProps> = ({ isOpen, onClose, children, title, size, dismissDisabled }) => {
+const ModalPortal: React.FC<ModalPortalProps> = ({ isOpen, onClose, children, title, subtitle, footer, size, dismissDisabled }) => {
   if (title !== undefined) {
-    return isOpen ? <NativeModal title={title} size={size} dismissDisabled={dismissDisabled} onClose={onClose}>{children}</NativeModal> : null;
+    return isOpen ? <NativeModal title={title} subtitle={subtitle} footer={footer} size={size} dismissDisabled={dismissDisabled} onClose={onClose}>{children}</NativeModal> : null;
   }
   if (!isOpen) return null;
   return createPortal(
     <div className={modalStyles.overlay} onClick={onClose}>
       <div className={modalStyles.modal} onClick={event => event.stopPropagation()}>
-        {children}
+        {children}{footer}
       </div>
     </div>,
     document.body
