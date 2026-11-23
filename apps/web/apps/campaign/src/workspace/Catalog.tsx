@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ActionRow, Button, IconButton, PageHeader, SearchBar, StatePanel, TabBar, Toolbar } from '@tdn/shared';
 import { useWorkspace } from './Workspace';
@@ -13,7 +13,7 @@ import CatalogGroupsDialog from './CatalogGroupsDialog';
 import CatalogSections from './CatalogSections';
 import { buildCatalogBrowseModel } from './catalogBrowseModel';
 import type { CatalogMembershipResult } from './catalogBrowseModel';
-import type { CatalogGroupConfigurationEnvelope, CatalogGroupSummary, CatalogKind, CatalogMetadata } from './catalogTypes';
+import type { CatalogContentEnvelope, CatalogGroupConfigurationEnvelope, CatalogGroupSummary, CatalogKind, CatalogMetadata } from './catalogTypes';
 
 export { CatalogAttributeValuesEditor };
 
@@ -37,10 +37,22 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
   const [definitionDialog, setDefinitionDialog] = useState<DefinitionDialogState>();
   const [attributesOpen, setAttributesOpen] = useState(false);
   const [groupsOpen, setGroupsOpen] = useState(false);
+  const [previewVersions, setPreviewVersions] = useState<Record<string, number>>({});
+  const previewPromises = useMemo(() => new Map<string, Promise<CatalogContentEnvelope>>(), [api, identity]);
 
   const rootCatalog = useResource<CatalogMetadata[]>(`${identity}:catalog-browse`, () => api.listCatalog(campaignId));
   const summaries = useResource(`${identity}:catalog-groups`, () => api.getCatalogGroups(campaignId));
   const schema = useResource(`${identity}:catalog-attributes`, () => api.getCatalogAttributes(campaignId));
+  const loadPreview = useCallback((entryId: string) => {
+    const existing = previewPromises.get(entryId);
+    if (existing) return existing;
+    const request = api.getCatalogContent(campaignId, entryId);
+    previewPromises.set(entryId, request);
+    request.catch(() => {
+      if (previewPromises.get(entryId) === request) previewPromises.delete(entryId);
+    });
+    return request;
+  }, [api, campaignId, previewPromises]);
   const summariesForbidden = summaries.error instanceof CampaignApiError
     && (summaries.error.status === 403 || summaries.error.status === 404);
   const groups = summariesForbidden ? emptyGroups : summaries.data?.groups ?? emptyGroups;
@@ -118,7 +130,10 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
     setDefinitionDialog({ initialKind: kind });
   };
 
-  const acceptSavedMetadata = (saved: CatalogMetadata) => {
+  const acceptSavedMetadata = (saved: CatalogMetadata, content?: CatalogContentEnvelope) => {
+    if (content) previewPromises.set(saved.id, Promise.resolve(content));
+    else previewPromises.delete(saved.id);
+    setPreviewVersions(current => ({ ...current, [saved.id]: (current[saved.id] ?? 0) + 1 }));
     const current = rootCatalog.data;
     if (!current) {
       rootCatalog.reload();
@@ -199,6 +214,11 @@ const Catalog: React.FC<{ kind?: CatalogKind }> = ({ kind = 'Item' }) => {
         })}
         onOpenEntry={openDefinition}
         onRetryMembership={() => memberships.reload()}
+        definitions={schema.data && !schema.error ? schema.data.data.definitions : undefined}
+        attributeSchemaLoading={schema.loading && !schema.data && !schema.error}
+        loadContent={loadPreview}
+        previewScope={identity}
+        previewVersions={previewVersions}
       />
     </>}
 

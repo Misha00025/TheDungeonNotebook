@@ -29,9 +29,33 @@
   outline-offset: 1px;
 }
 
+.groupHeading {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  margin: 0;
+  font-weight: 700;
+  line-height: 1.3;
+  color: inherit;
+}
+
+.summary h1.groupHeading {
+  font-size: 1.5rem;
+}
+
+.summary h2.groupHeading {
+  font-size: 1.25rem;
+}
+
+.summary h3.groupHeading {
+  font-size: 1.125rem;
+}
+
 .chevron {
   width: 0.4rem;
   height: 0.4rem;
+  flex-shrink: 0;
   border-right: 1px solid currentColor;
   border-bottom: 1px solid currentColor;
   transform: rotate(-45deg);
@@ -52,10 +76,22 @@
   margin: 0.2rem 0 0.45rem;
 }
 
+.entryRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
 .sections .entry {
-  width: 100%;
+  width: auto;
   min-height: 1.75rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
   justify-content: flex-start;
+  align-items: center;
   gap: 0.55rem;
   padding: 0.3rem 0.45rem;
   border: 0;

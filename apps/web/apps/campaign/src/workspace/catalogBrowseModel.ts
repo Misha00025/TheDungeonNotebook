@@ -41,6 +41,11 @@ export type CatalogBrowseModel = {
 
 const sectionKey = (id: string) => `group:${id}`;
 
+function collectEntryIds(section: CatalogBrowseSection, ids: Set<string>): void {
+  section.ownEntries.forEach(entry => ids.add(entry.id));
+  section.children.forEach(child => collectEntryIds(child, ids));
+}
+
 export function buildCatalogBrowseModel(input: CatalogBrowseInput): CatalogBrowseModel {
   const query = input.search.trim().toLocaleLowerCase();
   const visibleById = new Map(input.rootCatalog.filter(entry => entry.kind === input.kind).map(entry => [entry.id, entry]));
@@ -58,7 +63,7 @@ export function buildCatalogBrowseModel(input: CatalogBrowseInput): CatalogBrows
     const membership = membershipById.get(group.id);
     const membershipEntries = membership?.entries;
     const state: CatalogBrowseSection['state'] = membership?.error ? 'error' : membership?.loading || !membership?.entries ? 'loading' : 'ready';
-    const ownEntries = state === 'ready' && membership && membershipEntries
+    let ownEntries = state === 'ready' && membership && membershipEntries
       ? [...new Map(membershipEntries.flatMap(entry => {
         const visible = visibleById.get(entry.id);
         return visible && matching(visible) ? [[visible.id, visible] as const] : [];
@@ -69,6 +74,9 @@ export function buildCatalogBrowseModel(input: CatalogBrowseInput): CatalogBrows
       const section = buildGroup(child);
       return section ? [section] : [];
     });
+    const descendantEntryIds = new Set<string>();
+    children.forEach(child => collectEntryIds(child, descendantEntryIds));
+    ownEntries = ownEntries.filter(entry => !descendantEntryIds.has(entry.id));
     building.delete(group.id);
     const diagnostics = membership?.diagnostics ?? [];
     if (state === 'ready' && ownEntries.length === 0 && children.length === 0 && diagnostics.length === 0) return undefined;

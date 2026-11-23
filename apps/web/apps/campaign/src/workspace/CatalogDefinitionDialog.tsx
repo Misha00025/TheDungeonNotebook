@@ -19,7 +19,7 @@ export type CatalogDefinitionDialogProps = {
   canAdmin: boolean;
   permissionsPending?: boolean;
   onClose: () => void;
-  onSaved: (metadata: CatalogMetadata) => void;
+  onSaved: (metadata: CatalogMetadata, content?: CatalogContentEnvelope) => void;
   onForbidden: () => void;
 };
 
@@ -188,7 +188,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
     if (!mountedRef.current) return;
     setCreationBlocked(false);
     setCreationCheckFailed(false);
-    onSavedRef.current(created.entry);
+    onSavedRef.current(created.entry, created.content);
     onCloseRef.current();
   };
 
@@ -256,6 +256,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
     setFailure(undefined);
     setStatus('');
     let metadataSaved = false;
+    let savedMetadataBaseline = metadataBaseline;
     let activeDomain: Domain = metadataDirty ? 'metadata' : 'content';
     try {
       if (metadataDirty) {
@@ -268,6 +269,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
         });
         if (!mountedRef.current) return;
         metadataSaved = true;
+        savedMetadataBaseline = result;
         setMetadataBaseline(result);
         setDraft(current => ({
           ...current,
@@ -296,7 +298,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
         setContentBaseline(result);
         setDraft(current => ({ ...current, description: result.data.description, attributes: result.data.attributes }));
         setFieldsGeneration(value => value + 1);
-        if (!metadataSaved) onSavedRef.current(metadataBaseline);
+        onSavedRef.current(savedMetadataBaseline, result);
         setStatus(metadataSaved ? 'Метаданные и содержимое подтверждённо сохранены.' : 'Содержимое подтверждённо сохранено.');
       }
     } catch (error) {
@@ -332,7 +334,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
       ]);
       if (!mountedRef.current) return;
       setRecoverySnapshots(current => ({ ...current, [domain]: { metadata, content } }));
-      onSavedRef.current(metadata);
+      onSavedRef.current(metadata, content);
     } catch (error) {
       if (!mountedRef.current) return;
       setFailure(error);

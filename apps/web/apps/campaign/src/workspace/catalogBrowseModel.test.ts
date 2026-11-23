@@ -20,23 +20,28 @@ const collectEntries = (sections: ReturnType<typeof buildCatalogBrowseModel>['se
 ]);
 
 describe('catalog browse model', () => {
-  it('uses only visible current-kind metadata, preserves explicit nested membership, and deduplicates per group', () => {
+  it('shows repeated membership only at the deepest level within a branch', () => {
+    const repeatedEntry = entry('repeated', 'Repeated entry');
     const rootEntry = entry('root-entry', 'Root entry');
     const childEntry = entry('child-entry', 'Child entry');
     const ungroupedEntry = entry('ungrouped-entry', 'Ungrouped entry');
     const skill = entry('skill-entry', 'Skill entry', 'Skill');
     const invisible = entry('not-visible', 'Not visible metadata');
     const model = buildCatalogBrowseModel({
-      rootCatalog: [rootEntry, childEntry, ungroupedEntry, skill],
+      rootCatalog: [repeatedEntry, rootEntry, childEntry, ungroupedEntry, skill],
       groups: [
         { id: 'root', title: 'Root', parentId: null },
         { id: 'child', title: 'Child', parentId: 'root' },
-        { id: 'other', title: 'Other', parentId: null },
+        { id: 'grandchild', title: 'Grandchild', parentId: 'child' },
+        { id: 'sibling', title: 'Sibling', parentId: 'root' },
+        { id: 'independent', title: 'Independent', parentId: null },
       ],
       memberships: [
-        { groupId: 'root', entries: [rootEntry, rootEntry, invisible], diagnostics: [] },
-        { groupId: 'child', entries: [childEntry], diagnostics: [] },
-        { groupId: 'other', entries: [rootEntry], diagnostics: [] },
+        { groupId: 'root', entries: [repeatedEntry, rootEntry, invisible, skill], diagnostics: [] },
+        { groupId: 'child', entries: [repeatedEntry, childEntry], diagnostics: [] },
+        { groupId: 'grandchild', entries: [repeatedEntry], diagnostics: [] },
+        { groupId: 'sibling', entries: [repeatedEntry], diagnostics: [] },
+        { groupId: 'independent', entries: [repeatedEntry], diagnostics: [] },
       ],
       kind: 'Item',
       search: '',
@@ -44,15 +49,47 @@ describe('catalog browse model', () => {
       membershipsReady: true,
     });
     const root = model.sections.find(section => section.key === 'group:root');
-    const other = model.sections.find(section => section.key === 'group:other');
+    const sibling = root?.children.find(section => section.key === 'group:sibling');
+    const independent = model.sections.find(section => section.key === 'group:independent');
 
     expect(root?.ownEntries.map(item => item.id)).toEqual(['root-entry']);
-    expect(root?.children[0].ownEntries.map(item => item.id)).toEqual(['child-entry']);
-    expect(other?.ownEntries.map(item => item.id)).toEqual(['root-entry']);
+    expect(root?.children.find(section => section.key === 'group:child')?.ownEntries.map(item => item.id)).toEqual(['child-entry']);
+    expect(root?.children.find(section => section.key === 'group:child')?.children[0].ownEntries.map(item => item.id)).toEqual(['repeated']);
+    expect(sibling?.ownEntries.map(item => item.id)).toEqual(['repeated']);
+    expect(independent?.ownEntries.map(item => item.id)).toEqual(['repeated']);
     expect(model.sections.find(section => section.key === 'ungrouped')?.ownEntries.map(item => item.id)).toEqual(['ungrouped-entry']);
     expect(collectEntries(model.sections).map(item => item.id)).toEqual([
-      'root-entry', 'child-entry', 'root-entry', 'ungrouped-entry',
+      'root-entry', 'child-entry', 'repeated', 'repeated', 'repeated', 'ungrouped-entry',
     ]);
+  });
+
+  it('keeps confirmed parent entries while child memberships are loading or unavailable', () => {
+    const erroredEntry = entry('errored-parent-entry');
+    const loadingEntry = entry('loading-parent-entry');
+    const model = buildCatalogBrowseModel({
+      rootCatalog: [erroredEntry, loadingEntry],
+      groups: [
+        { id: 'error-parent', title: 'Error parent', parentId: null },
+        { id: 'error-child', title: 'Error child', parentId: 'error-parent' },
+        { id: 'loading-parent', title: 'Loading parent', parentId: null },
+        { id: 'loading-child', title: 'Loading child', parentId: 'loading-parent' },
+      ],
+      memberships: [
+        { groupId: 'error-parent', entries: [erroredEntry], diagnostics: [] },
+        { groupId: 'error-child', error: new Error('private error payload') },
+        { groupId: 'loading-parent', entries: [loadingEntry], diagnostics: [] },
+        { groupId: 'loading-child', loading: true },
+      ],
+      kind: 'Item',
+      search: '',
+      summariesReady: true,
+      membershipsReady: false,
+    });
+
+    expect(model.sections.find(section => section.key === 'group:error-parent')?.ownEntries.map(item => item.id)).toEqual([erroredEntry.id]);
+    expect(model.sections.find(section => section.key === 'group:loading-parent')?.ownEntries.map(item => item.id)).toEqual([loadingEntry.id]);
+    expect(model.ungroupedEntries).toEqual([]);
+    expect(model.sections.some(section => section.key === 'ungrouped')).toBe(false);
   });
 
   it('retains empty diagnostic sections and does not claim no matches while membership is erroneous', () => {
