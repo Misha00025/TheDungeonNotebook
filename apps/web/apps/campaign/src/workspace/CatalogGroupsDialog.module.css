@@ -1,0 +1,75 @@
+.groupCell {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  padding-inline-start: var(--tree-indent, 0rem);
+}
+
+.groupCell .disclosure {
+  flex: 0 0 1.5rem;
+  width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0.125rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.groupCell .groupName {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 1.75rem;
+  padding: 0.125rem 0.25rem;
+  border-color: transparent;
+  border-radius: 0;
+  background: transparent;
+}
+
+.groupCell .groupName:focus-visible {
+  border-color: var(--border-color);
+}
+
+.groupDiagnostic,
+.hierarchyWarning {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.treeTable tbody th,
+.treeTable tbody td {
+  padding: 0.125rem 0.375rem;
+}
+
+.treeTable .rowAction {
+  min-height: 1.75rem;
+  padding: 0.125rem 0.375rem;
+  border: 0;
+  border-color: transparent;
+  border-radius: 0;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.treeActionCell {
+  padding-inline-start: var(--tree-indent, 0rem);
+}
+
+.treeTable .addRowAction {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 1.75rem;
+  padding: 0.125rem 0.375rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  text-align: start;
+}

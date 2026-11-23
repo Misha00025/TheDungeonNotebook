@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Button, Field, FieldSet, Select } from '@tdn/shared';
+import { ActionRow, Button, DataTable, IconButton, ModalPortal, Select } from '@tdn/shared';
+import { useDirtyDraft } from './Workspace';
 import type { JsonValue } from './types';
 import type { CatalogAttributeDefinition, CatalogGroupCondition } from './catalogTypes';
 import { catalogValueLabel, catalogValueType, createConditionLeaf, defaultTypedValue } from './catalogModel';
@@ -70,6 +71,9 @@ type NodeProps = {
   idPrefix: string;
   onInteraction: () => void;
   onChange: (node: CatalogGroupCondition) => void;
+  onRootOperatorChange?: (operator: string) => void;
+  onRemove?: () => void;
+  canRemove: boolean;
   onValidityChange: (key: string, invalid: boolean) => void;
 };
 
@@ -85,13 +89,16 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
   idPrefix,
   onInteraction,
   onChange,
+  onRootOperatorChange,
+  onRemove,
+  canRemove,
   onValidityChange,
 }) => {
   const key = path.join('.') || 'root';
-  const controlId = `${idPrefix}-${key}`;
   const unchanged = sameCondition(node, baseline);
   const [childValidity, setChildValidity] = useState<Record<string, boolean>>({});
   const [inputInvalid, setInputInvalid] = useState(false);
+  const [choiceDraft, setChoiceDraft] = useState<{ value: JsonValue; initialValue: JsonValue; attributeId: string; typeKey: string; typeRevision: CatalogGroupCondition['typeRevision'] }>();
   const numericInputTouched = useRef(false);
   const validityCallback = useRef(onValidityChange);
   validityCallback.current = onValidityChange;
@@ -126,6 +133,8 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
     return false;
   }, [unchanged, stale, node, children.length, definition, allowedInactive, schemaMatches, currentValueValid]);
   const invalid = ownInvalid || inputInvalid || relevantChildValidity.some(([, childInvalid]) => childInvalid);
+  const choiceDraftDirty = Boolean(choiceDraft && stringifyJson(choiceDraft.value) !== stringifyJson(choiceDraft.initialValue));
+  useDirtyDraft(`catalog-condition-choice-${idPrefix}-${key}`, choiceDraftDirty);
 
   useEffect(() => {
     numericInputTouched.current = false;
@@ -177,70 +186,55 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
     onChange({ operator: node.operator, children: children.filter((_, childIndex) => childIndex !== index) });
   };
 
-  if (isCompound(node.operator)) {
-    return <FieldSet legend={operatorLabels[node.operator]}>
-      {!isRoot && <Field label="Тип условия" htmlFor={`${controlId}-operator`}>
-        <Select id={`${controlId}-operator`} value={node.operator} disabled={disabled} onChange={event => changeNodeOperator(event.target.value as ConditionOperator)}>
-          {conditionOperators.map(operator => <option key={operator} value={operator}>{operatorLabels[operator]}</option>)}
-        </Select>
-      </Field>}
-      {children.map((child, index) => <div key={`${key}.${index}`}>
-        <ConditionNodeEditor
-          node={child}
-          baseline={getAtPath(baseline, [index])}
-          path={[...path, index]}
-          definitions={definitions}
-          definitionById={definitionById}
-          allowedInactive={allowedInactive}
-          disabled={disabled}
-          isRoot={false}
-          idPrefix={idPrefix}
-          onInteraction={onInteraction}
-          onChange={next => updateChild(index, next)}
-          onValidityChange={validityCallback.current}
-        />
-        {(node.operator !== 'not' || children.length > 1) && <Button type="button" variant="secondary" disabled={disabled} onClick={() => removeChild(index)}>Удалить условие</Button>}
-      </div>)}
-      {(node.operator !== 'not' || children.length === 0) && <Button type="button" disabled={disabled} onClick={addChild}>Добавить условие</Button>}
-      {ownInvalid && <p role="alert">Добавьте хотя бы одно условие.</p>}
-    </FieldSet>;
-  }
-
   const eligibleDefinitions = definitions.filter(item => item.isActive || allowedInactive.has(item.id) || item.id === node.attributeId);
   const currentValueType = definition ? catalogValueType(definition.typeKey) : undefined;
   const rawValue = node.value;
   const defaultValue = definition ? defaultTypedValue(definition.typeKey, definition.options) : undefined;
-
-  return <FieldSet legend={operatorLabels[node.operator]}>
-    {!isRoot && <Field label="Тип условия" htmlFor={`${controlId}-operator`}>
-      <Select id={`${controlId}-operator`} value={node.operator} disabled={disabled} onChange={event => changeNodeOperator(event.target.value as ConditionOperator)}>
-        {conditionOperators.map(operator => <option key={operator} value={operator}>{operatorLabels[operator]}</option>)}
-      </Select>
-    </Field>}
-    {stale && <p>Условие использует устаревшую или недоступную схему и сохранено без преобразования.</p>}
-    <Field label="Атрибут" htmlFor={`${controlId}-attribute`}>
-      <Select
-        id={`${controlId}-attribute`}
-        value={node.attributeId ?? ''}
-        disabled={disabled}
-        onChange={event => updateAttribute(event.target.value)}
-      >
-        <option value="">Выберите атрибут</option>
-        {eligibleDefinitions.map(item => <option key={item.id} value={item.id}>{item.title}{item.isActive ? '' : ' · неактивен'}</option>)}
-      </Select>
-    </Field>
-    {node.operator !== 'exists' && definition && !stale && currentValueType && rawValue !== undefined
-      ? <>
+  const currentField = currentValueType && definition ? { valueType: currentValueType, options: definition.options } : undefined;
+  const choiceSnapshotMatches = Boolean(choiceDraft && choiceDraft.attributeId === node.attributeId
+    && choiceDraft.typeKey === node.typeKey
+    && String(choiceDraft.typeRevision) === String(node.typeRevision));
+  const choiceError = currentField && choiceDraft ? validateFieldValue(currentField, choiceDraft.value) : 'Схема атрибута недоступна.';
+  const canApplyChoice = Boolean(choiceDraft && !disabled && !stale && schemaMatches
+    && node.operator !== 'exists' && node.typeKey === 'multiChoice' && choiceSnapshotMatches && !choiceError);
+  const applyChoice = () => {
+    if (!choiceDraft || !canApplyChoice || !definition) return;
+    onChange({
+      operator: node.operator,
+      attributeId: definition.id,
+      typeKey: definition.typeKey,
+      typeRevision: definition.typeRevision,
+      value: choiceDraft.value,
+    });
+    setChoiceDraft(undefined);
+  };
+  const isMultiChoice = node.operator !== 'exists' && definition?.typeKey === 'multiChoice';
+  const fieldValue = node.operator !== 'exists' && definition && !stale && currentField && rawValue !== undefined;
+  const leafValue = fieldValue
+    ? isMultiChoice
+      ? <ActionRow>
+        <span>{catalogValueLabel(rawValue!, definition!) || 'Не выбрано'}</span>
+        <Button type="button" size="small" variant="secondary" disabled={disabled} onClick={() => setChoiceDraft({
+          value: rawValue!,
+          initialValue: rawValue!,
+          attributeId: definition!.id,
+          typeKey: definition!.typeKey,
+          typeRevision: definition!.typeRevision,
+        })}>Выбрать значения</Button>
+      </ActionRow>
+      : <>
         <ValueInput
-          field={{ valueType: currentValueType, options: definition.options }}
-          value={rawValue}
-          label={`Значение: ${definition.title}`}
+          field={currentField!}
+          value={rawValue!}
+          label={`Значение: ${definition!.title}`}
+          compact
+          inline
           disabled={disabled}
           onChange={(value: JsonValue) => onChange({
             operator: node.operator,
-            attributeId: definition.id,
-            typeKey: definition.typeKey,
-            typeRevision: definition.typeRevision,
+            attributeId: definition!.id,
+            typeKey: definition!.typeKey,
+            typeRevision: definition!.typeRevision,
             value,
           })}
           onRawChange={() => {
@@ -251,13 +245,74 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
             if (numericInputTouched.current) setInputInvalid(Boolean(error));
           }}
         />
-        {definition.typeKey === 'boolean' && <span>{rawValue === true ? 'Да' : 'Нет'}</span>}
+        {definition!.typeKey === 'boolean' && <span>{rawValue === true ? 'Да' : 'Нет'}</span>}
       </>
-      : node.operator !== 'exists' && node.value !== undefined && <p>{catalogValueLabel(node.value, definition)}</p>}
-    {stale && definition && <Button type="button" disabled={disabled} onClick={refresh}>Обновить условие по текущей схеме</Button>}
-    {ownInvalid && <p role="alert">Выберите атрибут и корректное значение условия.</p>}
-    {node.operator !== 'exists' && definition && defaultValue === undefined && <p role="alert">Для этого типа атрибута нельзя создать типизированное условие.</p>}
-  </FieldSet>;
+    : node.operator !== 'exists' && node.value !== undefined
+      ? catalogValueLabel(node.value, definition)
+      : '—';
+  const nodeStatus = stale
+    ? 'Условие использует устаревшую или недоступную схему и сохранено без преобразования.'
+    : isCompound(node.operator) && ownInvalid
+      ? 'Добавьте хотя бы одно условие.'
+      : ownInvalid
+        ? 'Выберите атрибут и корректное значение условия.'
+        : node.operator !== 'exists' && definition && defaultValue === undefined
+          ? 'Для этого типа атрибута нельзя создать типизированное условие.'
+          : undefined;
+  const nodeOperators: ConditionOperator[] = isRoot ? [...leafOperators, 'all', 'any', 'not'] : conditionOperators;
+
+  return <>
+    <tr key={key}>
+      <td style={path.length ? { paddingInlineStart: `${path.length}rem` } : undefined}>
+        <Select aria-label={isRoot ? 'Условие включения' : 'Тип условия'} value={node.operator} disabled={disabled} onChange={event => {
+          if (isRoot) onRootOperatorChange?.(event.target.value);
+          else changeNodeOperator(event.target.value as ConditionOperator);
+        }}>
+          {isRoot && <option value="none">{operatorLabels.none}</option>}
+          {nodeOperators.map(operator => <option key={operator} value={operator}>{operatorLabels[operator]}</option>)}
+        </Select>
+      </td>
+      <td>{isCompound(node.operator)
+        ? '—'
+        : <Select aria-label="Атрибут" value={node.attributeId ?? ''} disabled={disabled} onChange={event => updateAttribute(event.target.value)}>
+          <option value="">Выберите атрибут</option>
+          {eligibleDefinitions.map(item => <option key={item.id} value={item.id}>{item.title}{item.isActive ? '' : ' · неактивен'}</option>)}
+        </Select>}
+      </td>
+      <td>{isCompound(node.operator) || node.operator === 'exists'
+        ? <>—{nodeStatus && <small role={ownInvalid ? 'alert' : 'status'}>{nodeStatus}</small>}</>
+        : <>{leafValue}{nodeStatus && <small role={ownInvalid ? 'alert' : 'status'}>{nodeStatus}</small>}</>}</td>
+      <td><ActionRow style={{ gap: '0.5rem' }}>
+        {isCompound(node.operator) && (node.operator !== 'not' || children.length === 0) && <Button type="button" size="small" disabled={disabled} onClick={addChild}>Добавить условие</Button>}
+        {!isCompound(node.operator) && stale && definition && <Button type="button" size="small" disabled={disabled} onClick={refresh}>Обновить условие по текущей схеме</Button>}
+        {canRemove && onRemove && <IconButton icon="delete" size="small" variant="danger" title="Удалить условие" ariaLabel="Удалить условие" disabled={disabled} onClick={onRemove} />}
+      </ActionRow></td>
+    </tr>
+    {isCompound(node.operator) && children.map((child, index) => <ConditionNodeEditor
+      key={`${key}.${index}`}
+      node={child}
+      baseline={getAtPath(baseline, [index])}
+      path={[...path, index]}
+      definitions={definitions}
+      definitionById={definitionById}
+      allowedInactive={allowedInactive}
+      disabled={disabled}
+      isRoot={false}
+      idPrefix={idPrefix}
+      onInteraction={onInteraction}
+      onChange={next => updateChild(index, next)}
+      onRemove={() => removeChild(index)}
+      canRemove={node.operator !== 'not' || children.length > 1}
+      onValidityChange={validityCallback.current}
+    />)}
+    {choiceDraft && <ModalPortal isOpen onClose={() => setChoiceDraft(undefined)} title={`Значения: ${definition?.title ?? 'атрибут'}`}>
+      {!choiceSnapshotMatches || disabled || stale || !schemaMatches
+        ? <p role="status">Условие изменилось или редактирование больше недоступно. Закройте диалог и перечитайте данные.</p>
+        : <ValueInput field={currentField!} value={choiceDraft.value} label={`Значение: ${definition?.title ?? 'атрибут'}`} onChange={value => setChoiceDraft(current => current ? { ...current, value } : current)} />}
+      {choiceError && choiceSnapshotMatches && !disabled && !stale && schemaMatches && <p role="alert">{choiceError}</p>}
+      <ActionRow style={{ gap: '0.5rem' }}><Button type="button" disabled={!canApplyChoice} onClick={applyChoice}>Применить</Button><Button type="button" variant="secondary" onClick={() => setChoiceDraft(undefined)}>Отмена</Button></ActionRow>
+    </ModalPortal>}
+  </>;
 };
 
 export const CatalogConditionEditor: React.FC<CatalogConditionEditorProps> = ({
@@ -331,34 +386,34 @@ export const CatalogConditionEditor: React.FC<CatalogConditionEditorProps> = ({
     onChange(next);
   };
 
-  return <section>
-    <Field label="Условие включения" htmlFor={`${idPrefix}-condition-operator`}>
-      <Select
-        id={`${idPrefix}-condition-operator`}
-        value={condition?.operator ?? 'none'}
+  return <DataTable aria-label="Условия группы" minWidth="52rem">
+    <thead><tr><th scope="col">Условие</th><th scope="col">Атрибут</th><th scope="col">Значение</th><th scope="col">Действия</th></tr></thead>
+    <tbody>{condition
+      ? <ConditionNodeEditor
+        node={condition}
+        baseline={baselineCondition.current ?? undefined}
+        path={[]}
+        definitions={definitions}
+        definitionById={definitionById}
+        allowedInactive={allowedInactive}
         disabled={disabled}
-        onChange={event => changeOperator(event.target.value)}
-      >
-        {(['none', 'exists', 'eq', 'gt', 'gte', 'lt', 'lte', 'all', 'any', 'not'] as const).map(operator =>
-          <option key={operator} value={operator}>{operatorLabels[operator]}</option>)}
-      </Select>
-    </Field>
-    {condition && <ConditionNodeEditor
-      node={condition}
-      baseline={baselineCondition.current ?? undefined}
-      path={[]}
-      definitions={definitions}
-      definitionById={definitionById}
-      allowedInactive={allowedInactive}
-      disabled={disabled}
-      isRoot
-      idPrefix={idPrefix}
-      onInteraction={() => interactionCallback.current?.()}
-      onChange={updateRoot}
-      onValidityChange={reportNodeValidity}
-    />}
-    {invalid && <p role="alert">Условие содержит незаполненные или некорректные поля.</p>}
-  </section>;
+        isRoot
+        idPrefix={idPrefix}
+        onInteraction={() => interactionCallback.current?.()}
+        onChange={updateRoot}
+        onRootOperatorChange={changeOperator}
+        canRemove={false}
+        onValidityChange={reportNodeValidity}
+      />
+      : <tr>
+        <td><Select aria-label="Условие включения" value="none" disabled={disabled} onChange={event => changeOperator(event.target.value)}>
+          <option value="none">{operatorLabels.none}</option>
+          {([...leafOperators, 'all', 'any', 'not'] as const).map(operator => <option key={operator} value={operator}>{operatorLabels[operator]}</option>)}
+        </Select></td>
+        <td>—</td><td>—</td><td>—</td>
+      </tr>}
+    </tbody>
+  </DataTable>;
 };
 
 export default CatalogConditionEditor;

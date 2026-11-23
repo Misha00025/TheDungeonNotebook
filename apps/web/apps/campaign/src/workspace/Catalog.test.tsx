@@ -8,7 +8,10 @@ import Catalog from './Catalog';
 import CatalogDefinitionDialog from './CatalogDefinitionDialog';
 import CatalogGroupsDialog from './CatalogGroupsDialog';
 import { CampaignApiError } from './api';
-import type { CatalogContentEnvelope, CatalogMetadata } from './catalogTypes';
+import { stringifyJson } from './json';
+import type { CatalogContentEnvelope, CatalogGroup, CatalogGroupConfigurationEnvelope, CatalogGroupInput, CatalogMetadata } from './catalogTypes';
+
+type GroupPutBody = { expectedRevision: CatalogGroupConfigurationEnvelope['contentRevision']; groups: CatalogGroupInput[] };
 
 const state = vi.hoisted(() => ({
   sessionKey: 'user-4',
@@ -154,6 +157,12 @@ const renderGroupsDialog = () => render(
   </MemoryRouter>,
 );
 
+function changeFocusedGroupTitle(value: string) {
+  const input = screen.getAllByRole('textbox', { name: 'Название группы' }).find(element => element === document.activeElement);
+  if (!input) throw new Error('A newly added group title input is not focused.');
+  fireEvent.change(input, { target: { value } });
+}
+
 describe('campaign catalog', () => {
   beforeEach(resetApi);
 
@@ -223,7 +232,7 @@ describe('campaign catalog', () => {
   });
 });
 
-describe('catalog definition recovery', () => {
+describe('catalog definition recovery and group editing', () => {
   beforeEach(resetApi);
 
   it('keeps the content draft after metadata succeeds and content conflicts, then writes only content at its reread revision', async () => {
@@ -353,6 +362,297 @@ describe('catalog definition recovery', () => {
         condition: staleCondition,
       }],
     });
+  });
+
+  it('keeps membership and condition edits local until one full group save', async () => {
+    const hiddenEntry = { ...metadata, id: 'entry-hidden', name: 'Hidden tonic', isHidden: true };
+    const secondEntry = { ...metadata, id: 'entry-second', name: 'Second tonic' };
+    const firstGroup = {
+      id: 'group-first',
+      title: 'First group',
+      parentId: null,
+      entryIds: [hiddenEntry.id, 'unavailable-entry'],
+      condition: null,
+    };
+    const secondGroup = {
+      id: 'group-second',
+      title: 'Second group',
+      parentId: firstGroup.id,
+      entryIds: [secondEntry.id],
+      condition: null,
+    };
+    state.api.listCatalog.mockResolvedValue([hiddenEntry, secondEntry]);
+    state.api.getCatalogGroupConfiguration.mockResolvedValue({
+      campaignId: 12,
+      contentRevision: 11,
+      data: { groups: [firstGroup, secondGroup] },
+      attributeSchemaRevision: 4,
+      diagnostics: [],
+    });
+    state.api.getCatalogAttributes.mockResolvedValue({
+      campaignId: 12,
+      contentRevision: 4,
+      data: { definitions: [{ id: 'attribute-power', title: 'Power', typeKey: 'integer', typeRevision: 4, options: [], isActive: true }] },
+    });
+    state.api.putCatalogGroups.mockResolvedValue({
+      campaignId: 12,
+      contentRevision: 12,
+      data: { groups: [firstGroup, secondGroup] },
+      attributeSchemaRevision: 4,
+      diagnostics: [],
+    });
+    renderGroupsDialog();
+    const dialog = await screen.findByRole('dialog', { name: 'Группы каталога' });
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Состав: First group' }));
+    const cancelledMembers = await screen.findByRole('dialog', { name: 'Состав: First group' });
+    fireEvent.click(within(cancelledMembers).getByRole('checkbox', { name: 'Включить Second tonic в группу' }));
+    fireEvent.click(within(cancelledMembers).getByRole('checkbox', { name: 'Убрать недоступное определение 1 из группы' }));
+    fireEvent.click(within(cancelledMembers).getByRole('button', { name: 'Отмена' }));
+    expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Состав: First group' }));
+    const members = await screen.findByRole('dialog', { name: 'Состав: First group' });
+    expect(within(members).getByRole('checkbox', { name: 'Включить Hidden tonic в группу' })).toBeChecked();
+    expect(within(members).getByRole('checkbox', { name: 'Убрать недоступное определение 1 из группы' })).toBeChecked();
+    expect(within(members).getByRole('checkbox', { name: 'Включить Second tonic в группу' })).not.toBeChecked();
+    fireEvent.change(within(members).getByRole('textbox', { name: 'Поиск определений' }), { target: { value: 'Second' } });
+    fireEvent.click(within(members).getByRole('checkbox', { name: 'Включить Second tonic в группу' }));
+    fireEvent.click(within(members).getByRole('button', { name: 'Применить' }));
+    expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Условие: First group' }));
+    const cancelledCondition = await screen.findByRole('dialog', { name: 'Условие: First group' });
+    fireEvent.change(within(cancelledCondition).getByRole('combobox', { name: 'Условие включения' }), { target: { value: 'eq' } });
+    fireEvent.change(within(cancelledCondition).getByRole('combobox', { name: 'Атрибут' }), { target: { value: 'attribute-power' } });
+    fireEvent.change(await within(cancelledCondition).findByRole('textbox', { name: 'Значение: Power' }), { target: { value: '-' } });
+    await waitFor(() => expect(within(cancelledCondition).getByRole('button', { name: 'Применить' })).toBeDisabled());
+    fireEvent.click(within(cancelledCondition).getByRole('button', { name: 'Отмена' }));
+    expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Условие: First group' }));
+    const condition = await screen.findByRole('dialog', { name: 'Условие: First group' });
+    expect(within(condition).getByRole('combobox', { name: 'Условие включения' })).toHaveValue('none');
+    fireEvent.change(within(condition).getByRole('combobox', { name: 'Условие включения' }), { target: { value: 'eq' } });
+    fireEvent.change(within(condition).getByRole('combobox', { name: 'Атрибут' }), { target: { value: 'attribute-power' } });
+    fireEvent.change(await within(condition).findByRole('textbox', { name: 'Значение: Power' }), { target: { value: '7' } });
+    await waitFor(() => expect(within(condition).getByRole('button', { name: 'Применить' })).toBeEnabled());
+    fireEvent.click(within(condition).getByRole('button', { name: 'Применить' }));
+    expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить группы' }));
+    await waitFor(() => expect(state.api.putCatalogGroups).toHaveBeenCalledTimes(1));
+    const submitted = state.api.putCatalogGroups.mock.calls[0][1];
+    expect(submitted.expectedRevision).toBe(11);
+    expect(submitted.groups).toMatchObject([
+      {
+        id: firstGroup.id,
+        title: firstGroup.title,
+        parentId: null,
+        entryIds: [hiddenEntry.id, 'unavailable-entry', secondEntry.id],
+      },
+      {
+        id: secondGroup.id,
+        title: secondGroup.title,
+        parentId: firstGroup.id,
+        entryIds: [secondEntry.id],
+        condition: null,
+      },
+    ]);
+    expect(stringifyJson(submitted.groups[0].condition)).toBe(
+      '{"operator":"eq","attributeId":"attribute-power","typeKey":"integer","typeRevision":4,"value":7}',
+    );
+    expect(state.api.putCatalogMetadata).not.toHaveBeenCalled();
+    expect(state.api.putCatalogAttributes).not.toHaveBeenCalled();
+  });
+
+  it('requires moving children before removing a group and only saves the remaining group configuration', async () => {
+    const parent = { id: 'group-parent', title: 'Parent', parentId: null, entryIds: [metadata.id], condition: null };
+    const child = { id: 'group-child', title: 'Child', parentId: parent.id, entryIds: [], condition: null };
+    state.api.getCatalogGroupConfiguration.mockResolvedValue({
+      campaignId: 12,
+      contentRevision: 3,
+      data: { groups: [parent, child] },
+      attributeSchemaRevision: 0,
+      diagnostics: [],
+    });
+    state.api.listCatalog.mockResolvedValue([metadata]);
+    state.api.putCatalogGroups.mockResolvedValue({
+      campaignId: 12,
+      contentRevision: 4,
+      data: { groups: [{ ...child, parentId: null }] },
+      attributeSchemaRevision: 0,
+      diagnostics: [],
+    });
+    renderGroupsDialog();
+    const dialog = await screen.findByRole('dialog', { name: 'Группы каталога' });
+    const parentDelete = within(dialog).getByRole('button', { name: 'Удалить группу Parent' });
+    expect(parentDelete).toBeDisabled();
+    fireEvent.click(parentDelete);
+    expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Переместить группу Child' }));
+    const moveDialog = await screen.findByRole('dialog', { name: 'Переместить группу: Child' });
+    fireEvent.change(within(moveDialog).getByRole('combobox', { name: 'Родительская группа' }), { target: { value: '' } });
+    fireEvent.click(within(moveDialog).getByRole('button', { name: 'Применить' }));
+    expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole('button', { name: 'Удалить группу Parent' })).toBeEnabled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Удалить группу Parent' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить группы' }));
+    await waitFor(() => expect(state.api.putCatalogGroups).toHaveBeenCalledTimes(1));
+    expect(state.api.putCatalogGroups.mock.calls[0][1]).toEqual({
+      expectedRevision: 3,
+      groups: [{ id: child.id, title: child.title, parentId: null, entryIds: [], condition: null }],
+    });
+    expect(state.api.putCatalogMetadata).not.toHaveBeenCalled();
+    expect(state.api.putCatalogAttributes).not.toHaveBeenCalled();
+  });
+
+  it('stages nested unsaved groups while preserving the full draft through collapse and expansion', async () => {
+    const root: CatalogGroup = { id: 'saved-root', title: 'Root', parentId: null, entryIds: [], condition: null };
+    const other: CatalogGroup = { id: 'saved-other', title: 'Other root', parentId: null, entryIds: [], condition: null };
+    let confirmedGroups: CatalogGroup[] = [root, other];
+    let revision = 8;
+    let generatedId = 0;
+    state.api.getCatalogGroupConfiguration.mockResolvedValue({ campaignId: 12, contentRevision: revision, data: { groups: confirmedGroups }, attributeSchemaRevision: 0, diagnostics: [] });
+    state.api.listCatalog.mockResolvedValue([]);
+    state.api.getCatalogAttributes.mockResolvedValue({ campaignId: 12, contentRevision: 0, data: { definitions: [] } });
+    state.api.putCatalogGroups.mockImplementation(async (_campaignId: number, body: GroupPutBody) => {
+      const existingIds = new Set(confirmedGroups.map(group => group.id));
+      const assigned: CatalogGroup[] = body.groups.map((group): CatalogGroup => {
+        if (group.id && !existingIds.has(group.id)) throw new Error('A new group ID was supplied to the server.');
+        return { ...group, id: group.id ?? `server-group-${++generatedId}` };
+      });
+      const assignedIds = new Set(assigned.map(group => group.id));
+      if (assignedIds.size !== assigned.length || assigned.some(group => group.parentId && !assignedIds.has(group.parentId))) {
+        throw new Error('The submitted group configuration has invalid IDs or parents.');
+      }
+      confirmedGroups = assigned;
+      revision += 1;
+      const result: CatalogGroupConfigurationEnvelope = { campaignId: 12, contentRevision: revision, data: { groups: confirmedGroups }, attributeSchemaRevision: 0, diagnostics: [] };
+      state.api.getCatalogGroupConfiguration.mockResolvedValue(result);
+      return result;
+    });
+    renderGroupsDialog();
+    const dialog = await screen.findByRole('dialog', { name: 'Группы каталога' });
+
+    const rootInput = screen.getAllByRole('textbox', { name: 'Название группы' }).find(input => (input as HTMLInputElement).value === 'Root');
+    if (!rootInput) throw new Error('The saved root group title input was not found.');
+    fireEvent.change(rootInput, { target: { value: 'Renamed root' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Добавить дочернюю группу: Renamed root' }));
+    await waitFor(() => expect(screen.getAllByRole('textbox', { name: 'Название группы' }).some(input => input === document.activeElement)).toBe(true));
+    changeFocusedGroupTitle('Child');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Добавить дочернюю группу: Child' }));
+    await waitFor(() => expect(screen.getAllByRole('textbox', { name: 'Название группы' }).some(input => input === document.activeElement)).toBe(true));
+    changeFocusedGroupTitle('Grandchild');
+    expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Свернуть группу Renamed root' }));
+    expect(within(dialog).queryByRole('button', { name: 'Состав: Child' })).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Развернуть группу Renamed root' }));
+    expect(screen.getAllByRole('textbox', { name: 'Название группы' }).some(input => (input as HTMLInputElement).value === 'Child')).toBe(true);
+    expect(screen.getAllByRole('textbox', { name: 'Название группы' }).some(input => (input as HTMLInputElement).value === 'Grandchild')).toBe(true);
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Состав: Renamed root' }));
+    fireEvent.click(await within(await screen.findByRole('dialog', { name: 'Состав: Renamed root' })).findByRole('button', { name: 'Отмена' }));
+    expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить группы' }));
+    await waitFor(() => expect(state.api.putCatalogGroups).toHaveBeenCalledTimes(2));
+
+    const firstStage = state.api.putCatalogGroups.mock.calls[0][1] as GroupPutBody;
+    expect(firstStage).toEqual({
+      expectedRevision: 8,
+      groups: [
+        { id: root.id, title: root.title, parentId: null, entryIds: [], condition: null },
+        { id: other.id, title: other.title, parentId: null, entryIds: [], condition: null },
+        { title: 'Child', parentId: root.id, entryIds: [], condition: null },
+      ],
+    });
+    const finalStage = state.api.putCatalogGroups.mock.calls[1][1] as GroupPutBody;
+    expect(finalStage).toEqual({
+      expectedRevision: 9,
+      groups: [
+        { id: root.id, title: 'Renamed root', parentId: null, entryIds: [], condition: null },
+        { id: other.id, title: other.title, parentId: null, entryIds: [], condition: null },
+        { id: 'server-group-1', title: 'Child', parentId: root.id, entryIds: [], condition: null },
+        { title: 'Grandchild', parentId: 'server-group-1', entryIds: [], condition: null },
+      ],
+    });
+    expect(finalStage.groups.every(group => !('parentKey' in group))).toBe(true);
+    expect(new Set(confirmedGroups.map(group => group.id)).size).toBe(confirmedGroups.length);
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Сохранить группы' })).toBeDisabled());
+  });
+
+  it('retains a confirmed parent and draft descendants after an unknown staged creation without retrying', async () => {
+    const root: CatalogGroup = { id: 'saved-root', title: 'Root', parentId: null, entryIds: [], condition: null };
+    let confirmedGroups: CatalogGroup[] = [root];
+    let revision = 30;
+    state.api.getCatalogGroupConfiguration.mockResolvedValue({ campaignId: 12, contentRevision: revision, data: { groups: confirmedGroups }, attributeSchemaRevision: 0, diagnostics: [] });
+    state.api.listCatalog.mockResolvedValue([]);
+    state.api.getCatalogAttributes.mockResolvedValue({ campaignId: 12, contentRevision: 0, data: { definitions: [] } });
+    state.api.putCatalogGroups
+      .mockImplementationOnce(async (_campaignId: number, body: GroupPutBody) => {
+        const priorIds = new Set(confirmedGroups.map(group => group.id));
+        const assigned: CatalogGroup[] = body.groups.map((group): CatalogGroup => {
+          if (group.id && !priorIds.has(group.id)) throw new Error('A new group ID was supplied to the server.');
+          return { ...group, id: group.id ?? 'server-child' };
+        });
+        const assignedIds = new Set(assigned.map(group => group.id));
+        if (assigned.some(group => group.parentId && !assignedIds.has(group.parentId))) throw new Error('A parent was not included in the request.');
+        confirmedGroups = assigned;
+        revision += 1;
+        const result = { campaignId: 12, contentRevision: revision, data: { groups: confirmedGroups }, attributeSchemaRevision: 0, diagnostics: [] };
+        state.api.getCatalogGroupConfiguration.mockResolvedValue(result);
+        return result;
+      })
+      .mockRejectedValueOnce(new CampaignApiError(0, { code: 'unknown_outcome', title: 'Unknown outcome', detail: 'network failure' }, true));
+    renderGroupsDialog();
+    const dialog = await screen.findByRole('dialog', { name: 'Группы каталога' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Добавить дочернюю группу: Root' }));
+    await waitFor(() => expect(screen.getAllByRole('textbox', { name: 'Название группы' }).some(input => input === document.activeElement)).toBe(true));
+    changeFocusedGroupTitle('Child');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Добавить дочернюю группу: Child' }));
+    await waitFor(() => expect(screen.getAllByRole('textbox', { name: 'Название группы' }).some(input => input === document.activeElement)).toBe(true));
+    changeFocusedGroupTitle('Grandchild');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Свернуть группу Root' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Развернуть группу Root' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Состав: Root' }));
+    const members = await screen.findByRole('dialog', { name: 'Состав: Root' });
+    fireEvent.click(within(members).getByRole('button', { name: 'Отмена' }));
+    expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Сохранить группы' }));
+    await waitFor(() => expect(state.api.putCatalogGroups).toHaveBeenCalledTimes(2));
+    expect(confirmedGroups.map(group => group.id)).toEqual([root.id, 'server-child']);
+    expect(state.api.putCatalogGroups.mock.calls[0][1]).toEqual({
+      expectedRevision: 30,
+      groups: [
+        { id: root.id, title: root.title, parentId: null, entryIds: [], condition: null },
+        { title: 'Child', parentId: root.id, entryIds: [], condition: null },
+      ],
+    });
+    expect(state.api.putCatalogGroups.mock.calls[1][1]).toEqual({
+      expectedRevision: 31,
+      groups: [
+        { id: root.id, title: root.title, parentId: null, entryIds: [], condition: null },
+        { id: 'server-child', title: 'Child', parentId: root.id, entryIds: [], condition: null },
+        { title: 'Grandchild', parentId: 'server-child', entryIds: [], condition: null },
+      ],
+    });
+    expect(await screen.findByRole('heading', { name: 'Восстановление конфигурации' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Оставить черновик с новой ревизией' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('textbox', { name: 'Название группы' }).some(input => (input as HTMLInputElement).value === 'Grandchild')).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Перечитать группы и состав' }));
+    expect(await screen.findByRole('button', { name: 'Принять серверную конфигурацию' })).toBeInTheDocument();
+    expect(state.api.putCatalogGroups).toHaveBeenCalledTimes(2);
+    const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Принять серверную конфигурацию' }));
+    confirmation.mockRestore();
+    expect(state.api.putCatalogGroups).toHaveBeenCalledTimes(2);
+    expect(screen.getAllByRole('textbox', { name: 'Название группы' }).some(input => (input as HTMLInputElement).value === 'Grandchild')).toBe(false);
+    expect(state.api.createCatalogEntry).not.toHaveBeenCalled();
   });
 });
 

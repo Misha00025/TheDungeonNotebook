@@ -1,26 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Checkbox, Field, FieldSet, Input, ModalPortal, Select, StatePanel } from '@tdn/shared';
+import { ActionRow, Button, DataTable, IconButton, Input, ModalPortal, StatePanel } from '@tdn/shared';
 import { useDirtyDraft, useWorkspace } from './Workspace';
 import { CampaignApiError } from './api';
 import { ApiError } from './Feedback';
-import { stringifyJson } from './json';
-import { CatalogConditionEditor } from './CatalogConditionEditor';
-import type { CatalogAttributeDefinition, CatalogGroup, CatalogGroupCondition, CatalogGroupConfigurationEnvelope, CatalogGroupInput, CatalogMetadata } from './catalogTypes';
-
-type GroupRow = {
-  clientKey: string;
-  id?: string;
-  title: string;
-  parentId: string | null;
-  entryIds: string[];
-  condition: CatalogGroupCondition | null;
-};
+import CatalogGroupConditionDialog from './CatalogGroupConditionDialog';
+import CatalogGroupMembersDialog from './CatalogGroupMembersDialog';
+import CatalogGroupMoveDialog from './CatalogGroupMoveDialog';
+import styles from './CatalogGroupsDialog.module.css';
+import type { CatalogAttributeDefinition, CatalogGroupCondition, CatalogGroupConfigurationEnvelope, CatalogMetadata } from './catalogTypes';
+import { assignConfirmedIds, createGroupDraftRow, groupDraftHierarchyError, groupDraftIsDirty, planGroupSaveStage, rowsFromAcceptedGroups, rowsFromConfiguration } from './catalogGroupDraft';
+import type { CatalogGroupDraftRow } from './catalogGroupDraft';
 
 type RecoverySnapshot = {
   configuration: CatalogGroupConfigurationEnvelope;
   entries: CatalogMetadata[];
   definitions: CatalogAttributeDefinition[];
 };
+
+type ActiveEditor = { kind: 'members' | 'condition' | 'move'; clientKey: string };
 
 type Props = {
   campaignId: number;
@@ -41,6 +38,11 @@ const diagnosticLabels: Record<string, string> = {
   invalid_group_entries: 'Состав группы содержит недопустимую запись.',
 };
 
+function initialExpandedKeys(rows: CatalogGroupDraftRow[]) {
+  const parentKeys = new Set(rows.flatMap(row => row.parentKey ? [row.parentKey] : []));
+  return new Set(rows.filter(row => row.parentKey === null || !parentKeys.has(row.clientKey)).map(row => row.clientKey));
+}
+
 const safeMessage = (error: unknown) => {
   if (!(error instanceof CampaignApiError)) return 'Не удалось выполнить операцию. Попробуйте ещё раз.';
   if (error.unknownOutcome || error.status === 0) return 'Результат записи неизвестен. Перечитайте конфигурацию перед продолжением.';
@@ -53,36 +55,11 @@ const safeMessage = (error: unknown) => {
 const isRecoverable = (error: unknown) => error instanceof CampaignApiError
   && (error.conflict || error.unknownOutcome || error.status === 0);
 
-function rowsFromConfiguration(groups: CatalogGroup[]): GroupRow[] {
-  return groups.map(group => ({
-    clientKey: `group-${group.id}`,
-    id: group.id,
-    title: group.title,
-    parentId: group.parentId,
-    entryIds: [...group.entryIds],
-    condition: group.condition,
-  }));
-}
-
-function inputsFromRows(rows: GroupRow[]): CatalogGroupInput[] {
-  return rows.map(({ id, title, parentId, entryIds, condition }) => ({
-    ...(id ? { id } : {}),
-    title,
-    parentId: id ? parentId : null,
-    entryIds,
-    condition,
-  }));
-}
-
 function collectAttributeIds(condition: CatalogGroupCondition | null, ids = new Set<string>()): string[] {
   if (!condition) return [...ids];
   if (condition.attributeId) ids.add(condition.attributeId);
   condition.children?.forEach(child => collectAttributeIds(child, ids));
   return [...ids];
-}
-
-function sameGroupDraft(left: CatalogGroupInput[], right: CatalogGroupInput[]): boolean {
-  return stringifyJson(left) === stringifyJson(right);
 }
 
 const CatalogGroupsDialog: React.FC<Props> = ({
@@ -107,14 +84,15 @@ const CatalogGroupsDialog: React.FC<Props> = ({
   onForbiddenRef.current = onForbidden;
 
   const [baseline, setBaseline] = useState<CatalogGroupConfigurationEnvelope>();
-  const [rows, setRows] = useState<GroupRow[]>([]);
+  const [rows, setRows] = useState<CatalogGroupDraftRow[]>([]);
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => new Set());
+  const [focusGroupKey, setFocusGroupKey] = useState<string>();
+  const titleInputRefs = useRef(new Map<string, HTMLInputElement>());
   const [catalogEntries, setCatalogEntries] = useState<CatalogMetadata[]>([]);
   const [definitions, setDefinitions] = useState<CatalogAttributeDefinition[]>([]);
   const [allowInactiveByGroup, setAllowInactiveByGroup] = useState<Record<string, string[]>>({});
   const [diagnostics, setDiagnostics] = useState<CatalogGroupConfigurationEnvelope['diagnostics']>([]);
-  const [conditionInvalid, setConditionInvalid] = useState<Record<string, boolean>>({});
-  const [conditionTouched, setConditionTouched] = useState(false);
-  const [conditionEpoch, setConditionEpoch] = useState(0);
+  const [activeEditor, setActiveEditor] = useState<ActiveEditor>();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>();
   const [failure, setFailure] = useState<unknown>();
@@ -125,14 +103,20 @@ const CatalogGroupsDialog: React.FC<Props> = ({
   const [acceptOnly, setAcceptOnly] = useState(false);
   const [recovery, setRecovery] = useState<RecoverySnapshot>();
   const [status, setStatus] = useState('');
+  const [draftError, setDraftError] = useState<string>();
 
   canWriteRef.current = canManage && !permissionsPending && !revoked;
-  const baselineInputs = useMemo(() => baseline ? inputsFromRows(rowsFromConfiguration(baseline.data.groups)) : [], [baseline]);
-  const dirty = Boolean(baseline && !sameGroupDraft(inputsFromRows(rows), baselineInputs));
+  const dirty = groupDraftIsDirty(rows, baseline);
   const invalidTitles = rows.some(row => !row.title.trim());
-  const invalidConditions = rows.some(row => conditionInvalid[row.clientKey]);
-  const invalid = invalidTitles || invalidConditions;
-  useDirtyDraft(`catalog-groups-${sessionKey}-${campaignId}`, dirty || blocked || (invalid && conditionTouched));
+  const hierarchyError = groupDraftHierarchyError(rows);
+  const invalid = invalidTitles || Boolean(hierarchyError || draftError);
+  useDirtyDraft(`catalog-groups-${sessionKey}-${campaignId}`, dirty || blocked);
+
+  useEffect(() => {
+    if (!focusGroupKey) return;
+    titleInputRefs.current.get(focusGroupKey)?.focus();
+    setFocusGroupKey(undefined);
+  }, [focusGroupKey, rows, expandedKeys]);
 
   const reportForbidden = () => {
     if (!mountedRef.current) return;
@@ -144,6 +128,7 @@ const CatalogGroupsDialog: React.FC<Props> = ({
     const nextRows = rowsFromConfiguration(snapshot.configuration.data.groups);
     setBaseline(snapshot.configuration);
     setRows(nextRows);
+    setExpandedKeys(initialExpandedKeys(nextRows));
     setCatalogEntries(snapshot.entries);
     setDefinitions(snapshot.definitions);
     setDiagnostics(snapshot.configuration.diagnostics);
@@ -151,13 +136,12 @@ const CatalogGroupsDialog: React.FC<Props> = ({
       group.id,
       collectAttributeIds(group.condition),
     ])));
-    setConditionInvalid({});
-    setConditionTouched(false);
-    setConditionEpoch(value => value + 1);
+    setActiveEditor(undefined);
     setRecovery(undefined);
     setBlocked(false);
     setAcceptOnly(false);
     setFailure(undefined);
+    setDraftError(undefined);
     setStatus('Принята серверная конфигурация групп.');
     onSavedRef.current(snapshot.configuration);
   };
@@ -174,7 +158,9 @@ const CatalogGroupsDialog: React.FC<Props> = ({
       ]);
       if (!mountedRef.current || generation !== loadGeneration.current) return;
       setBaseline(configuration);
-      setRows(rowsFromConfiguration(configuration.data.groups));
+      const loadedRows = rowsFromConfiguration(configuration.data.groups);
+      setRows(loadedRows);
+      setExpandedKeys(initialExpandedKeys(loadedRows));
       setCatalogEntries(entries);
       setDefinitions(schema.data.definitions);
       setDiagnostics(configuration.diagnostics);
@@ -202,87 +188,121 @@ const CatalogGroupsDialog: React.FC<Props> = ({
 
   const close = () => {
     if (busyRef.current || recoveryBusyRef.current || recovering) return;
-    if ((dirty || blocked || (invalid && conditionTouched))
+    if ((dirty || blocked)
       && !window.confirm('Есть несохранённые изменения. Закрыть и потерять их?')) return;
     onCloseRef.current();
   };
 
-  const updateRow = (clientKey: string, updater: (row: GroupRow) => GroupRow) => {
+  const updateRow = (clientKey: string, updater: (row: CatalogGroupDraftRow) => CatalogGroupDraftRow) => {
+    setDraftError(undefined);
     setRows(current => current.map(row => row.clientKey === clientKey ? updater(row) : row));
   };
 
-  const hasChildren = (row: GroupRow) => {
-    const groupId = row.id;
-    return Boolean(groupId && rows.some(child => child.parentId === groupId));
+  const hasChildren = (row: CatalogGroupDraftRow) => {
+    return rows.some(child => child.parentKey === row.clientKey);
   };
 
-  const removeGroup = (row: GroupRow) => {
-    if (hasChildren(row)) return;
+  const removeGroup = (row: CatalogGroupDraftRow) => {
+    if (!canWriteRef.current || busyRef.current || blocked || activeEditor || hasChildren(row)) return;
+    setDraftError(undefined);
     setRows(current => current.filter(item => item.clientKey !== row.clientKey));
-    setConditionInvalid(current => {
-      if (!(row.clientKey in current)) return current;
-      const next = { ...current };
-      delete next[row.clientKey];
+    setExpandedKeys(current => {
+      const next = new Set(current);
+      next.delete(row.clientKey);
       return next;
     });
   };
 
-  const isDescendant = (candidateId: string, groupId: string) => {
-    let current = rows.find(row => row.id === candidateId);
+  const addGroup = (parentKey: string | null = null) => {
+    if (!canWriteRef.current || busyRef.current || blocked || activeEditor) return;
+    if (parentKey !== null && !rows.some(row => row.clientKey === parentKey)) return;
+    setDraftError(undefined);
+    const row = createGroupDraftRow(parentKey);
+    setRows(current => [...current, row]);
+    setExpandedKeys(current => {
+      const next = new Set(current);
+      if (parentKey) next.add(parentKey);
+      next.add(row.clientKey);
+      return next;
+    });
+    setFocusGroupKey(row.clientKey);
+  };
+
+  const toggleExpanded = (clientKey: string) => setExpandedKeys(current => {
+    const next = new Set(current);
+    if (next.has(clientKey)) next.delete(clientKey);
+    else next.add(clientKey);
+    return next;
+  });
+
+  const isDescendant = (candidateKey: string, groupKey: string) => {
+    let current = rows.find(row => row.clientKey === candidateKey);
     const visited = new Set<string>();
-    while (current?.parentId && !visited.has(current.parentId)) {
-      const parentId = current.parentId;
-      if (parentId === groupId) return true;
-      visited.add(parentId);
-      current = rows.find(row => row.id === parentId);
+    while (current?.parentKey && !visited.has(current.parentKey)) {
+      const parentKey = current.parentKey;
+      if (parentKey === groupKey) return true;
+      visited.add(parentKey);
+      current = rows.find(row => row.clientKey === parentKey);
     }
     return false;
   };
 
-  const updateConditionValidity = (clientKey: string, value: boolean) => {
-    setConditionInvalid(current => current[clientKey] === value ? current : { ...current, [clientKey]: value });
-  };
-
-  const serverRows = (result: CatalogGroupConfigurationEnvelope, submittedRows: GroupRow[]) => result.data.groups.map((group, index) => ({
-    clientKey: submittedRows[index]?.clientKey ?? `group-${group.id}`,
-    id: group.id,
-    title: group.title,
-    parentId: group.parentId,
-    entryIds: [...group.entryIds],
-    condition: group.condition,
-  }));
-
   const save = async () => {
-    if (!baseline || !canWriteRef.current || busyRef.current || blocked || invalid || !dirty) return;
-    const submittedRows = rows;
-    const payload = inputsFromRows(submittedRows);
-    const hasNewGroups = payload.some(group => !group.id);
+    if (!baseline || !canWriteRef.current || busyRef.current || blocked || activeEditor || invalid || !dirty) return;
+    const generation = loadGeneration.current;
+    let confirmed = baseline;
+    let workingRows = rows;
+    let failedStageContainsNewGroups = false;
     busyRef.current = true;
     setBusy(true);
     setFailure(undefined);
     setStatus('');
+    setDraftError(undefined);
     try {
-      const result = await api.putCatalogGroups(campaignId, {
-        expectedRevision: baseline.contentRevision,
-        groups: payload,
-      });
-      if (!mountedRef.current) return;
-      setBaseline(result);
-      setRows(serverRows(result, submittedRows));
-      setDiagnostics(result.diagnostics);
-      setConditionInvalid({});
-      setConditionTouched(false);
-      setConditionEpoch(value => value + 1);
-      setAllowInactiveByGroup(Object.fromEntries(result.data.groups.map(group => [group.id, collectAttributeIds(group.condition)])));
-      setStatus('Конфигурация групп подтверждённо сохранена.');
-      onSavedRef.current(result);
+      while (true) {
+        if (!mountedRef.current || generation !== loadGeneration.current) return;
+        if (!canWriteRef.current || blocked) {
+          setStatus('Дальнейшее сохранение остановлено после изменения доступа.');
+          break;
+        }
+        const plan = planGroupSaveStage(workingRows, confirmed.data.groups);
+        if ('error' in plan) {
+          setDraftError(plan.error);
+          break;
+        }
+        failedStageContainsNewGroups = plan.stage.containsNewGroups;
+        const result = await api.putCatalogGroups(campaignId, {
+          expectedRevision: confirmed.contentRevision,
+          groups: plan.stage.groups,
+        });
+        if (!mountedRef.current || generation !== loadGeneration.current) return;
+        workingRows = plan.stage.kind === 'final'
+          ? rowsFromAcceptedGroups(result.data.groups, plan.stage.clientKeys)
+          : assignConfirmedIds(workingRows, plan.stage.clientKeys, result.data.groups);
+        confirmed = result;
+        setBaseline(result);
+        setRows(workingRows);
+        setDiagnostics(result.diagnostics);
+        setAllowInactiveByGroup(Object.fromEntries(result.data.groups.map(group => [group.id, collectAttributeIds(group.condition)])));
+        onSavedRef.current(result);
+        if (plan.stage.kind === 'final') {
+          setStatus('Конфигурация групп подтверждённо сохранена.');
+          break;
+        }
+        setStatus('Новые группы подтверждены; остальные изменения ещё не сохранены.');
+        failedStageContainsNewGroups = false;
+        if (!canWriteRef.current) {
+          setStatus('Сохранённый этап принят; дальнейшая запись остановлена после изменения доступа.');
+          break;
+        }
+      }
     } catch (error) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || generation !== loadGeneration.current) return;
       setFailure(error);
       if ((error as { status?: number })?.status === 403) reportForbidden();
       if (isRecoverable(error)) {
         setBlocked(true);
-        setAcceptOnly(Boolean(error instanceof CampaignApiError && (error.unknownOutcome || error.status === 0) && hasNewGroups));
+        setAcceptOnly(Boolean(error instanceof CampaignApiError && (error.unknownOutcome || error.status === 0) && failedStageContainsNewGroups));
       }
     } finally {
       busyRef.current = false;
@@ -335,14 +355,134 @@ const CatalogGroupsDialog: React.FC<Props> = ({
     setRecovery(undefined);
     setBlocked(false);
     setFailure(undefined);
+    setDraftError(undefined);
     setStatus('Черновик оставлен; актуальная ревизия принята для следующего явного сохранения.');
   };
 
   const controlsDisabled = busy || recovering || permissionsPending || revoked || !canManage || blocked;
+  const tableDisabled = controlsDisabled || Boolean(activeEditor);
   const entryById = useMemo(() => new Map(catalogEntries.map(entry => [entry.id, entry])), [catalogEntries]);
   const diagnosticRows = (groupId: string) => diagnostics.filter(item => item.groupId === groupId);
+  const diagnosticMessage = (diagnostic: CatalogGroupConfigurationEnvelope['diagnostics'][number]) => {
+    const message = diagnosticLabels[diagnostic.code] ?? 'Сервер обнаружил проблему в настройке группы.';
+    const entryName = diagnostic.entryId ? entryById.get(diagnostic.entryId)?.name : undefined;
+    return diagnostic.entryId ? `${message} Определение: ${entryName ?? 'недоступно'}.` : message;
+  };
+  const applyMembers = (clientKey: string, entryIds: string[]) => {
+    if (activeEditor?.kind !== 'members' || activeEditor.clientKey !== clientKey
+      || controlsDisabled || !canWriteRef.current || busyRef.current || recoveryBusyRef.current || blocked || recovering) return;
+    if (!rows.some(row => row.clientKey === clientKey)) return;
+    updateRow(clientKey, row => ({ ...row, entryIds: [...new Set(entryIds)] }));
+    setActiveEditor(undefined);
+  };
+  const applyCondition = (clientKey: string, condition: CatalogGroupCondition | null) => {
+    if (activeEditor?.kind !== 'condition' || activeEditor.clientKey !== clientKey
+      || controlsDisabled || !canWriteRef.current || busyRef.current || recoveryBusyRef.current || blocked || recovering) return;
+    if (!rows.some(row => row.clientKey === clientKey)) return;
+    updateRow(clientKey, row => ({ ...row, condition }));
+    setActiveEditor(undefined);
+  };
+  const applyMove = (clientKey: string, parentKey: string | null) => {
+    if (activeEditor?.kind !== 'move' || activeEditor.clientKey !== clientKey
+      || controlsDisabled || !canWriteRef.current || busyRef.current || recoveryBusyRef.current || blocked || recovering) return;
+    if (!rows.some(row => row.clientKey === clientKey)) return;
+    if (parentKey !== null && (!rows.some(row => row.clientKey === parentKey)
+      || parentKey === clientKey || isDescendant(parentKey, clientKey))) return;
+    updateRow(clientKey, row => ({ ...row, parentKey }));
+    setExpandedKeys(current => {
+      const next = new Set(current);
+      let currentKey: string | null = parentKey;
+      const visited = new Set<string>();
+      while (currentKey && !visited.has(currentKey)) {
+        next.add(currentKey);
+        visited.add(currentKey);
+        currentKey = rows.find(row => row.clientKey === currentKey)?.parentKey ?? null;
+      }
+      next.add(clientKey);
+      return next;
+    });
+    setActiveEditor(undefined);
+  };
 
-  return <ModalPortal isOpen onClose={close} title="Группы каталога" dismissDisabled={busy || recovering}>
+  const renderGroupRows = () => {
+    const rendered = new Set<string>();
+    const renderGroup = (row: CatalogGroupDraftRow, depth: number, detached = false): React.ReactNode[] => {
+      if (rendered.has(row.clientKey)) return [];
+      rendered.add(row.clientKey);
+      const children = rows.filter(candidate => candidate.parentKey === row.clientKey);
+      const expanded = expandedKeys.has(row.clientKey);
+      const safeDiagnostics = row.id ? diagnosticRows(row.id) : [];
+      const groupLabel = row.title || 'Новая группа';
+      const diagnosticTitle = safeDiagnostics.map(diagnosticMessage).join(' ');
+      const result: React.ReactNode[] = [<tr key={row.clientKey}>
+        <td><div className={styles.groupCell} style={{ '--tree-indent': `${depth * 1.125}rem` } as React.CSSProperties}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="small"
+            className={styles.disclosure}
+            aria-label={`${expanded ? 'Свернуть' : 'Развернуть'} группу ${groupLabel}`}
+            aria-expanded={expanded}
+            disabled={tableDisabled}
+            onClick={() => toggleExpanded(row.clientKey)}
+          ><span aria-hidden="true">{expanded ? '▾' : '▸'}</span></Button>
+          <Input
+            ref={element => {
+              if (element) titleInputRefs.current.set(row.clientKey, element);
+              else titleInputRefs.current.delete(row.clientKey);
+            }}
+            className={styles.groupName}
+            aria-label="Название группы"
+            value={row.title}
+            disabled={tableDisabled}
+            aria-invalid={!row.title.trim() || undefined}
+            title={!row.title.trim() ? 'Введите название.' : undefined}
+            onChange={event => updateRow(row.clientKey, current => ({ ...current, title: event.target.value }))}
+          />
+          {detached && <small className={styles.hierarchyWarning} aria-hidden="true" title={hierarchyError}>!</small>}
+          {safeDiagnostics.length > 0 && <small className={styles.groupDiagnostic} role="status" aria-label={`Проблемы: ${safeDiagnostics.length}. ${diagnosticTitle}`} title={diagnosticTitle}>!</small>}
+        </div></td>
+        <td><Button type="button" size="small" variant="ghost" className={styles.rowAction} aria-label={`Состав: ${groupLabel}`} disabled={tableDisabled} onClick={() => setActiveEditor({ kind: 'members', clientKey: row.clientKey })}>#{row.entryIds.length}</Button></td>
+        <td><Button type="button" size="small" variant="ghost" className={styles.rowAction} aria-label={`Условие: ${groupLabel}`} disabled={tableDisabled} onClick={() => setActiveEditor({ kind: 'condition', clientKey: row.clientKey })}>{row.condition ? 'Задано' : 'Нет'}</Button></td>
+        <td><div className={styles.rowActions}>
+          <IconButton icon="sort" size="small" title={`Переместить группу ${groupLabel}`} ariaLabel={`Переместить группу ${groupLabel}`} disabled={tableDisabled} onClick={() => setActiveEditor({ kind: 'move', clientKey: row.clientKey })} />
+          <IconButton icon="delete" size="small" variant="danger" title={children.length > 0 ? 'Сначала перенесите дочерние группы' : `Удалить группу ${groupLabel}`} ariaLabel={`Удалить группу ${groupLabel}`} disabled={tableDisabled || children.length > 0} onClick={() => removeGroup(row)} />
+        </div></td>
+      </tr>];
+      if (expanded) {
+        for (const child of children) result.push(...renderGroup(child, depth + 1));
+        result.push(<tr key={`add-child-${row.clientKey}`}>
+          <td colSpan={4}>
+            <div className={styles.treeActionCell} style={{ '--tree-indent': `${(depth + 1) * 1.125}rem` } as React.CSSProperties}>
+              <Button type="button" variant="ghost" className={styles.addRowAction} aria-label={`Добавить дочернюю группу: ${groupLabel}`} disabled={tableDisabled} onClick={() => addGroup(row.clientKey)}>+ Добавить дочернюю группу</Button>
+            </div>
+          </td>
+        </tr>);
+      }
+      return result;
+    };
+
+    const reachable = new Set<string>();
+    const pending = rows.filter(row => row.parentKey === null).map(row => row.clientKey);
+    while (pending.length > 0) {
+      const clientKey = pending.pop()!;
+      if (reachable.has(clientKey)) continue;
+      reachable.add(clientKey);
+      rows.filter(row => row.parentKey === clientKey).forEach(row => pending.push(row.clientKey));
+    }
+
+    const treeRows: React.ReactNode[] = [];
+    for (const root of rows.filter(row => row.parentKey === null)) treeRows.push(...renderGroup(root, 0));
+    for (const row of rows) {
+      if (!reachable.has(row.clientKey)) treeRows.push(...renderGroup(row, 0, true));
+    }
+    treeRows.push(<tr key="add-root-group">
+      <td colSpan={4}><Button type="button" variant="ghost" className={styles.addRowAction} aria-label="Добавить группу" disabled={tableDisabled} onClick={() => addGroup(null)}>+ Добавить группу</Button></td>
+    </tr>);
+    return treeRows;
+  };
+
+  return <ModalPortal isOpen onClose={close} title="Группы каталога" size="wide" dismissDisabled={busy || recovering}>
     {loading && <StatePanel kind="loading">Загрузка групп, состава каталога и схемы условий…</StatePanel>}
     {!loading && Boolean(loadError) && <>
       <ApiError error={loadError} />
@@ -352,84 +492,53 @@ const CatalogGroupsDialog: React.FC<Props> = ({
     {!loading && !loadError && baseline ? <>
       {permissionsPending && <p role="status">Проверка прав. Запись до её завершения отключена.</p>}
       {revoked && <p role="alert">Управление группами заблокировано после отказа сервера.</p>}
-      {rows.length === 0 && <StatePanel kind="empty">Групп пока нет. Добавьте корневую группу.</StatePanel>}
-      {rows.map(row => {
-        const currentGroupId = row.id;
-        const children = Boolean(currentGroupId && rows.some(candidate => candidate.parentId === currentGroupId));
-        const safeDiagnostics = currentGroupId ? diagnosticRows(currentGroupId) : [];
-        const groupAttributeIds = currentGroupId ? allowInactiveByGroup[currentGroupId] ?? [] : [];
-        const parentChoices = currentGroupId
-          ? rows.filter((candidate): candidate is GroupRow & { id: string } => typeof candidate.id === 'string'
-            && candidate.id !== currentGroupId
-            && !isDescendant(candidate.id, currentGroupId))
+      {(hierarchyError || draftError) && <p role="alert">{hierarchyError ?? draftError}</p>}
+      {invalidTitles && <p role="alert">Укажите название каждой группы.</p>}
+      <DataTable className={styles.treeTable} aria-label="Группы каталога" minWidth="32rem">
+        <thead><tr><th scope="col">Группа</th><th scope="col">Состав</th><th scope="col">Условие</th><th scope="col">Действия</th></tr></thead>
+        <tbody>{renderGroupRows()}</tbody>
+      </DataTable>
+      {activeEditor?.kind === 'members' && (() => {
+        const row = rows.find(candidate => candidate.clientKey === activeEditor.clientKey);
+        return row ? <CatalogGroupMembersDialog
+          key={row.clientKey}
+          groupLabel={row.title || 'Новая группа'}
+          initialEntryIds={row.entryIds}
+          catalogEntries={catalogEntries}
+          disabled={controlsDisabled}
+          onApply={entryIds => applyMembers(row.clientKey, entryIds)}
+          onClose={() => setActiveEditor(undefined)}
+        /> : null;
+      })()}
+      {activeEditor?.kind === 'condition' && (() => {
+        const row = rows.find(candidate => candidate.clientKey === activeEditor.clientKey);
+        return row ? <CatalogGroupConditionDialog
+          key={row.clientKey}
+          groupLabel={row.title || 'Новая группа'}
+          initialCondition={row.condition}
+          definitions={definitions}
+          allowInactiveAttributeIds={row.id ? allowInactiveByGroup[row.id] ?? [] : []}
+          disabled={controlsDisabled}
+          onApply={condition => applyCondition(row.clientKey, condition)}
+          onClose={() => setActiveEditor(undefined)}
+        /> : null;
+      })()}
+      {activeEditor?.kind === 'move' && (() => {
+        const row = rows.find(candidate => candidate.clientKey === activeEditor.clientKey);
+        const choices = row
+          ? rows.filter(candidate => candidate.clientKey !== row.clientKey && !isDescendant(candidate.clientKey, row.clientKey))
+            .map(candidate => ({ key: candidate.clientKey, title: candidate.title || 'Новая группа' }))
           : [];
-        return <FieldSet key={row.clientKey} legend={row.title || 'Новая группа'}>
-          <Field label="Название группы" htmlFor={`${row.clientKey}-title`} error={!row.title.trim() ? 'Введите название.' : undefined}>
-            <Input
-              id={`${row.clientKey}-title`}
-              value={row.title}
-              disabled={controlsDisabled}
-              aria-invalid={!row.title.trim() || undefined}
-              onChange={event => updateRow(row.clientKey, current => ({ ...current, title: event.target.value }))}
-            />
-          </Field>
-          {currentGroupId
-            ? <Field label="Родительская группа" htmlFor={`${row.clientKey}-parent`}>
-              <Select
-                id={`${row.clientKey}-parent`}
-                value={row.parentId ?? ''}
-                disabled={controlsDisabled}
-                onChange={event => updateRow(row.clientKey, current => ({ ...current, parentId: event.target.value || null }))}
-              >
-                <option value="">Нет родителя</option>
-                {parentChoices.map(parent => <option key={parent.id} value={parent.id}>{parent.title}</option>)}
-              </Select>
-            </Field>
-            : <p>Новая группа будет создана корневой. Сохраните её, чтобы назначать её родителем.</p>}
-          <FieldSet legend="Явный состав">
-            {catalogEntries.length === 0 && <p>Доступных определений каталога нет.</p>}
-            {catalogEntries.map(entry => <label key={entry.id}>
-              <Checkbox
-                checked={row.entryIds.includes(entry.id)}
-                disabled={controlsDisabled}
-                onChange={event => updateRow(row.clientKey, current => ({
-                  ...current,
-                  entryIds: event.target.checked
-                    ? [...current.entryIds, entry.id]
-                    : current.entryIds.filter(id => id !== entry.id),
-                }))}
-              />
-              {entry.name} <small>{entry.kind === 'Item' ? 'Предмет' : 'Навык'}{entry.isHidden ? ' · скрытое' : ''}</small>
-            </label>)}
-          </FieldSet>
-          <CatalogConditionEditor
-            key={`${conditionEpoch}:${row.clientKey}`}
-            definitions={definitions}
-            condition={row.condition}
-            disabled={controlsDisabled}
-            allowInactiveAttributeIds={groupAttributeIds}
-            onChange={condition => updateRow(row.clientKey, current => ({ ...current, condition }))}
-            onValidityChange={invalid => updateConditionValidity(row.clientKey, invalid)}
-            onInteraction={() => setConditionTouched(true)}
-          />
-          {safeDiagnostics.map((diagnostic, index) => {
-            const message = diagnosticLabels[diagnostic.code] ?? 'Сервер обнаружил проблему в настройке этой группы.';
-            const entryName = diagnostic.entryId ? entryById.get(diagnostic.entryId)?.name : undefined;
-            return <p role="status" key={`${diagnostic.code}-${index}`}>
-              {message}{diagnostic.entryId ? ` Определение: ${entryName ?? 'недоступно'}.` : ''}
-            </p>;
-          })}
-          {children && <p role="alert">Перед удалением группы перенесите или удалите её дочерние группы.</p>}
-          <Button type="button" variant="secondary" disabled={controlsDisabled || children} onClick={() => removeGroup(row)}>Удалить группу</Button>
-        </FieldSet>;
-      })}
-      {!controlsDisabled && <Button type="button" onClick={() => setRows(current => [...current, {
-        clientKey: `new:${crypto.randomUUID()}`,
-        title: '',
-        parentId: null,
-        entryIds: [],
-        condition: null,
-      }])}>Добавить корневую группу</Button>}
+        return row ? <CatalogGroupMoveDialog
+          key={row.clientKey}
+          groupLabel={row.title || 'Новая группа'}
+          initialParentKey={row.parentKey}
+          choices={choices}
+          disabled={controlsDisabled}
+          onApply={parentKey => applyMove(row.clientKey, parentKey)}
+          onClose={() => setActiveEditor(undefined)}
+        /> : null;
+      })()}
       {Boolean(failure) && <>
         <ApiError error={failure} />
         <p role="alert">{safeMessage(failure)}</p>
@@ -442,12 +551,16 @@ const CatalogGroupsDialog: React.FC<Props> = ({
           ? <Button type="button" disabled={recovering || busy} onClick={() => void reread()}>Перечитать группы и состав</Button>
           : <>
             <p>Серверная конфигурация перечитана. Неопубликованные новые группы не будут отправлены повторно после неизвестного результата.</p>
-            <Button type="button" disabled={recovering || busy} onClick={() => resolveRecovery('accept')}>Принять серверную конфигурацию</Button>
-            {!acceptOnly && <Button type="button" variant="secondary" disabled={recovering || busy} onClick={() => resolveRecovery('keep')}>Оставить черновик с новой ревизией</Button>}
+            <ActionRow style={{ gap: '0.5rem' }}>
+              <Button type="button" disabled={recovering || busy} onClick={() => resolveRecovery('accept')}>Принять серверную конфигурацию</Button>
+              {!acceptOnly && <Button type="button" variant="secondary" disabled={recovering || busy} onClick={() => resolveRecovery('keep')}>Оставить черновик с новой ревизией</Button>}
+            </ActionRow>
           </>}
       </section>}
-      {!blocked && <Button type="button" disabled={controlsDisabled || invalid || !dirty} onClick={() => void save()}>{busy ? 'Сохранение…' : 'Сохранить группы'}</Button>}
-      <Button type="button" variant="secondary" disabled={busy || recovering} onClick={close}>Отмена</Button>
+      <ActionRow style={{ gap: '0.5rem' }}>
+        {!blocked && <Button type="button" disabled={controlsDisabled || Boolean(activeEditor) || invalid || !dirty} onClick={() => void save()}>{busy ? 'Сохранение…' : 'Сохранить группы'}</Button>}
+        <Button type="button" variant="secondary" disabled={busy || recovering} onClick={close}>Отмена</Button>
+      </ActionRow>
     </> : null}
   </ModalPortal>;
 };
