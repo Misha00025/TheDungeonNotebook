@@ -118,6 +118,38 @@ public sealed class CatalogGroupServiceTests
         Assert.Equal(JsonValueKind.Undefined, Assert.Single(roundTrip.Children!).Value.ValueKind);
     }
 
+    [Fact]
+    public async Task StringContainsConditionMatchesSubstring()
+    {
+        var f = CharacterCatalogTestFixture<ItemCatalog>.Create();
+        var schema = await f.DefineSchemaAsync(CharacterCatalogTestFixture<ItemCatalog>.Definition("material", "string"));
+        var material = Assert.Single(schema.Data.Definitions).Id;
+        var matching = await Create(f, "ancient steel sword", QuantityUnit.Whole, [CharacterCatalogTestFixture<ItemCatalog>.Value(Guid.NewGuid(), material, "\"ancient steel sword\"")]);
+        await Create(f, "wooden staff", QuantityUnit.Whole, [CharacterCatalogTestFixture<ItemCatalog>.Value(Guid.NewGuid(), material, "\"wooden staff\"")]);
+        var configured = await f.Groups.UpdateConfigurationAsync(Admin, 7, Request(0, Input("steel", [], condition: Node("contains", material, "\"steel\""))), default);
+
+        var result = await f.Groups.GetEntriesAsync(Member, 7, Assert.Single(configured.Data.Groups).Id, default);
+
+        Assert.Equal(matching, Assert.Single(result.Entries).Id);
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
+    public async Task MultiChoiceContainsConditionMatchesExactOptionKey()
+    {
+        var f = CharacterCatalogTestFixture<SkillCatalog>.Create();
+        var schema = await f.DefineSchemaAsync(CharacterCatalogTestFixture<SkillCatalog>.Definition("elements", "multiChoice", [new("fire", "Fire"), new("ice", "Ice"), new("arcane", "Arcane")]));
+        var elements = Assert.Single(schema.Data.Definitions).Id;
+        var matching = await Create(f, "fire and arcane", null, [CharacterCatalogTestFixture<SkillCatalog>.Value(Guid.NewGuid(), elements, "[\"arcane\",\"fire\"]")]);
+        await Create(f, "ice", null, [CharacterCatalogTestFixture<SkillCatalog>.Value(Guid.NewGuid(), elements, "[\"ice\"]")]);
+        var configured = await f.Groups.UpdateConfigurationAsync(Admin, 7, Request(0, Input("fire", [], condition: Node("contains", elements, "\"fire\""))), default);
+
+        var result = await f.Groups.GetEntriesAsync(Member, 7, Assert.Single(configured.Data.Groups).Id, default);
+
+        Assert.Equal(matching, Assert.Single(result.Entries).Id);
+        Assert.Empty(result.Diagnostics);
+    }
+
     private static Task<Guid> Create<T>(CharacterCatalogTestFixture<T> f, string name, QuantityUnit? unit, CatalogAttributeValue[]? attrs = null) where T : ICatalogType => CreateImpl(f, name, unit, attrs);
     private static async Task<Guid> CreateImpl<T>(CharacterCatalogTestFixture<T> f, string name, QuantityUnit? unit, CatalogAttributeValue[]? attrs) where T : ICatalogType =>
         (await f.Catalog.CreateAsync(Admin, 7, new CatalogCreateRequest { RequestId = Guid.NewGuid(), Name = name, IsHidden = false, QuantityUnit = unit, AllowNegative = false, Description = "", Attributes = attrs ?? [] }, default)).Entry.Id;

@@ -28,6 +28,7 @@ Conditions are JSON trees with `operator` and the applicable leaf/child fields. 
 - `not`: exactly one child, with no leaf fields.
 - `exists`: `attributeId`; true if any occurrence of that attribute is present.
 - `eq`: `attributeId` and native JSON `value`; equality uses JSON semantic equality.
+- `contains`: `attributeId` and string `value`, for example `{"operator":"contains","attributeId":"...","value":"fire"}`; for `string` attributes it matches a case-sensitive substring, and for `multiChoice` the value must be an existing option key matched exactly, not a substring of an array element. A match in any occurrence is sufficient.
 - `gt`, `gte`, `lt`, `lte`: `attributeId` and native JSON `value`; the current attribute definition must be `integer` or `number`.
 
 There are no `typeKey`, type revision, or active-state fields in condition leaves. A leaf comparison uses the currently configured attribute type and options. Numeric values are not coerced from strings. For repeated occurrences, a comparison succeeds if at least one valid occurrence matches; `all` evaluates each child independently, so separate occurrences may satisfy separate children. `not` negates its child, and `exists` tests presence even if an occurrence's value is currently invalid.
@@ -39,7 +40,7 @@ If a stored condition refers to an attribute absent from that scope's current sc
 The service does not persist historical schema/type snapshots for conditions. Current diagnostics are calculated on reads:
 
 - `invalid_condition`: malformed tree or unsupported operator/shape.
-- `incompatible_attribute_type`: a numeric comparison now targets a non-numeric definition.
+- `incompatible_attribute_type`: a numeric comparison now targets a non-numeric definition, or `contains` targets a type other than `string` or `multiChoice`.
 - `invalid_attribute_value`: the condition's native JSON value no longer validates under the current type/options, or an entry occurrence used for a typed condition is invalid.
 
 An absent-attribute reference is filtered to `condition: null` without an `unknown_attribute` diagnostic. An invalid group condition disables automatic matching while explicit visible membership remains. For a valid condition, an entry with an invalid occurrence for a typed condition gets an `invalid_attribute_value` entry diagnostic and is skipped for automatic matching; it is not treated as false under `not`. Diagnostics are read-time only and do not repair or mutate catalog data.

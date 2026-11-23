@@ -209,12 +209,25 @@ public sealed class CatalogGroupService<TCatalog>(CampaignService campaigns, Cat
             case "gte":
             case "lt":
             case "lte":
+            case "contains":
                 if (condition.AttributeId is not { } attributeId || attributeId == Guid.Empty || condition.Value.ValueKind == JsonValueKind.Undefined || condition.Children is not null)
                 {
                     diagnostics.Add("invalid_condition");
                     return;
                 }
                 if (!TryGetDefinition(schema, attributeId, diagnostics, out var definition)) return;
+                if (condition.Operator == "contains")
+                {
+                    if (definition.TypeKey is not ("string" or "multiChoice"))
+                    {
+                        diagnostics.Add("incompatible_attribute_type");
+                        return;
+                    }
+                    if (condition.Value.ValueKind != JsonValueKind.String ||
+                        definition.TypeKey == "multiChoice" && !definition.Options.Any(option => string.Equals(option.OptionKey, condition.Value.GetString(), StringComparison.Ordinal)))
+                        diagnostics.Add("invalid_attribute_value");
+                    return;
+                }
                 if ((condition.Operator is "gt" or "gte" or "lt" or "lte") && definition.TypeKey is not ("integer" or "number"))
                 {
                     diagnostics.Add("incompatible_attribute_type");
@@ -285,10 +298,18 @@ public sealed class CatalogGroupService<TCatalog>(CampaignService campaigns, Cat
         "not" => !Evaluate(condition.Children![0], values, schema),
         "exists" => values.Any(x => x.AttributeId == condition.AttributeId),
         "eq" => values.Where(x => x.AttributeId == condition.AttributeId).Any(x => JsonElement.DeepEquals(x.Value, condition.Value)),
+        "contains" => values.Where(x => x.AttributeId == condition.AttributeId).Any(x => ContainsValue(x.Value, condition.Value.GetString()!)),
         "gt" => CompareValues(values, condition, schema, comparison => comparison > 0),
         "gte" => CompareValues(values, condition, schema, comparison => comparison >= 0),
         "lt" => CompareValues(values, condition, schema, comparison => comparison < 0),
         "lte" => CompareValues(values, condition, schema, comparison => comparison <= 0),
+        _ => false
+    };
+
+    private static bool ContainsValue(JsonElement value, string needle) => value.ValueKind switch
+    {
+        JsonValueKind.String => value.GetString()!.Contains(needle, StringComparison.Ordinal),
+        JsonValueKind.Array => value.EnumerateArray().Any(item => item.ValueKind == JsonValueKind.String && string.Equals(item.GetString(), needle, StringComparison.Ordinal)),
         _ => false
     };
 
@@ -325,7 +346,7 @@ public sealed class CatalogGroupService<TCatalog>(CampaignService campaigns, Cat
 
     private static IEnumerable<Guid> TypedAttributeIds(CatalogGroupCondition condition)
     {
-        if ((condition.Operator is "eq" or "gt" or "gte" or "lt" or "lte") && condition.AttributeId is { } id)
+        if ((condition.Operator is "eq" or "gt" or "gte" or "lt" or "lte" or "contains") && condition.AttributeId is { } id)
             yield return id;
         if (condition.Children is not null)
             foreach (var child in condition.Children)
