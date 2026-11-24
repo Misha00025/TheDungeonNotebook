@@ -40,7 +40,6 @@ const CharacterCatalogQuantity: React.FC<CharacterCatalogQuantityProps> = ({ ent
   const busyRef = useRef(false);
   const blockedRef = useRef(false);
   const armedRef = useRef(false);
-  const focusOnEditRef = useRef(false);
   const baselineRef = useRef<CharacterCatalogEntryEnvelope | undefined>(undefined);
   const [editing, setEditing] = useState(false);
   const [raw, setRaw] = useState('');
@@ -51,15 +50,24 @@ const CharacterCatalogQuantity: React.FC<CharacterCatalogQuantityProps> = ({ ent
   const [recoveryError, setRecoveryError] = useState<unknown>();
   const [failure, setFailure] = useState<unknown>();
   const [unavailable, setUnavailable] = useState(false);
-  const active = editing || busy || blocked;
   const writable = catalog.canWrite && !catalog.permissionsPending && !readOnly && !preview;
   const policyEntry = baselineRef.current ?? entry;
-  const valid = validateCharacterQuantity(raw, {
+  const draftRaw = editing ? raw : characterQuantityToRaw(entry.record.quantity);
+  const valid = validateCharacterQuantity(draftRaw, {
     kind: 'Item',
     quantityUnit: policyEntry.definition.quantityUnit,
     allowNegative: policyEntry.definition.allowNegative,
   });
+  const baselineRaw = characterQuantityToRaw(baselineRef.current?.record.quantity);
+  const quantityDirty = Boolean(editing && baselineRef.current && (valid.issue || valid.value === undefined
+    ? draftRaw !== baselineRaw
+    : valid.value === null
+      ? baselineRef.current.record.quantity !== null
+      : baselineRef.current.record.quantity === null
+        || compareNumber(String(valid.value), String(baselineRef.current.record.quantity)) !== 0));
+  const active = quantityDirty || busy || blocked;
   const owner = `character-catalog-quantity-${sessionKey}-${catalog.campaignId}-${catalog.characterId}-${entry.record.id}-${id}`;
+  const statusId = `${id}-quantity-status`;
 
   useDirtyDraft(owner, active);
 
@@ -75,24 +83,16 @@ const CharacterCatalogQuantity: React.FC<CharacterCatalogQuantityProps> = ({ ent
     onStateChange(entry.record.id, active);
   }, [entry.record.id, active, onStateChange]);
 
-  useEffect(() => {
-    if (editing && !blocked && !busy && focusOnEditRef.current) {
-      focusOnEditRef.current = false;
-      inputRef.current?.focus();
-    }
-  }, [editing, blocked, busy]);
-
-  const begin = () => {
-    if (!writable || !canEditPolicy(entry) || editing) return;
+  const begin = (initialRaw = characterQuantityToRaw(entry.record.quantity)) => {
+    if (!writable || !canEditPolicy(entry) || baselineRef.current) return;
     baselineRef.current = entry;
-    setRaw(characterQuantityToRaw(entry.record.quantity));
+    setRaw(initialRaw);
     setFailure(undefined);
     setRecoveryError(undefined);
     setRecoveryEntry(undefined);
     setUnavailable(false);
     setEditing(true);
     armedRef.current = true;
-    focusOnEditRef.current = true;
   };
 
   const cancel = () => {
@@ -117,7 +117,7 @@ const CharacterCatalogQuantity: React.FC<CharacterCatalogQuantityProps> = ({ ent
   const save = async () => {
     const baseline = baselineRef.current;
     if (!baseline || busyRef.current || blockedRef.current || !editing || !writable || !canEditPolicy(baseline)) return;
-    if (raw === characterQuantityToRaw(baseline.record.quantity)) {
+    if (!quantityDirty) {
       setEditing(false);
       baselineRef.current = undefined;
       return;
@@ -209,25 +209,36 @@ const CharacterCatalogQuantity: React.FC<CharacterCatalogQuantityProps> = ({ ent
 
   const displayed = entry.definition.quantityUnit === 'Single' ? '1' : characterQuantityToRaw(entry.record.quantity) || '—';
   if (!editing && (!writable || !canEditPolicy(entry))) return <span className={styles.value}>{displayed}</span>;
-  if (!editing) return <Button className={styles.value} type="button" size="small" variant="ghost" aria-label={`Изменить количество: ${entry.definition.name}`} onClick={begin}>{displayed}</Button>;
 
   const newPolicyCanEdit = canEditPolicy(policyEntry);
-  const errorMessage = valid.issue ? issueMessages[valid.issue] : blocked ? 'Требуется сверка с сервером.' : failure ? failure instanceof CampaignApiError && failure.status === 403 ? 'Право записи недоступно.' : failure instanceof CampaignApiError && failure.status === 404 ? 'Запись недоступна.' : 'Не удалось сохранить количество.' : undefined;
+  const errorMessage = quantityDirty && valid.issue ? issueMessages[valid.issue] : blocked ? 'Требуется сверка с сервером.' : failure ? failure instanceof CampaignApiError && failure.status === 403 ? 'Право записи недоступно.' : failure instanceof CampaignApiError && failure.status === 404 ? 'Запись недоступна.' : 'Не удалось сохранить количество.' : undefined;
 
   return <div className={styles.editor}>
     <div ref={editorRef} className={styles.controls} onMouseDown={event => {
       if ((event.target as HTMLElement).closest('button[aria-label="Отменить изменение количества"]')) event.preventDefault();
     }}>
-      <Input ref={inputRef} className={styles.input} aria-label={`Количество: ${entry.definition.name}`} inputMode="decimal" value={raw} disabled={busy || !writable || !newPolicyCanEdit || blocked} aria-invalid={Boolean(errorMessage) || undefined} onFocus={() => { armedRef.current = true; }} onChange={event => { setRaw(event.target.value); setFailure(undefined); armedRef.current = true; }} onKeyDown={event => {
+      <Input ref={inputRef} className={styles.input} aria-label={`Количество: ${entry.definition.name}`} aria-describedby={errorMessage ? statusId : undefined} inputMode="decimal" value={editing ? raw : characterQuantityToRaw(entry.record.quantity)} disabled={busy || !writable || !newPolicyCanEdit || blocked} aria-invalid={Boolean(errorMessage) || undefined} onFocus={() => {
+        if (!editing) begin();
+        else armedRef.current = true;
+      }} onChange={event => {
+        if (!editing || !baselineRef.current) begin(event.target.value);
+        else setRaw(event.target.value);
+        setFailure(undefined);
+        armedRef.current = true;
+      }} onKeyDown={event => {
         if (event.key === 'Enter') { event.preventDefault(); void save(); }
         if (event.key === 'Escape' && !blockedRef.current && !busyRef.current) { event.preventDefault(); cancel(); }
       }} onBlur={event => {
-        if (event.relatedTarget instanceof Node && editorRef.current?.contains(event.relatedTarget) || blockedRef.current || !armedRef.current) return;
-        void save();
+        if (event.relatedTarget instanceof Node && editorRef.current?.contains(event.relatedTarget) || blockedRef.current || busyRef.current || !armedRef.current) return;
+        if (quantityDirty) void save();
+        else {
+          setEditing(false);
+          baselineRef.current = undefined;
+        }
       }} />
-      {!blocked && <IconButton icon="close" size="small" variant="secondary" title="Отменить изменение количества" ariaLabel="Отменить изменение количества" disabled={busy} onClick={cancel} />}
+      {quantityDirty && !blocked && <IconButton icon="close" size="small" variant="secondary" title="Отменить изменение количества" ariaLabel="Отменить изменение количества" disabled={busy} onClick={cancel} />}
     </div>
-    <small className={styles.status} role={errorMessage || busy ? 'status' : undefined}>{busy ? 'Сохранение…' : errorMessage ?? ' '}</small>
+    <small id={statusId} className={styles.status} role={errorMessage || busy ? 'status' : undefined}>{busy ? 'Сохранение…' : errorMessage ?? ' '}</small>
     {!newPolicyCanEdit && <div className={styles.recovery}><small>Формат количества изменился. Черновик нельзя сохранить.</small><Button type="button" size="small" variant="secondary" disabled={blocked || busy} onClick={cancel}>Отменить черновик</Button></div>}
     {blocked && <div className={styles.recovery}>
       {unavailable && <small>Запись недоступна; черновик сохранён до отмены.</small>}

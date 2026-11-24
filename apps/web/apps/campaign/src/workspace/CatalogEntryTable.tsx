@@ -27,22 +27,28 @@ export type CatalogEntryTableRowProps = {
 };
 
 export const CatalogEntryTable: React.FC<CatalogEntryTableProps> = ({ children, label, showQuantity = false, showSelection = false }) => <DataTable aria-label={label} minWidth="0" className={styles.table}>
+  <colgroup>
+    <col className={styles.nameColumn} />
+    <col className={styles.attributesColumn} />
+    {showQuantity && <col className={styles.controlColumn} />}
+    {showSelection && <col className={styles.controlColumn} />}
+  </colgroup>
   <thead><tr><th scope="col">Название</th><th scope="col">Атрибуты</th>{showQuantity && <th scope="col" className={styles.compact}>Количество</th>}{showSelection && <th scope="col" className={styles.compact}>Выбор</th>}</tr></thead>
   <tbody>{children}</tbody>
 </DataTable>;
 
 export const CatalogEntryTableRow: React.FC<CatalogEntryTableRowProps> = ({ name, onOpen, definitions, values, attributesLoading = false, attributesError, onRetryAttributes, quantity, selection, openDisabled = false, note }) => {
   const tags = definitions && values ? catalogAttributeTags(definitions, values) : [];
-  return <tr className={styles.row}>
-    <th scope="row" className={styles.name}><Button type="button" size="small" variant="ghost" aria-label={name} disabled={openDisabled} onClick={onOpen}>{name}</Button>{note && <small>{note}</small>}</th>
+  return <tr className={[styles.row, openDisabled && styles.openDisabled].filter(Boolean).join(' ')}>
+    <th scope="row" className={styles.name}><Button className={styles.open} type="button" size="small" variant="ghost" aria-label={name} disabled={openDisabled} onClick={onOpen}>{name}</Button>{note && <small>{note}</small>}</th>
     <td className={styles.attributes}>
       {attributesLoading ? <span className={styles.message}>Загрузка атрибутов…</span>
-        : attributesError ? <span className={styles.message}>Атрибуты недоступны{onRetryAttributes && <> <IconButton icon="undo" size="small" variant="secondary" title={`Повторить загрузку атрибутов ${name}`} ariaLabel={`Повторить загрузку атрибутов ${name}`} onClick={onRetryAttributes} /></>}</span>
+        : attributesError ? <span className={styles.message}>Атрибуты недоступны{onRetryAttributes && <> <IconButton className={styles.independentControl} icon="undo" size="small" variant="secondary" title={`Повторить загрузку атрибутов ${name}`} ariaLabel={`Повторить загрузку атрибутов ${name}`} onClick={onRetryAttributes} /></>}</span>
           : tags.length ? tags.map(tag => <Badge key={tag.attributeId}>{`${tag.title}: ${tag.values.join('; ')}`}</Badge>)
             : definitions && values ? '—' : null}
     </td>
-    {quantity !== undefined && <td className={styles.compact}>{quantity}</td>}
-    {selection !== undefined && <td className={styles.compact}>{selection}</td>}
+    {quantity !== undefined && <td className={`${styles.compact} ${styles.controlCell}`}>{quantity}</td>}
+    {selection !== undefined && <td className={`${styles.compact} ${styles.controlCell}`}>{selection}</td>}
   </tr>;
 };
 

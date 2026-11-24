@@ -2,6 +2,19 @@
   table-layout: auto;
 }
 
+.nameColumn {
+  width: 1%;
+}
+
+.attributesColumn {
+  width: 100%;
+}
+
+.controlColumn {
+  width: 1%;
+  min-width: 8ch;
+}
+
 .table th,
 .table td {
   min-width: 0;
@@ -10,6 +23,10 @@
   text-align: left;
   vertical-align: top;
   overflow-wrap: anywhere;
+}
+
+.table tr > * + * {
+  border-inline-start: 1px solid var(--border-color);
 }
 
 .table thead th {
@@ -21,15 +38,83 @@
   border-bottom: 0;
 }
 
+.row {
+  position: relative;
+  isolation: isolate;
+}
+
+.row:hover {
+  background: var(--bg-hover);
+}
+
+.openDisabled {
+  cursor: default;
+}
+
 .name {
   font-weight: 400;
 }
 
-.name button {
-  max-width: 100%;
-  justify-content: flex-start;
+.nameColumn {
+  min-inline-size: 0;
+}
+
+.row .open {
+  display: inline-block;
+  position: static;
+  min-height: 0;
+  width: max-content;
+  max-inline-size: 24ch;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   text-align: left;
+  text-shadow: none;
   white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.row .open:hover:not(:disabled),
+.row .open:active:not(:disabled) {
+  background: transparent;
+  filter: none;
+}
+
+.row .open:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.row .open:not(:disabled)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  cursor: pointer;
+}
+
+.row .open:focus-visible {
+  outline: none;
+}
+
+.row .open:focus-visible::after {
+  outline: 2px solid var(--accent-color);
+  outline-offset: -2px;
+}
+
+.independentControl {
+  position: relative;
+  z-index: 2;
+}
+
+.controlCell {
+  position: relative;
+  z-index: 2;
 }
 
 .attributes {
