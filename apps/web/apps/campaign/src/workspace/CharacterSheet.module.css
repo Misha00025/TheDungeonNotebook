@@ -153,6 +153,16 @@
 }
 
 @media (max-width: 600px) {
+  .tabNavigation > *,
+  .toolTabs {
+    flex-basis: 100%;
+  }
+
+  .toolTabs {
+    padding-inline-start: 0;
+    border-inline-start: 0;
+  }
+
   .valueField {
     min-width: 0;
   }

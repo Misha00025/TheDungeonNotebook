@@ -19,7 +19,7 @@ import { normalizeRoots, readPages, surfaceContextKeys } from './presentationMod
 import { editableBaseFields } from './CharacterPresentation';
 import InlineValueEditor from './InlineValueEditor';
 import CharacterStatsTable from './CharacterStatsTable';
-import { CharacterCatalogProvider } from './CharacterCatalogContext';
+import { CharacterCatalogScope } from './CharacterCatalogContext';
 import CharacterCatalogPanel from './CharacterCatalogPanel';
 import { PresentationCatalogProvider } from './PresentationCatalog';
 
@@ -55,8 +55,8 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
   const scope = `${sessionKey}:${campaignId}:${characterId}`;
   const metadataResource = useResource<CharacterMetadata>(`${scope}:metadata`, () => api.getCharacter(campaignId, characterId), variant === 'sheet' || !initialMetadata);
   const permissionResource = useResource<Permissions>(`${scope}:character-permissions`, () => api.characterPermissions(campaignId, characterId));
-  const sheetResource = useResource<ComputedSheet>(`${scope}:computed-sheet`, () => api.getComputedSheet(campaignId, characterId), !gmCatalogPage);
-  const presentationResource = useResource<PresentationEnvelope>(`${scope}:presentation`, () => api.getPresentation(campaignId), variant === 'sheet' && !gmCatalogPage);
+  const sheetResource = useResource<ComputedSheet>(`${scope}:computed-sheet`, () => api.getComputedSheet(campaignId, characterId));
+  const presentationResource = useResource<PresentationEnvelope>(`${scope}:presentation`, () => api.getPresentation(campaignId), variant === 'sheet');
   const [metadata, setMetadata] = useState<CharacterMetadata | undefined>(initialMetadata);
   const [metadataDraft, setMetadataDraft] = useState<MetadataDraft>();
   const [sheet, setSheet] = useState<ComputedSheet>();
@@ -186,6 +186,11 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
   ));
   const currentPermissions = permissionSnapshot ?? permissionResource.data;
   const permissionError = permissionCheckError ?? (permissionDirectVerified ? undefined : permissionResource.error);
+  const metadataStatus = metadataResource.error && typeof metadataResource.error === 'object' && 'status' in metadataResource.error ? Number(metadataResource.error.status) : undefined;
+  const metadataConfirmed = Boolean(metadata && metadataStatus !== 403 && metadataStatus !== 404);
+  const catalogAccessPending = !currentPermissions || permissionResource.loading || Boolean(permissionError) || !metadataConfirmed;
+  const catalogCanRead = Boolean(metadataConfirmed && currentPermissions && !permissionError && (currentPermissions.canRead || currentPermissions.canWrite));
+  const catalogCanWrite = Boolean(metadataConfirmed && currentPermissions?.canWrite && !catalogAccessPending);
   const sheetStatus = [sheetResource.error, computedReadError, snapshotError].map(error => error && typeof error === 'object' && 'status' in error ? Number(error.status) : undefined);
   const sheetInaccessible = sheetReadBlocked || sheetStatus.some(status => status === 403 || status === 404);
   const permissionPending = !currentPermissions || permissionResource.loading || snapshotBusy || Boolean(permissionError) || Boolean(snapshotError);
@@ -582,7 +587,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
     setPageRefreshConflict(false);
     navigate(first ? `${pageBase}/${first.key}` : mode === 'gm' ? `${pageBase}/all-stats` : pageBase, { replace: true });
   }, [variant, gmServicePage, mode, pageNavigable, pages, pageKey, routeDirty, navigate, pageBase]);
-  useEffect(() => { if (!gmStatsPage && !gmCatalogPage) setPageVisibleFieldIds([]); }, [pageKey, gmStatsPage, gmCatalogPage]);
+  useEffect(() => { if (!gmStatsPage) setPageVisibleFieldIds([]); }, [pageKey, gmStatsPage]);
   const goToPage = (key: string) => navigate(`${pageBase}/${key}`);
   const loadedRecovery = recoveryFields.map(fieldId => {
     const field = sheetRef.current?.baseFields.find(item => item.id === fieldId);
@@ -602,9 +607,9 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
   const withCatalogs = (content: React.ReactNode) => <PresentationCatalogProvider
     campaignId={campaignId}
     characterId={characterId}
-    canRead={readAllowed}
-    canWrite={canWrite && !permissionPending}
-    permissionsPending={permissionPending}
+    canRead={gmCatalogPage ? catalogCanRead : readAllowed}
+    canWrite={gmCatalogPage ? catalogCanWrite : canWrite && !permissionPending}
+    permissionsPending={gmCatalogPage ? catalogAccessPending : permissionPending}
     onForbidden={() => { permissionResource.reload(); campaignWorkspace?.reloadPermissions(); }}
     characterName={metadata?.name}
     audience={mode}
@@ -640,66 +645,15 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
     </section>);
   }
 
-  if (gmCatalogPage) {
-    const metadataStatus = metadataResource.error && typeof metadataResource.error === 'object' && 'status' in metadataResource.error
-      ? Number(metadataResource.error.status)
-      : undefined;
-    const metadataInaccessible = metadataStatus === 403 || metadataStatus === 404;
-    const metadataConfirmed = Boolean(metadata && !metadataInaccessible);
-    const characterPermissionsPending = !currentPermissions || permissionResource.loading || Boolean(permissionError);
-    const characterCanRead = Boolean(metadataConfirmed && currentPermissions && !permissionError && (currentPermissions.canRead || currentPermissions.canWrite));
-    const characterCanWrite = Boolean(metadataConfirmed && currentPermissions?.canWrite && !characterPermissionsPending);
-    const catalogPermissionsPending = characterPermissionsPending || !metadataConfirmed;
-    const canPublishDefinition = Boolean(campaignWorkspace?.permissions.canWrite && !campaignWorkspace.permissionsLoading);
-    const retryCatalogAccess = () => { metadataResource.reload(); permissionResource.reload(); };
-    return <section className={characterStyles.sheetSection} aria-busy={metadataResource.loading || permissionResource.loading}>
-      {metadataConfirmed && metadata && <PageHeader title={metadata.name} headingLevel={2} />}
-      {metadataResource.loading && !metadata && <StatePanel kind="loading">Загрузка персонажа…</StatePanel>}
-      {Boolean(metadataResource.error) && <ApiError error={metadataResource.error} onRetry={metadataResource.reload} />}
-      {permissionResource.loading && !currentPermissions && <StatePanel kind="loading">Проверка доступа к персонажу…</StatePanel>}
-      {Boolean(permissionError) && <ApiError error={permissionError} onRetry={permissionResource.reload} />}
-      {metadataConfirmed && <>
-        {pages.length > 0 && <TabBar basePath={pageBase} aria-label="Страницы персонажа" tabs={pages.map(page => ({ id: page.key, label: page.title, path: page.key }))} />}
-        <div className={characterStyles.toolTabs}>
-          <TabBar basePath={pageBase} aria-label="Инструменты мастера" tabs={[
-            { id: 'all-stats', label: 'Все характеристики', path: 'all-stats' },
-            { id: 'inventory', label: 'Инвентарь', path: 'inventory' },
-            { id: 'skills', label: 'Навыки', path: 'skills' },
-          ]} />
-        </div>
-        {catalogPermissionsPending && !permissionError && <StatePanel kind="loading">Проверка доступа к персонажу…</StatePanel>}
-        {!catalogPermissionsPending && !characterCanRead && <StatePanel kind="error">Доступ к персонажу не подтверждён.</StatePanel>}
-      </>}
-      <CharacterCatalogProvider
-        campaignId={campaignId}
-        characterId={characterId}
-        kind={pageKey === 'inventory' ? 'Item' : 'Skill'}
-        canRead={characterCanRead}
-        canWrite={characterCanWrite}
-        permissionsPending={catalogPermissionsPending}
-        onForbidden={() => { permissionResource.reload(); campaignWorkspace?.reloadPermissions(); }}
-      >
-        <CharacterCatalogPanel
-          kind={pageKey === 'inventory' ? 'Item' : 'Skill'}
-          canPublishDefinition={canPublishDefinition}
-          audience="gm"
-          characterName={metadata?.name}
-          definitionPermissionsPending={campaignWorkspace?.permissionsLoading ?? false}
-          onDefinitionForbidden={() => campaignWorkspace?.reloadPermissions()}
-        />
-      </CharacterCatalogProvider>
-      {!metadata && !metadataResource.loading && !metadataResource.error && <Button type="button" variant="secondary" onClick={retryCatalogAccess}>Повторить загрузку</Button>}
-    </section>;
-  }
-
-  if (!metadata || !sheet) {
+  if (!metadata || (!sheet && !gmCatalogPage)) {
     return <section className={characterStyles.sheetSection} aria-busy={!metadataResource.error && !sheetResource.error}>
       {(metadataResource.error || sheetResource.error) ? <ApiError error={metadataResource.error ?? sheetResource.error} onRetry={retryInitialLoad} /> : <StatePanel kind="loading">Загрузка листа персонажа…</StatePanel>}
     </section>;
   }
   const ensureMetadataDraft = () => setMetadataDraft(current => current ?? { name: metadata.name, importance: metadata.importance });
   const saveMetadata = async () => { if (metadataDraft) await metadataMutation.run(metadataDraft); };
-  const metadataControlsDisabled = permissionPending || !canWrite || metadataMutation.busy || metadataBlocked || snapshotBusy;
+  const metadataReadAllowed = gmCatalogPage ? catalogCanRead : readAllowed;
+  const metadataControlsDisabled = !metadataReadAllowed || permissionPending || !canWrite || metadataMutation.busy || metadataBlocked || snapshotBusy;
   const descriptionControlsDisabled = permissionPending || !canWrite || contentBusy || computedReadBusy || sheetBlocked || snapshotBusy;
   const handleDescriptionEscape = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Escape' && !contentBusy && !computedReadBusy) { event.preventDefault(); cancelDescription(); }
@@ -717,18 +671,18 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
   const identityAside = metadataDraft
     ? <Select aria-label="Важность" value={metadataDraft.importance} disabled={metadataControlsDisabled} onChange={event => setMetadataDraft(current => ({ ...(current ?? { name: metadata.name, importance: metadata.importance }), importance: event.target.value as CharacterMetadata['importance'] }))} onKeyDown={handleMetadataEscape}><option value="Background">Фоновый</option><option value="Secondary">Второстепенный</option><option value="Key">Ключевой</option></Select>
     : <Badge>{importanceLabel[metadata.importance] ?? metadata.importance}</Badge>;
-  const identityDescription = descriptionDraft !== undefined ? <List layout="vertical" gap="small" stretch className={characterStyles.description}>
+  const identityDescription = readAllowed && !sheetInaccessible && sheet && descriptionDraft !== undefined ? <List layout="vertical" gap="small" stretch className={characterStyles.description}>
     <Textarea aria-label="Описание" autoFocus value={descriptionDraft} disabled={descriptionControlsDisabled} onChange={event => { setWriteStatus(''); setDescriptionDraft(event.target.value); }} onKeyDown={handleDescriptionEscape} />
     <ActionRow><IconButton icon="check" title="Сохранить описание" ariaLabel="Сохранить описание" size="small" variant="secondary" disabled={descriptionDraft === sheet.description || descriptionControlsDisabled} busy={contentBusy} onClick={saveDescription} /><IconButton icon="close" title="Отменить изменения описания" ariaLabel="Отменить изменения описания" size="small" variant="secondary" disabled={contentBusy || computedReadBusy} onClick={cancelDescription} /></ActionRow>
-  </List> : sheet.description || canWrite ? <List layout="vertical" gap="small" stretch className={characterStyles.description}><List layout="horizontal" gap="small">{sheet.description && <span className={characterStyles.descriptionText}>{sheet.description}</span>}{canWrite && <IconButton icon="edit" title="Изменить описание" ariaLabel="Изменить описание" size="small" variant="secondary" disabled={descriptionControlsDisabled} onClick={() => { setDescriptionDraft(sheet.description); setWriteStatus(''); }} />}</List></List> : undefined;
+  </List> : readAllowed && !sheetInaccessible && sheet && (sheet.description || canWrite) ? <List layout="vertical" gap="small" stretch className={characterStyles.description}><List layout="horizontal" gap="small">{sheet.description && <span className={characterStyles.descriptionText}>{sheet.description}</span>}{canWrite && <IconButton icon="edit" title="Изменить описание" ariaLabel="Изменить описание" size="small" variant="secondary" disabled={descriptionControlsDisabled} onClick={() => { setDescriptionDraft(sheet.description); setWriteStatus(''); }} />}</List></List> : undefined;
   const identityActions = <ActionRow justify="end">
     {currentPermissions && !currentPermissions.canWrite && <Badge>Только чтение</Badge>}
-    {metadataDraft === undefined && canWrite && <IconButton icon="edit" title="Изменить сведения персонажа" ariaLabel="Изменить сведения персонажа" size="small" variant="secondary" disabled={metadataControlsDisabled} onClick={ensureMetadataDraft} />}
+    {metadataDraft === undefined && metadataReadAllowed && canWrite && <IconButton icon="edit" title="Изменить сведения персонажа" ariaLabel="Изменить сведения персонажа" size="small" variant="secondary" disabled={metadataControlsDisabled} onClick={ensureMetadataDraft} />}
     {metadataDraft !== undefined && <><IconButton icon="check" title="Сохранить сведения персонажа" ariaLabel="Сохранить сведения персонажа" size="small" variant="secondary" disabled={!metadataDirty || metadataControlsDisabled} busy={metadataMutation.busy} onClick={() => void saveMetadata()} /><IconButton icon="close" title="Отменить изменения сведений персонажа" ariaLabel="Отменить изменения сведений персонажа" size="small" variant="secondary" disabled={metadataMutation.busy} onClick={cancelMetadata} /></>}
   </ActionRow>;
   const characterIdentity = headerViewKey
     ? <PresentationSurfaceFrame surface="header" title={identityTitle} titleAside={identityAside} description={identityDescription} actions={identityActions} headingLevel={2}>
-        {readAllowed && presentationSheet && <CharacterPresentation campaignId={campaignId} characterId={characterId} pageKey={surfaceContextKeys.header} surface="header" sheet={presentationSheet} conditionSheet={sheet} refreshKey={presentationRefreshKey} renderValue={editorAllowed ? renderValue : undefined} onVisibleFieldsChange={onHeaderVisibleFieldsChange} />}
+        {readAllowed && presentationSheet && !sheetInaccessible && <CharacterPresentation campaignId={campaignId} characterId={characterId} pageKey={surfaceContextKeys.header} surface="header" sheet={presentationSheet} conditionSheet={sheet} refreshKey={presentationRefreshKey} renderValue={editorAllowed ? renderValue : undefined} onVisibleFieldsChange={onHeaderVisibleFieldsChange} />}
       </PresentationSurfaceFrame>
     : <PageHeader title={identityTitle} headingLevel={2} titleAside={identityAside} subtitle={identityDescription} actions={identityActions} />;
   const openCurrentPage = () => { if (pages[0]) goToPage(pages[0].key); };
@@ -737,25 +691,28 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
   const visiblePage = Boolean(displayedPageKey && pages.some(page => page.key === displayedPageKey));
     const shellBusy = (!gmStatsPage && !gmCatalogPage && presentationPending) || snapshotBusy || computedReadBusy || (permissionResource.loading && !permissionSnapshot);
   return withCatalogs(<section className={characterStyles.sheetSection} aria-busy={shellBusy}>
-    {!readAllowed ? <div className={characterStyles.accessState}>
+       {!(gmCatalogPage ? catalogCanRead : readAllowed) ? <div className={characterStyles.accessState}>
       {Boolean(permissionError || snapshotError) ? <><ApiError error={permissionError ?? snapshotError} onRetry={() => void refreshAll()} /><Button variant="secondary" type="button" onClick={() => void refreshAll()}>Проверить доступ и данные</Button></> : <Notification kind="warning" eventKey={`${scope}:permission`}>Доступ к актуальным данным персонажа не подтверждён.</Notification>}
       {Boolean(writeError) && <ApiError error={writeError} onRetry={() => void refreshAll()} />}{Boolean(metadataError) && <ApiError error={metadataError} onRetry={() => void refreshAll()} />}
-    </div> : <List layout="vertical" stretch>
+     </div> : <List layout="vertical" stretch>
        {characterIdentity}
-       {presentationUnavailable && <ApiError error={presentationError ?? presentationResource.error} onRetry={() => void refreshAll()} />}
-      <div className={characterStyles.tabNavigation}>
+        {presentationUnavailable && <ApiError error={presentationError ?? presentationResource.error} onRetry={() => { presentationResource.reload(); setPresentationError(undefined); }} />}
+       <div className={characterStyles.tabNavigation}>
         <TabBar basePath={pageBase} aria-label="Страницы персонажа" tabs={pages.map(page => ({ id: page.key, label: page.title, path: page.key }))} />
          {mode === 'gm' && <div className={characterStyles.toolTabs}><TabBar basePath={pageBase} aria-label="Инструменты мастера" tabs={[{ id: 'all-stats', label: 'Все характеристики', path: 'all-stats' }, { id: 'inventory', label: 'Инвентарь', path: 'inventory' }, { id: 'skills', label: 'Навыки', path: 'skills' }]} /></div>}
-      </div>
+       </div>
+        {gmCatalogPage && catalogCanRead && <CharacterCatalogScope kind={pageKey === 'inventory' ? 'Item' : 'Skill'}><CharacterCatalogPanel kind={pageKey === 'inventory' ? 'Item' : 'Skill'} canPublishDefinition={canManageViews} audience="gm" characterName={metadata.name} definitionPermissionsPending={campaignWorkspace?.permissionsLoading ?? false} onDefinitionForbidden={() => campaignWorkspace?.reloadPermissions()} /></CharacterCatalogScope>}
+        {gmCatalogPage && Boolean(sheetResource.error) && <ApiError error={sheetResource.error} onRetry={sheetResource.reload} />}
+        {gmCatalogPage && !sheet && !sheetResource.error && <StatePanel kind="loading">Загрузка характеристик…</StatePanel>}
       {baseEntryWithDraft && pages.length > 0 && <div className={characterStyles.pageConflict}><Notification kind="info" eventKey={`${scope}:base-entry`}>Черновые значения сохранены. Сейчас показана первая доступная страница без смены адреса.</Notification><Button variant="secondary" type="button" onClick={() => goToPage(pages[0].key)}>Открыть страницу «{pages[0].title}»</Button></div>}
-      {!gmStatsPage && !presentationUnavailable && pages.length === 0 && <StatePanel kind="empty" title="Страницы кампании">Для кампании ещё не настроены страницы.{canManageViews && <LinkButton to={path(`/${campaignId}/gm/views`)}>Настроить страницы</LinkButton>}</StatePanel>}
-      {!gmStatsPage && !presentationUnavailable && pageRefreshConflict && <div className={characterStyles.pageConflict}><Notification kind="warning" eventKey={`${scope}:${pageKey ?? ''}`}>Текущая страница больше не назначена. Неподтверждённые значения сохранены ниже.</Notification>{pages.length > 0 && <Button type="button" onClick={openCurrentPage}>Перейти к доступной странице «{pages[0].title}»</Button>}</div>}
+       {!gmServicePage && !presentationUnavailable && pages.length === 0 && <StatePanel kind="empty" title="Страницы кампании">Для кампании ещё не настроены страницы.{canManageViews && <LinkButton to={path(`/${campaignId}/gm/views`)}>Настроить страницы</LinkButton>}</StatePanel>}
+       {!gmServicePage && !presentationUnavailable && pageRefreshConflict && <div className={characterStyles.pageConflict}><Notification kind="warning" eventKey={`${scope}:${pageKey ?? ''}`}>Текущая страница больше не назначена. Неподтверждённые значения сохранены ниже.</Notification>{pages.length > 0 && <Button type="button" onClick={openCurrentPage}>Перейти к доступной странице «{pages[0].title}»</Button>}</div>}
       {serverSheetSnapshot ? <div className={characterStyles.pageConflict}><Notification kind="warning" eventKey={String(serverSheetSnapshot.contentRevision)}>Лист изменился на сервере. Черновые значения сохранены и не отправлены.</Notification><ActionRow><Button type="button" onClick={useServerSheetAsBase}>Использовать актуальную ревизию</Button><Button variant="secondary" type="button" onClick={loadServerSheet}>Загрузить серверную версию</Button></ActionRow></div> : null}
       {serverMetadataSnapshot ? <div className={characterStyles.pageConflict}><Notification kind="warning" eventKey={String(serverMetadataSnapshot.metadataRevision)}>Метаданные персонажа изменились на сервере.</Notification><ActionRow><Button type="button" onClick={useServerMetadataAsBase}>Использовать актуальную ревизию</Button><Button variant="secondary" type="button" onClick={loadServerMetadata}>Загрузить серверную версию</Button></ActionRow></div> : null}
       {(sheetBlocked || metadataBlocked) && !serverSheetSnapshot && !serverMetadataSnapshot && <div className={characterStyles.pageConflict}><Notification kind="warning" eventKey={`${sheetBlocked}:${metadataBlocked}`}>Проверяем результат сохранения. Повторная запись автоматически не выполняется.</Notification><Button variant="secondary" type="button" disabled={snapshotBusy} onClick={retrySnapshot}>Проверить данные и права</Button></div>}
       {Boolean(snapshotError) && <ApiError error={snapshotError} onRetry={retrySnapshot} />}
       {Boolean(computedReadError) && <><ApiError error={computedReadError} /><Button variant="secondary" type="button" disabled={computedReadBusy || contentBusy || snapshotBusy} onClick={() => void refreshComputedSheet()}>Повторить обновление расчётов</Button></>}
-       {gmStatsPage && readAllowed && presentationSheet && <CharacterStatsTable sheet={presentationSheet} renderValue={editorAllowed ? renderValue : undefined} onVisibleFieldsChange={onPageVisibleFieldsChange} />}
+        {gmStatsPage && readAllowed && presentationSheet && <CharacterStatsTable sheet={presentationSheet} renderValue={editorAllowed ? renderValue : undefined} onVisibleFieldsChange={onPageVisibleFieldsChange} />}
        {pageNavigable && visiblePage && !pageRefreshConflict && presentationSheet && <CharacterPresentation campaignId={campaignId} characterId={characterId} pageKey={displayedPageKey!} surface="page" sheet={presentationSheet} conditionSheet={sheet} refreshKey={presentationRefreshKey} renderValue={editorAllowed ? renderValue : undefined} onVisibleFieldsChange={onPageVisibleFieldsChange} />}
       {Boolean(writeError) && <ApiError error={writeError} onRetry={() => void refreshAll()} />}{Boolean(metadataError) && <ApiError error={metadataError} onRetry={() => void refreshAll()} />}
       {writeStatus && <Notification kind={writeStatusKind} eventKey={writeStatusEvent}>{writeStatus}</Notification>}

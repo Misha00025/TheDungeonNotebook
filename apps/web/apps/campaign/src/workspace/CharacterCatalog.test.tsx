@@ -378,7 +378,7 @@ describe('character catalog consumer', () => {
     expect(calls.filter(([url]) => url.endsWith(`/additions/${submittedRequestId}`))).toHaveLength(2);
   });
 
-  it.each(['inventory', 'skills'])('opens the GM %s service without presentation reads and switches to the player character root', async service => {
+  it.each(['inventory', 'skills'])('opens the GM %s service and switches to the player character root', async service => {
     const request = vi.fn(async (url: string) => {
       if (url === '/api/campaigns') return response([campaign]);
       if (url === '/api/campaigns/12') return response(campaign);
@@ -397,7 +397,8 @@ describe('character catalog consumer', () => {
     expect(await screen.findByRole('heading', { name: 'Service hero' })).toBeInTheDocument();
     expect(await screen.findByText('Ничего не найдено')).toBeInTheDocument();
     expect(screen.getByLabelText('Current pathname').textContent).toBe(`/groups/12/gm/characters/${characterId}/${service}`);
-    expect(request.mock.calls.some(([url]) => url.includes('/computed-sheet') || url.endsWith('/presentation') || url.includes('/presentation/resolve?'))).toBe(false);
+    expect(request.mock.calls.some(([url]) => url.endsWith('/computed-sheet'))).toBe(true);
+    expect(request.mock.calls.some(([url]) => url.endsWith('/presentation'))).toBe(true);
     const characterPermissionRead = request.mock.calls.findIndex(([url]) => url === `/api/campaigns/12/characters/${characterId}/permissions`);
     const entriesRead = request.mock.calls.findIndex(([url]) => url === `/api/campaigns/12/characters/${characterId}/${service === 'inventory' ? 'items' : 'skills'}`);
     expect(entriesRead).toBeGreaterThan(characterPermissionRead);
