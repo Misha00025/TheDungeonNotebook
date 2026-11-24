@@ -1,0 +1,52 @@
+.table {
+  table-layout: auto;
+}
+
+.table th,
+.table td {
+  min-width: 0;
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.table thead th {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.row:last-child > * {
+  border-bottom: 0;
+}
+
+.name {
+  font-weight: 400;
+}
+
+.name button {
+  max-width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+}
+
+.attributes {
+  color: var(--text-secondary);
+}
+
+.attributes > * {
+  margin: 0 0.25rem 0.2rem 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.message {
+  color: var(--text-secondary);
+}
+
+.compact {
+  min-inline-size: 8ch;
+  white-space: normal;
+}

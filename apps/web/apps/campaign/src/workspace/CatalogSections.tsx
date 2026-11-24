@@ -1,10 +1,10 @@
 import React from 'react';
-import { Badge, Button, IconButton, List, StatePanel } from '@tdn/shared';
+import { Button, StatePanel } from '@tdn/shared';
 import { ApiError } from './Feedback';
 import { useResource } from './hooks';
 import type { CatalogBrowseSection } from './catalogBrowseModel';
 import type { CatalogAttributeDefinition, CatalogContentEnvelope, CatalogMetadata } from './catalogTypes';
-import { catalogAttributeTags } from './catalogAttributeTags';
+import { CatalogEntryTable, CatalogEntryTableRow } from './CatalogEntryTable';
 import styles from './CatalogSections.module.css';
 
 export type CatalogSectionsProps = {
@@ -25,19 +25,7 @@ export type CatalogSectionsProps = {
 const EntryRow: React.FC<{ entry: CatalogMetadata; props: CatalogSectionsProps }> = ({ entry, props }) => {
   const key = `${props.previewScope}:${entry.id}:${props.previewVersions[entry.id] ?? 0}`;
   const content = useResource(key, () => props.loadContent(entry.id), Boolean(props.definitions));
-  const tags = props.definitions && content.data && !content.error
-    ? catalogAttributeTags(props.definitions, content.data.data.attributes)
-    : [];
-  return <div className={styles.entryRow}>
-    <Button className={styles.entry} size="small" variant="ghost" type="button" aria-label={entry.name} onClick={() => props.onOpenEntry(entry)}>
-      <span>{entry.name}</span>
-      {tags.map(tag => <Badge key={tag.attributeId}>{`${tag.title}: ${tag.values.join('; ')}`}</Badge>)}
-      {(props.attributeSchemaLoading || (props.definitions && content.loading)) && <small>Загрузка атрибутов…</small>}
-      {props.definitions && Boolean(content.error) && <small>Атрибуты недоступны.</small>}
-    </Button>
-    {props.onSelectEntry && <Button size="small" variant="secondary" type="button" aria-label={`Выбрать ${entry.name}`} disabled={props.selectionDisabled} onClick={() => props.onSelectEntry?.(entry)}>Выбрать</Button>}
-    {props.definitions && Boolean(content.error) && <IconButton icon="undo" size="small" variant="secondary" title={`Повторить загрузку атрибутов ${entry.name}`} ariaLabel={`Повторить загрузку атрибутов ${entry.name}`} onClick={content.reload} />}
-  </div>;
+  return <CatalogEntryTableRow name={entry.name} onOpen={() => props.onOpenEntry(entry)} definitions={props.definitions} values={content.data?.data.attributes} attributesLoading={props.attributeSchemaLoading || Boolean(props.definitions && content.loading)} attributesError={content.error} onRetryAttributes={content.reload} selection={props.onSelectEntry && <Button size="small" variant="secondary" type="button" aria-label={`Выбрать ${entry.name}`} disabled={props.selectionDisabled} onClick={() => props.onSelectEntry?.(entry)}>Выбрать</Button>} />;
 };
 
 const diagnosticLabels: Record<string, string> = {
@@ -59,9 +47,9 @@ const Section: React.FC<{ section: CatalogBrowseSection; props: CatalogSectionsP
       {section.state === 'loading' && <StatePanel kind="loading">Загрузка состава раздела…</StatePanel>}
       {section.state === 'error' && <><ApiError error={section.error} /><Button size="small" variant="ghost" type="button" onClick={() => props.onRetryMembership(section.key.slice('group:'.length))}>Повторить загрузку раздела</Button></>}
       {section.state === 'ready' && section.diagnostics.map((diagnostic, index) => <p className={styles.diagnostic} role="status" key={`${diagnostic.groupId}-${diagnostic.entryId ?? 'group'}-${diagnostic.code}-${index}`}>{diagnosticLabels[diagnostic.code] ?? 'Сервер обнаружил проблему при вычислении состава группы.'}</p>)}
-      {section.state === 'ready' && section.ownEntries.length > 0 && <List className={styles.entries} layout="vertical" gap="small" aria-label={`Записи: ${section.title}`}>
-         {section.ownEntries.map(entry => <EntryRow key={entry.id} entry={entry} props={props} />)}
-      </List>}
+       {section.state === 'ready' && section.ownEntries.length > 0 && <CatalogEntryTable label={`Записи: ${section.title}`} showSelection={Boolean(props.onSelectEntry)}>
+          {section.ownEntries.map(entry => <EntryRow key={entry.id} entry={entry} props={props} />)}
+       </CatalogEntryTable>}
        {section.children.map(child => <Section key={child.key} section={child} props={props} depth={depth + 1} />)}
     </div>}
   </details>;

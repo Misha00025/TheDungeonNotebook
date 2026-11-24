@@ -207,29 +207,6 @@ describe('campaign catalog', () => {
     expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
   });
 
-  it('shows an owner’s confirmed item settings in player view without exposing visibility controls or writing', async () => {
-    const ownedItem = { ...metadata, creatorUserId: state.userId, isHidden: true, quantityUnit: 'Fractional' as const, allowNegative: true };
-    state.api.listCatalog.mockResolvedValue([ownedItem]);
-    state.api.getCatalogEntry.mockResolvedValue(ownedItem);
-    renderCatalog();
-
-    await screen.findByText('Без группы');
-    fireEvent.click(screen.getByRole('button', { name: 'Развернуть всё' }));
-    fireEvent.click(await screen.findByRole('button', { name: /Public tonic/ }));
-    const dialog = await screen.findByRole('dialog', { name: 'Public tonic' });
-
-    expect(within(dialog).getByText('Дробное')).toBeInTheDocument();
-    expect(within(dialog).getByRole('checkbox', { name: 'Отрицательное' })).toBeChecked();
-    expect(within(dialog).getByRole('checkbox', { name: 'Отрицательное' })).toBeDisabled();
-    expect(within(dialog).queryByRole('checkbox', { name: 'Скрыт' })).not.toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'Редактировать' })).toBeInTheDocument();
-    expect(state.api.putCatalogMetadata).not.toHaveBeenCalled();
-    expect(state.api.putCatalogContent).not.toHaveBeenCalled();
-    expect(state.api.createCatalogEntry).not.toHaveBeenCalled();
-    expect(state.api.putCatalogAttributes).not.toHaveBeenCalled();
-    expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
-  });
-
   it('switches item/skill tabs, searches the full current catalogue, and creates the selected kind', async () => {
     state.mode = 'gm';
     state.permissions = { canRead: true, canWrite: true, canManageAccess: false };

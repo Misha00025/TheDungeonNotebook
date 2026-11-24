@@ -1,0 +1,44 @@
+.value {
+  display: inline-flex;
+  min-inline-size: 8ch;
+  align-items: center;
+  justify-content: flex-start;
+  white-space: nowrap;
+}
+
+.editor {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  min-inline-size: 8ch;
+}
+
+.controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.input {
+  width: 8ch;
+  min-width: 4ch;
+  flex: 0 1 auto;
+}
+
+.status {
+  min-height: 1.25em;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.recovery {
+  display: grid;
+  gap: 0.25rem;
+  max-inline-size: 18rem;
+  min-width: 0;
+}
+
+.recovery small {
+  overflow-wrap: anywhere;
+}

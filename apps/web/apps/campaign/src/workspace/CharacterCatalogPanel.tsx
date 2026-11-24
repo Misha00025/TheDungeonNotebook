@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionRow, Button, DataTable, IconButton, List, ListItem, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActionRow, Button, IconButton, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
 import { ApiError } from './Feedback';
 import { useCharacterCatalog } from './CharacterCatalogContext';
 import type { CatalogGroupCondition, CatalogKind, CharacterCatalogEntryEnvelope } from './catalogTypes';
 import CharacterCatalogAddDialog from './CharacterCatalogAddDialog';
 import CharacterCatalogEntryDialog from './CharacterCatalogEntryDialog';
 import { compileCatalogFilter } from './catalogFilter';
+import { CatalogEntryTable, CatalogEntryTableRow } from './CatalogEntryTable';
+import CharacterCatalogQuantity from './CharacterCatalogQuantity';
 
 export type CharacterCatalogPanelProps = {
   kind: CatalogKind;
@@ -27,20 +29,33 @@ const CharacterCatalogPanel: React.FC<CharacterCatalogPanelProps> = ({ canPublis
   const [selectedEntryId, setSelectedEntryId] = useState<string>();
   const [adding, setAdding] = useState(false);
   const [notice, setNotice] = useState<{ recordId: string; action: 'added' | 'changed' }>();
+  const [activeQuantityIds, setActiveQuantityIds] = useState<Set<string>>(() => new Set());
   const sectionRef = useRef<HTMLElement>(null);
   const selectedBaseline = useRef<{ id: string; revisions: string } | undefined>(undefined);
   const definitions = catalog.definitions ?? [];
   const compiledFilter = useMemo(() => compileCatalogFilter(condition, definitions), [condition, definitions]);
   const schemaReady = catalog.definitions !== undefined && !catalog.schemaError;
-  const filterError = schemaReady ? compiledFilter.error : undefined;
+  const filterApplied = Boolean(condition && schemaReady && !compiledFilter.error);
+  const filterNotApplied = Boolean(condition && !filterApplied);
   const sourceEntries = catalog.entries ?? [];
-  const classified = useMemo(() => sourceEntries.map(entry => ({ entry, result: condition && schemaReady && !filterError ? compiledFilter.test(entry.effectiveAttributes) : condition ? undefined : true })), [sourceEntries, condition, schemaReady, filterError, compiledFilter]);
-  const matched = condition && schemaReady && !filterError ? classified.filter(item => item.result === true).map(item => item.entry) : condition ? [] : sourceEntries;
-  const incompatible = condition && schemaReady && !filterError ? classified.filter(item => item.result === undefined).map(item => item.entry) : [];
+  const classified = useMemo(() => sourceEntries.map(entry => ({ entry, result: filterApplied ? compiledFilter.test(entry.effectiveAttributes) : condition ? undefined : true })), [sourceEntries, condition, filterApplied, compiledFilter]);
+  const filterState = new Map(classified.map(item => [item.entry.record.id, item.result]));
+  const matched = filterApplied ? classified.filter(item => item.result === true).map(item => item.entry) : sourceEntries;
+  const incompatible = filterApplied ? classified.filter(item => item.result === undefined).map(item => item.entry) : [];
   const matchesSearch = (entry: CharacterCatalogEntryEnvelope) => entry.definition.name.toLocaleLowerCase().includes(search.toLocaleLowerCase());
   const entries = useMemo(() => matched.filter(entry => entry.definition.kind === kind && matchesSearch(entry))
     .sort((left, right) => left.definition.name.localeCompare(right.definition.name)), [matched, kind, search]);
   const incompatibleEntries = incompatible.filter(matchesSearch).sort((left, right) => left.definition.name.localeCompare(right.definition.name));
+  const activeQuantityEntries = sourceEntries.filter(entry => activeQuantityIds.has(entry.record.id) && entry.definition.kind === kind);
+  const activeIncompatibleEntries = layout && filterApplied
+    ? activeQuantityEntries.filter(entry => filterState.has(entry.record.id) && filterState.get(entry.record.id) === undefined)
+    : [];
+  const mainActiveEntries = activeQuantityEntries.filter(entry => !activeIncompatibleEntries.some(item => item.record.id === entry.record.id));
+  const mainEntries = [...new Map([...entries, ...mainActiveEntries].map(entry => [entry.record.id, entry])).values()]
+    .sort((left, right) => left.definition.name.localeCompare(right.definition.name));
+  const visibleIncompatibleEntries = [...new Map([...incompatibleEntries, ...activeIncompatibleEntries]
+    .map(entry => [entry.record.id, entry])).values()]
+    .sort((left, right) => left.definition.name.localeCompare(right.definition.name));
   const canAdd = catalog.canWrite && !readOnly && !preview;
 
   useEffect(() => {
@@ -53,17 +68,34 @@ const CharacterCatalogPanel: React.FC<CharacterCatalogPanelProps> = ({ canPublis
     selectedBaseline.current = { id: selectedEntryId, revisions };
   }, [catalog.entries, selectedEntryId]);
 
-  const filterState = new Map(classified.map(item => [item.entry.record.id, item.result]));
   const noticeEntry = notice && catalog.entries?.find(entry => entry.record.id === notice.recordId);
   const noticeResult = noticeEntry ? filterState.get(noticeEntry.record.id) : undefined;
-  const noticeReason = !filterError && noticeEntry && noticeResult === false ? 'filter' : !filterError && noticeEntry && noticeResult === true && !matchesSearch(noticeEntry) ? 'search' : undefined;
+  const noticeReason = filterApplied && noticeEntry && noticeResult === false
+    ? 'filter'
+    : noticeEntry && !matchesSearch(noticeEntry) && (!filterApplied || noticeResult === true) ? 'search' : undefined;
   useEffect(() => {
     if (notice && (!catalog.entries || !noticeEntry)) { setNotice(undefined); return; }
     if (!notice || !noticeEntry) return;
-    if (noticeResult === true && matchesSearch(noticeEntry)) setNotice(undefined);
-  }, [notice, noticeEntry, noticeResult, search, catalog.entries]);
+    if ((!filterApplied || noticeResult === true) && matchesSearch(noticeEntry)) setNotice(undefined);
+  }, [notice, noticeEntry, noticeResult, search, catalog.entries, filterApplied]);
 
+  const onQuantityStateChange = useCallback((id: string, active: boolean) => {
+    setActiveQuantityIds(current => {
+      if (current.has(id) === active) return current;
+      const next = new Set(current);
+      if (active) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+  const onQuantitySaved = useCallback((updated: CharacterCatalogEntryEnvelope) => {
+    setNotice({ recordId: updated.record.id, action: 'changed' });
+  }, []);
+  const quantityFor = (entry: CharacterCatalogEntryEnvelope) => kind === 'Item'
+    ? <CharacterCatalogQuantity entry={entry} readOnly={readOnly} preview={preview} onStateChange={onQuantityStateChange} onSaved={onQuantitySaved} />
+    : undefined;
   const openEntry = (entry: CharacterCatalogEntryEnvelope) => {
+    if (activeQuantityIds.has(entry.record.id)) return;
     selectedBaseline.current = { id: entry.record.id, revisions: `${String(entry.record.metadataRevision)}:${String(entry.localContentRevision)}:${String(entry.definitionContentRevision)}` };
     setSelectedEntryId(entry.record.id);
   };
@@ -80,12 +112,16 @@ const CharacterCatalogPanel: React.FC<CharacterCatalogPanelProps> = ({ canPublis
     {catalog.canRead && condition && catalog.schemaLoading && !catalog.definitions && <StatePanel kind="loading">Загрузка схемы характеристик…</StatePanel>}
     {Boolean(catalog.entriesError) && <ApiError error={catalog.entriesError} onRetry={catalog.reload} />}
     {Boolean(catalog.schemaError) && <ApiError error={catalog.schemaError} onRetry={catalog.reload} />}
-    {filterError && <p role="status">Невозможно применить фильтр раздела: его настройки требуют обновления.</p>}
-    {catalog.entries && !filterError && (!condition || schemaReady) && entries.length > 0 && <List layout="vertical" stretch gap="small">{entries.map(entry => <ListItem key={entry.record.id} density="compact" meta={kind === 'Item' ? entry.record.quantity === null ? '—' : String(entry.record.quantity) : undefined}><Button type="button" size="small" variant="ghost" onClick={() => openEntry(entry)}>{entry.definition.name}</Button></ListItem>)}</List>}
+    {filterNotApplied && <p role="status">Фильтр раздела не применён. Показаны все доступные записи.</p>}
+    {catalog.entries && mainEntries.length > 0 && <CatalogEntryTable label={kind === 'Item' ? 'Инвентарь персонажа' : 'Навыки персонажа'} showQuantity={kind === 'Item'}>
+      {mainEntries.map(entry => <CatalogEntryTableRow key={entry.record.id} name={entry.definition.name} onOpen={() => openEntry(entry)} openDisabled={activeQuantityIds.has(entry.record.id)} note={activeQuantityIds.has(entry.record.id) && !entries.some(item => item.record.id === entry.record.id) ? 'Вне текущего отбора' : undefined} definitions={catalog.definitions} values={entry.effectiveAttributes} attributesLoading={catalog.schemaLoading} attributesError={catalog.schemaError} onRetryAttributes={catalog.reload} quantity={quantityFor(entry)} />)}
+    </CatalogEntryTable>}
     {catalog.entries && !catalog.entriesLoading && !catalog.entriesError && sourceEntries.length === 0 && <StatePanel kind="empty">У персонажа пока нет {kind === 'Item' ? 'предметов' : 'навыков'}.</StatePanel>}
-    {catalog.entries && !catalog.entriesLoading && !catalog.entriesError && !filterError && (!condition || schemaReady) && sourceEntries.length > 0 && entries.length === 0 && incompatibleEntries.length === 0 && search && <StatePanel kind="empty" actions={<Button type="button" size="small" variant="secondary" onClick={() => setSearch('')}>Очистить поиск</Button>}>Ничего не найдено</StatePanel>}
-    {catalog.entries && !catalog.entriesLoading && !catalog.entriesError && !filterError && (!condition || schemaReady) && sourceEntries.length > 0 && entries.length === 0 && incompatibleEntries.length === 0 && !search && condition && <StatePanel kind="empty">Нет записей, соответствующих этому разделу</StatePanel>}
-    {incompatibleEntries.length > 0 && <details><summary>Записи с несовместимыми характеристиками ({incompatibleEntries.length})</summary><List layout="vertical" stretch gap="small">{incompatibleEntries.map(entry => <ListItem key={entry.record.id} density="compact" meta={kind === 'Item' ? entry.record.quantity === null ? '—' : String(entry.record.quantity) : undefined}><Button type="button" size="small" variant="ghost" onClick={() => openEntry(entry)}>{entry.definition.name}</Button></ListItem>)}</List></details>}
+    {catalog.entries && !catalog.entriesLoading && !catalog.entriesError && sourceEntries.length > 0 && mainEntries.length === 0 && incompatibleEntries.length === 0 && search && <StatePanel kind="empty" actions={<Button type="button" size="small" variant="secondary" onClick={() => setSearch('')}>Очистить поиск</Button>}>Ничего не найдено</StatePanel>}
+    {catalog.entries && !catalog.entriesLoading && !catalog.entriesError && filterApplied && sourceEntries.length > 0 && mainEntries.length === 0 && incompatibleEntries.length === 0 && !search && <StatePanel kind="empty">Нет записей, соответствующих этому разделу</StatePanel>}
+    {visibleIncompatibleEntries.length > 0 && <details><summary>Записи с несовместимыми характеристиками ({visibleIncompatibleEntries.length})</summary><CatalogEntryTable label="Записи с несовместимыми характеристиками" showQuantity={kind === 'Item'}>
+      {visibleIncompatibleEntries.map(entry => <CatalogEntryTableRow key={entry.record.id} name={entry.definition.name} onOpen={() => openEntry(entry)} openDisabled={activeQuantityIds.has(entry.record.id)} note={activeQuantityIds.has(entry.record.id) && !entries.some(item => item.record.id === entry.record.id) ? 'Вне текущего отбора' : undefined} definitions={catalog.definitions} values={entry.effectiveAttributes} attributesLoading={catalog.schemaLoading} attributesError={catalog.schemaError} onRetryAttributes={catalog.reload} quantity={quantityFor(entry)} />)}
+    </CatalogEntryTable></details>}
     {notice && noticeEntry && noticeReason && <div role="status">
       <p>{kind === 'Item' ? 'Предмет' : 'Навык'} {notice.action === 'added' ? 'добавлен' : 'изменён'}, но {noticeReason === 'filter' ? 'не соответствует фильтру раздела.' : 'скрыт текущим поиском.'}</p>
       <ActionRow style={{ '--al-gap': '0.5rem' } as React.CSSProperties}>
@@ -102,15 +138,14 @@ const CharacterCatalogPanel: React.FC<CharacterCatalogPanelProps> = ({ canPublis
     {canAdd && <Button type="button" onClick={() => setAdding(true)}>{kind === 'Item' ? 'Добавить предмет' : 'Добавить навык'}</Button>}
     {!catalog.canRead && !catalog.permissionsPending && <StatePanel kind="error">Доступ к записям этого персонажа не подтверждён.</StatePanel>}
     {catalog.canRead && catalog.loading && !catalog.entries && <StatePanel kind="loading">Загрузка записей персонажа…</StatePanel>}
-    {Boolean(catalog.error) && <ApiError error={catalog.error} onRetry={catalog.reload} />}
-    {catalog.entries && entries.length === 0 && <StatePanel kind="empty">Ничего не найдено</StatePanel>}
-    {catalog.entries && entries.length > 0 && <DataTable aria-label={kind === 'Item' ? 'Инвентарь персонажа' : 'Навыки персонажа'} minWidth="24rem">
-      <thead><tr><th scope="col">Название</th>{kind === 'Item' && <th scope="col">Количество</th>}</tr></thead>
-      <tbody>{entries.map(entry => <tr key={entry.record.id}>
-        <th scope="row"><Button type="button" variant="secondary" onClick={() => setSelectedEntryId(entry.record.id)}>{entry.definition.name}</Button></th>
-        {kind === 'Item' && <td>{entry.record.quantity === null ? '—' : String(entry.record.quantity)}</td>}
-      </tr>)}</tbody>
-    </DataTable>}
+    {catalog.canRead && condition && catalog.schemaLoading && !catalog.definitions && <StatePanel kind="loading">Загрузка схемы характеристик…</StatePanel>}
+    {Boolean(catalog.entriesError) && <ApiError error={catalog.entriesError} onRetry={catalog.reload} />}
+    {Boolean(catalog.schemaError) && <ApiError error={catalog.schemaError} onRetry={catalog.reload} />}
+    {filterNotApplied && <p role="status">Фильтр раздела не применён. Показаны все доступные записи.</p>}
+    {catalog.entries && !catalog.entriesLoading && !catalog.entriesError && mainEntries.length === 0 && <StatePanel kind="empty">Ничего не найдено</StatePanel>}
+    {catalog.entries && mainEntries.length > 0 && <CatalogEntryTable label={kind === 'Item' ? 'Инвентарь персонажа' : 'Навыки персонажа'} showQuantity={kind === 'Item'}>
+      {mainEntries.map(entry => <CatalogEntryTableRow key={entry.record.id} name={entry.definition.name} onOpen={() => { if (!activeQuantityIds.has(entry.record.id)) setSelectedEntryId(entry.record.id); }} openDisabled={activeQuantityIds.has(entry.record.id)} note={activeQuantityIds.has(entry.record.id) && !entries.some(item => item.record.id === entry.record.id) ? 'Вне текущего отбора' : undefined} definitions={catalog.definitions} values={entry.effectiveAttributes} attributesLoading={catalog.schemaLoading} attributesError={catalog.schemaError} onRetryAttributes={catalog.reload} quantity={quantityFor(entry)} />)}
+    </CatalogEntryTable>}
     {selectedEntryId && <CharacterCatalogEntryDialog entryId={selectedEntryId} readOnly={readOnly || !catalog.canWrite} characterName={characterName} audience={audience} canAdminDefinition={canPublishDefinition} definitionPermissionsPending={definitionPermissionsPending} onDefinitionForbidden={onDefinitionForbidden} onClose={() => setSelectedEntryId(undefined)} />}
     {adding && <CharacterCatalogAddDialog kind={kind} canPublishDefinition={canPublishDefinition} characterName={characterName} definitionPermissionsPending={definitionPermissionsPending} audience={audience} onDefinitionForbidden={onDefinitionForbidden} onClose={() => setAdding(false)} />}
   </section>;

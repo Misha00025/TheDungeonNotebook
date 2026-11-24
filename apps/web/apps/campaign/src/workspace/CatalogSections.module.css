@@ -72,48 +72,6 @@
   border-left: 1px solid var(--border-color);
 }
 
-.entries {
-  margin: 0.2rem 0 0.45rem;
-}
-
-.entryRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem;
-  min-width: 0;
-}
-
-.sections .entry {
-  width: auto;
-  min-height: 1.75rem;
-  min-width: 0;
-  flex: 1 1 auto;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.3rem 0.45rem;
-  border: 0;
-  border-radius: 0;
-  text-align: left;
-  color: var(--text-primary);
-  margin: 0.05rem 0;
-}
-
-.sections .entry:hover {
-  background: var(--bg-secondary);
-}
-
-.sections .entry:focus-visible {
-  outline: 2px solid var(--accent-color);
-  outline-offset: -2px;
-}
-
-.sections .entry small {
-  color: var(--text-secondary);
-}
-
 .diagnostic {
   color: var(--text-secondary);
 }
