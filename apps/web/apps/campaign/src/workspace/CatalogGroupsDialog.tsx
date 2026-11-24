@@ -407,6 +407,7 @@ const CatalogGroupsDialog: React.FC<Props> = ({
             onClick={() => toggleExpanded(row.clientKey)}
           ><span aria-hidden="true">{expanded ? '▾' : '▸'}</span></Button>
           <Input
+            variant="embedded"
             ref={element => {
               if (element) titleInputRefs.current.set(row.clientKey, element);
               else titleInputRefs.current.delete(row.clientKey);

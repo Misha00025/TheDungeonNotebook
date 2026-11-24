@@ -25,7 +25,7 @@ const CatalogGroupMoveDialog: React.FC<Props> = ({ groupLabel, initialParentKey,
 
   return <ModalPortal isOpen onClose={onClose} title={`Переместить группу: ${groupLabel}`} size="compact">
     <Field label="Родительская группа" htmlFor={`${id}-parent`}>
-      <Select id={`${id}-parent`} value={parentKey} disabled={disabled} onChange={event => setParentKey(event.target.value)}>
+      <Select variant="single-line" id={`${id}-parent`} value={parentKey} disabled={disabled} onChange={event => setParentKey(event.target.value)}>
         <option value="">Нет родителя</option>
         {!choices.some(choice => choice.key === parentKey) && parentKey && <option value={parentKey} disabled>Недоступная родительская группа</option>}
         {choices.map(choice => <option key={choice.key} value={choice.key}>{choice.title}</option>)}

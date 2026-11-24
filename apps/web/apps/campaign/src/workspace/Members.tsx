@@ -42,7 +42,7 @@ const AssignmentLine: React.FC<{ entry: CharacterAccessEntry; userName: string; 
   };
   return <ListItem className={styles.assignmentItem} density="compact">
     <span className={styles.assignmentName}>{entry.character.name}</span>
-    <Select aria-label={`Уровень доступа ${entry.character.name} для ${memberName}`} value={canWrite ? 'write' : 'read'} disabled={disabled} onChange={event => void access.setAssignmentAccess(characterId, userId, event.target.value === 'write')}>
+    <Select variant="embedded" aria-label={`Уровень доступа ${entry.character.name} для ${memberName}`} value={canWrite ? 'write' : 'read'} disabled={disabled} onChange={event => void access.setAssignmentAccess(characterId, userId, event.target.value === 'write')}>
       <option value="read">Просмотр</option><option value="write">Редактирование</option>
     </Select>
     <IconButton icon="delete" variant="danger" title={`Снять доступ ${memberName} к ${entry.character.name}`} ariaLabel={`Снять доступ ${memberName} к ${entry.character.name}`} disabled={disabled} onClick={remove} />
@@ -129,12 +129,12 @@ const AssignmentDialog: React.FC<{ member: Member; memberName: string; isOpen: b
   return <ModalPortal isOpen={isOpen} onClose={close} dismissDisabled={access.isBusy} title={`Назначить персонажа ${memberName}`}>
     {access.pendingAssignmentAdds.map(([key, op]) => <PendingAdd key={key} op={op} access={access} memberName={op.userId === member.userId ? memberName : 'Участник'} characterName={access.characters.find(entry => entry.character.id === op.characterId)?.character.name} />)}
     <Field label="Персонаж" htmlFor={selectId}>
-      <Select id={selectId} value={characterId} disabled={access.isBusy || Boolean(addOp?.blocked)} onChange={event => setCharacterId(event.target.value)}>
+      <Select variant="single-line" id={selectId} value={characterId} disabled={access.isBusy || Boolean(addOp?.blocked)} onChange={event => setCharacterId(event.target.value)}>
         <option value="">Выберите персонажа</option>{available.map(entry => <option key={entry.character.id} value={entry.character.id}>{entry.character.name}</option>)}
       </Select>
     </Field>
     <Field label="Уровень доступа" htmlFor={`${selectId}-level`}>
-      <Select id={`${selectId}-level`} value={canWrite ? 'write' : 'read'} disabled={access.isBusy || Boolean(addOp?.blocked)} onChange={event => setCanWrite(event.target.value === 'write')}>
+      <Select variant="single-line" id={`${selectId}-level`} value={canWrite ? 'write' : 'read'} disabled={access.isBusy || Boolean(addOp?.blocked)} onChange={event => setCanWrite(event.target.value === 'write')}>
         <option value="read">Просмотр</option><option value="write">Редактирование</option>
       </Select>
     </Field>
@@ -213,7 +213,7 @@ const MembersPage: React.FC<{ campaignId: number }> = ({ campaignId }) => {
       <Panel title="Добавить участника" headingLevel={2} className={styles.addPanel} aria-busy={searching || undefined}>
         <form className={styles.searchForm} aria-busy={searching || undefined} onSubmit={event => void search(event)}>
           <Field label="Никнейм" htmlFor={searchInputId} className={styles.searchField}>
-            <Input id={searchInputId} value={nickname} disabled={!access.writable || access.isBusy} onChange={event => { setNickname(event.target.value); searchSequence.current += 1; setSearching(false); setSearchResults(undefined); setSearchError(undefined); }} />
+            <Input variant="single-line" id={searchInputId} value={nickname} disabled={!access.writable || access.isBusy} onChange={event => { setNickname(event.target.value); searchSequence.current += 1; setSearching(false); setSearchResults(undefined); setSearchError(undefined); }} />
           </Field>
           <Button type="submit" variant="secondary" disabled={!access.writable || access.isBusy || searching} busy={searching}>Найти</Button>
         </form>

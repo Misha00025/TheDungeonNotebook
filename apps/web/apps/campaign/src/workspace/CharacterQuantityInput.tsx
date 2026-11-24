@@ -86,6 +86,7 @@ export const CharacterQuantityInput: React.FC<CharacterQuantityInputProps> = ({
     {readOnly
       ? <output id={id} aria-label={label}>{raw || '—'}</output>
       : <Input
+        variant="single-line"
         id={id}
         inputMode="decimal"
         value={raw}

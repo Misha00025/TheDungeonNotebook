@@ -62,8 +62,8 @@ const CreateCharacter: React.FC<{ campaignId: number; onClose: () => void }> = (
      <form aria-busy={permissionsLoading || creation.busy || undefined} onSubmit={submit}>
       <p>Персонаж использует единственный шаблон кампании.</p>
       <List layout="vertical" stretch>
-        <Field label="Имя" htmlFor={nameId}><Input id={nameId} autoFocus required value={name} disabled={!writable || uncertain || creation.busy} onChange={event => setName(event.target.value)} /></Field>
-        <Field label="Важность" htmlFor={importanceId}><Select id={importanceId} value={importance} disabled={!writable || uncertain || creation.busy} onChange={event => setImportance(event.target.value as Importance | '')}><option value="">По умолчанию (фоновый)</option><option value="Background">Фоновый</option><option value="Secondary">Второстепенный</option><option value="Key">Ключевой</option></Select></Field>
+        <Field label="Имя" htmlFor={nameId}><Input variant="single-line" id={nameId} autoFocus required value={name} disabled={!writable || uncertain || creation.busy} onChange={event => setName(event.target.value)} /></Field>
+        <Field label="Важность" htmlFor={importanceId}><Select variant="single-line" id={importanceId} value={importance} disabled={!writable || uncertain || creation.busy} onChange={event => setImportance(event.target.value as Importance | '')}><option value="">По умолчанию (фоновый)</option><option value="Background">Фоновый</option><option value="Secondary">Второстепенный</option><option value="Key">Ключевой</option></Select></Field>
       </List>
       {Boolean(createError) && <ApiError error={createError} />}{Boolean(checkError) && <ApiError error={checkError} />}
       <ActionRow>

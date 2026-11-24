@@ -26,7 +26,7 @@ const SurfaceAssignment: React.FC<{ surface: Exclude<PresentationSurface, 'page'
   const unavailable = Boolean(value && !views.some(view => view.key === value));
   const title = surface === 'header' ? 'Шапка персонажа' : 'Карточка персонажа';
   return <div className={styles.surfaceAssignment}>
-    <Field label={title} htmlFor={id}><Select id={id} value={value} disabled={disabled} onChange={event => onChange(event.target.value)}><option value="">Не показывать</option>{unavailable && <option value={value}>Недоступное отображение</option>}{views.map(view => <option key={view.id} value={view.key}>{view.name}</option>)}</Select></Field>
+    <Field label={title} htmlFor={id}><Select variant="single-line" id={id} value={value} disabled={disabled} onChange={event => onChange(event.target.value)}><option value="">Не показывать</option>{unavailable && <option value={value}>Недоступное отображение</option>}{views.map(view => <option key={view.id} value={view.key}>{view.name}</option>)}</Select></Field>
     {value && !unavailable && <Button variant="secondary" type="button" disabled={disabled} onClick={() => onEditView?.(value, surface)}>Редактировать</Button>}
     {unavailable && <p className={styles.warningText}>Назначенное отображение недоступно. Выберите доступное перед сохранением.</p>}
   </div>;
@@ -46,8 +46,8 @@ const CampaignPageRow: React.FC<{
   const viewId = useId();
   const unavailable = Boolean(page.viewKey && !views.some(view => view.key === page.viewKey));
   return <article className={styles.pageRow}>
-    <Field label="Название страницы" htmlFor={titleId}><Input id={titleId} value={page.title} disabled={disabled} onChange={event => onPatch(page.key, { title: event.target.value })} /></Field>
-    <Field label="Отображение" htmlFor={viewId}><Select id={viewId} value={page.viewKey} disabled={disabled} onChange={event => onPatch(page.key, { viewKey: event.target.value })}><option value="">Выберите отображение</option>{unavailable && <option value={page.viewKey}>Недоступное отображение</option>}{views.map(view => <option key={view.id} value={view.key}>{view.name}</option>)}</Select></Field>
+    <Field label="Название страницы" htmlFor={titleId}><Input variant="single-line" id={titleId} value={page.title} disabled={disabled} onChange={event => onPatch(page.key, { title: event.target.value })} /></Field>
+    <Field label="Отображение" htmlFor={viewId}><Select variant="single-line" id={viewId} value={page.viewKey} disabled={disabled} onChange={event => onPatch(page.key, { viewKey: event.target.value })}><option value="">Выберите отображение</option>{unavailable && <option value={page.viewKey}>Недоступное отображение</option>}{views.map(view => <option key={view.id} value={view.key}>{view.name}</option>)}</Select></Field>
     {unavailable && <p className={styles.warningText}>Назначенное отображение сейчас недоступно. Выберите доступное перед сохранением.</p>}
     <ActionRow><Button variant="secondary" type="button" disabled={disabled || index === 0} onClick={() => onMove(index, -1)}>Выше</Button><Button variant="secondary" type="button" disabled={disabled || index === count - 1} onClick={() => onMove(index, 1)}>Ниже</Button><Button variant="secondary" type="button" disabled={disabled} onClick={() => onRemove(page.key)}>Убрать</Button></ActionRow>
   </article>;

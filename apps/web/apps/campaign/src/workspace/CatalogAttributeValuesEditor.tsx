@@ -112,7 +112,7 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
     const isMultiChoice = definition?.typeKey === 'multiChoice' && canEdit && field;
     return <tr key={`${source ? 'source-' : ''}${row.id}`}>
       <DataTableCell as="th" scope="row" sizing="editor">{canRebind && definition
-        ? <Select aria-label={`Атрибут: ${definition.title}`} value={row.attributeId} disabled={disabled || immutableBindings.has(row.id)} onChange={event => {
+        ? <Select variant="embedded" aria-label={`Атрибут: ${definition.title}`} value={row.attributeId} disabled={disabled || immutableBindings.has(row.id)} onChange={event => {
           const nextDefinition = definitionById.get(event.target.value);
           if (!nextDefinition) return;
           const next = createCatalogOccurrence(nextDefinition, row.editLevel);
@@ -127,12 +127,12 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
         : canEdit && isMultiChoice
           ? <><span>{catalogValueLabel(row.value, definition) || 'Не выбрано'}</span> <Button type="button" size="small" variant="secondary" disabled={disabled} onClick={() => setChoiceDraft({ row, value: row.value, definition: { typeKey: definition.typeKey, options: definition.options }, error: issue })}>Выбрать значения</Button></>
           : canEdit && field && definition
-            ? <ValueInput field={field} value={row.value} label={`Значение: ${definition.title}`} compact disabled={disabled} onChange={value => updateRow(row.id, { ...row, value })} onValidityChange={error => setInputErrors(current => current[row.id] === Boolean(error) ? current : { ...current, [row.id]: Boolean(error) })} />
+            ? <ValueInput variant="embedded" field={field} value={row.value} label={`Значение: ${definition.title}`} compact disabled={disabled} onChange={value => updateRow(row.id, { ...row, value })} onValidityChange={error => setInputErrors(current => current[row.id] === Boolean(error) ? current : { ...current, [row.id]: Boolean(error) })} />
             : catalogValueLabel(row.value, definition)}
         {issue && <DataTableNote role="status" tone="error">{definition ? 'Значение не соответствует текущей характеристике.' : 'Характеристика удалена.'}</DataTableNote>}
       </DataTableCell>
       <DataTableCell sizing="editor">{mode === 'definition' && !rowReadOnly && definition && field
-        ? <Select aria-label={`Где разрешено менять: ${definition.title}`} value={row.editLevel} disabled={disabled} onChange={event => updateRow(row.id, { ...row, editLevel: event.target.value as CatalogEditLevel })}>
+        ? <Select variant="embedded" aria-label={`Где разрешено менять: ${definition.title}`} value={row.editLevel} disabled={disabled} onChange={event => updateRow(row.id, { ...row, editLevel: event.target.value as CatalogEditLevel })}>
           <option value="Definition">Только в каталоге</option>
           <option value="Character">Можно менять у персонажа</option>
         </Select>
@@ -154,7 +154,7 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
     </DataTable>
     {!disabled && <ActionRow className={styles.addAttributeRow}>
       <Field label="Новая характеристика" htmlFor={`${idPrefix}-catalog-new-attribute`}>
-        <Select id={`${idPrefix}-catalog-new-attribute`} value={newAttributeId} onChange={event => setNewAttributeId(event.target.value)}>
+        <Select variant="single-line" id={`${idPrefix}-catalog-new-attribute`} value={newAttributeId} onChange={event => setNewAttributeId(event.target.value)}>
           <option value="">Выберите характеристику</option>
           {definitions.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
         </Select>
@@ -175,7 +175,7 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
       return <ModalPortal isOpen onClose={() => setChoiceDraft(undefined)} title={`Значения: ${currentDefinition?.title ?? 'характеристика'}`}>
         {!editable && <p role="status">Характеристика или право редактирования изменились. Черновик выбора сохранён.</p>}
         {currentField && editable
-          ? <ValueInput field={currentField} value={choiceDraft.value} label={`Значение: ${currentDefinition?.title ?? 'характеристика'}`} onChange={value => setChoiceDraft(current => current ? { ...current, value } : current)} onValidityChange={value => setChoiceDraft(current => current ? { ...current, error: value } : current)} />
+          ? <ValueInput variant="single-line" field={currentField} value={choiceDraft.value} label={`Значение: ${currentDefinition?.title ?? 'характеристика'}`} onChange={value => setChoiceDraft(current => current ? { ...current, value } : current)} onValidityChange={value => setChoiceDraft(current => current ? { ...current, error: value } : current)} />
           : <p>{currentDefinition?.typeKey === 'multiChoice' ? catalogValueLabel(choiceDraft.value, currentDefinition) : 'Выбор недоступен'}</p>}
         {error && <p role="alert">{error}</p>}
         {choiceDraft.error && <p role="alert">{choiceDraft.error}</p>}

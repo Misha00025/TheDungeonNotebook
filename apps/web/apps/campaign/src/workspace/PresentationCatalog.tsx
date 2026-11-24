@@ -99,7 +99,7 @@ export const PresentationCatalogSettings: React.FC<{
 
   return <div>
     <Field label="Раздел каталога" htmlFor={kindFieldId}>
-      <Select id={kindFieldId} disabled={disabled} value={kind} onChange={event => changeKind(event.target.value as CatalogKind)}>
+      <Select variant="single-line" id={kindFieldId} disabled={disabled} value={kind} onChange={event => changeKind(event.target.value as CatalogKind)}>
         <option value="Item">Инвентарь</option>
         <option value="Skill">Навыки</option>
       </Select>

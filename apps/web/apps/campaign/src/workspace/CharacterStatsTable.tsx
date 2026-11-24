@@ -48,7 +48,7 @@ const CharacterStatsTable: React.FC<Props> = ({ sheet, renderValue, onVisibleFie
   return <section className={styles.section} aria-label="Все характеристики">
     <div className={styles.toolbar}>
       <SearchBar searchTerm={searchTerm} onSearchChange={setSearchTerm} aria-label="Поиск характеристик" />
-      <Select aria-label="Фильтр характеристик" value={filter} onChange={event => setFilter(event.target.value as Filter)}>
+      <Select variant="single-line" aria-label="Фильтр характеристик" value={filter} onChange={event => setFilter(event.target.value as Filter)}>
         <option value="all">Все</option><option value="base">Базовые</option><option value="virtual">Вычисляемые</option><option value="errors">С ошибками расчёта</option>
       </Select>
     </div>

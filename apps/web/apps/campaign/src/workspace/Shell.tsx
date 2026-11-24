@@ -127,13 +127,13 @@ const CampaignShell: React.FC = () => {
   return <CampaignContext.Provider value={{ campaign: campaign.data, permissions: effective, lastKnownPermissions: permission.data, permissionsLoading: permission.loading || Boolean(permission.error), mode, reloadCampaign: campaign.reload, reloadPermissions: permission.reload, updateCampaign }}>
     <WorkspaceLayout navigation={<>
       <Field label="Кампания" htmlFor={campaignSelectId}>
-        <Select id={campaignSelectId} value={String(id)} disabled={switchBusy || (campaigns.loading && !campaigns.data)} aria-busy={campaigns.loading || undefined} onChange={event => { void changeCampaign(Number(event.target.value)); }}>
+        <Select variant="single-line" id={campaignSelectId} value={String(id)} disabled={switchBusy || (campaigns.loading && !campaigns.data)} aria-busy={campaigns.loading || undefined} onChange={event => { void changeCampaign(Number(event.target.value)); }}>
           {campaignOptions.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
         </Select>
       </Field>
       {Boolean(campaigns.error) && <ApiError error={campaigns.error} onRetry={campaigns.reload} />}
       {effective.canWrite && <Field label="Окружение" htmlFor={modeSelectId}>
-        <Select id={modeSelectId} value={mode} disabled={switchBusy || permission.loading || Boolean(permission.error)} aria-busy={switchBusy || undefined} onChange={event => { void switchMode(event.target.value as 'gm' | 'player'); }}>
+        <Select variant="single-line" id={modeSelectId} value={mode} disabled={switchBusy || permission.loading || Boolean(permission.error)} aria-busy={switchBusy || undefined} onChange={event => { void switchMode(event.target.value as 'gm' | 'player'); }}>
           <option value="gm">Пространство мастера</option>
           <option value="player">Пространство игрока</option>
         </Select>

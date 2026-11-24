@@ -2,7 +2,7 @@ import React, { forwardRef, useRef } from 'react';
 import type { InputProps } from './Input';
 import Button from '../Buttons/Button';
 
-export type FileInputProps = Omit<InputProps, 'type' | 'children' | 'hidden'> & {
+export type FileInputProps = Omit<InputProps, 'type' | 'children' | 'hidden' | 'variant'> & {
   buttonLabel?: string;
 };
 

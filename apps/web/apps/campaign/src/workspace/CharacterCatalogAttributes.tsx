@@ -177,7 +177,7 @@ export const CharacterCatalogAttributes: React.FC<CharacterCatalogAttributesProp
       }}>Применить</Button></ActionRow>}>
       {!canEditChoice && <p role="status">Характеристика или право редактирования изменились. Черновик выбора сохранён.</p>}
       {currentField && canEditChoice
-        ? <ValueInput field={currentField} value={choiceDraft.value} label={`Значение: ${currentDefinition?.title ?? 'характеристика'}`} onChange={value => setChoiceDraft(current => current ? { ...current, value } : current)} onValidityChange={error => setChoiceDraft(current => current ? { ...current, error } : current)} />
+        ? <ValueInput variant="single-line" field={currentField} value={choiceDraft.value} label={`Значение: ${currentDefinition?.title ?? 'характеристика'}`} onChange={value => setChoiceDraft(current => current ? { ...current, value } : current)} onValidityChange={error => setChoiceDraft(current => current ? { ...current, error } : current)} />
         : <p>{currentDefinition?.typeKey === 'multiChoice' ? catalogValueLabel(choiceDraft.value, currentDefinition) : 'Выбор недоступен'}</p>}
       {valueIssue && <p role="alert">{valueIssue}</p>}
       {choiceDraft.error && <p role="alert">{choiceDraft.error}</p>}
@@ -231,7 +231,7 @@ export const CharacterCatalogAttributes: React.FC<CharacterCatalogAttributesProp
       const issueMessage = localIssue || sourceIssue;
       return <div className={styles.row} key={id}>
         <div className={styles.name}>
-          {canRebind && localDefinition && <Select aria-label={`Характеристика: ${title}`} value={local!.attributeId} disabled={disabled} onChange={event => {
+          {canRebind && localDefinition && <Select variant="embedded" aria-label={`Характеристика: ${title}`} value={local!.attributeId} disabled={disabled} onChange={event => {
             const nextDefinition = supportedDefinitions.find(item => item.id === event.target.value);
             const next = nextDefinition && createCatalogOccurrence(nextDefinition, 'Character');
             if (next) updateOccurrence(id, { ...next, id });
@@ -242,7 +242,7 @@ export const CharacterCatalogAttributes: React.FC<CharacterCatalogAttributesProp
           {multiChoice && local
             ? <><span>{valueLabel || 'Не выбрано'}</span><Button type="button" size="small" variant="secondary" disabled={disabled} onClick={() => setChoiceDraft({ row: local, source, schema: { typeKey: localDefinition!.typeKey, options: localDefinition!.options }, value: local.value })}>Выбрать значения: {title}</Button></>
             : localEditable && local && localDefinition
-              ? <ValueInput field={catalogAttributeField(localDefinition)!} value={local.value} label={`Значение: ${title}`} compact inline disabled={disabled} onChange={value => updateOccurrence(id, { ...local, value })} onValidityChange={error => setInputErrors(current => current[id] === Boolean(error) ? current : { ...current, [id]: Boolean(error)})} />
+              ? <ValueInput variant="embedded" field={catalogAttributeField(localDefinition)!} value={local.value} label={`Значение: ${title}`} compact inline disabled={disabled} onChange={value => updateOccurrence(id, { ...local, value })} onValidityChange={error => setInputErrors(current => current[id] === Boolean(error) ? current : { ...current, [id]: Boolean(error)})} />
               : <span className={styles.valueText}>{valueLabel || (readOnly && effectiveById && !effective ? 'Не применяется' : 'Не задано')}</span>}
           {issueMessage && <small className={styles.note}>{definition ? 'Значение не соответствует текущей характеристике.' : 'Характеристика удалена или недоступна.'}</small>}
           {savedPendingRemoval && <small className={styles.note}>{source ? 'Сброс ожидает сохранения; значение из каталога пока не подтверждено.' : 'Характеристика будет убрана после сохранения.'}</small>}
@@ -263,7 +263,7 @@ export const CharacterCatalogAttributes: React.FC<CharacterCatalogAttributesProp
     })}
     {!readOnly && <ActionRow className={styles.addRow}>
       <Field label="Новая характеристика" htmlFor={`${idPrefix}-new-attribute`}>
-        <Select id={`${idPrefix}-new-attribute`} value={newAttributeId} disabled={disabled || supportedDefinitions.length === 0} onChange={event => setNewAttributeId(event.target.value)}>
+        <Select variant="single-line" id={`${idPrefix}-new-attribute`} value={newAttributeId} disabled={disabled || supportedDefinitions.length === 0} onChange={event => setNewAttributeId(event.target.value)}>
           <option value="">Выберите характеристику</option>{supportedDefinitions.map(definition => <option key={definition.id} value={definition.id}>{definition.title}</option>)}
         </Select>
       </Field>

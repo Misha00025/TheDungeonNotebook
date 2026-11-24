@@ -313,7 +313,7 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
     {!permissionsLoading && mode === 'gm' && !permissions.canWrite && <p role="alert">Нет прав на запись в кампанию.</p>}
     {step === 1 && <section aria-label="Выбор персонажа">
       <Field label="Персонаж из файла" htmlFor="hero-import-source">
-        <Select id="hero-import-source" value={selectedSourceValue} disabled={locked || busy || !canWrite} onChange={event => selectSource(event.target.value)}>
+        <Select variant="single-line" id="hero-import-source" value={selectedSourceValue} disabled={locked || busy || !canWrite} onChange={event => selectSource(event.target.value)}>
           <option value="">Выберите персонажа</option>{sources.map((source, index) => <option key={index} value={String(index)}>{source.name}</option>)}
         </Select>
       </Field>
@@ -323,21 +323,21 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
         const identityDisabled = locked || busy || !canWrite || controlsDisabled;
         return <Panel key={draft.sourceIndex} title={source.name}>
           <Field label={`Цель для ${source.name}`} htmlFor={`hero-target-mode-${draft.sourceIndex}`}>
-            <Select id={`hero-target-mode-${draft.sourceIndex}`} value={draft.targetMode ?? ''} disabled={identityDisabled} onChange={event => setTarget(draft, event.target.value as HeroDraft['targetMode'])}>
+            <Select variant="single-line" id={`hero-target-mode-${draft.sourceIndex}`} value={draft.targetMode ?? ''} disabled={identityDisabled} onChange={event => setTarget(draft, event.target.value as HeroDraft['targetMode'])}>
               <option value="">Выберите цель</option><option value="new">Создать нового персонажа</option><option value="existing">Существующий персонаж</option>
             </Select>
           </Field>
           {draft.targetMode === 'existing' && <Field label={`Существующий персонаж для ${source.name}`} htmlFor={`hero-target-id-${draft.sourceIndex}`}>
-            <Select id={`hero-target-id-${draft.sourceIndex}`} value={draft.targetId} disabled={identityDisabled} onChange={event => setTarget(draft, 'existing', event.target.value)}>
+            <Select variant="single-line" id={`hero-target-id-${draft.sourceIndex}`} value={draft.targetId} disabled={identityDisabled} onChange={event => setTarget(draft, 'existing', event.target.value)}>
               <option value="">Выберите персонажа</option>{existingTargets.map(target => <option key={target.id} value={target.id}>{target.name}</option>)}
             </Select>
           </Field>}
           {draft.targetMode === 'new' && <>
             <Field label={`Имя нового персонажа ${source.name}`} htmlFor={`hero-new-name-${draft.sourceIndex}`}>
-              <Input id={`hero-new-name-${draft.sourceIndex}`} value={draft.newName} disabled={identityDisabled} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, newName: event.target.value }))} />
+              <Input variant="single-line" id={`hero-new-name-${draft.sourceIndex}`} value={draft.newName} disabled={identityDisabled} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, newName: event.target.value }))} />
             </Field>
             <Field label={`Важность персонажа ${source.name}`} htmlFor={`hero-importance-${draft.sourceIndex}`}>
-              <Select id={`hero-importance-${draft.sourceIndex}`} value={draft.importance} disabled={identityDisabled} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, importance: event.target.value as HeroDraft['importance'] }))}>
+              <Select variant="single-line" id={`hero-importance-${draft.sourceIndex}`} value={draft.importance} disabled={identityDisabled} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, importance: event.target.value as HeroDraft['importance'] }))}>
                 {importanceOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </Select>
             </Field>
@@ -390,7 +390,7 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
               const targetField = candidates.find(candidate => candidate.id === choice.targetId);
               return <tr key={`${field.key}:${index}`}><DataTableCell as="th" scope="row" sizing="content">{field.name}</DataTableCell><DataTableCell sizing="content">{field.key}</DataTableCell><DataTableCell preserveWhitespace>{sourceFieldValue(field)}</DataTableCell><DataTableCell sizing="editor">
                 <Field label={`Поле назначения ${source.name}: ${field.name}`} htmlFor={`hero-field-target-${draft.sourceIndex}-${index}`}>
-                  <Select id={`hero-field-target-${draft.sourceIndex}-${index}`} value={choice.targetId} disabled={mapDisabled || candidates.length === 0 || ['applied', 'verified'].includes(run?.statuses[`${draft.sourceIndex}:value:${field.key}`] ?? '')} onChange={event => updateField(draft.sourceIndex, field.key, current => ({ ...current, targetId: event.target.value, action: event.target.value ? 'replace' : 'skip' }))}>
+                  <Select variant="embedded" id={`hero-field-target-${draft.sourceIndex}-${index}`} value={choice.targetId} disabled={mapDisabled || candidates.length === 0 || ['applied', 'verified'].includes(run?.statuses[`${draft.sourceIndex}:value:${field.key}`] ?? '')} onChange={event => updateField(draft.sourceIndex, field.key, current => ({ ...current, targetId: event.target.value, action: event.target.value ? 'replace' : 'skip' }))}>
                     <option value="">Не импортировать</option>{candidates.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.title}</option>)}
                   </Select>
                 </Field>

@@ -37,7 +37,7 @@ export function TemplateDescriptionDialog({ label, value, disabled, onClose, onA
   const [draft, setDraft] = useState(value);
   useDialogDirty('template-description-dialog', draft, value);
   return <ModalPortal isOpen onClose={onClose} title={`Описание поля ${label}`}>
-    <Textarea aria-label="Описание поля" rows={6} value={draft} disabled={disabled} onChange={event => setDraft(event.target.value)} />
+      <Textarea variant="multiline" aria-label="Описание поля" rows={6} value={draft} disabled={disabled} onChange={event => setDraft(event.target.value)} />
     <DialogActions disabled={disabled} onApply={() => onApply(draft)} onClose={onClose} />
   </ModalPortal>;
 }
@@ -50,8 +50,8 @@ export function TemplateOptionsDialog({ label, options, disabled, onClose, onApp
     <DataTable aria-label={`Варианты поля ${label}`}>
       <thead><tr><DataTableCell as="th" scope="col" sizing="editor">Ключ</DataTableCell><DataTableCell as="th" scope="col" sizing="editor">Название</DataTableCell><DataTableCell as="th" scope="col" sizing="control">Действия</DataTableCell></tr></thead>
       <tbody>{draft.map((option, index) => <tr key={index}>
-        <DataTableCell sizing="editor"><Input aria-label={`Ключ варианта ${index + 1}`} value={option.optionKey} disabled={disabled} onChange={event => update(index, { optionKey: event.target.value })} /></DataTableCell>
-        <DataTableCell sizing="editor"><Input aria-label={`Название варианта ${index + 1}`} value={option.title} disabled={disabled} onChange={event => update(index, { title: event.target.value })} /></DataTableCell>
+        <DataTableCell sizing="editor"><Input variant="embedded" aria-label={`Ключ варианта ${index + 1}`} value={option.optionKey} disabled={disabled} onChange={event => update(index, { optionKey: event.target.value })} /></DataTableCell>
+        <DataTableCell sizing="editor"><Input variant="embedded" aria-label={`Название варианта ${index + 1}`} value={option.title} disabled={disabled} onChange={event => update(index, { title: event.target.value })} /></DataTableCell>
         <DataTableCell sizing="control"><IconButton size="small" icon="delete" variant="danger" title={`Удалить вариант ${index + 1}`} disabled={disabled} onClick={() => setDraft(current => current.filter((_, itemIndex) => itemIndex !== index))} /></DataTableCell>
       </tr>)}</tbody>
     </DataTable>
@@ -66,6 +66,7 @@ export function TemplateChoiceValueDialog({ label, field, value, disabled, onClo
   useDialogDirty('template-choice-value-dialog', draft, value);
   return <ModalPortal isOpen onClose={onClose} title={`Значения поля ${label}`}>
     <ValueInput
+      variant="single-line"
       field={field}
       value={draft}
       disabled={disabled}
@@ -117,7 +118,7 @@ export function TemplateVirtualLinksDialog({ label, campaignId, field, sources, 
         const unknown = Boolean(reference && !options.some(option => option.value === value));
         return <tr key={name}>
           <DataTableCell as="th" scope="row" sizing="content">{name}</DataTableCell>
-          <DataTableCell sizing="editor"><Select aria-label={`Параметр ${name}`} value={value} disabled={disabled} onChange={event => {
+          <DataTableCell sizing="editor"><Select variant="embedded" aria-label={`Параметр ${name}`} value={value} disabled={disabled} onChange={event => {
             const selected = options.find(option => option.value === event.target.value)?.source;
             patchBinding(name, selected ? { kind: selected.kind, fieldId: selected.id } : undefined);
           }}>

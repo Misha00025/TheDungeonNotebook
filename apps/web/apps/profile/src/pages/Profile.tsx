@@ -169,7 +169,7 @@ const Profile: React.FC = () => {
                   name="visibleName"
                   value={formData.visibleName}
                   onChange={handleInputChange}
-                  className={inputStyles.input}
+                  className={`${inputStyles.input} ${inputStyles['single-line']}`}
                   placeholder="Введите видимое имя"
                 />
               </div>

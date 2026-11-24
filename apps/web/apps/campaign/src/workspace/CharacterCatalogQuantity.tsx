@@ -216,7 +216,7 @@ const CharacterCatalogQuantity: React.FC<CharacterCatalogQuantityProps> = ({ ent
     <DataTableActions ref={editorRef} onMouseDown={event => {
       if ((event.target as HTMLElement).closest('button[aria-label="Отменить изменение количества"]')) event.preventDefault();
     }}>
-      <Input ref={inputRef} aria-label={`Количество: ${entry.definition.name}`} aria-describedby={errorMessage ? statusId : undefined} inputMode="decimal" value={editing ? raw : characterQuantityToRaw(entry.record.quantity)} disabled={busy || !writable || !newPolicyCanEdit || blocked} aria-invalid={Boolean(errorMessage) || undefined} onFocus={() => {
+      <Input variant="embedded" ref={inputRef} aria-label={`Количество: ${entry.definition.name}`} aria-describedby={errorMessage ? statusId : undefined} inputMode="decimal" value={editing ? raw : characterQuantityToRaw(entry.record.quantity)} disabled={busy || !writable || !newPolicyCanEdit || blocked} aria-invalid={Boolean(errorMessage) || undefined} onFocus={() => {
         if (!editing) begin();
         else armedRef.current = true;
       }} onChange={event => {

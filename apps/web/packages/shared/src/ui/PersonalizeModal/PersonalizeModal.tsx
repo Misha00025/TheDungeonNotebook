@@ -150,6 +150,7 @@ const PersonalizeModal: React.FC<PersonalizeModalProps> = ({ isOpen, onClose }) 
                 />
                 <Input
                   type="text"
+                  variant="single-line"
                   className={styles.hexInput}
                   value={customColors[field]}
                   onChange={handleHexChange(field)}
@@ -171,6 +172,7 @@ const PersonalizeModal: React.FC<PersonalizeModalProps> = ({ isOpen, onClose }) 
               />
               <Input
                 type="text"
+                variant="single-line"
                 className={styles.hexInput}
                 value={customColors.progressFrom}
                 onChange={handleHexChange('progressFrom')}
@@ -187,6 +189,7 @@ const PersonalizeModal: React.FC<PersonalizeModalProps> = ({ isOpen, onClose }) 
               />
               <Input
                 type="text"
+                variant="single-line"
                 className={styles.hexInput}
                 value={customColors.progressTo}
                 onChange={handleHexChange('progressTo')}

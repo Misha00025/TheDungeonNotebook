@@ -62,9 +62,9 @@ export const CreateFormula: React.FC<{ campaignId: number; onCreated: (formula: 
   };
   return <ModalPortal isOpen title="Создать формулу" onClose={cancel} dismissDisabled={mutation.busy}>
     <form onSubmit={create}>
-      <Field label="Название" htmlFor={nameId}><Input id={nameId} autoFocus value={name} disabled={!writable || uncertain || mutation.busy} onChange={event => setName(event.target.value)} /></Field>
-      <Field label="Выражение" htmlFor={expressionId}><Textarea id={expressionId} value={expression} disabled={!writable || uncertain || mutation.busy} onChange={event => setExpression(event.target.value)} /></Field>
-      <Field label="Параметры, по одному в строке" htmlFor={parametersId}><Textarea id={parametersId} value={parametersText} disabled={!writable || uncertain || mutation.busy} onChange={event => setParametersText(event.target.value)} /></Field>
+      <Field label="Название" htmlFor={nameId}><Input variant="single-line" id={nameId} autoFocus value={name} disabled={!writable || uncertain || mutation.busy} onChange={event => setName(event.target.value)} /></Field>
+      <Field label="Выражение" htmlFor={expressionId}><Textarea variant="multiline" id={expressionId} value={expression} disabled={!writable || uncertain || mutation.busy} onChange={event => setExpression(event.target.value)} /></Field>
+      <Field label="Параметры, по одному в строке" htmlFor={parametersId}><Textarea variant="multiline" id={parametersId} value={parametersText} disabled={!writable || uncertain || mutation.busy} onChange={event => setParametersText(event.target.value)} /></Field>
       {Boolean(error) && <ApiError error={error} />}{Boolean(checkError) && <ApiError error={checkError} />}
       <ActionRow>
         {uncertain ? <Button type="button" disabled={!writable} onClick={() => void check()}>Проверить создание</Button> : <Button type="submit" disabled={!writable || mutation.busy || !name.trim()}>Создать</Button>}
@@ -93,9 +93,9 @@ const FormulaTableEditor: React.FC<{ campaignId: number }> = ({ campaignId }) =>
         const label = row.metadataBaseline.name || row.name || 'Без названия';
         const modified = rowDirty(row);
         return <DataTableRow key={row.id} aria-label={`Формула ${label}`} change={modified ? 'modified' : undefined}>
-          <DataTableCell sizing="editor"><Input aria-label={`Название формулы ${label}`} value={row.name} disabled={!rows.writable || rows.busy || creating || row.missing || !row.contentBaseline} onChange={event => rows.change(row.id, 'name', event.target.value)} /></DataTableCell>
-          <DataTableCell sizing="editor"><Textarea rows={2} aria-label={`Выражение формулы ${label}`} value={row.expression} disabled={!rows.writable || rows.busy || creating || row.missing || !row.contentBaseline} onChange={event => rows.change(row.id, 'expression', event.target.value)} /></DataTableCell>
-          <DataTableCell sizing="editor"><Textarea rows={2} aria-label={`Параметры формулы ${label}`} placeholder="По одному в строке" value={row.parametersText} disabled={!rows.writable || rows.busy || creating || row.missing || !row.contentBaseline} onChange={event => rows.change(row.id, 'parametersText', event.target.value)} />
+          <DataTableCell sizing="editor"><Input variant="embedded" aria-label={`Название формулы ${label}`} value={row.name} disabled={!rows.writable || rows.busy || creating || row.missing || !row.contentBaseline} onChange={event => rows.change(row.id, 'name', event.target.value)} /></DataTableCell>
+          <DataTableCell sizing="editor"><Textarea variant="embedded" rows={2} aria-label={`Выражение формулы ${label}`} value={row.expression} disabled={!rows.writable || rows.busy || creating || row.missing || !row.contentBaseline} onChange={event => rows.change(row.id, 'expression', event.target.value)} /></DataTableCell>
+          <DataTableCell sizing="editor"><Textarea variant="embedded" rows={2} aria-label={`Параметры формулы ${label}`} placeholder="По одному в строке" value={row.parametersText} disabled={!rows.writable || rows.busy || creating || row.missing || !row.contentBaseline} onChange={event => rows.change(row.id, 'parametersText', event.target.value)} />
             {Boolean(row.loadError) && <ApiError error={row.loadError} />}
             {Boolean(row.nameError) && <ApiError error={row.nameError} />}
             {Boolean(row.contentError) && <ApiError error={row.contentError} />}

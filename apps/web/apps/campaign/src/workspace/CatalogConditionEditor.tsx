@@ -233,6 +233,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
         ? disabled
           ? <output aria-label={`Значение: ${definition.title}`}>{formatConditionValue(rawValue, definition)}</output>
           : <ValueInput
+            variant="embedded"
             field={currentField!}
             value={rawValue}
             label={`Значение: ${definition.title}`}
@@ -240,6 +241,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
           />
         : <>
         <ValueInput
+          variant="embedded"
           field={currentField!}
           value={rawValue!}
           label={`Значение: ${definition!.title}`}
@@ -277,7 +279,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
   return <>
     <tr key={key}>
       <DataTableCell sizing="editor" indent={path.length}>
-        <Select aria-label={isRoot ? 'Условие включения' : 'Тип условия'} value={node.operator} disabled={disabled} onChange={event => {
+        <Select variant="embedded" aria-label={isRoot ? 'Условие включения' : 'Тип условия'} value={node.operator} disabled={disabled} onChange={event => {
           if (isRoot) onRootOperatorChange?.(event.target.value);
           else changeNodeOperator(event.target.value as ConditionOperator);
         }}>
@@ -287,7 +289,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
       </DataTableCell>
       <DataTableCell sizing="editor">{isCompound(node.operator)
         ? '—'
-        : <Select aria-label="Атрибут" value={node.attributeId ?? ''} disabled={disabled} onChange={event => updateAttribute(event.target.value)}>
+        : <Select variant="embedded" aria-label="Атрибут" value={node.attributeId ?? ''} disabled={disabled} onChange={event => updateAttribute(event.target.value)}>
           <option value="">Выберите атрибут</option>
           {eligibleDefinitions.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
         </Select>}
@@ -320,7 +322,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
     {choiceDraft && <ModalPortal isOpen onClose={() => setChoiceDraft(undefined)} title={`Значения: ${definition?.title ?? 'атрибут'}`}>
       {!choiceSnapshotMatches || disabled || stale
         ? <p role="status">Условие изменилось или редактирование больше недоступно. Закройте диалог и перечитайте данные.</p>
-        : <ValueInput field={currentField!} value={choiceDraft.value} label={`Значение: ${definition?.title ?? 'атрибут'}`} onChange={value => setChoiceDraft(current => current ? { ...current, value } : current)} />}
+        : <ValueInput variant="single-line" field={currentField!} value={choiceDraft.value} label={`Значение: ${definition?.title ?? 'атрибут'}`} onChange={value => setChoiceDraft(current => current ? { ...current, value } : current)} />}
       {choiceError && choiceSnapshotMatches && !disabled && !stale && <p role="alert">{choiceError}</p>}
       <ActionRow style={{ gap: '0.5rem' }}><Button type="button" disabled={!canApplyChoice} onClick={applyChoice}>Применить</Button><Button type="button" variant="secondary" onClick={() => setChoiceDraft(undefined)}>Отмена</Button></ActionRow>
     </ModalPortal>}
@@ -415,7 +417,7 @@ export const CatalogConditionEditor: React.FC<CatalogConditionEditorProps> = ({
         onValidityChange={reportNodeValidity}
       />
       : <tr>
-        <DataTableCell sizing="editor"><Select aria-label="Условие включения" value="none" disabled={disabled} onChange={event => changeOperator(event.target.value)}>
+        <DataTableCell sizing="editor"><Select variant="embedded" aria-label="Условие включения" value="none" disabled={disabled} onChange={event => changeOperator(event.target.value)}>
           <option value="none">{operatorLabels.none}</option>
           {([...leafOperators, 'all', 'any', 'not'] as const).map(operator => <option key={operator} value={operator}>{operatorLabels[operator]}</option>)}
         </Select></DataTableCell>

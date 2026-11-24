@@ -106,8 +106,8 @@ const CampaignCreateForm: React.FC<{ onClose: () => void; requestId: string; onN
 
   return <form className={`${commonStyles.form} ${styles.page}`} onSubmit={submit}>
     <h2>Создать кампанию</h2>
-    <label className={commonStyles.formGroup}>Название<input className={inputStyles.input} required value={name} disabled={uncertain || creation.busy} onChange={event => setName(event.target.value)} /></label>
-    <label className={commonStyles.formGroup}>ID администратора (необязательно)<input className={inputStyles.input} value={administratorUserId} disabled={uncertain || creation.busy} onChange={event => setAdministratorUserId(event.target.value)} inputMode="numeric" /></label>
+    <label className={commonStyles.formGroup}>Название<input className={`${inputStyles.input} ${inputStyles['single-line']}`} required value={name} disabled={uncertain || creation.busy} onChange={event => setName(event.target.value)} /></label>
+    <label className={commonStyles.formGroup}>ID администратора (необязательно)<input className={`${inputStyles.input} ${inputStyles['single-line']}`} value={administratorUserId} disabled={uncertain || creation.busy} onChange={event => setAdministratorUserId(event.target.value)} inputMode="numeric" /></label>
     {Boolean(createError) && <ApiError error={createError} />}
     {Boolean(checkError) && <ApiError error={checkError} />}
     <div className={commonStyles.formActions}>

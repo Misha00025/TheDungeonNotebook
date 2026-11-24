@@ -41,11 +41,11 @@ export const CatalogDefinitionBasics: React.FC<SharedFieldsProps & { onValidityC
   const update = (patch: Partial<CatalogDefinitionDraft>) => onChange({ ...draft, ...patch });
   return <div className={styles.basics}>
     <Field label="Название" htmlFor={`${idPrefix}-name`} error={!readOnly && invalidName ? 'Введите название.' : undefined}>
-      {readOnly ? <p>{draft.name}</p> : <Input id={`${idPrefix}-name`} value={draft.name} disabled={disabled} autoFocus={autoFocusName} aria-invalid={invalidName || undefined} aria-describedby={invalidName ? `${idPrefix}-name-error` : undefined} onChange={event => update({ name: event.target.value })} />}
+      {readOnly ? <p>{draft.name}</p> : <Input variant="single-line" id={`${idPrefix}-name`} value={draft.name} disabled={disabled} autoFocus={autoFocusName} aria-invalid={invalidName || undefined} aria-describedby={invalidName ? `${idPrefix}-name-error` : undefined} onChange={event => update({ name: event.target.value })} />}
     </Field>
     {afterName}
     <Field label="Описание" htmlFor={`${idPrefix}-description`}>
-      {readOnly ? <p className={styles.description}>{draft.description || 'Описание отсутствует.'}</p> : <Textarea id={`${idPrefix}-description`} value={draft.description} disabled={disabled} onChange={event => update({ description: event.target.value })} />}
+      {readOnly ? <p className={styles.description}>{draft.description || 'Описание отсутствует.'}</p> : <Textarea variant="multiline" id={`${idPrefix}-description`} value={draft.description} disabled={disabled} onChange={event => update({ description: event.target.value })} />}
     </Field>
   </div>;
 };
@@ -72,7 +72,7 @@ export const CatalogDefinitionSettings: React.FC<SharedFieldsProps & { canPublis
     {canPublish && <label><Checkbox checked={draft.isHidden} disabled={disabled || readOnly} onChange={event => update({ isHidden: event.target.checked })} />Скрыт</label>}
     {draft.kind === 'Item' && <>
       <Field label="Количество" htmlFor={`${id}-quantity-unit`}>
-        {readOnly ? <p>{draft.quantityUnit === 'Whole' ? 'Целое' : draft.quantityUnit === 'Fractional' ? 'Дробное' : 'Единичное'}</p> : <Select id={`${id}-quantity-unit`} value={draft.quantityUnit ?? 'Whole'} disabled={disabled} onChange={event => update({ quantityUnit: event.target.value as QuantityUnit })}><option value="Whole">Целое</option><option value="Fractional">Дробное</option><option value="Single">Единичное</option></Select>}
+        {readOnly ? <p>{draft.quantityUnit === 'Whole' ? 'Целое' : draft.quantityUnit === 'Fractional' ? 'Дробное' : 'Единичное'}</p> : <Select variant="single-line" id={`${id}-quantity-unit`} value={draft.quantityUnit ?? 'Whole'} disabled={disabled} onChange={event => update({ quantityUnit: event.target.value as QuantityUnit })}><option value="Whole">Целое</option><option value="Fractional">Дробное</option><option value="Single">Единичное</option></Select>}
       </Field>
       <label><Checkbox checked={draft.allowNegative} disabled={disabled || readOnly} onChange={event => update({ allowNegative: event.target.checked })} />Отрицательное</label>
     </>}

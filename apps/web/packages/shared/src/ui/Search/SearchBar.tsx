@@ -48,6 +48,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
       <div className={`${styles.searchWrapper} ${hasText ? styles.hasText : ''}`}>
         <Input
           type="text"
+          variant="single-line"
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={handleKeyDown}

@@ -296,8 +296,8 @@ const CatalogAttributesDialog: React.FC<Props> = ({
         <thead><tr><DataTableCell as="th" scope="col" sizing="editor">Название</DataTableCell><DataTableCell as="th" scope="col" sizing="editor">Тип значения</DataTableCell><DataTableCell as="th" scope="col" sizing="control">Варианты</DataTableCell><DataTableCell as="th" scope="col" sizing="control">Действия</DataTableCell></tr></thead>
         <tbody>{rows.map(row => <tr key={row.clientKey}>
           {row.removed ? <DataTableCell colSpan={4}><strong>{row.title || 'Новая характеристика'}</strong><p>Будет удалена после сохранения</p><Button type="button" size="small" variant="secondary" disabled={writesDisabled} onClick={() => setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, removed: false } : item))}>Восстановить характеристику: {row.title || 'новая'}</Button></DataTableCell> : <>
-          <DataTableCell sizing="editor"><Input aria-label={`Название атрибута ${row.title || 'новый'}`} value={row.title} disabled={writesDisabled} aria-invalid={!row.title.trim() || undefined} onChange={event => setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, title: event.target.value } : item))} /></DataTableCell>
-          <DataTableCell sizing="editor"><Select aria-label={`Тип атрибута ${row.title || 'новый'}`} value={row.typeKey} disabled={writesDisabled} onChange={event => changeType(row, event.target.value as CatalogAttributeType)}>
+          <DataTableCell sizing="editor"><Input variant="embedded" aria-label={`Название атрибута ${row.title || 'новый'}`} value={row.title} disabled={writesDisabled} aria-invalid={!row.title.trim() || undefined} onChange={event => setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, title: event.target.value } : item))} /></DataTableCell>
+          <DataTableCell sizing="editor"><Select variant="embedded" aria-label={`Тип атрибута ${row.title || 'новый'}`} value={row.typeKey} disabled={writesDisabled} onChange={event => changeType(row, event.target.value as CatalogAttributeType)}>
             {schemaTypes.map(type => <option key={type} value={type}>{typeLabels[type]}</option>)}
           </Select></DataTableCell>
           <DataTableCell sizing="control">{row.typeKey === 'singleChoice' || row.typeKey === 'multiChoice'
@@ -336,7 +336,7 @@ const CatalogAttributesDialog: React.FC<Props> = ({
       <DataTable aria-label={`Варианты атрибута ${optionsRow.title || 'новый'}`}>
         <thead><tr><DataTableCell as="th" scope="col" sizing="editor">Название</DataTableCell><DataTableCell as="th" scope="col" sizing="control">Действия</DataTableCell></tr></thead>
         <tbody>{optionsDraft.map((option, index) => <tr key={option.optionKey}>
-          <DataTableCell sizing="editor"><Input aria-label={`Название варианта ${index + 1}`} value={option.title} disabled={writesDisabled} onChange={event => setOptionsDraft(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item))} /></DataTableCell>
+          <DataTableCell sizing="editor"><Input variant="embedded" aria-label={`Название варианта ${index + 1}`} value={option.title} disabled={writesDisabled} onChange={event => setOptionsDraft(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item))} /></DataTableCell>
           <DataTableCell sizing="control"><IconButton size="small" icon="delete" variant="danger" title="Удалить вариант" ariaLabel="Удалить вариант" disabled={writesDisabled} onClick={() => {
             const option = optionsDraft[index];
             if (optionsRow.id && option && !window.confirm('Удаление варианта может сделать сохранённые значения несовместимыми. Удалить вариант?')) return;

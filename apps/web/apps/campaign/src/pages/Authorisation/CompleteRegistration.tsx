@@ -56,7 +56,7 @@ const CompleteRegistration: React.FC<CompleteRegistrationProps> = ({ onCompleted
             type="text"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
-            className={inputStyles.input}
+            className={`${inputStyles.input} ${inputStyles['single-line']}`}
             required
           />
         </div>
@@ -67,7 +67,7 @@ const CompleteRegistration: React.FC<CompleteRegistrationProps> = ({ onCompleted
             type="text"
             value={visibleName}
             onChange={(e) => setVisibleName(e.target.value)}
-            className={inputStyles.input}
+            className={`${inputStyles.input} ${inputStyles['single-line']}`}
             required
           />
         </div>
@@ -78,7 +78,7 @@ const CompleteRegistration: React.FC<CompleteRegistrationProps> = ({ onCompleted
             type="text"
             value={imageLink}
             onChange={(e) => setImageLink(e.target.value)}
-            className={inputStyles.input}
+            className={`${inputStyles.input} ${inputStyles['single-line']}`}
           />
         </div>
 
