@@ -143,8 +143,8 @@ describe('character catalog consumer', () => {
     expect(within(dialog).queryByRole('button', { name: 'Убрать у персонажа' })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Изменить: Заметка A' })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Сбросить к каталогу: Заметка A' })).not.toBeInTheDocument();
-    expect(within(dialog).queryByText('Единица количества')).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole('checkbox', { name: 'Разрешить отрицательное количество' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('combobox', { name: 'Количество' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('checkbox', { name: 'Отрицательное' })).not.toBeInTheDocument();
     expect(screen.getAllByText('read-only')[0]).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Сохранить изменения' })).not.toBeInTheDocument();
     expect(calls.some(([url]) => url === `/api/campaigns/12/items/${sourceId}` || url === `/api/campaigns/12/items/${sourceId}/content`)).toBe(false);

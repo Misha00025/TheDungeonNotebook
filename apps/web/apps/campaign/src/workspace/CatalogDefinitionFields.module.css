@@ -1,44 +1,53 @@
 .editor,
 .ownEditor,
 .basics,
-.settings,
 .details {
   display: grid;
-  gap: 1rem;
+  gap: 0.75rem;
   min-width: 0;
 }
 
-.summary {
+.settings {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
-  gap: 0.4rem 1rem;
+  justify-items: start;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.settingsReadout {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.readView {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.settingsReadout h3,
+.settingsReadout p {
   margin: 0;
 }
 
-.summary dt,
-.summary dd {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.summary dt {
-  color: var(--text-secondary);
-}
-
-.topGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(13rem, 1fr);
-  gap: 1rem;
+.settingsSummary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
   min-width: 0;
 }
 
-.viewGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(13rem, 0.32fr);
-  align-items: start;
-  gap: 1rem;
-  min-width: 0;
+.summaryCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.readonlyCheckbox.readonlyCheckbox:disabled {
+  cursor: default;
+  opacity: 1;
 }
 
 .attributes {
@@ -51,34 +60,29 @@
 }
 
 .readout {
-  display: grid;
-  gap: 0.5rem;
-  margin: 0;
+  table-layout: auto;
   min-width: 0;
+  border: 1px solid var(--border-color);
 }
 
-.readoutRow {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  min-width: 0;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.readoutRow dt,
-.readoutRow dd {
+.readout.readout th,
+.readout.readout td {
   min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;
+  text-align: left;
+  vertical-align: top;
 }
 
-.readoutRow dt {
-  font-weight: 600;
+.readout.readout th:first-child {
+  width: 1%;
+  white-space: nowrap;
+  border-right: 1px solid var(--border-color);
 }
 
-.readoutRow dd {
-  text-align: right;
+.readout.readout tbody tr:last-child th,
+.readout.readout tbody tr:last-child td {
+  border-bottom: 1px solid var(--border-color);
 }
 
 .readoutNote {
@@ -136,20 +140,10 @@
 }
 
 @media (max-width: 42rem) {
-  .topGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .viewGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .readoutRow {
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .readoutRow dd {
-    text-align: left;
+  .readout.readout th:first-child {
+    width: 30%;
+    max-width: 11rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }

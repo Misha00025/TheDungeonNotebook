@@ -188,8 +188,8 @@ describe('campaign catalog', () => {
     expect(within(dialog).getByText('Связан')).toBeInTheDocument();
     expect(within(dialog).getByText('0')).toBeInTheDocument();
     expect(within(dialog).getByText('Нет')).toBeInTheDocument();
-    expect(within(dialog).queryByText('Единица количества')).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole('checkbox', { name: 'Разрешить отрицательное количество' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('combobox', { name: 'Количество' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('checkbox', { name: 'Отрицательное' })).not.toBeInTheDocument();
     expect(within(dialog).queryByText('Можно менять у персонажа')).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('textbox', { name: 'Название' })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Редактировать' })).not.toBeInTheDocument();
@@ -200,6 +200,29 @@ describe('campaign catalog', () => {
     expect(screen.queryByRole('button', { name: 'Атрибуты каталога' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Группы каталога' })).not.toBeInTheDocument();
     expect(state.api.getCatalogGroupConfiguration).not.toHaveBeenCalled();
+    expect(state.api.putCatalogMetadata).not.toHaveBeenCalled();
+    expect(state.api.putCatalogContent).not.toHaveBeenCalled();
+    expect(state.api.createCatalogEntry).not.toHaveBeenCalled();
+    expect(state.api.putCatalogAttributes).not.toHaveBeenCalled();
+    expect(state.api.putCatalogGroups).not.toHaveBeenCalled();
+  });
+
+  it('shows an owner’s confirmed item settings in player view without exposing visibility controls or writing', async () => {
+    const ownedItem = { ...metadata, creatorUserId: state.userId, isHidden: true, quantityUnit: 'Fractional' as const, allowNegative: true };
+    state.api.listCatalog.mockResolvedValue([ownedItem]);
+    state.api.getCatalogEntry.mockResolvedValue(ownedItem);
+    renderCatalog();
+
+    await screen.findByText('Без группы');
+    fireEvent.click(screen.getByRole('button', { name: 'Развернуть всё' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Public tonic/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Public tonic' });
+
+    expect(within(dialog).getByText('Дробное')).toBeInTheDocument();
+    expect(within(dialog).getByRole('checkbox', { name: 'Отрицательное' })).toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: 'Отрицательное' })).toBeDisabled();
+    expect(within(dialog).queryByRole('checkbox', { name: 'Скрыт' })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Редактировать' })).toBeInTheDocument();
     expect(state.api.putCatalogMetadata).not.toHaveBeenCalled();
     expect(state.api.putCatalogContent).not.toHaveBeenCalled();
     expect(state.api.createCatalogEntry).not.toHaveBeenCalled();
@@ -275,8 +298,8 @@ describe('campaign catalog', () => {
     const itemDialog = await screen.findByRole('dialog', { name: 'Новый предмет' });
     expect(within(itemDialog).queryByRole('combobox', { name: 'Тип определения' })).not.toBeInTheDocument();
     fireEvent.change(within(itemDialog).getByRole('textbox', { name: 'Название' }), { target: { value: 'Created tonic' } });
-    fireEvent.change(within(itemDialog).getByRole('combobox', { name: 'Единица количества' }), { target: { value: 'Fractional' } });
-    fireEvent.click(within(itemDialog).getByRole('checkbox', { name: 'Разрешить отрицательное количество' }));
+    fireEvent.change(within(itemDialog).getByRole('combobox', { name: 'Количество' }), { target: { value: 'Fractional' } });
+    fireEvent.click(within(itemDialog).getByRole('checkbox', { name: 'Отрицательное' }));
     fireEvent.click(within(itemDialog).getByRole('button', { name: 'Создать предмет' }));
     await waitFor(() => expect(state.api.createCatalogEntry).toHaveBeenCalledTimes(1));
     expect(state.api.createCatalogEntry.mock.calls[0][2]).toMatchObject({
@@ -295,8 +318,8 @@ describe('campaign catalog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Создать навык' }));
     const skillDialog = await screen.findByRole('dialog', { name: 'Новый навык' });
     expect(within(skillDialog).queryByRole('combobox', { name: 'Тип определения' })).not.toBeInTheDocument();
-    expect(within(skillDialog).queryByRole('combobox', { name: 'Единица количества' })).not.toBeInTheDocument();
-    expect(within(skillDialog).queryByRole('checkbox', { name: 'Разрешить отрицательное количество' })).not.toBeInTheDocument();
+    expect(within(skillDialog).queryByRole('combobox', { name: 'Количество' })).not.toBeInTheDocument();
+    expect(within(skillDialog).queryByRole('checkbox', { name: 'Отрицательное' })).not.toBeInTheDocument();
     fireEvent.change(within(skillDialog).getByRole('textbox', { name: 'Название' }), { target: { value: 'Created skill' } });
     fireEvent.click(within(skillDialog).getByRole('button', { name: 'Создать навык' }));
     await waitFor(() => expect(state.api.createCatalogEntry).toHaveBeenCalledTimes(2));

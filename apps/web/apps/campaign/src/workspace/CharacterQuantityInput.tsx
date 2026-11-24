@@ -21,14 +21,14 @@ export type CharacterQuantityInputProps = {
 const issueLabels: Record<CharacterQuantityIssue, string> = {
   required: 'Введите количество.',
   invalid_number: 'Введите корректное число.',
-  whole_required: 'Для целой единицы количества нужно целое число.',
+  whole_required: 'Для целого количества нужно целое число.',
   negative_not_allowed: 'Отрицательное количество запрещено для этого предмета.',
-  invalid_definition: 'Для предмета не задана единица количества.',
+  invalid_definition: 'Для предмета не задан формат количества.',
 };
 
 function serverErrorMessage(error: unknown): string | undefined {
   if (!(error instanceof CampaignApiError) || error.status !== 400) return undefined;
-  return 'Сервер не принял количество. Проверьте формат, единицу и допустимость отрицательного значения.';
+  return 'Сервер не принял количество. Проверьте формат и допустимость отрицательного значения.';
 }
 
 export const CharacterQuantityInput: React.FC<CharacterQuantityInputProps> = ({

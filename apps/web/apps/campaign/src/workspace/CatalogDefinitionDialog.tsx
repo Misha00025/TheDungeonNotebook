@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActionRow, Button, ModalPortal, Notification, Panel, StatePanel, useAuth } from '@tdn/shared';
+import { ActionRow, Button, ModalPortal, Notification, StatePanel, useAuth } from '@tdn/shared';
 import type { CatalogAttributeSchemaEnvelope, CatalogContentEnvelope, CatalogCreateResult, CatalogKind, CatalogMetadata } from './catalogTypes';
 import type { Revision } from './types';
 import { CampaignApiError } from './api';
@@ -7,7 +7,7 @@ import { useDirtyDraft, useWorkspace } from './Workspace';
 import { ApiError } from './Feedback';
 import { stringifyJson } from './json';
 import { catalogAttributeIssue } from './catalogModel';
-import { CatalogDefinitionFields, createCatalogDefinitionDraft } from './CatalogDefinitionFields';
+import { CatalogDefinitionFields, CatalogDefinitionSettings, CatalogDefinitionSettingsReadout, createCatalogDefinitionDraft } from './CatalogDefinitionFields';
 import type { CatalogDefinitionDraft } from './CatalogDefinitionFields';
 import OwnCatalogDefinitionFields from './OwnCatalogDefinitionFields';
 import CatalogEntryDetails from './CatalogEntryDetails';
@@ -507,12 +507,15 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
       {permissionsPending && <p role="status">Проверка прав. До её завершения доступно только чтение.</p>}
       {revoked && <p role="alert">Запись заблокирована после отказа сервера. Проверьте права кампании.</p>}
       {entryId && !editing && metadataBaseline && contentBaseline && <>
-        <div className={audience === 'gm' ? styles.viewGrid : undefined}>
+        <div className={styles.readView}>
+          {(audience === 'gm' || audience === 'player' && isOwner && entryKind === 'Item') && <CatalogDefinitionSettingsReadout
+            kind={metadataBaseline.kind}
+            isHidden={metadataBaseline.isHidden}
+            quantityUnit={metadataBaseline.quantityUnit}
+            allowNegative={metadataBaseline.allowNegative}
+            showVisibility={audience === 'gm'}
+          />}
           <CatalogEntryDetails description={contentBaseline.data.description} definitions={schema.data.definitions} values={contentBaseline.data.attributes} showEditRules={audience === 'gm'} />
-          {audience === 'gm' && <Panel title="Настройки каталога" density="compact"><dl className={styles.summary}>
-          <dt>Видимость</dt><dd>{metadataBaseline.isHidden ? 'Скрыт из общего каталога' : 'Доступен в общем каталоге'}</dd>
-          {entryKind === 'Item' && <><dt>Единица количества</dt><dd>{metadataBaseline.quantityUnit === 'Whole' ? 'Целое' : metadataBaseline.quantityUnit === 'Fractional' ? 'Дробное' : 'Единичное'}</dd><dt>Отрицательное количество</dt><dd>{metadataBaseline.allowNegative ? 'Разрешено' : 'Запрещено'}</dd></>}
-          </dl></Panel>}
         </div>
       </>}
       {(!entryId || editing) && <>

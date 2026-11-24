@@ -24,8 +24,7 @@ export const OwnCatalogDefinitionFields: React.FC<OwnCatalogDefinitionFieldsProp
   callback.current = onValidityChange;
   useEffect(() => callback.current?.(invalid), [invalid]);
   return <div className={styles.ownEditor}>
-  <CatalogDefinitionBasics draft={draft} onChange={onChange} disabled={disabled} readOnly={readOnly} autoFocusName={autoFocusName} />
-  {draft.kind === 'Item' && <details><summary>Настройки предмета</summary><CatalogDefinitionSettings draft={draft} onChange={onChange} canPublish={false} disabled={disabled} readOnly={readOnly} /></details>}
+  <CatalogDefinitionBasics draft={draft} onChange={onChange} disabled={disabled} readOnly={readOnly} autoFocusName={autoFocusName} afterName={draft.kind === 'Item' ? <CatalogDefinitionSettings draft={draft} onChange={onChange} canPublish={false} disabled={disabled} readOnly={readOnly} /> : null} />
   <FieldSet className={styles.attributes} legend="Характеристики">
      <CatalogAttributeValuesEditor definitions={definitions} values={draft.attributes} savedValues={savedAttributes} onChange={attributes => onChange({ ...draft, attributes })} onValidityChange={setInvalidAttributes} disabled={disabled} readOnly={readOnly} />
   </FieldSet>
