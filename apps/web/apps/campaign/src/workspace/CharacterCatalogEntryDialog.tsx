@@ -615,6 +615,7 @@ const CharacterCatalogEntryDialog: React.FC<CharacterCatalogEntryDialogProps> = 
     {definitionDialogOpen && definition && <CatalogDefinitionDialog
       campaignId={catalog.campaignId}
       entryId={definition.id}
+      initialMode="edit"
       initialKind={definition.kind}
       canAdmin={canAdminDefinition}
       audience={audience}

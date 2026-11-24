@@ -334,11 +334,9 @@ describe('character catalog consumer', () => {
     const entryDialog = await screen.findByRole('dialog', { name: 'Тайный паёк' });
     expect(within(entryDialog).queryByRole('textbox', { name: 'Название' })).not.toBeInTheDocument();
     fireEvent.click(within(entryDialog).getByRole('button', { name: 'Изменить мой предмет' }));
-    await screen.findByRole('button', { name: 'Редактировать' });
+    await screen.findByRole('textbox', { name: 'Название' });
     const definitionDialogs = await screen.findAllByRole('dialog', { name: 'Тайный паёк' });
-    const definitionDialog = definitionDialogs.find(candidate => within(candidate).queryByRole('button', { name: 'Редактировать' }))!;
-    expect(within(definitionDialog).queryByRole('textbox', { name: 'Название' })).not.toBeInTheDocument();
-    fireEvent.click(await within(definitionDialog).findByRole('button', { name: 'Редактировать' }));
+    const definitionDialog = definitionDialogs.find(candidate => within(candidate).queryByRole('textbox', { name: 'Название' }))!;
     fireEvent.change(await within(definitionDialog).findByRole('textbox', { name: 'Название' }), { target: { value: 'Обновлённый паёк' } });
     fireEvent.click(within(definitionDialog).getByRole('button', { name: 'Сохранить' }));
     await waitFor(() => expect(calls.some(([url, options]) => url.endsWith(`/items/${sourceId}`) && options?.method === 'PUT')).toBe(true));

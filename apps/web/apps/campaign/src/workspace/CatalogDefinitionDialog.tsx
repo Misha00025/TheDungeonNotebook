@@ -18,6 +18,7 @@ type RecoverySnapshot = { metadata: CatalogMetadata; content: CatalogContentEnve
 export type CatalogDefinitionDialogProps = {
   campaignId: number;
   entryId?: string;
+  initialMode?: 'view' | 'edit';
   initialKind: CatalogKind;
   canAdmin: boolean;
   audience?: 'gm' | 'player';
@@ -78,6 +79,7 @@ function getExpectedRevision(value: Revision): number | import('lossless-json').
 const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
   campaignId,
   entryId,
+  initialMode = 'view',
   initialKind,
   canAdmin,
   audience = canAdmin ? 'gm' : 'player',
@@ -120,6 +122,8 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
   const [creationCheckFailed, setCreationCheckFailed] = useState(false);
   const [editing, setEditing] = useState(!entryId);
   const [autoFocusName, setAutoFocusName] = useState(!entryId);
+  const initialEditPending = useRef(initialMode === 'edit' && Boolean(entryId));
+  const [initialEditResolved, setInitialEditResolved] = useState(!initialEditPending.current);
 
   const userId = Number(auth.userId);
   const isOwner = Boolean(metadataBaseline && metadataBaseline.creatorUserId !== null && metadataBaseline.creatorUserId === userId);
@@ -183,6 +187,18 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
       readGeneration.current += 1;
     };
   }, [loadInitial]);
+
+  useEffect(() => {
+    if (!initialEditPending.current || loading || loadingError || !schema || !metadataBaseline || !contentBaseline || permissionsPending) return;
+    initialEditPending.current = false;
+    setInitialEditResolved(true);
+    if (canEdit) {
+      setEditing(true);
+      setAutoFocusName(true);
+    } else {
+      setStatus('Редактирование недоступно. Открыт просмотр.');
+    }
+  }, [canEdit, contentBaseline, loading, loadingError, metadataBaseline, permissionsPending, schema]);
 
   useEffect(() => {
     if (autoFocusName && editing && !loading && !loadingError && schema) setAutoFocusName(false);
@@ -478,7 +494,9 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
     ? `${entryKind === 'Item' ? 'Предмет' : 'Навык'} · Каталог кампании`
     : entryKind === 'Item' ? 'Предмет' : 'Навык';
   const footer = <ActionRow justify="end">
-    {!loading && !loadingError && schema && (!entryId || Boolean(metadataBaseline && contentBaseline)) && (entryId
+    {!loading && !loadingError && schema && (!entryId || Boolean(metadataBaseline && contentBaseline)) && (entryId && !initialEditResolved
+      ? <Button type="button" variant="secondary" disabled={busy || recovering} onClick={close}>Закрыть</Button>
+      : entryId
       ? editing
         ? <>
           <Button type="button" variant="secondary" disabled={busy || recovering || blockedDomains.size > 0 || creationBlocked} onClick={cancelEditing}>Отменить изменения</Button>
@@ -505,7 +523,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
     {!loading && !loadingError && schema && (!entryId || Boolean(metadataBaseline && contentBaseline)) ? <>
       {permissionsPending && <p role="status">Проверка прав. До её завершения доступно только чтение.</p>}
       {revoked && <p role="alert">Запись заблокирована после отказа сервера. Проверьте права кампании.</p>}
-      {entryId && !editing && metadataBaseline && contentBaseline && <>
+      {entryId && !editing && initialEditResolved && metadataBaseline && contentBaseline && <>
         <CatalogDefinitionReadView metadata={metadataBaseline} content={contentBaseline} definitions={schema.data.definitions} showSettings={audience === 'gm' || isOwner && entryKind === 'Item'} showVisibility={audience === 'gm'} showEditRules={audience === 'gm'} />
       </>}
       {(!entryId || editing) && <>
@@ -550,7 +568,8 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
           </div>;
         })}
       </section>}
-    </> : null}
+      </> : null}
+      {!initialEditResolved && !loading && !loadingError && <StatePanel kind="loading">Проверка прав…</StatePanel>}
     {!loading && !loadingError && !schema && <Notification kind="error">Схема атрибутов недоступна. Сохранение невозможно.</Notification>}
   </ModalPortal>;
 };
