@@ -49,9 +49,28 @@
   border: 1px solid var(--danger-color);
 }
 
+.iconButton.ghost {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  text-shadow: none;
+}
+
 .iconButton:hover {
   opacity: 0.9;
   transform: translateY(-1px);
+}
+
+.iconButton.ghost:hover:not(:disabled) {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  background-color: var(--bg-hover);
+}
+
+.iconButton.ghost:active:not(:disabled) {
+  transform: none;
+  filter: none;
 }
 
 .svgIcon {

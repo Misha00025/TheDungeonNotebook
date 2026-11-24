@@ -10,7 +10,7 @@ export interface IconButtonProps {
   title: string;
   ariaLabel?: string;
   size?: 'small' | 'medium' | 'large';
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   disabled?: boolean;
   busy?: boolean;
   className?: string;

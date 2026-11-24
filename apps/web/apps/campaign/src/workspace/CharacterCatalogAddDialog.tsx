@@ -526,7 +526,7 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
         </>}
 
         {mode === 'catalog' && catalog.canRead && !blocked && !confirmedRemoved && <div style={{ display: choosing && !previewEntryId ? undefined : 'none' }}>
-          <CatalogBrowser campaignId={catalog.campaignId} kind={kind} audience={audience} canManage={false} permissionsPending={definitionPermissionsPending} onForbidden={() => onDefinitionForbidden?.()} onOpenEntry={openPreview} onSelectEntry={selectFromBrowser} selectionDisabled={fieldsDisabled || !schemaReady} />
+          <CatalogBrowser campaignId={catalog.campaignId} kind={kind} audience={audience} canManage={false} permissionsPending={definitionPermissionsPending} onForbidden={() => onDefinitionForbidden?.()} onSelectEntry={selectFromBrowser} selectionDisabled={fieldsDisabled || !schemaReady} />
         </div>}
 
         {previewEntryId && <section className={styles.section}>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActionRow, Button, IconButton, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
+import { ActionRow, Button, IconButton, SearchBar, StatePanel, Toolbar, useAuth } from '@tdn/shared';
 import { useWorkspace } from './Workspace';
 import { useResource } from './hooks';
 import { ApiError } from './Feedback';
@@ -15,7 +15,7 @@ import type { CatalogAttributeSchemaEnvelope, CatalogContentEnvelope, CatalogGro
 
 export { CatalogAttributeValuesEditor };
 
-type DefinitionDialogState = { entryId?: string; initialKind: CatalogKind };
+type DefinitionDialogState = { entryId?: string; initialKind: CatalogKind; initialMode?: 'view' | 'edit' };
 type SearchExpansion = { scope: string; searching: boolean; previousKeys: Set<string> };
 const emptyGroups: CatalogGroupSummary[] = [];
 
@@ -26,13 +26,13 @@ export type CatalogBrowserProps = {
   canManage?: boolean;
   permissionsPending?: boolean;
   onForbidden: () => void;
-  onOpenEntry?: (metadata: CatalogMetadata) => void;
   onSelectEntry?: (metadata: CatalogMetadata) => void;
   selectionDisabled?: boolean;
 };
 
-const CatalogBrowser: React.FC<CatalogBrowserProps> = ({ campaignId, kind, audience, canManage: canManageProp = false, permissionsPending = false, onForbidden, onOpenEntry: onOpenEntryProp, onSelectEntry, selectionDisabled = false }) => {
+const CatalogBrowser: React.FC<CatalogBrowserProps> = ({ campaignId, kind, audience, canManage: canManageProp = false, permissionsPending = false, onForbidden, onSelectEntry, selectionDisabled = false }) => {
   const { api, sessionKey } = useWorkspace();
+  const auth = useAuth();
   const identity = `${sessionKey}:${campaignId}:${kind}`;
   const browseScope = `${identity}:${kind}`;
   const canManage = audience === 'gm' && !permissionsPending && canManageProp;
@@ -51,6 +51,8 @@ const CatalogBrowser: React.FC<CatalogBrowserProps> = ({ campaignId, kind, audie
   const summaries = useResource(`${identity}:catalog-groups`, () => api.getCatalogGroups(campaignId, kind));
   const schema = useResource(`${identity}:catalog-attributes`, () => api.getCatalogAttributes(campaignId, kind));
   const schemaRevision = String(schema.data?.contentRevision ?? '');
+  const schemaForbidden = schema.error instanceof CampaignApiError
+    && (schema.error.status === 403 || schema.error.status === 404);
   const loadPreview = useCallback((entryId: string) => {
     const key = `${schemaRevision}:${entryId}`;
     const existing = previewPromises.get(key);
@@ -133,10 +135,9 @@ const CatalogBrowser: React.FC<CatalogBrowserProps> = ({ campaignId, kind, audie
     setSearch(value);
   };
 
-  const openDefinition = (entry: CatalogMetadata) => {
-    if (onOpenEntryProp) onOpenEntryProp(entry);
-    else setDefinitionDialog({ entryId: entry.id, initialKind: entry.kind });
-  };
+  const editEntry = (entry: CatalogMetadata) => setDefinitionDialog({ entryId: entry.id, initialKind: entry.kind, initialMode: 'edit' });
+  const canEditEntry = (entry: CatalogMetadata) => !onSelectEntry && !permissionsPending
+    && (canManage || entry.creatorUserId !== null && entry.creatorUserId === Number(auth.userId));
   const startCreate = () => {
     if (!canManage) return;
     setDefinitionDialog({ initialKind: kind });
@@ -179,12 +180,12 @@ const CatalogBrowser: React.FC<CatalogBrowserProps> = ({ campaignId, kind, audie
   const rootEntriesUnavailable = rootCatalogForbidden ? undefined : rootCatalog.data;
 
   return <>
-    <Toolbar>
+    <Toolbar sticky={!onSelectEntry}>
       <SearchBar searchTerm={search} onSearchChange={changeSearch} compact aria-label="Поиск по названию" />
       <ActionRow style={{ gap: '0.5rem' }}>
         <IconButton icon={allSectionsOpen ? 'collapse-all' : 'expand-all'} size="small" variant="secondary" title={allSectionsOpen ? 'Свернуть всё' : 'Развернуть всё'} ariaLabel={allSectionsOpen ? 'Свернуть всё' : 'Развернуть всё'} disabled={!model?.sectionKeys.length} onClick={toggleAll} />
         {canManage && <>
-          <IconButton icon="add" size="small" variant="secondary" title={kind === 'Item' ? 'Создать предмет' : 'Создать навык'} ariaLabel={kind === 'Item' ? 'Создать предмет' : 'Создать навык'} onClick={startCreate} />
+          <Button type="button" size="small" onClick={startCreate}>{kind === 'Item' ? 'Создать предмет' : 'Создать навык'}</Button>
           <IconButton icon="edit" size="small" variant="secondary" title="Атрибуты каталога" ariaLabel="Атрибуты каталога" onClick={() => setAttributesOpen(true)} />
           <IconButton icon="sort" size="small" variant="secondary" title="Группы каталога" ariaLabel="Группы каталога" onClick={() => setGroupsOpen(true)} />
         </>}
@@ -202,15 +203,15 @@ const CatalogBrowser: React.FC<CatalogBrowserProps> = ({ campaignId, kind, audie
         ? <><StatePanel kind="error">Не удалось определить, какие записи не входят в группы.</StatePanel><Button size="small" variant="ghost" type="button" onClick={memberships.reload}>Повторить загрузку групп</Button></>
         : summaries.error ? null : <StatePanel kind="loading">Загрузка групп каталога…</StatePanel>)}
       {model.noMatches && !rootCatalog.error && <StatePanel kind="empty">Ничего не найдено</StatePanel>}
-      <CatalogSections sections={model.sections} openKeys={openKeys} onToggle={(key, open) => setExpanded(current => {
+      <CatalogSections key={identity} sections={model.sections} openKeys={openKeys} onToggle={(key, open) => setExpanded(current => {
         const keys = new Set(current.scope === browseScope ? current.keys : []);
         if (keys.has(key) === open) return current;
         if (open) keys.add(key);
         else keys.delete(key);
         return { scope: browseScope, keys };
-      })} onOpenEntry={openDefinition} onSelectEntry={onSelectEntry} selectionDisabled={selectionDisabled} onRetryMembership={() => memberships.reload()} definitions={schema.data && !schema.error ? schema.data.data.definitions : undefined} attributeSchemaLoading={schema.loading && !schema.data && !schema.error} loadContent={loadPreview} previewScope={`${identity}:${schemaRevision}`} previewVersions={previewVersions} />
+      })} onEditEntry={editEntry} canEditEntry={canEditEntry} onSelectEntry={onSelectEntry} selectionDisabled={selectionDisabled} onRetryMembership={() => memberships.reload()} definitions={schemaForbidden ? undefined : schema.data?.data.definitions} attributeSchemaLoading={schema.loading && !schema.data && !schema.error} attributeSchemaError={schema.error} onRetryAttributeSchema={schema.reload} showVisibility={audience === 'gm'} loadContent={loadPreview} previewScope={`${identity}:${schemaRevision}`} previewVersions={previewVersions} />
     </>}
-    {definitionDialog && <CatalogDefinitionDialog key={`${identity}:${definitionDialog.entryId ?? `new-${definitionDialog.initialKind}`}`} campaignId={campaignId} entryId={definitionDialog.entryId} initialKind={definitionDialog.initialKind} canAdmin={canManage} audience={audience} permissionsPending={permissionsPending} onClose={() => setDefinitionDialog(undefined)} onSaved={acceptSavedMetadata} onForbidden={onForbidden} />}
+    {definitionDialog && <CatalogDefinitionDialog key={`${identity}:${definitionDialog.entryId ?? `new-${definitionDialog.initialKind}`}`} campaignId={campaignId} entryId={definitionDialog.entryId} initialMode={definitionDialog.initialMode} initialKind={definitionDialog.initialKind} canAdmin={canManage} audience={audience} permissionsPending={permissionsPending} onClose={() => setDefinitionDialog(undefined)} onSaved={acceptSavedMetadata} onForbidden={onForbidden} />}
     {canKeepManagementDialogs && attributesOpen && <CatalogAttributesDialog key={`${identity}:attributes`} campaignId={campaignId} kind={kind} canManage={canManage} permissionsPending={permissionsPending} onClose={() => setAttributesOpen(false)} onSaved={acceptSavedSchema} onForbidden={onForbidden} />}
     {canKeepManagementDialogs && groupsOpen && <CatalogGroupsDialog key={`${identity}:groups`} campaignId={campaignId} kind={kind} canManage={canManage} permissionsPending={permissionsPending} onClose={() => setGroupsOpen(false)} onSaved={(result: CatalogGroupConfigurationEnvelope) => summaries.setData({ campaignId: result.campaignId, contentRevision: result.contentRevision, groups: result.data.groups.map(({ id, title, parentId }) => ({ id, title, parentId })) })} onForbidden={onForbidden} />}
   </>;
