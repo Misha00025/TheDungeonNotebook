@@ -1,5 +1,5 @@
 import React, { useId, useState } from 'react';
-import { ActionRow, Button, DataTable, IconButton, Input, List, ModalPortal, Select, Textarea } from '@tdn/shared';
+import { ActionRow, Button, DataTable, DataTableCell, IconButton, Input, List, ModalPortal, Select, Textarea } from '@tdn/shared';
 import type { ChoiceOption, FieldReference, JsonValue, ValueType, VirtualFieldInput } from './types';
 import { stringifyJson } from './json';
 import { useWorkspace, useDirtyDraft } from './Workspace';
@@ -48,11 +48,11 @@ export function TemplateOptionsDialog({ label, options, disabled, onClose, onApp
   const update = (index: number, patch: Partial<ChoiceOption>) => setDraft(current => current.map((option, itemIndex) => itemIndex === index ? { ...option, ...patch } : option));
   return <ModalPortal isOpen onClose={onClose} title={`Варианты поля ${label}`} size="wide">
     <DataTable aria-label={`Варианты поля ${label}`}>
-      <thead><tr><th scope="col">Ключ</th><th scope="col">Название</th><th scope="col">Действия</th></tr></thead>
+      <thead><tr><DataTableCell as="th" scope="col" sizing="editor">Ключ</DataTableCell><DataTableCell as="th" scope="col" sizing="editor">Название</DataTableCell><DataTableCell as="th" scope="col" sizing="control">Действия</DataTableCell></tr></thead>
       <tbody>{draft.map((option, index) => <tr key={index}>
-        <td><Input aria-label={`Ключ варианта ${index + 1}`} value={option.optionKey} disabled={disabled} onChange={event => update(index, { optionKey: event.target.value })} /></td>
-        <td><Input aria-label={`Название варианта ${index + 1}`} value={option.title} disabled={disabled} onChange={event => update(index, { title: event.target.value })} /></td>
-        <td><IconButton icon="delete" variant="danger" title={`Удалить вариант ${index + 1}`} disabled={disabled} onClick={() => setDraft(current => current.filter((_, itemIndex) => itemIndex !== index))} /></td>
+        <DataTableCell sizing="editor"><Input aria-label={`Ключ варианта ${index + 1}`} value={option.optionKey} disabled={disabled} onChange={event => update(index, { optionKey: event.target.value })} /></DataTableCell>
+        <DataTableCell sizing="editor"><Input aria-label={`Название варианта ${index + 1}`} value={option.title} disabled={disabled} onChange={event => update(index, { title: event.target.value })} /></DataTableCell>
+        <DataTableCell sizing="control"><IconButton size="small" icon="delete" variant="danger" title={`Удалить вариант ${index + 1}`} disabled={disabled} onClick={() => setDraft(current => current.filter((_, itemIndex) => itemIndex !== index))} /></DataTableCell>
       </tr>)}</tbody>
     </DataTable>
     <ActionRow style={{ gap: '0.5rem' }}><Button type="button" disabled={disabled} onClick={() => setDraft(current => [...current, { optionKey: '', title: '' }])}>Добавить вариант</Button></ActionRow>
@@ -109,16 +109,15 @@ export function TemplateVirtualLinksDialog({ label, campaignId, field, sources, 
     {Boolean(formula.error) && <ApiError error={formula.error} onRetry={formula.reload} />}
     {ready && parameters?.length === 0 && <p>Формула не требует входных полей.</p>}
     {ready && extras && <p>Связи с параметрами, которых нет в формуле, будут убраны при применении.</p>}
-    {ready && parameters && parameters.length > 0 && <DataTable aria-label="Привязки параметров" minWidth="24rem">
-      <colgroup><col style={{ width: '40%' }} /><col style={{ width: '60%' }} /></colgroup>
-      <thead><tr><th scope="col">Параметр</th><th scope="col">Поле</th></tr></thead>
+    {ready && parameters && parameters.length > 0 && <DataTable aria-label="Привязки параметров">
+      <thead><tr><DataTableCell as="th" scope="col" sizing="content">Параметр</DataTableCell><DataTableCell as="th" scope="col" sizing="editor">Поле</DataTableCell></tr></thead>
       <tbody>{parameters.map(name => {
         const reference = Object.prototype.hasOwnProperty.call(currentBindings, name) ? currentBindings[name] : undefined;
         const value = reference ? `${reference.kind}:${reference.fieldId}` : '';
         const unknown = Boolean(reference && !options.some(option => option.value === value));
         return <tr key={name}>
-          <th scope="row">{name}</th>
-          <td><Select aria-label={`Параметр ${name}`} value={value} disabled={disabled} onChange={event => {
+          <DataTableCell as="th" scope="row" sizing="content">{name}</DataTableCell>
+          <DataTableCell sizing="editor"><Select aria-label={`Параметр ${name}`} value={value} disabled={disabled} onChange={event => {
             const selected = options.find(option => option.value === event.target.value)?.source;
             patchBinding(name, selected ? { kind: selected.kind, fieldId: selected.id } : undefined);
           }}>
@@ -127,7 +126,7 @@ export function TemplateVirtualLinksDialog({ label, campaignId, field, sources, 
             {(['Base', 'Virtual'] as const).map(kind => <optgroup key={kind} label={kind === 'Base' ? 'Базовые поля' : 'Виртуальные поля'}>
               {options.filter(option => option.source.kind === kind).map(option => <option key={`${name}-${option.value}`} value={option.value}>{option.source.title}</option>)}
             </optgroup>)}
-          </Select></td>
+          </Select></DataTableCell>
         </tr>;
       })}</tbody>
     </DataTable>}

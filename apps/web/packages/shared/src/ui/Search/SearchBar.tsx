@@ -1,5 +1,6 @@
 // components/SearchBar/SearchBar.tsx
 import React, { useState, useEffect } from 'react';
+import Input from '../Form/Input';
 import styles from './SearchBar.module.css';
 
 export interface SearchBarProps {
@@ -23,7 +24,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
   'aria-label': ariaLabel = 'Поиск',
   compact = false,
 }) => {
-  const [isFocused, setIsFocused] = useState(false);
   const [hasText, setHasText] = useState(false);
 
   useEffect(() => {
@@ -45,21 +45,17 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
   return (
     <div className={`${styles.container} ${compact ? styles.compact : ''}`}>
-      <div className={`${styles.searchWrapper} ${isFocused ? styles.focused : ''} ${hasText ? styles.hasText : ''}`}>
-        <input
+      <div className={`${styles.searchWrapper} ${hasText ? styles.hasText : ''}`}>
+        <Input
           type="text"
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
           onKeyDown={handleKeyDown}
           className={styles.searchInput}
           placeholder={placeholder}
           autoFocus={autoFocus}
           aria-label={ariaLabel}
         />
-        
-        <div className={styles.underline}></div>
         
         {showClearButton && hasText && (
           <button

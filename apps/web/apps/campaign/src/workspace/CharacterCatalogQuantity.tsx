@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { Button, IconButton, Input } from '@tdn/shared';
+import { Button, DataTableActions, DataTableNote, DataTableStack, IconButton, Input } from '@tdn/shared';
 import { compareNumber } from 'lossless-json';
 import type { JsonNumber } from './types';
 import type { CharacterCatalogEntryEnvelope } from './catalogTypes';
@@ -9,7 +9,6 @@ import { useDirtyDraft, useWorkspace } from './Workspace';
 import { characterQuantityToRaw, validateCharacterQuantity } from './characterCatalogModel';
 import type { CharacterQuantityIssue } from './characterCatalogModel';
 import { ApiError } from './Feedback';
-import styles from './CharacterCatalogQuantity.module.css';
 
 export type CharacterCatalogQuantityProps = {
   entry: CharacterCatalogEntryEnvelope;
@@ -208,16 +207,16 @@ const CharacterCatalogQuantity: React.FC<CharacterCatalogQuantityProps> = ({ ent
   };
 
   const displayed = entry.definition.quantityUnit === 'Single' ? '1' : characterQuantityToRaw(entry.record.quantity) || '—';
-  if (!editing && (!writable || !canEditPolicy(entry))) return <span className={styles.value}>{displayed}</span>;
+  if (!editing && (!writable || !canEditPolicy(entry))) return <span>{displayed}</span>;
 
   const newPolicyCanEdit = canEditPolicy(policyEntry);
   const errorMessage = quantityDirty && valid.issue ? issueMessages[valid.issue] : blocked ? 'Требуется сверка с сервером.' : failure ? failure instanceof CampaignApiError && failure.status === 403 ? 'Право записи недоступно.' : failure instanceof CampaignApiError && failure.status === 404 ? 'Запись недоступна.' : 'Не удалось сохранить количество.' : undefined;
 
-  return <div className={styles.editor}>
-    <div ref={editorRef} className={styles.controls} onMouseDown={event => {
+  return <DataTableStack>
+    <DataTableActions ref={editorRef} onMouseDown={event => {
       if ((event.target as HTMLElement).closest('button[aria-label="Отменить изменение количества"]')) event.preventDefault();
     }}>
-      <Input ref={inputRef} className={styles.input} aria-label={`Количество: ${entry.definition.name}`} aria-describedby={errorMessage ? statusId : undefined} inputMode="decimal" value={editing ? raw : characterQuantityToRaw(entry.record.quantity)} disabled={busy || !writable || !newPolicyCanEdit || blocked} aria-invalid={Boolean(errorMessage) || undefined} onFocus={() => {
+      <Input ref={inputRef} aria-label={`Количество: ${entry.definition.name}`} aria-describedby={errorMessage ? statusId : undefined} inputMode="decimal" value={editing ? raw : characterQuantityToRaw(entry.record.quantity)} disabled={busy || !writable || !newPolicyCanEdit || blocked} aria-invalid={Boolean(errorMessage) || undefined} onFocus={() => {
         if (!editing) begin();
         else armedRef.current = true;
       }} onChange={event => {
@@ -237,22 +236,22 @@ const CharacterCatalogQuantity: React.FC<CharacterCatalogQuantityProps> = ({ ent
         }
       }} />
       {quantityDirty && !blocked && <IconButton icon="close" size="small" variant="secondary" title="Отменить изменение количества" ariaLabel="Отменить изменение количества" disabled={busy} onClick={cancel} />}
-    </div>
-    <small id={statusId} className={styles.status} role={errorMessage || busy ? 'status' : undefined}>{busy ? 'Сохранение…' : errorMessage ?? ' '}</small>
-    {!newPolicyCanEdit && <div className={styles.recovery}><small>Формат количества изменился. Черновик нельзя сохранить.</small><Button type="button" size="small" variant="secondary" disabled={blocked || busy} onClick={cancel}>Отменить черновик</Button></div>}
-    {blocked && <div className={styles.recovery}>
-      {unavailable && <small>Запись недоступна; черновик сохранён до отмены.</small>}
+    </DataTableActions>
+    {(busy || errorMessage) && <DataTableNote id={statusId} role="status">{busy ? 'Сохранение…' : errorMessage}</DataTableNote>}
+    {!newPolicyCanEdit && <DataTableStack><DataTableNote>Формат количества изменился. Черновик нельзя сохранить.</DataTableNote><DataTableActions><Button type="button" size="small" variant="secondary" disabled={blocked || busy} onClick={cancel}>Отменить черновик</Button></DataTableActions></DataTableStack>}
+    {blocked && <DataTableStack>
+      {unavailable && <DataTableNote>Запись недоступна; черновик сохранён до отмены.</DataTableNote>}
       {Boolean(recoveryError) && !unavailable && <ApiError error={recoveryError} />}
       {Boolean(recoveryError) && <Button type="button" size="small" variant="secondary" disabled={recoveryBusy} onClick={() => void reconcile()}>Повторить сверку</Button>}
       {!unavailable && !recoveryEntry && !recoveryError && <Button type="button" size="small" variant="secondary" disabled={recoveryBusy} onClick={() => void reconcile()}>{recoveryBusy ? 'Сверка…' : 'Сверить'}</Button>}
       {recoveryEntry && <>
-        <small>На сервере: {characterQuantityToRaw(recoveryEntry.record.quantity) || '—'}; черновик: {raw || '—'}</small>
+        <DataTableNote>На сервере: {characterQuantityToRaw(recoveryEntry.record.quantity) || '—'}; черновик: {raw || '—'}</DataTableNote>
         <Button type="button" size="small" variant="secondary" onClick={useLatest}>Использовать актуальное</Button>
         <Button type="button" size="small" variant="secondary" onClick={keepDraft}>Оставить черновик</Button>
       </>}
       {unavailable && <Button type="button" size="small" variant="secondary" onClick={cancel}>Отменить черновик</Button>}
-    </div>}
-  </div>;
+    </DataTableStack>}
+  </DataTableStack>;
 };
 
 export default CharacterCatalogQuantity;

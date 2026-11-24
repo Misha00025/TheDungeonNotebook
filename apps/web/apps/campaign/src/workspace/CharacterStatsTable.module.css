@@ -16,27 +16,3 @@
   min-width: 0;
   flex: 1 1 14rem;
 }
-
-.tableWrapper {
-  max-width: 100%;
-  min-width: 0;
-}
-
-.table {
-  table-layout: fixed;
-}
-
-.nameColumn { width: 45%; }
-.kindColumn { width: 20%; }
-
-.name,
-.value {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-
-.value > * {
-  min-width: 0;
-  max-width: 100%;
-}

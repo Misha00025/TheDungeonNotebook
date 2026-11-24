@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionRow, Button, DataTable, IconButton, Input, ModalPortal, StatePanel } from '@tdn/shared';
+import { ActionRow, Button, DataTable, DataTableActions, DataTableCell, IconButton, Input, ModalPortal, StatePanel } from '@tdn/shared';
 import { useDirtyDraft, useWorkspace } from './Workspace';
 import { CampaignApiError } from './api';
 import { ApiError } from './Feedback';
@@ -396,12 +396,11 @@ const CatalogGroupsDialog: React.FC<Props> = ({
       const groupLabel = row.title || 'Новая группа';
       const diagnosticTitle = safeDiagnostics.map(diagnosticMessage).join(' ');
       const result: React.ReactNode[] = [<tr key={row.clientKey}>
-        <td><div className={styles.groupCell} style={{ '--tree-indent': `${depth * 1.125}rem` } as React.CSSProperties}>
+        <DataTableCell sizing="editor" indent={depth}><DataTableActions fullWidth>
           <Button
             type="button"
             variant="ghost"
             size="small"
-            className={styles.disclosure}
             aria-label={`${expanded ? 'Свернуть' : 'Развернуть'} группу ${groupLabel}`}
             aria-expanded={expanded}
             disabled={tableDisabled}
@@ -412,7 +411,6 @@ const CatalogGroupsDialog: React.FC<Props> = ({
               if (element) titleInputRefs.current.set(row.clientKey, element);
               else titleInputRefs.current.delete(row.clientKey);
             }}
-            className={styles.groupName}
             aria-label="Название группы"
             value={row.title}
             disabled={tableDisabled}
@@ -422,22 +420,18 @@ const CatalogGroupsDialog: React.FC<Props> = ({
           />
           {detached && <small className={styles.hierarchyWarning} aria-hidden="true" title={hierarchyError}>!</small>}
           {safeDiagnostics.length > 0 && <small className={styles.groupDiagnostic} role="status" aria-label={`Проблемы: ${safeDiagnostics.length}. ${diagnosticTitle}`} title={diagnosticTitle}>!</small>}
-        </div></td>
-        <td><Button type="button" size="small" variant="ghost" className={styles.rowAction} aria-label={`Состав: ${groupLabel}`} disabled={tableDisabled} onClick={() => setActiveEditor({ kind: 'members', clientKey: row.clientKey })}>#{row.entryIds.length}</Button></td>
-        <td><Button type="button" size="small" variant="ghost" className={styles.rowAction} aria-label={`Условие: ${groupLabel}`} disabled={tableDisabled} onClick={() => setActiveEditor({ kind: 'condition', clientKey: row.clientKey })}>{row.condition ? 'Задано' : 'Нет'}</Button></td>
-        <td><div className={styles.rowActions}>
+        </DataTableActions></DataTableCell>
+        <DataTableCell sizing="control"><Button type="button" size="small" variant="ghost" aria-label={`Состав: ${groupLabel}`} disabled={tableDisabled} onClick={() => setActiveEditor({ kind: 'members', clientKey: row.clientKey })}>#{row.entryIds.length}</Button></DataTableCell>
+        <DataTableCell sizing="control"><Button type="button" size="small" variant="ghost" aria-label={`Условие: ${groupLabel}`} disabled={tableDisabled} onClick={() => setActiveEditor({ kind: 'condition', clientKey: row.clientKey })}>{row.condition ? 'Задано' : 'Нет'}</Button></DataTableCell>
+        <DataTableCell sizing="control"><DataTableActions>
           <IconButton icon="sort" size="small" title={`Переместить группу ${groupLabel}`} ariaLabel={`Переместить группу ${groupLabel}`} disabled={tableDisabled} onClick={() => setActiveEditor({ kind: 'move', clientKey: row.clientKey })} />
           <IconButton icon="delete" size="small" variant="danger" title={children.length > 0 ? 'Сначала перенесите дочерние группы' : `Удалить группу ${groupLabel}`} ariaLabel={`Удалить группу ${groupLabel}`} disabled={tableDisabled || children.length > 0} onClick={() => removeGroup(row)} />
-        </div></td>
+        </DataTableActions></DataTableCell>
       </tr>];
       if (expanded) {
         for (const child of children) result.push(...renderGroup(child, depth + 1));
         result.push(<tr key={`add-child-${row.clientKey}`}>
-          <td colSpan={4}>
-            <div className={styles.treeActionCell} style={{ '--tree-indent': `${(depth + 1) * 1.125}rem` } as React.CSSProperties}>
-              <Button type="button" variant="ghost" className={styles.addRowAction} aria-label={`Добавить дочернюю группу: ${groupLabel}`} disabled={tableDisabled} onClick={() => addGroup(row.clientKey)}>+ Добавить дочернюю группу</Button>
-            </div>
-          </td>
+          <DataTableCell colSpan={4} indent={depth + 1}><Button size="small" type="button" variant="ghost" aria-label={`Добавить дочернюю группу: ${groupLabel}`} disabled={tableDisabled} onClick={() => addGroup(row.clientKey)}>+ Добавить дочернюю группу</Button></DataTableCell>
         </tr>);
       }
       return result;
@@ -458,7 +452,7 @@ const CatalogGroupsDialog: React.FC<Props> = ({
       if (!reachable.has(row.clientKey)) treeRows.push(...renderGroup(row, 0, true));
     }
     treeRows.push(<tr key="add-root-group">
-      <td colSpan={4}><Button type="button" variant="ghost" className={styles.addRowAction} aria-label="Добавить группу" disabled={tableDisabled} onClick={() => addGroup(null)}>+ Добавить группу</Button></td>
+      <DataTableCell colSpan={4}><Button size="small" type="button" variant="ghost" aria-label="Добавить группу" disabled={tableDisabled} onClick={() => addGroup(null)}>+ Добавить группу</Button></DataTableCell>
     </tr>);
     return treeRows;
   };
@@ -475,8 +469,8 @@ const CatalogGroupsDialog: React.FC<Props> = ({
       {revoked && <p role="alert">Управление группами заблокировано после отказа сервера.</p>}
       {(hierarchyError || draftError) && <p role="alert">{hierarchyError ?? draftError}</p>}
       {invalidTitles && <p role="alert">Укажите название каждой группы.</p>}
-      <DataTable className={styles.treeTable} aria-label="Группы каталога" minWidth="32rem">
-        <thead><tr><th scope="col">Группа</th><th scope="col">Состав</th><th scope="col">Условие</th><th scope="col">Действия</th></tr></thead>
+      <DataTable aria-label="Группы каталога">
+        <thead><tr><DataTableCell as="th" scope="col" sizing="editor">Группа</DataTableCell><DataTableCell as="th" scope="col" sizing="control">Состав</DataTableCell><DataTableCell as="th" scope="col" sizing="control">Условие</DataTableCell><DataTableCell as="th" scope="col" sizing="control">Действия</DataTableCell></tr></thead>
         <tbody>{renderGroupRows()}</tbody>
       </DataTable>
       {activeEditor?.kind === 'members' && (() => {

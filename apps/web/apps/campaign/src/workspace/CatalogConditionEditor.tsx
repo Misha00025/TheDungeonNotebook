@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { ActionRow, Button, DataTable, IconButton, ModalPortal, Select } from '@tdn/shared';
+import { ActionRow, Button, DataTable, DataTableActions, DataTableCell, DataTableNote, IconButton, ModalPortal, Select } from '@tdn/shared';
 import { useDirtyDraft } from './Workspace';
 import type { JsonValue } from './types';
 import type { CatalogAttributeDefinition, CatalogGroupCondition } from './catalogTypes';
@@ -218,7 +218,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
   const fieldValue = node.operator !== 'exists' && definition && !stale && currentField && rawValue !== undefined;
   const leafValue = fieldValue
     ? isMultiChoice
-      ? <ActionRow>
+      ? <DataTableActions wrap>
         <span>{formatConditionValue(rawValue!, definition!) || 'Не выбрано'}</span>
         <Button type="button" size="small" variant="secondary" disabled={disabled} onClick={() => setChoiceDraft({
           value: rawValue!,
@@ -228,7 +228,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
           options: definition!.options,
           operator: node.operator,
         })}>Выбрать значения</Button>
-      </ActionRow>
+      </DataTableActions>
       : node.operator === 'contains' && definition?.typeKey === 'multiChoice' && typeof rawValue === 'string'
         ? disabled
           ? <output aria-label={`Значение: ${definition.title}`}>{formatConditionValue(rawValue, definition)}</output>
@@ -244,7 +244,6 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
           value={rawValue!}
           label={`Значение: ${definition!.title}`}
           compact
-          inline
           disabled={disabled}
           onChange={(value: JsonValue) => onChange({
             operator: node.operator,
@@ -277,7 +276,7 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
 
   return <>
     <tr key={key}>
-      <td style={path.length ? { paddingInlineStart: `${path.length}rem` } : undefined}>
+      <DataTableCell sizing="editor" indent={path.length}>
         <Select aria-label={isRoot ? 'Условие включения' : 'Тип условия'} value={node.operator} disabled={disabled} onChange={event => {
           if (isRoot) onRootOperatorChange?.(event.target.value);
           else changeNodeOperator(event.target.value as ConditionOperator);
@@ -285,22 +284,22 @@ const ConditionNodeEditor: React.FC<NodeProps> = ({
           {isRoot && <option value="none">{operatorLabels.none}</option>}
           {nodeOperators.map(operator => <option key={operator} value={operator}>{operatorLabels[operator]}</option>)}
         </Select>
-      </td>
-      <td>{isCompound(node.operator)
+      </DataTableCell>
+      <DataTableCell sizing="editor">{isCompound(node.operator)
         ? '—'
         : <Select aria-label="Атрибут" value={node.attributeId ?? ''} disabled={disabled} onChange={event => updateAttribute(event.target.value)}>
           <option value="">Выберите атрибут</option>
           {eligibleDefinitions.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
         </Select>}
-      </td>
-      <td>{isCompound(node.operator) || node.operator === 'exists'
-        ? <>—{nodeStatus && <small role={ownInvalid ? 'alert' : 'status'}>{nodeStatus}</small>}</>
-        : <>{leafValue}{nodeStatus && <small role={ownInvalid ? 'alert' : 'status'}>{nodeStatus}</small>}</>}</td>
-      <td><ActionRow style={{ gap: '0.5rem' }}>
+      </DataTableCell>
+      <DataTableCell sizing="editor">{isCompound(node.operator) || node.operator === 'exists'
+        ? <>—{nodeStatus && <DataTableNote role={ownInvalid ? 'alert' : 'status'} tone={ownInvalid ? 'error' : 'muted'}>{nodeStatus}</DataTableNote>}</>
+        : <>{leafValue}{nodeStatus && <DataTableNote role={ownInvalid ? 'alert' : 'status'} tone={ownInvalid ? 'error' : 'muted'}>{nodeStatus}</DataTableNote>}</>}</DataTableCell>
+      <DataTableCell sizing="control"><DataTableActions wrap>
         {isCompound(node.operator) && (node.operator !== 'not' || children.length === 0) && <Button type="button" size="small" disabled={disabled} onClick={addChild}>Добавить условие</Button>}
         {!isCompound(node.operator) && stale && definition && <Button type="button" size="small" disabled={disabled} onClick={refresh}>Обновить условие по текущей схеме</Button>}
         {canRemove && onRemove && <IconButton icon="delete" size="small" variant="danger" title="Удалить условие" ariaLabel="Удалить условие" disabled={disabled} onClick={onRemove} />}
-      </ActionRow></td>
+      </DataTableActions></DataTableCell>
     </tr>
     {isCompound(node.operator) && children.map((child, index) => <ConditionNodeEditor
       key={`${key}.${index}`}
@@ -397,8 +396,8 @@ export const CatalogConditionEditor: React.FC<CatalogConditionEditorProps> = ({
     onChange(next);
   };
 
-  return <DataTable aria-label="Условия группы" minWidth="52rem">
-    <thead><tr><th scope="col">Условие</th><th scope="col">Атрибут</th><th scope="col">Значение</th><th scope="col">Действия</th></tr></thead>
+  return <DataTable aria-label="Условия группы">
+      <thead><tr><DataTableCell as="th" scope="col" sizing="editor">Условие</DataTableCell><DataTableCell as="th" scope="col" sizing="editor">Атрибут</DataTableCell><DataTableCell as="th" scope="col" sizing="editor">Значение</DataTableCell><DataTableCell as="th" scope="col" sizing="control">Действия</DataTableCell></tr></thead>
     <tbody>{condition
       ? <ConditionNodeEditor
         node={condition}
@@ -416,11 +415,11 @@ export const CatalogConditionEditor: React.FC<CatalogConditionEditorProps> = ({
         onValidityChange={reportNodeValidity}
       />
       : <tr>
-        <td><Select aria-label="Условие включения" value="none" disabled={disabled} onChange={event => changeOperator(event.target.value)}>
+        <DataTableCell sizing="editor"><Select aria-label="Условие включения" value="none" disabled={disabled} onChange={event => changeOperator(event.target.value)}>
           <option value="none">{operatorLabels.none}</option>
           {([...leafOperators, 'all', 'any', 'not'] as const).map(operator => <option key={operator} value={operator}>{operatorLabels[operator]}</option>)}
-        </Select></td>
-        <td>—</td><td>—</td><td>—</td>
+        </Select></DataTableCell>
+        <DataTableCell sizing="editor">—</DataTableCell><DataTableCell>—</DataTableCell><DataTableCell sizing="control">—</DataTableCell>
       </tr>}
     </tbody>
   </DataTable>;

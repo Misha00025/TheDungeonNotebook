@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionRow, Button, Checkbox, DataTable, Field, Input, LinkButton, ModalPortal, Panel, Select } from '@tdn/shared';
+import { ActionRow, Button, Checkbox, DataTable, DataTableCell, Field, Input, LinkButton, ModalPortal, Panel, Select } from '@tdn/shared';
 import { useWorkspace, useDirtyDraft } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 import { useResource } from './hooks';
@@ -383,12 +383,12 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
           {draft.targetMode === 'existing' && snapshot && <p>Существующий персонаж: {snapshot.metadata.name}</p>}
           {draft.targetMode === 'existing' && draft.selectName && <p>Имя: {snapshot?.metadata.name ?? '—'} → {String(source.data.name ?? '')}</p>}
           {draft.targetMode === 'existing' && draft.selectDescription && <p>Описание: {snapshot?.sheet.description ?? '—'} → {String(source.data.description ?? '')}</p>}
-          {source.fields.some(field => draft.fields[field.key]?.selected) ? <DataTable aria-label={`Сопоставление полей ${source.name}`} minWidth="55rem"><thead><tr><th>Исходное поле</th><th>Ключ</th><th>Значение</th><th>Поле назначения</th><th>Текущее значение</th></tr></thead><tbody>
+          {source.fields.some(field => draft.fields[field.key]?.selected) ? <DataTable aria-label={`Сопоставление полей ${source.name}`}><thead><tr><DataTableCell as="th" sizing="content">Исходное поле</DataTableCell><DataTableCell as="th" sizing="content">Ключ</DataTableCell><DataTableCell as="th">Значение</DataTableCell><DataTableCell as="th" sizing="editor">Поле назначения</DataTableCell><DataTableCell as="th">Текущее значение</DataTableCell></tr></thead><tbody>
             {source.fields.filter(field => draft.fields[field.key]?.selected).map((field, index) => {
               const choice = draft.fields[field.key];
               const candidates = compatibleHeroFields(field, snapshot ? snapshot.sheet.baseFields : currentTemplate?.data.baseFields ?? []);
               const targetField = candidates.find(candidate => candidate.id === choice.targetId);
-              return <tr key={`${field.key}:${index}`}><th scope="row">{field.name}</th><td>{field.key}</td><td>{sourceFieldValue(field)}</td><td>
+              return <tr key={`${field.key}:${index}`}><DataTableCell as="th" scope="row" sizing="content">{field.name}</DataTableCell><DataTableCell sizing="content">{field.key}</DataTableCell><DataTableCell preserveWhitespace>{sourceFieldValue(field)}</DataTableCell><DataTableCell sizing="editor">
                 <Field label={`Поле назначения ${source.name}: ${field.name}`} htmlFor={`hero-field-target-${draft.sourceIndex}-${index}`}>
                   <Select id={`hero-field-target-${draft.sourceIndex}-${index}`} value={choice.targetId} disabled={mapDisabled || candidates.length === 0 || ['applied', 'verified'].includes(run?.statuses[`${draft.sourceIndex}:value:${field.key}`] ?? '')} onChange={event => updateField(draft.sourceIndex, field.key, current => ({ ...current, targetId: event.target.value, action: event.target.value ? 'replace' : 'skip' }))}>
                     <option value="">Не импортировать</option>{candidates.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.title}</option>)}
@@ -396,7 +396,7 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
                 </Field>
                 {candidates.length === 0 && <p>{Object.prototype.hasOwnProperty.call(field.data, 'value') ? 'Нет подходящего поля — поле не импортируется.' : 'Нет явного значения — поле не импортируется.'}</p>}
                 {candidates.length > 0 && !choice.targetId && <p>По умолчанию не импортируется. Выберите существующее поле для переноса.</p>}
-              </td><td>{targetField ? currentValue(targetKey, targetField.id) : '—'}</td></tr>;
+              </DataTableCell><DataTableCell preserveWhitespace>{targetField ? currentValue(targetKey, targetField.id) : '—'}</DataTableCell></tr>;
             })}
           </tbody></DataTable> : <p>Поля не выбраны.</p>}
         </Panel>;

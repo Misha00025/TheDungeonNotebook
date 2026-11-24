@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { ActionRow, Button, DataTable, Field, IconButton, ModalPortal, Select } from '@tdn/shared';
+import { ActionRow, Button, DataTable, DataTableActions, DataTableCell, DataTableNote, Field, IconButton, ModalPortal, Select } from '@tdn/shared';
 import { useDirtyDraft } from './Workspace';
 import type { CatalogAttributeDefinition, CatalogAttributeOccurrence, CatalogEditLevel } from './catalogTypes';
 import { catalogAttributeField, catalogAttributeIssue, catalogValueLabel, createCatalogOccurrence, defaultTypedValue } from './catalogModel';
@@ -111,7 +111,7 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
     };
     const isMultiChoice = definition?.typeKey === 'multiChoice' && canEdit && field;
     return <tr key={`${source ? 'source-' : ''}${row.id}`}>
-      <th scope="row">{canRebind && definition
+      <DataTableCell as="th" scope="row" sizing="editor">{canRebind && definition
         ? <Select aria-label={`Атрибут: ${definition.title}`} value={row.attributeId} disabled={disabled || immutableBindings.has(row.id)} onChange={event => {
           const nextDefinition = definitionById.get(event.target.value);
           if (!nextDefinition) return;
@@ -121,35 +121,35 @@ export const CatalogAttributeValuesEditor: React.FC<CatalogAttributeValuesEditor
           {definitions.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
         </Select>
         : definition?.title ?? 'Характеристика удалена'}
-      </th>
-      <td data-label="Значение">{rowReadOnly || issue
+      </DataTableCell>
+      <DataTableCell sizing="editor">{rowReadOnly || issue
         ? definition ? catalogValueLabel(row.value, definition) : '—'
         : canEdit && isMultiChoice
           ? <><span>{catalogValueLabel(row.value, definition) || 'Не выбрано'}</span> <Button type="button" size="small" variant="secondary" disabled={disabled} onClick={() => setChoiceDraft({ row, value: row.value, definition: { typeKey: definition.typeKey, options: definition.options }, error: issue })}>Выбрать значения</Button></>
           : canEdit && field && definition
-            ? <ValueInput field={field} value={row.value} label={`Значение: ${definition.title}`} compact inline disabled={disabled} onChange={value => updateRow(row.id, { ...row, value })} onValidityChange={error => setInputErrors(current => current[row.id] === Boolean(error) ? current : { ...current, [row.id]: Boolean(error) })} />
+            ? <ValueInput field={field} value={row.value} label={`Значение: ${definition.title}`} compact disabled={disabled} onChange={value => updateRow(row.id, { ...row, value })} onValidityChange={error => setInputErrors(current => current[row.id] === Boolean(error) ? current : { ...current, [row.id]: Boolean(error) })} />
             : catalogValueLabel(row.value, definition)}
-        {issue && <small role="status">{definition ? 'Значение не соответствует текущей характеристике.' : 'Характеристика удалена.'}</small>}
-      </td>
-      <td data-label="Можно менять у персонажа">{mode === 'definition' && !rowReadOnly && definition && field
+        {issue && <DataTableNote role="status" tone="error">{definition ? 'Значение не соответствует текущей характеристике.' : 'Характеристика удалена.'}</DataTableNote>}
+      </DataTableCell>
+      <DataTableCell sizing="editor">{mode === 'definition' && !rowReadOnly && definition && field
         ? <Select aria-label={`Где разрешено менять: ${definition.title}`} value={row.editLevel} disabled={disabled} onChange={event => updateRow(row.id, { ...row, editLevel: event.target.value as CatalogEditLevel })}>
           <option value="Definition">Только в каталоге</option>
           <option value="Character">Можно менять у персонажа</option>
         </Select>
-        : row.editLevel === 'Character' ? 'Можно менять у персонажа' : 'Только в каталоге'}</td>
-      <td data-label="Действия"><ActionRow className={styles.attributeActions}>
+        : row.editLevel === 'Character' ? 'Можно менять у персонажа' : 'Только в каталоге'}</DataTableCell>
+      <DataTableCell sizing="control"><DataTableActions wrap>
         {issue && definition && canEdit && <Button type="button" size="small" disabled={disabled} onClick={replaceInvalid}>Заменить некорректное значение</Button>}
         {canRemove && <IconButton icon="delete" size="small" variant="danger" title="Убрать" ariaLabel="Убрать" disabled={disabled} onClick={() => removeRow(row.id)} />}
         {!definition && !source && !readOnly && <Button type="button" size="small" disabled={disabled} onClick={() => removeRow(row.id)}>Удалить черновик</Button>}
-      </ActionRow></td>
+      </DataTableActions></DataTableCell>
     </tr>;
   };
 
   if (readOnly) return <CatalogAttributeReadout definitions={definitions} values={[...sourceValues, ...values]} showEditRules={mode === 'definition'} />;
 
   return <section>
-    <DataTable className={styles.attributeTable} wrapperClassName={styles.attributeTableWrapper} aria-label="Характеристики" minWidth="0">
-      <thead><tr><th scope="col">Характеристика</th><th scope="col">Значение</th><th scope="col">Можно менять у персонажа</th><th scope="col">Действия</th></tr></thead>
+    <DataTable aria-label="Характеристики">
+      <thead><tr><DataTableCell as="th" scope="col" sizing="editor">Характеристика</DataTableCell><DataTableCell as="th" scope="col" sizing="editor">Значение</DataTableCell><DataTableCell as="th" scope="col" sizing="editor">Можно менять у персонажа</DataTableCell><DataTableCell as="th" scope="col" sizing="control">Действия</DataTableCell></tr></thead>
       <tbody>{sourceValues.map(row => renderRow(row, true))}{values.map(row => renderRow(row, false))}</tbody>
     </DataTable>
     {!disabled && <ActionRow className={styles.addAttributeRow}>

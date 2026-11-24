@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { DataTable, SearchBar, Select, StatePanel } from '@tdn/shared';
+import { DataTable, DataTableCell, SearchBar, Select, StatePanel } from '@tdn/shared';
 import type { ComputedSheet, FieldReference, JsonValue } from './types';
 import { displayValue } from './json';
 import { diagnosticMessage } from './displayDiagnostics';
@@ -54,13 +54,12 @@ const CharacterStatsTable: React.FC<Props> = ({ sheet, renderValue, onVisibleFie
     </div>
     {!hasFields ? <StatePanel kind="empty" title="Характеристики">Для персонажа пока нет характеристик.</StatePanel>
       : rows.length === 0 ? <StatePanel kind="empty" title="Характеристики не найдены">Измените поиск или фильтр.</StatePanel>
-        : <DataTable aria-label="Все характеристики" minWidth="30rem" className={styles.table} wrapperClassName={styles.tableWrapper}>
-          <colgroup><col className={styles.nameColumn} /><col className={styles.kindColumn} /><col /></colgroup>
-          <thead><tr><th scope="col">Характеристика</th><th scope="col">Вид</th><th scope="col">Значение</th></tr></thead>
+        : <DataTable aria-label="Все характеристики">
+          <thead><tr><DataTableCell as="th" scope="col" sizing="content">Характеристика</DataTableCell><DataTableCell as="th" scope="col" sizing="content">Вид</DataTableCell><DataTableCell as="th" scope="col">Значение</DataTableCell></tr></thead>
           <tbody>{rows.map(row => <tr key={`${row.kind}:${row.id}`}>
-            <th scope="row" className={styles.name}>{row.label}</th>
-            <td>{row.kind === 'Base' ? 'Базовая' : 'Вычисляемая'}</td>
-            <td className={styles.value}>{row.kind === 'Base' ? renderValue?.({ kind: 'Base', fieldId: row.id }, row.label, row.value) ?? row.value : row.value}</td>
+            <DataTableCell as="th" scope="row" sizing="content">{row.label}</DataTableCell>
+            <DataTableCell sizing="content">{row.kind === 'Base' ? 'Базовая' : 'Вычисляемая'}</DataTableCell>
+            <DataTableCell preserveWhitespace>{row.kind === 'Base' ? renderValue?.({ kind: 'Base', fieldId: row.id }, row.label, row.value) ?? row.value : row.value}</DataTableCell>
           </tr>)}</tbody>
         </DataTable>}
   </section>;

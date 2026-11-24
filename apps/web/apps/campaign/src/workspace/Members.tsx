@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ActionRow, Button, DataTable, Field, IconButton, Input, List, ListItem, ModalPortal, Notification, Panel, Select } from '@tdn/shared';
+import { ActionRow, Button, DataTable, DataTableActions, DataTableCell, Field, IconButton, Input, List, ListItem, ModalPortal, Notification, Panel, Select } from '@tdn/shared';
 import { useWorkspace } from './Workspace';
 import { useResource } from './hooks';
 import { ApiError } from './Feedback';
@@ -73,20 +73,20 @@ const MemberRow: React.FC<{ member: Member; campaignId: number; sessionKey: stri
   };
   const errorConflict = isMemberAssignmentsConflict(op?.error);
   return <tr aria-label={`Участник ${name}`}>
-    <td>{member.isAdmin ? <Crown /> : null}</td>
-    <th scope="row" className={styles.nameCell}>{visibleProfileName && <span>{visibleProfileName}</span>}
+    <DataTableCell sizing="control">{member.isAdmin ? <Crown /> : null}</DataTableCell>
+    <DataTableCell as="th" scope="row" sizing="content">{visibleProfileName && <span>{visibleProfileName}</span>}
       {errorConflict && <Notification kind="error" eventKey={`member-assignments:${member.userId}`}>Нельзя удалить участника: сначала снимите назначения персонажей в его строке.</Notification>}
       {!errorConflict && <OperationRecovery op={op} onRead={() => void access.rereadMember(member.userId)} onRetry={() => void access.retryOperation(access.memberOperationKey(member.userId))} onDiscard={() => access.discardOperation(access.memberOperationKey(member.userId))} readLabel={`Перечитать участника ${name}`} disabled={!access.writable || access.isBusy} />}
-    </th>
-    <td><List className={styles.assignmentList} layout="vertical" gap="small" stretch>
+    </DataTableCell>
+    <DataTableCell><List className={styles.assignmentList} layout="vertical" gap="small" stretch>
       {assignments.map(entry => <AssignmentLine key={entry.character.id} entry={entry} userName={name} userId={member.userId} access={access} participantsLoading={participantsLoading} />)}
       {assignments.length === 0 && charactersComplete && <span>Персонажи не назначены.</span>}
-    </List></td>
-    <td><ActionRow className={styles.rowActions}>
-      <IconButton icon="add" title={`Назначить персонажа ${name}`} ariaLabel={`Назначить персонажа ${name}`} disabled={rowDisabled} onClick={() => onAssign(member, name)} />
-      <IconButton icon={member.isAdmin ? 'arrow-down' : 'arrow-up'} title={member.isAdmin ? `Понизить ${name} до игрока` : `Повысить ${name} до ГМ`} ariaLabel={member.isAdmin ? `Понизить ${name} до игрока` : `Повысить ${name} до ГМ`} disabled={rowDisabled || Boolean(op?.blocked || op?.busy)} onClick={() => void access.setMemberRole(member.userId, !member.isAdmin)} />
-      <IconButton icon="delete" variant="danger" title={`Удалить участника ${name}`} ariaLabel={`Удалить участника ${name}`} disabled={rowDisabled || Boolean(op?.blocked || op?.busy)} onClick={remove} />
-    </ActionRow></td>
+    </List></DataTableCell>
+    <DataTableCell sizing="control"><DataTableActions>
+      <IconButton icon="add" size="small" title={`Назначить персонажа ${name}`} ariaLabel={`Назначить персонажа ${name}`} disabled={rowDisabled} onClick={() => onAssign(member, name)} />
+      <IconButton icon={member.isAdmin ? 'arrow-down' : 'arrow-up'} size="small" title={member.isAdmin ? `Понизить ${name} до игрока` : `Повысить ${name} до ГМ`} ariaLabel={member.isAdmin ? `Понизить ${name} до игрока` : `Повысить ${name} до ГМ`} disabled={rowDisabled || Boolean(op?.blocked || op?.busy)} onClick={() => void access.setMemberRole(member.userId, !member.isAdmin)} />
+      <IconButton icon="delete" size="small" variant="danger" title={`Удалить участника ${name}`} ariaLabel={`Удалить участника ${name}`} disabled={rowDisabled || Boolean(op?.blocked || op?.busy)} onClick={remove} />
+    </DataTableActions></DataTableCell>
   </tr>;
 };
 
@@ -239,8 +239,8 @@ const MembersPage: React.FC<{ campaignId: number }> = ({ campaignId }) => {
       {sectionReadErrorsSettled && assignmentErrors && <Button type="button" variant="secondary" size="small" disabled={!access.writable || access.isBusy} onClick={access.reload}>Повторить загрузку назначений</Button>}
       {sectionReadErrorsSettled && profilesFailed && <Button type="button" variant="secondary" size="small" disabled={!access.writable || access.isBusy} onClick={() => setProfileRetryVersion(version => version + 1)}>Повторить загрузку профилей</Button>}
       {!access.listLoading && !access.listError && access.members.length === 0 && <p>Участников нет.</p>}
-      <DataTable aria-label="Участники кампании" aria-busy={participantsLoading || access.isBusy || undefined} minWidth="48rem" className={styles.membersTable}>
-        <thead><tr><th scope="col">#</th><th scope="col">Имя</th><th scope="col">Персонажи</th><th scope="col">Действия</th></tr></thead>
+      <DataTable aria-label="Участники кампании" aria-busy={participantsLoading || access.isBusy || undefined}>
+        <thead><tr><DataTableCell as="th" scope="col" sizing="control">#</DataTableCell><DataTableCell as="th" scope="col" sizing="content">Имя</DataTableCell><DataTableCell as="th" scope="col">Персонажи</DataTableCell><DataTableCell as="th" scope="col" sizing="control">Действия</DataTableCell></tr></thead>
         <tbody>{access.members.map(member => <MemberRow key={`${campaignId}:${member.userId}`} member={member} campaignId={campaignId} sessionKey={sessionKey} access={access} onAssign={openAssignment} charactersComplete={charactersComplete} participantsLoading={participantsLoading} onProfileState={updateProfileState} profileRetryVersion={profileRetryVersion} />)}</tbody>
       </DataTable>
       {dialogMember && <AssignmentDialog member={dialogMember.member} memberName={dialogMember.name} isOpen access={access} onClose={closeAssignment} participantsLoading={participantsLoading} />}

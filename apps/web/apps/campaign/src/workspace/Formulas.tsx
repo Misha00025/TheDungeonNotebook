@@ -6,7 +6,7 @@ import { CampaignApiError } from './api';
 import { useMutation } from './hooks';
 import type { DefinitionCreate } from './types';
 import { ApiError } from './Feedback';
-import { ActionRow, Button, DataTable, Field, Input, ModalPortal, Notification, PageHeader, Textarea } from '@tdn/shared';
+import { ActionRow, Button, DataTable, DataTableCell, DataTableRow, Field, Input, ModalPortal, Notification, PageHeader, Textarea } from '@tdn/shared';
 import { rowDirty, useFormulaRows } from './useFormulaRows';
 import styles from './Formulas.module.css';
 
@@ -87,22 +87,22 @@ const FormulaTableEditor: React.FC<{ campaignId: number }> = ({ campaignId }) =>
     {Boolean(rows.listError) && <ApiError error={rows.listError} onRetry={() => void rows.reload()} />}
     {rows.feedback && <Notification kind={rows.feedback.kind} eventKey={String(rows.feedback.event)}>{rows.feedback.message}</Notification>}
     {rows.loaded && rows.rows.length === 0 && !rows.listError && <p>Формул пока нет.</p>}
-    <DataTable aria-label="Формулы" className={styles.formulaTable} minWidth="48rem">
-      <thead><tr><th scope="col">Название</th><th scope="col">Выражение</th><th scope="col">Параметры</th></tr></thead>
+    <DataTable aria-label="Формулы">
+      <thead><tr><DataTableCell as="th" scope="col" sizing="editor">Название</DataTableCell><DataTableCell as="th" scope="col" sizing="editor">Выражение</DataTableCell><DataTableCell as="th" scope="col" sizing="editor">Параметры</DataTableCell></tr></thead>
       <tbody>{rows.rows.map(row => {
         const label = row.metadataBaseline.name || row.name || 'Без названия';
         const modified = rowDirty(row);
-        return <tr key={row.id} aria-label={`Формула ${label}`} className={modified ? styles.modified : undefined}>
-          <td><Input aria-label={`Название формулы ${label}`} value={row.name} disabled={!rows.writable || rows.busy || creating || row.missing || !row.contentBaseline} onChange={event => rows.change(row.id, 'name', event.target.value)} /></td>
-          <td><Textarea rows={2} aria-label={`Выражение формулы ${label}`} value={row.expression} disabled={!rows.writable || rows.busy || creating || row.missing || !row.contentBaseline} onChange={event => rows.change(row.id, 'expression', event.target.value)} /></td>
-          <td><Textarea rows={2} aria-label={`Параметры формулы ${label}`} placeholder="По одному в строке" value={row.parametersText} disabled={!rows.writable || rows.busy || creating || row.missing || !row.contentBaseline} onChange={event => rows.change(row.id, 'parametersText', event.target.value)} />
+        return <DataTableRow key={row.id} aria-label={`Формула ${label}`} change={modified ? 'modified' : undefined}>
+          <DataTableCell sizing="editor"><Input aria-label={`Название формулы ${label}`} value={row.name} disabled={!rows.writable || rows.busy || creating || row.missing || !row.contentBaseline} onChange={event => rows.change(row.id, 'name', event.target.value)} /></DataTableCell>
+          <DataTableCell sizing="editor"><Textarea rows={2} aria-label={`Выражение формулы ${label}`} value={row.expression} disabled={!rows.writable || rows.busy || creating || row.missing || !row.contentBaseline} onChange={event => rows.change(row.id, 'expression', event.target.value)} /></DataTableCell>
+          <DataTableCell sizing="editor"><Textarea rows={2} aria-label={`Параметры формулы ${label}`} placeholder="По одному в строке" value={row.parametersText} disabled={!rows.writable || rows.busy || creating || row.missing || !row.contentBaseline} onChange={event => rows.change(row.id, 'parametersText', event.target.value)} />
             {Boolean(row.loadError) && <ApiError error={row.loadError} />}
             {Boolean(row.nameError) && <ApiError error={row.nameError} />}
             {Boolean(row.contentError) && <ApiError error={row.contentError} />}
             {row.missing && <p role="alert">{row.nameBlocked || row.contentBlocked ? 'Формула отсутствует в списке. Перечитайте формулу для проверки результата.' : 'Формула отсутствует на сервере. Отмените черновик.'}</p>}
             {(Boolean(row.loadError) || row.nameBlocked || row.contentBlocked) && <Button type="button" variant="secondary" disabled={rows.busy || creating} onClick={() => void rows.rereadRow(row.id)}>Перечитать формулу {label}</Button>}
-          </td>
-        </tr>;
+          </DataTableCell>
+        </DataTableRow>;
       })}</tbody>
     </DataTable>
     {creating && <CreateFormula campaignId={campaignId} onCancel={() => setCreating(false)} onCreated={() => { setCreating(false); rows.created(); }} />}

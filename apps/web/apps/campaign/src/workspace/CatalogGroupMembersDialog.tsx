@@ -1,5 +1,5 @@
 import React, { useId, useMemo, useRef, useState } from 'react';
-import { ActionRow, Button, Checkbox, DataTable, ModalPortal, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
+import { ActionRow, Button, Checkbox, DataTable, DataTableCell, ModalPortal, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
 import { useDirtyDraft } from './Workspace';
 import type { CatalogMetadata } from './catalogTypes';
 import { stringifyJson } from './json';
@@ -38,18 +38,18 @@ const CatalogGroupMembersDialog: React.FC<Props> = ({ groupLabel, initialEntryId
 
   return <ModalPortal isOpen onClose={onClose} title={`Состав: ${groupLabel}`} size="wide">
     <Toolbar><SearchBar searchTerm={search} onSearchChange={setSearch} compact aria-label="Поиск предметов и навыков" /></Toolbar>
-    <DataTable aria-label={`Состав группы ${groupLabel}`} minWidth="32rem">
-      <thead><tr><th scope="col">В группе</th><th scope="col">Предмет или навык</th><th scope="col">Тип</th></tr></thead>
+    <DataTable aria-label={`Состав группы ${groupLabel}`}>
+      <thead><tr><DataTableCell as="th" scope="col" sizing="control">В группе</DataTableCell><DataTableCell as="th" scope="col">Предмет или навык</DataTableCell><DataTableCell as="th" scope="col" sizing="content">Тип</DataTableCell></tr></thead>
       <tbody>
         {visibleEntries.map(entry => <tr key={entry.id}>
-          <td><Checkbox aria-label={`Включить ${entry.name} в группу`} checked={selectedIds.has(entry.id)} disabled={disabled} onChange={event => toggle(entry.id, event.target.checked)} /></td>
-          <th scope="row">{entry.name}{entry.isHidden && <small> · скрытое</small>}</th>
-          <td>{entry.kind === 'Item' ? 'Предмет' : 'Навык'}</td>
+          <DataTableCell sizing="control"><Checkbox aria-label={`Включить ${entry.name} в группу`} checked={selectedIds.has(entry.id)} disabled={disabled} onChange={event => toggle(entry.id, event.target.checked)} /></DataTableCell>
+          <DataTableCell as="th" scope="row">{entry.name}{entry.isHidden && <small> · скрытое</small>}</DataTableCell>
+          <DataTableCell sizing="content">{entry.kind === 'Item' ? 'Предмет' : 'Навык'}</DataTableCell>
         </tr>)}
         {unavailableIds.map((entryId, index) => <tr key={`unavailable-${entryId}`}>
-          <td><Checkbox aria-label={`Убрать недоступную запись ${index + 1} из группы`} checked disabled={disabled} onChange={event => toggle(entryId, event.target.checked)} /></td>
-          <th scope="row">Недоступная запись</th>
-          <td>Недоступно</td>
+          <DataTableCell sizing="control"><Checkbox aria-label={`Убрать недоступную запись ${index + 1} из группы`} checked disabled={disabled} onChange={event => toggle(entryId, event.target.checked)} /></DataTableCell>
+          <DataTableCell as="th" scope="row">Недоступная запись</DataTableCell>
+          <DataTableCell sizing="content">Недоступно</DataTableCell>
         </tr>)}
       </tbody>
     </DataTable>

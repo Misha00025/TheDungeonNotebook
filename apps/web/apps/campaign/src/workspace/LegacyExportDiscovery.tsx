@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
-import { ActionRow, Button, DataTable, Field, FileInput, Panel } from '@tdn/shared';
+import { ActionRow, Button, DataTable, DataTableCell, Field, FileInput, Panel } from '@tdn/shared';
 import { useParams } from 'react-router-dom';
 import { displayValue } from './json';
 import type { JsonValue } from './types';
@@ -15,13 +15,13 @@ const readValue = (data: Record<string, JsonValue>, key: string) => Object.proto
 const formatValue = (value: JsonValue) => value === '' ? 'Пустая строка' : value === null ? 'null' : displayValue(value);
 const unsupportedSections = new Set(['items', 'skills', 'characterItems', 'characterSkills', 'skillAttributes']);
 
-const FieldTable: React.FC<{ fields: LegacyField[] }> = ({ fields }) => <DataTable aria-label="Исходные поля" minWidth="60rem">
-  <thead><tr><th>Название</th><th>Ключ</th><th>Значение</th><th>Формула</th><th>Формула модификатора</th><th>Максимум</th><th>Описание</th></tr></thead>
+const FieldTable: React.FC<{ fields: LegacyField[] }> = ({ fields }) => <DataTable aria-label="Исходные поля">
+  <thead><tr><DataTableCell as="th" sizing="content">Название</DataTableCell><DataTableCell as="th" sizing="content">Ключ</DataTableCell><DataTableCell as="th">Значение</DataTableCell><DataTableCell as="th">Формула</DataTableCell><DataTableCell as="th">Формула модификатора</DataTableCell><DataTableCell as="th">Максимум</DataTableCell><DataTableCell as="th">Описание</DataTableCell></tr></thead>
   <tbody>{fields.map((field, index) => <tr key={`${field.key}:${index}`}>
-    <th scope="row">{field.name}</th><td>{field.key}</td>
-    <td>{readValue(field.data, 'value')}</td><td>{readValue(field.data, 'formula')}</td>
-    <td>{readValue(field.data, 'modifierFormula')}</td><td>{readValue(field.data, 'maxValue')}</td>
-    <td>{readValue(field.data, 'description')}</td>
+    <DataTableCell as="th" scope="row" sizing="content">{field.name}</DataTableCell><DataTableCell sizing="content">{field.key}</DataTableCell>
+    <DataTableCell preserveWhitespace>{readValue(field.data, 'value')}</DataTableCell><DataTableCell preserveWhitespace>{readValue(field.data, 'formula')}</DataTableCell>
+    <DataTableCell preserveWhitespace>{readValue(field.data, 'modifierFormula')}</DataTableCell><DataTableCell preserveWhitespace>{readValue(field.data, 'maxValue')}</DataTableCell>
+    <DataTableCell preserveWhitespace>{readValue(field.data, 'description')}</DataTableCell>
   </tr>)}</tbody>
 </DataTable>;
 

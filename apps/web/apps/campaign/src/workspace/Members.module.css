@@ -39,34 +39,6 @@
   min-width: 0;
 }
 
-.membersTable {
-  table-layout: fixed;
-}
-
-.membersTable th,
-.membersTable td {
-  vertical-align: top;
-}
-
-.membersTable th:first-child,
-.membersTable td:first-child {
-  width: 3rem;
-}
-
-.membersTable th:nth-child(2),
-.membersTable td:nth-child(2) {
-  width: 16rem;
-}
-
-.membersTable th:nth-child(4),
-.membersTable td:nth-child(4) {
-  width: 11rem;
-}
-
-.nameCell {
-  overflow-wrap: anywhere;
-}
-
 .assignmentList {
   min-width: 0;
 }
@@ -90,11 +62,6 @@
   display: grid;
   gap: 0.5rem;
   margin-top: 0.5rem;
-}
-
-.rowActions {
-  flex-wrap: nowrap;
-  align-items: center;
 }
 
 .crown {

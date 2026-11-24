@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionRow, Button, DataTable, Field, IconButton, Input, ModalPortal, Select, StatePanel } from '@tdn/shared';
+import { ActionRow, Button, DataTable, DataTableCell, IconButton, Input, ModalPortal, Select, StatePanel } from '@tdn/shared';
 import { useDirtyDraft, useWorkspace } from './Workspace';
 import { CampaignApiError } from './api';
 import { ApiError } from './Feedback';
@@ -292,20 +292,20 @@ const CatalogAttributesDialog: React.FC<Props> = ({
       {revoked && <p role="alert">Управление схемой заблокировано после отказа сервера.</p>}
       {rows.length === 0 && <StatePanel kind="empty">В схеме пока нет атрибутов. Добавьте атрибут, чтобы использовать типизированные поля.</StatePanel>}
       <p>При смене типа или удалении варианта существующие значения не преобразуются автоматически.</p>
-      <DataTable aria-label="Атрибуты каталога" minWidth="46rem">
-        <thead><tr><th scope="col">Название</th><th scope="col">Тип значения</th><th scope="col">Варианты</th><th scope="col">Действия</th></tr></thead>
+      <DataTable aria-label="Атрибуты каталога">
+        <thead><tr><DataTableCell as="th" scope="col" sizing="editor">Название</DataTableCell><DataTableCell as="th" scope="col" sizing="editor">Тип значения</DataTableCell><DataTableCell as="th" scope="col" sizing="control">Варианты</DataTableCell><DataTableCell as="th" scope="col" sizing="control">Действия</DataTableCell></tr></thead>
         <tbody>{rows.map(row => <tr key={row.clientKey}>
-          {row.removed ? <td colSpan={4}><strong>{row.title || 'Новая характеристика'}</strong><p>Будет удалена после сохранения</p><Button type="button" size="small" variant="secondary" disabled={writesDisabled} onClick={() => setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, removed: false } : item))}>Восстановить характеристику: {row.title || 'новая'}</Button></td> : <>
-          <td><Input aria-label={`Название атрибута ${row.title || 'новый'}`} value={row.title} disabled={writesDisabled} aria-invalid={!row.title.trim() || undefined} onChange={event => setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, title: event.target.value } : item))} /></td>
-          <td><Select aria-label={`Тип атрибута ${row.title || 'новый'}`} value={row.typeKey} disabled={writesDisabled} onChange={event => changeType(row, event.target.value as CatalogAttributeType)}>
+          {row.removed ? <DataTableCell colSpan={4}><strong>{row.title || 'Новая характеристика'}</strong><p>Будет удалена после сохранения</p><Button type="button" size="small" variant="secondary" disabled={writesDisabled} onClick={() => setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, removed: false } : item))}>Восстановить характеристику: {row.title || 'новая'}</Button></DataTableCell> : <>
+          <DataTableCell sizing="editor"><Input aria-label={`Название атрибута ${row.title || 'новый'}`} value={row.title} disabled={writesDisabled} aria-invalid={!row.title.trim() || undefined} onChange={event => setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, title: event.target.value } : item))} /></DataTableCell>
+          <DataTableCell sizing="editor"><Select aria-label={`Тип атрибута ${row.title || 'новый'}`} value={row.typeKey} disabled={writesDisabled} onChange={event => changeType(row, event.target.value as CatalogAttributeType)}>
             {schemaTypes.map(type => <option key={type} value={type}>{typeLabels[type]}</option>)}
-          </Select></td>
-          <td>{row.typeKey === 'singleChoice' || row.typeKey === 'multiChoice'
+          </Select></DataTableCell>
+          <DataTableCell sizing="control">{row.typeKey === 'singleChoice' || row.typeKey === 'multiChoice'
             ? <Button type="button" size="small" variant="secondary" disabled={writesDisabled} onClick={() => { setOptionsDraft(row.options.map(option => ({ ...option }))); setOptionsRowKey(row.clientKey); }}>Варианты ({row.options.length})</Button>
-            : '—'}</td>
-          <td><IconButton icon="delete" size="small" variant="danger" title={`Удалить характеристику: ${row.title || 'новая'}`} ariaLabel={`Удалить характеристику: ${row.title || 'новая'}`} disabled={writesDisabled} onClick={() => row.id
+             : '—'}</DataTableCell>
+          <DataTableCell sizing="control"><IconButton size="small" icon="delete" variant="danger" title={`Удалить характеристику: ${row.title || 'новая'}`} ariaLabel={`Удалить характеристику: ${row.title || 'новая'}`} disabled={writesDisabled} onClick={() => row.id
             ? (setOptionsRowKey(current => current === row.clientKey ? undefined : current), setRows(current => current.map(item => item.clientKey === row.clientKey ? { ...item, removed: true } : item)))
-            : setRows(current => current.filter(item => item.clientKey !== row.clientKey))} /></td>
+            : setRows(current => current.filter(item => item.clientKey !== row.clientKey))} /></DataTableCell>
           </>}
         </tr>)}</tbody>
       </DataTable>
@@ -333,15 +333,15 @@ const CatalogAttributesDialog: React.FC<Props> = ({
       <Button type="button" variant="secondary" disabled={busy || recovering} onClick={close}>Отмена</Button>
     </> : null}
     {optionsRow && <ModalPortal isOpen onClose={() => setOptionsRowKey(undefined)} title={`Варианты: ${optionsRow.title || 'новый атрибут'}`} size="compact">
-      <DataTable aria-label={`Варианты атрибута ${optionsRow.title || 'новый'}`} minWidth="24rem">
-        <thead><tr><th scope="col">Название</th><th scope="col">Действия</th></tr></thead>
+      <DataTable aria-label={`Варианты атрибута ${optionsRow.title || 'новый'}`}>
+        <thead><tr><DataTableCell as="th" scope="col" sizing="editor">Название</DataTableCell><DataTableCell as="th" scope="col" sizing="control">Действия</DataTableCell></tr></thead>
         <tbody>{optionsDraft.map((option, index) => <tr key={option.optionKey}>
-          <td><Input aria-label={`Название варианта ${index + 1}`} value={option.title} disabled={writesDisabled} onChange={event => setOptionsDraft(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item))} /></td>
-          <td><IconButton icon="delete" size="small" variant="danger" title="Удалить вариант" ariaLabel="Удалить вариант" disabled={writesDisabled} onClick={() => {
+          <DataTableCell sizing="editor"><Input aria-label={`Название варианта ${index + 1}`} value={option.title} disabled={writesDisabled} onChange={event => setOptionsDraft(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item))} /></DataTableCell>
+          <DataTableCell sizing="control"><IconButton size="small" icon="delete" variant="danger" title="Удалить вариант" ariaLabel="Удалить вариант" disabled={writesDisabled} onClick={() => {
             const option = optionsDraft[index];
             if (optionsRow.id && option && !window.confirm('Удаление варианта может сделать сохранённые значения несовместимыми. Удалить вариант?')) return;
             setOptionsDraft(current => current.filter((_, itemIndex) => itemIndex !== index));
-          }} /></td>
+          }} /></DataTableCell>
         </tr>)}</tbody>
       </DataTable>
       <ActionRow><Button type="button" size="small" disabled={writesDisabled} onClick={() => setOptionsDraft(current => [...current, { optionKey: crypto.randomUUID(), title: '' }])}>Добавить вариант</Button></ActionRow>

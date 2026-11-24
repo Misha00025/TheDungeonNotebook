@@ -7,6 +7,7 @@ import buttonStyles from '../../styles/components/Button.module.css';
 import styles from './PersonalizeModal.module.css';
 import AdaptiveLayout from '../AdaptiveLayout/AdaptiveLayout';
 import Notification from '../Notification/Notification';
+import Input from '../Form/Input';
 
 interface PersonalizeModalProps {
   isOpen: boolean;
@@ -147,7 +148,7 @@ const PersonalizeModal: React.FC<PersonalizeModalProps> = ({ isOpen, onClose }) 
                   value={customColors[field]}
                   onChange={handleColorChange(field)}
                 />
-                <input
+                <Input
                   type="text"
                   className={styles.hexInput}
                   value={customColors[field]}
@@ -168,7 +169,7 @@ const PersonalizeModal: React.FC<PersonalizeModalProps> = ({ isOpen, onClose }) 
                 value={customColors.progressFrom}
                 onChange={handleColorChange('progressFrom')}
               />
-              <input
+              <Input
                 type="text"
                 className={styles.hexInput}
                 value={customColors.progressFrom}
@@ -184,7 +185,7 @@ const PersonalizeModal: React.FC<PersonalizeModalProps> = ({ isOpen, onClose }) 
                 value={customColors.progressTo}
                 onChange={handleColorChange('progressTo')}
               />
-              <input
+              <Input
                 type="text"
                 className={styles.hexInput}
                 value={customColors.progressTo}
