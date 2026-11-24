@@ -12,6 +12,8 @@ export type CatalogSectionsProps = {
   openKeys: Set<string>;
   onToggle: (key: string, open: boolean) => void;
   onOpenEntry: (metadata: CatalogMetadata) => void;
+  onSelectEntry?: (metadata: CatalogMetadata) => void;
+  selectionDisabled?: boolean;
   onRetryMembership: (groupId: string) => void;
   definitions?: CatalogAttributeDefinition[];
   loadContent: (id: string) => Promise<CatalogContentEnvelope>;
@@ -33,6 +35,7 @@ const EntryRow: React.FC<{ entry: CatalogMetadata; props: CatalogSectionsProps }
       {(props.attributeSchemaLoading || (props.definitions && content.loading)) && <small>Загрузка атрибутов…</small>}
       {props.definitions && Boolean(content.error) && <small>Атрибуты недоступны.</small>}
     </Button>
+    {props.onSelectEntry && <Button size="small" variant="secondary" type="button" aria-label={`Выбрать ${entry.name}`} disabled={props.selectionDisabled} onClick={() => props.onSelectEntry?.(entry)}>Выбрать</Button>}
     {props.definitions && Boolean(content.error) && <IconButton icon="undo" size="small" variant="secondary" title={`Повторить загрузку атрибутов ${entry.name}`} ariaLabel={`Повторить загрузку атрибутов ${entry.name}`} onClick={content.reload} />}
   </div>;
 };

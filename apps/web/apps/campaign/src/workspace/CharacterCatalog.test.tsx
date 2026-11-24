@@ -118,6 +118,13 @@ function catalogTree(request: (url: string, options?: RequestInit) => Promise<Re
   </RemoteAuthProvider>;
 }
 
+async function expandCatalogAndSelect(dialog: HTMLElement, name: string) {
+  const expandAll = await within(dialog).findByRole('button', { name: 'Развернуть всё' });
+  await waitFor(() => expect(expandAll).toBeEnabled());
+  fireEvent.click(expandAll);
+  fireEvent.click(await within(dialog).findByRole('button', { name: `Выбрать ${name}` }));
+}
+
 describe('character catalog consumer', () => {
   beforeEach(() => window.localStorage.clear());
   afterEach(() => { vi.restoreAllMocks(); window.localStorage.clear(); });
@@ -284,7 +291,12 @@ describe('character catalog consumer', () => {
     render(catalogTree(request, { canWrite: true }));
     fireEvent.click(await screen.findByRole('button', { name: 'Добавить предмет' }));
     const dialog = await screen.findByRole('dialog', { name: 'Добавить предмет' });
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Поиск по названию' }), { target: { value: source.name } });
     fireEvent.click(await within(dialog).findByRole('button', { name: source.name }));
+    expect(await within(dialog).findByText('Два вхождения.')).toBeInTheDocument();
+    expect(calls.filter(([url, options]) => url === `/api/campaigns/12/characters/${characterId}/items` && options?.method === 'POST')).toHaveLength(0);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Выбрать' }));
+    expect(await within(dialog).findByLabelText('Количество')).toHaveTextContent('1');
     fireEvent.click(await within(dialog).findByRole('button', { name: 'Изменить: Тип' }));
     const value = await within(dialog).findByRole('textbox', { name: 'Значение: Тип' });
     fireEvent.change(value, { target: { value: 'новый личный тип' } });
@@ -361,7 +373,7 @@ describe('character catalog consumer', () => {
     const mounted = render(catalogTree(request, { canWrite: true }));
     fireEvent.click(await screen.findByRole('button', { name: 'Добавить предмет' }));
     const addDialog = screen.getByRole('dialog', { name: 'Добавить предмет' });
-    fireEvent.click(await within(addDialog).findByRole('button', { name: sourceDefinition.name }));
+    await expandCatalogAndSelect(addDialog, sourceDefinition.name);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Добавить персонажу' })).toBeEnabled());
     fireEvent.click(await screen.findByRole('button', { name: 'Добавить персонажу' }));
     expect(await screen.findByText('Добавление пока не подтверждено. Проверку можно повторить.')).toBeInTheDocument();

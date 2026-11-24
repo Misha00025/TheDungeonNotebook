@@ -94,7 +94,7 @@ const CharacterCatalogPanel: React.FC<CharacterCatalogPanelProps> = ({ canPublis
       </ActionRow>
     </div>}
     {selectedEntryId && <CharacterCatalogEntryDialog key={kind} entryId={selectedEntryId} readOnly={preview || readOnly || !catalog.canWrite} preview={preview} characterName={characterName} audience={audience} canAdminDefinition={canPublishDefinition} definitionPermissionsPending={definitionPermissionsPending} onDefinitionForbidden={onDefinitionForbidden} onClose={closeEntry} />}
-    {adding && <CharacterCatalogAddDialog kind={kind} canPublishDefinition={canPublishDefinition} characterName={characterName} definitionPermissionsPending={definitionPermissionsPending} onAdded={entry => setNotice({ recordId: entry.record.id, action: 'added' })} onClose={() => setAdding(false)} />}
+    {adding && <CharacterCatalogAddDialog kind={kind} canPublishDefinition={canPublishDefinition} characterName={characterName} definitionPermissionsPending={definitionPermissionsPending} audience={audience} onDefinitionForbidden={onDefinitionForbidden} onAdded={entry => setNotice({ recordId: entry.record.id, action: 'added' })} onClose={() => setAdding(false)} />}
   </section>;
 
   return <section aria-busy={catalog.loading}>
@@ -112,7 +112,7 @@ const CharacterCatalogPanel: React.FC<CharacterCatalogPanelProps> = ({ canPublis
       </tr>)}</tbody>
     </DataTable>}
     {selectedEntryId && <CharacterCatalogEntryDialog entryId={selectedEntryId} readOnly={readOnly || !catalog.canWrite} characterName={characterName} audience={audience} canAdminDefinition={canPublishDefinition} definitionPermissionsPending={definitionPermissionsPending} onDefinitionForbidden={onDefinitionForbidden} onClose={() => setSelectedEntryId(undefined)} />}
-    {adding && <CharacterCatalogAddDialog kind={kind} canPublishDefinition={canPublishDefinition} characterName={characterName} definitionPermissionsPending={definitionPermissionsPending} onClose={() => setAdding(false)} />}
+    {adding && <CharacterCatalogAddDialog kind={kind} canPublishDefinition={canPublishDefinition} characterName={characterName} definitionPermissionsPending={definitionPermissionsPending} audience={audience} onDefinitionForbidden={onDefinitionForbidden} onClose={() => setAdding(false)} />}
   </section>;
 };
 

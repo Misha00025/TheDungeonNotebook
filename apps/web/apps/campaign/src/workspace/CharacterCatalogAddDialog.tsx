@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionRow, Button, FieldSet, ModalPortal, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
+import { ActionRow, Button, FieldSet, ModalPortal, StatePanel, useAuth } from '@tdn/shared';
 import { compareNumber } from 'lossless-json';
 import { useResource } from './hooks';
 import { useWorkspace, useDirtyDraft } from './Workspace';
 import { useCharacterCatalog } from './CharacterCatalogContext';
 import { CampaignApiError } from './api';
 import { ApiError } from './Feedback';
-import CatalogGroupTree from './CatalogGroupTree';
 import { CatalogAttributeValuesEditor } from './CatalogAttributeValuesEditor';
 import { CatalogDefinitionBasics, CatalogDefinitionSettings, createCatalogDefinitionDraft } from './CatalogDefinitionFields';
 import type { CatalogDefinitionDraft } from './CatalogDefinitionFields';
@@ -16,18 +15,20 @@ import { supportsCharacterAttributes, validateCharacterQuantity } from './charac
 import { stringifyJson } from './json';
 import CharacterCatalogAttributes from './CharacterCatalogAttributes';
 import { CatalogAttributeReadout } from './CatalogAttributeReadout';
+import CatalogBrowser from './CatalogBrowser';
+import CatalogDefinitionReadView from './CatalogDefinitionReadView';
 import styles from './CharacterCatalogDialog.module.css';
-import type { CatalogAttributeOccurrence, CatalogKind, CatalogMetadata, CatalogContentEnvelope, CatalogGroupEntriesEnvelope, CharacterCatalogAddRequest, CharacterCatalogCreateRequest, CharacterCatalogEntryEnvelope } from './catalogTypes';
+import type { CatalogAttributeOccurrence, CatalogKind, CatalogMetadata, CatalogContentEnvelope, CharacterCatalogAddRequest, CharacterCatalogCreateRequest, CharacterCatalogEntryEnvelope } from './catalogTypes';
 import type { JsonNumber } from './types';
 
 type Mode = 'catalog' | 'own';
-type PickerData = Pick<CatalogGroupEntriesEnvelope, 'entries' | 'diagnostics'>;
-
 export type CharacterCatalogAddDialogProps = {
   kind: CatalogKind;
   canPublishDefinition?: boolean;
   characterName?: string;
   definitionPermissionsPending?: boolean;
+  audience?: 'gm' | 'player';
+  onDefinitionForbidden?: () => void;
   onAdded?: (entry: CharacterCatalogEntryEnvelope) => void;
   onClose: () => void;
 };
@@ -76,10 +77,13 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   canPublishDefinition = false,
   characterName,
   definitionPermissionsPending = false,
+  audience = 'player',
+  onDefinitionForbidden,
   onAdded,
   onClose,
 }) => {
   const { api, sessionKey } = useWorkspace();
+  const auth = useAuth();
   const catalog = useCharacterCatalog();
   const kind = catalog.kind;
   const mountedRef = useRef(false);
@@ -96,8 +100,10 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
 
   const [mode, setMode] = useState<Mode>('catalog');
   const [choosing, setChoosing] = useState(true);
-  const [groupId, setGroupId] = useState('');
-  const [search, setSearch] = useState('');
+  const [previewEntryId, setPreviewEntryId] = useState<string>();
+  const previewTriggerRef = useRef<HTMLElement | null>(null);
+  const restorePreviewFocusRef = useRef(false);
+  const previewHeadingRef = useRef<HTMLHeadingElement>(null);
   const [selectedEntryId, setSelectedEntryId] = useState<string>();
   const [selectedSource, setSelectedSource] = useState<{ metadata: CatalogMetadata; content: CatalogContentEnvelope }>();
   const [sourceLoading, setSourceLoading] = useState(false);
@@ -119,17 +125,33 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   const [verificationMessage, setVerificationMessage] = useState('');
 
   const scope = `${sessionKey}:${catalog.campaignId}:${catalog.characterId}:${kind}`;
-  const pickerEnabled = mode === 'catalog' && catalog.canRead && !blocked && !confirmedRemoved;
-  const picker = useResource<PickerData>(
-    `${scope}:add-picker:${groupId || 'ungrouped'}`,
-    () => groupId
-      ? api.getCatalogGroupEntries(catalog.campaignId, kind, groupId).then(result => ({ entries: result.entries, diagnostics: result.diagnostics }))
-      : api.listCatalog(catalog.campaignId, kind).then(entries => ({ entries, diagnostics: [] })),
-    pickerEnabled,
-  );
-  const groups = useResource(`${scope}:add-groups`, () => api.getCatalogGroups(catalog.campaignId, kind), pickerEnabled);
+  const preview = useResource(`${scope}:definition-preview:${previewEntryId ?? ''}`, async () => {
+    if (!previewEntryId) throw new Error('Preview entry is unavailable.');
+    const [metadata, content] = await Promise.all([
+      api.getCatalogEntry(catalog.campaignId, kind, previewEntryId),
+      api.getCatalogContent(catalog.campaignId, kind, previewEntryId),
+    ]);
+    return { metadata, content };
+  }, mode === 'catalog' && Boolean(previewEntryId) && !blocked && !confirmedRemoved);
   const definitions = catalog.definitions ?? [];
   const schemaReady = catalog.definitions !== undefined && !catalog.schemaLoading;
+  useEffect(() => {
+    if (previewEntryId && !preview.loading && preview.data && !preview.error) previewHeadingRef.current?.focus();
+  }, [previewEntryId, preview.loading, preview.data, preview.error]);
+  useEffect(() => {
+    if (!previewEntryId && restorePreviewFocusRef.current) {
+      restorePreviewFocusRef.current = false;
+      const trigger = previewTriggerRef.current;
+      if (trigger?.isConnected) trigger.focus();
+    }
+  }, [previewEntryId]);
+  useEffect(() => {
+    const status = (preview.error as { status?: number } | undefined)?.status;
+    if (status === 403) {
+      if (onDefinitionForbidden) onDefinitionForbidden();
+      else catalog.reportAccessFailure(preview.error);
+    }
+  }, [preview.error, onDefinitionForbidden, catalog.reportAccessFailure]);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -225,8 +247,6 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
     ...localBindingMismatches.map(value => value.id),
     ...localEditLevelMismatches.map(value => value.id),
   ])];
-  const visibleEntries = (picker.data?.entries ?? []).filter(entry =>
-    entry.kind === kind && entry.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
   const fieldsDisabled = busy || blocked || confirmedRemoved || !canWriteRef.current || catalog.permissionsPending || definitionPermissionsPending;
   const canPublish = canPublishDefinition && canWriteRef.current && !catalog.permissionsPending && !definitionPermissionsPending;
   useDirtyDraft(`character-catalog-add-${scope}-${requestIdRef.current}`, dirty || blocked && !confirmedRemoved);
@@ -373,8 +393,8 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
     setSelectedSource(undefined);
     setSourceError(undefined);
     setSourceLoading(false);
-    setGroupId('');
-    setSearch('');
+    setPreviewEntryId(undefined);
+    restorePreviewFocusRef.current = false;
     setLocalAttributes([]);
     setLocalAttributesInvalid(false);
     setSourceFieldsInvalid(false);
@@ -388,18 +408,18 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
   };
 
   const changeMode = (nextMode: Mode) => {
-    if (nextMode === mode || busyRef.current || blocked || confirmedRemoved || !canWriteRef.current) return;
+    if (nextMode === mode || previewEntryId || busyRef.current || blocked || confirmedRemoved || !canWriteRef.current) return;
     if (dirty && !window.confirm('Отменить черновик текущего способа добавления?')) return;
     resetForModeChange(nextMode);
   };
 
-  const chooseEntry = (metadata: CatalogMetadata) => {
-    if (busyRef.current || blocked || confirmedRemoved || !canWriteRef.current || catalog.permissionsPending || definitionPermissionsPending) return;
+  const chooseEntry = (metadata: CatalogMetadata): boolean => {
+    if (busyRef.current || blocked || confirmedRemoved || !canWriteRef.current || catalog.permissionsPending || definitionPermissionsPending) return false;
     if (selectedEntryId === metadata.id) {
       setChoosing(false);
-      return;
+      return true;
     }
-    if (dirty && !window.confirm('Отменить черновик выбранной записи и выбрать другую?')) return;
+    if (dirty && !window.confirm('Отменить черновик выбранной записи и выбрать другую?')) return false;
     sourceReadGeneration.current += 1;
     requestIdRef.current = crypto.randomUUID();
     setFailure(undefined);
@@ -418,6 +438,31 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
     setSourceLoading(true);
     setSelectedEntryId(metadata.id);
     setChoosing(false);
+    return true;
+  };
+
+  const openPreview = (metadata: CatalogMetadata) => {
+    if (busyRef.current || blocked || confirmedRemoved) return;
+    previewTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    restorePreviewFocusRef.current = false;
+    setPreviewEntryId(metadata.id);
+  };
+
+  const closePreview = (restoreFocus = true) => {
+    restorePreviewFocusRef.current = restoreFocus;
+    setPreviewEntryId(undefined);
+  };
+
+  const choosePreview = () => {
+    const metadata = preview.data?.metadata;
+    if (!metadata || preview.loading || preview.error || busy || blocked || confirmedRemoved || !schemaReady || !canWriteRef.current || catalog.permissionsPending || definitionPermissionsPending) return;
+    if (chooseEntry(metadata)) closePreview(false);
+  };
+
+  const selectFromBrowser = (metadata: CatalogMetadata) => {
+    if (chooseEntry(metadata)) {
+      if (previewEntryId) closePreview(false);
+    }
   };
 
   const changeSourceRetry = () => setSourceRetry(value => value + 1);
@@ -443,6 +488,11 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
     <ActionRow className={styles.footerActions} justify="end">
       {confirmedRemoved
         ? <Button type="button" variant="secondary" onClick={close}>Закрыть</Button>
+        : previewEntryId
+          ? <>
+            <Button type="button" variant="secondary" disabled={busy} onClick={close}>Отмена</Button>
+            <Button type="button" disabled={busy || blocked || confirmedRemoved || !catalog.canWrite || catalog.permissionsPending || definitionPermissionsPending || !schemaReady || preview.loading || Boolean(preview.error) || !preview.data} onClick={choosePreview}>Выбрать</Button>
+          </>
         : <>
           <Button type="button" variant="secondary" disabled={busy} onClick={close}>Отмена</Button>
           <Button
@@ -462,10 +512,10 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
         <p role="status">{verificationMessage}</p>
       </section>
       : <div className={styles.content}>
-        <ActionRow className={styles.modeActions}>
+        {!previewEntryId && <ActionRow className={styles.modeActions}>
           <Button type="button" size="small" variant={mode === 'catalog' ? 'primary' : 'secondary'} disabled={busy || blocked || confirmedRemoved || !canWriteRef.current} onClick={() => changeMode('catalog')}>Из каталога</Button>
           <Button type="button" size="small" variant={mode === 'own' ? 'primary' : 'secondary'} disabled={busy || blocked || confirmedRemoved || !canWriteRef.current} onClick={() => changeMode('own')}>Создать своё</Button>
-        </ActionRow>
+        </ActionRow>}
 
         {catalog.permissionsPending && <p role="status">Проверка прав. Запись до её завершения отключена.</p>}
         {definitionPermissionsPending && <p role="status">Проверка прав каталога. Добавление пока недоступно.</p>}
@@ -475,26 +525,25 @@ const CharacterCatalogAddDialog: React.FC<CharacterCatalogAddDialogProps> = ({
           <Button type="button" disabled={busy || blocked || definitionPermissionsPending} onClick={catalog.reload}>Повторить чтение схемы</Button>
         </>}
 
-        {mode === 'catalog' && catalog.canRead && !blocked && choosing && <section className={styles.section}>
-          <Toolbar><SearchBar searchTerm={search} onSearchChange={setSearch} compact aria-label="Поиск по названию" /></Toolbar>
-          {groups.loading && !groups.data && <StatePanel kind="loading">Загрузка групп каталога…</StatePanel>}
-          {Boolean(groups.error) && <ApiError error={groups.error} onRetry={groups.reload} />}
-          {groups.data && <CatalogGroupTree groups={groups.data.groups} selectedId={groupId} onSelect={setGroupId} />}
-          {groupId && <Button type="button" size="small" variant="secondary" disabled={busy} onClick={() => setGroupId('')}>Сбросить группу</Button>}
-          {selectedSource && <Button type="button" size="small" variant="secondary" onClick={() => setChoosing(false)}>К выбранному {kind === 'Item' ? 'предмету' : 'навыку'}</Button>}
-          {picker.loading && !picker.data && <StatePanel kind="loading">Загрузка {kind === 'Item' ? 'предметов' : 'навыков'}…</StatePanel>}
-          {Boolean(picker.error) && <ApiError error={picker.error} onRetry={picker.reload} />}
-          {picker.data?.diagnostics.length ? <p className={styles.warning} role="status">Часть записей группы может быть недоступна. Можно повторить поиск в общем каталоге.</p> : null}
-          {picker.data && !picker.error && visibleEntries.length === 0 && <StatePanel kind="empty">Ничего не найдено</StatePanel>}
-          {picker.data && visibleEntries.length > 0 && <ul className={styles.pickerList}>
-            {visibleEntries.map(item => <li key={item.id}>
-              <Button type="button" size="small" variant="ghost" disabled={busy || blocked || confirmedRemoved || !canWriteRef.current || definitionPermissionsPending} onClick={() => chooseEntry(item)}>{item.name}</Button>
-            </li>)}
-          </ul>}
+        {mode === 'catalog' && catalog.canRead && !blocked && !confirmedRemoved && <div style={{ display: choosing && !previewEntryId ? undefined : 'none' }}>
+          <CatalogBrowser campaignId={catalog.campaignId} kind={kind} audience={audience} canManage={false} permissionsPending={definitionPermissionsPending} onForbidden={() => onDefinitionForbidden?.()} onOpenEntry={openPreview} onSelectEntry={selectFromBrowser} selectionDisabled={fieldsDisabled || !schemaReady} />
+        </div>}
+
+        {previewEntryId && <section className={styles.section}>
+          <Button type="button" size="small" variant="secondary" disabled={busy || blocked} onClick={() => closePreview(true)}>{choosing ? 'К каталогу' : 'К добавлению'}</Button>
+          {preview.loading && <StatePanel kind="loading">Загрузка {kind === 'Item' ? 'предмета' : 'навыка'}…</StatePanel>}
+          {Boolean(preview.error) && <ApiError error={preview.error} onRetry={preview.reload} />}
+          {!preview.loading && !preview.error && preview.data && <>
+            <h3 ref={previewHeadingRef} tabIndex={-1}>{preview.data.metadata.name}</h3>
+            {catalog.schemaError && <><ApiError error={catalog.schemaError} /><Button type="button" disabled={busy || blocked || definitionPermissionsPending} onClick={catalog.reload}>Повторить чтение схемы</Button></>}
+            {!schemaReady && !catalog.schemaError && <StatePanel kind="loading">Загрузка схемы характеристик…</StatePanel>}
+            {schemaReady && <CatalogDefinitionReadView metadata={preview.data.metadata} content={preview.data.content} definitions={definitions} showSettings={audience === 'gm' || preview.data.metadata.kind === 'Item' && preview.data.metadata.creatorUserId !== null && preview.data.metadata.creatorUserId === Number(auth.userId)} showVisibility={audience === 'gm'} showEditRules={audience === 'gm'} />}
+          </>}
         </section>}
 
-        {mode === 'catalog' && selectedEntryId && !choosing && <section className={styles.section}>
+        {mode === 'catalog' && selectedEntryId && !choosing && <section className={styles.section} style={{ display: previewEntryId ? 'none' : undefined }}>
           <Button type="button" size="small" variant="secondary" disabled={busy || blocked} onClick={() => setChoosing(true)}>Выбрать другой {kind === 'Item' ? 'предмет' : 'навык'}</Button>
+          <Button type="button" size="small" variant="secondary" disabled={busy || blocked || !selectedSource} onClick={() => { if (selectedSource) openPreview(selectedSource.metadata); }}>Подробности</Button>
           {sourceLoading && <StatePanel kind="loading">Загрузка {kind === 'Item' ? 'предмета' : 'навыка'}…</StatePanel>}
           {Boolean(sourceError) && <>
             <ApiError error={sourceError} />

@@ -7,11 +7,10 @@ import { useDirtyDraft, useWorkspace } from './Workspace';
 import { ApiError } from './Feedback';
 import { stringifyJson } from './json';
 import { catalogAttributeIssue } from './catalogModel';
-import { CatalogDefinitionFields, CatalogDefinitionSettings, CatalogDefinitionSettingsReadout, createCatalogDefinitionDraft } from './CatalogDefinitionFields';
+import { CatalogDefinitionFields, CatalogDefinitionSettings, createCatalogDefinitionDraft } from './CatalogDefinitionFields';
 import type { CatalogDefinitionDraft } from './CatalogDefinitionFields';
 import OwnCatalogDefinitionFields from './OwnCatalogDefinitionFields';
-import CatalogEntryDetails from './CatalogEntryDetails';
-import styles from './CatalogDefinitionFields.module.css';
+import CatalogDefinitionReadView from './CatalogDefinitionReadView';
 
 type Domain = 'metadata' | 'content';
 type RecoverySnapshot = { metadata: CatalogMetadata; content: CatalogContentEnvelope; schema: CatalogAttributeSchemaEnvelope };
@@ -507,16 +506,7 @@ const CatalogDefinitionDialog: React.FC<CatalogDefinitionDialogProps> = ({
       {permissionsPending && <p role="status">Проверка прав. До её завершения доступно только чтение.</p>}
       {revoked && <p role="alert">Запись заблокирована после отказа сервера. Проверьте права кампании.</p>}
       {entryId && !editing && metadataBaseline && contentBaseline && <>
-        <div className={styles.readView}>
-          {(audience === 'gm' || audience === 'player' && isOwner && entryKind === 'Item') && <CatalogDefinitionSettingsReadout
-            kind={metadataBaseline.kind}
-            isHidden={metadataBaseline.isHidden}
-            quantityUnit={metadataBaseline.quantityUnit}
-            allowNegative={metadataBaseline.allowNegative}
-            showVisibility={audience === 'gm'}
-          />}
-          <CatalogEntryDetails description={contentBaseline.data.description} definitions={schema.data.definitions} values={contentBaseline.data.attributes} showEditRules={audience === 'gm'} />
-        </div>
+        <CatalogDefinitionReadView metadata={metadataBaseline} content={contentBaseline} definitions={schema.data.definitions} showSettings={audience === 'gm' || isOwner && entryKind === 'Item'} showVisibility={audience === 'gm'} showEditRules={audience === 'gm'} />
       </>}
       {(!entryId || editing) && <>
         {entryId && isOwner && !canAdmin && <p>Изменения затрагивают {entryKind === 'Item' ? 'предмет' : 'навык'} в каталоге, а не только запись у персонажа.</p>}
