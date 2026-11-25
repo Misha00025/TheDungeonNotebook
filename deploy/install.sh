@@ -132,17 +132,30 @@ choose_areas() {
     while :; do
         printf '\033[H\033[2JВыберите новые области установки\n\n'
         local i label; for ((i=0;i<3;i++)); do case $i in 0) label='Backend + BFF';;1) label=Web;;2) label=Keycloak;;esac; [[ ${selected[${areas[i]}]:-0} == 1 ]] && label="[x] $label" || label="[ ] $label"; ((i==idx)) && printf ' > %s\n' "$label" || printf '   %s\n' "$label"; done
-        printf '\nSpace — выбрать, Enter — продолжить, Esc — отмена\n'
+        printf '\nSpace — выбрать, Enter — продолжить, Esc — отмена\nЕсли ничего не выбрано, будут установлены только меню и исходники.\n'
         IFS= read -rsn1 key || cancel
         case $key in ' ') local area=${areas[idx]}; [[ ${selected[$area]:-0} == 1 ]] && selected[$area]=0 || selected[$area]=1;; '') return;; $'\e') IFS= read -rsn2 -t .1 key || cancel; case $key in '[A') ((idx>0)) && ((idx--));; '[B') ((idx<2)) && ((idx++));; *) cancel;;esac;; esac
     done
 }
 preflight() {
     local cmd
-    for cmd in bash realpath mkdir mktemp chmod cp mv rmdir find dirname git curl docker openssl jq install stty cat rm awk env; do command -v "$cmd" >/dev/null 2>&1 || fail "Не найдена обязательная команда: $cmd"; done
+    for cmd in bash realpath mkdir mktemp chmod mv rmdir find dirname git install stty rm; do command -v "$cmd" >/dev/null 2>&1 || fail "Не найдена обязательная команда: $cmd"; done
     ((BASH_VERSINFO[0] > 4 || BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 3)) || fail 'Требуется Bash 4.3 или новее.'
+}
+preflight_services() {
+    local cmd needs_make=0 needs_openssl=0 needs_jq=0
+    for cmd in backend web keycloak; do
+        [[ ${selected[$cmd]:-0} == 1 ]] || continue
+        if [[ -z ${existing[$cmd]+x} ]]; then
+            case $cmd in backend) needs_make=1; needs_jq=1; needs_openssl=1;; web) needs_make=1;; keycloak) needs_openssl=1;; esac
+        fi
+    done
+    for cmd in docker env cp; do command -v "$cmd" >/dev/null 2>&1 || fail "Не найдена необходимая команда: $cmd"; done
     docker compose version >/dev/null 2>&1 || fail 'Требуется Docker Compose v2.'
     docker info >/dev/null 2>&1 || fail 'Docker daemon недоступен.'
+    if ((needs_make)); then command -v make >/dev/null 2>&1 || fail 'Для выбранной новой сборки требуется Make.'; fi
+    if ((needs_openssl)); then command -v openssl >/dev/null 2>&1 || fail 'Для новых credentials требуется OpenSSL.'; fi
+    if ((needs_jq)); then command -v jq >/dev/null 2>&1 || fail 'Для новой Backend-конфигурации требуется jq.'; fi
 }
 filesystem_preflight() {
     local parent area file found previously_existing
@@ -250,8 +263,25 @@ ask_settings() {
         while [[ ${values[$key]} == */ ]]; do values[$key]=${values[$key]%/}; done
     done
 }
+services_selected() {
+    [[ ${selected[backend]:-0}${selected[web]:-0}${selected[keycloak]:-0} == *1* ]]
+}
+prepare_selection() {
+    existing=()
+    saved=()
+    FS_FINAL=0
+    filesystem_preflight
+    services_selected || return 0
+    preflight_services
+    check_project_collisions
+    ask_settings
+    if [[ ${selected[backend]:-0} == 1 && -z ${existing[backend]+x} && ${selected[keycloak]:-0} == 1 && -z ${existing[keycloak]+x} && ${values[OIDC_FLOW]-} == local ]]; then command -v awk >/dev/null 2>&1 || fail 'Для локальной Keycloak-конфигурации требуется awk.'; fi
+}
 confirm_plan() {
     local key label title; local -a lines=('Проверьте выбранные области и параметры. Секреты не отображаются.') choices=('Отмена' 'Назад к настройкам' 'Установить')
+    if ! services_selected; then
+        lines+=("Меню: $root/menu.sh" "Исходники: $root/.sources" 'Сервисы не устанавливаются и не собираются; образы не загружаются; контейнеры не запускаются и не меняются.')
+    fi
     for key in backend web keycloak; do [[ ${selected[$key]:-0} == 1 ]] || continue; case $key in backend) label='Backend + BFF';;web) label=Web;;keycloak) label=Keycloak;;esac; if [[ -n ${existing[$key]+x} ]]; then lines+=("Существующая область: $label"); else lines+=("Новая область: $label"); fi; done
     [[ ${selected[keycloak]:-0} != 1 || -n ${existing[keycloak]+x} ]] || lines+=("Keycloak URL: ${values[KEYCLOAK_URL]}")
     [[ ${selected[backend]:-0} != 1 || -n ${existing[backend]+x} ]] || lines+=("BFF: ${values[BFF_ORIGIN]}/bff — Web: ${values[WEB_ORIGIN]}" "OIDC: ${values[OIDC_ISSUER]} — client ${values[OIDC_CLIENT_ID]} — audience ${values[OIDC_AUDIENCE]} — ${values[CLIENT_AUTH]}")
@@ -299,7 +329,47 @@ add_keycloak_secret_environment() {
     printf "TDN_BFF_CLIENT_SECRET='%s'\n" "${values[OIDC_CLIENT_SECRET]}" >> "$envfile" || fail 'Не удалось записать Keycloak client secret.'
     chmod 600 "$envfile" || fail 'Не удалось защитить Keycloak .env.'
 }
+deliver_menu() {
+    local source_menu=$1 menu_temp file
+    if [[ -e $root/menu.sh || -L $root/menu.sh ]]; then
+        [[ -f $root/menu.sh && ! -L $root/menu.sh ]] || fail 'menu.sh стал symlink или не-обычным файлом.'
+    else
+        menu_temp=$(umask 077; mktemp "$root/.menu.sh.XXXXXX") || fail 'Не удалось подготовить временный menu.sh.'
+        temps+=("$menu_temp")
+        install -m 0755 "$source_menu" "$menu_temp" || fail 'Не удалось установить временный menu.sh.'
+        [[ ! -e $root/menu.sh && ! -L $root/menu.sh ]] || fail 'menu.sh появился во время установки; существующий файл сохранён.'
+        mv -nT -- "$menu_temp" "$root/menu.sh" || fail 'Не удалось атомарно доставить menu.sh.'
+        [[ -f $root/menu.sh && ! -L $root/menu.sh ]] || fail 'После доставки menu.sh не является обычным файлом.'
+        IFS= read -r file < "$root/menu.sh" || fail 'Не удалось проверить menu.sh.'
+        [[ $file == '#!/usr/bin/env bash' || $file == '#!/bin/bash' ]] || fail 'Доставленный menu.sh не прошёл проверку shebang.'
+        rm -f -- "$menu_temp" || fail 'Не удалось убрать временный menu.sh.'
+    fi
+}
+save_menu_bindings() {
+    local source_dir=$1 conf=$root/.tdn-menu.conf tmp record key value area
+    [[ ! -e $conf && ! -L $conf || -f $conf && ! -L $conf ]] || fail 'Конфигурация меню стала symlink или не-обычным файлом.'
+    tmp=$(umask 077; mktemp "$root/.tdn-menu.XXXXXX") || fail 'Не удалось подготовить конфигурацию меню.'
+    temps+=("$tmp")
+    config_values=()
+    if [[ -f $conf ]]; then
+        while IFS= read -r record || [[ -n $record ]]; do
+            [[ $record == *$'\t'* ]] || continue
+            key=${record%%$'\t'*}; value=${record#*$'\t'}
+            [[ $value != *$'\t'* ]] || continue
+            case $key in backend|web|keycloak|source) [[ -n ${config_values[$key]+x} ]] || config_values[$key]=$value;; esac
+        done < "$conf"
+    fi
+    for area in backend web keycloak; do
+        if [[ ${selected[$area]:-0} == 1 && -n ${saved[$area]-} ]]; then config_values[$area]=${saved[$area]}; fi
+    done
+    config_values[source]=$source_dir
+    for key in backend web keycloak source; do printf '%s\t%s\n' "$key" "${config_values[$key]-}" >> "$tmp" || fail 'Не удалось сформировать конфигурацию меню.'; done
+    chmod 600 "$tmp" || fail 'Не удалось защитить конфигурацию меню.'
+    [[ ! -e $conf && ! -L $conf || -f $conf && ! -L $conf ]] || fail 'Конфигурация меню изменилась и не может быть заменена.'
+    mv -fT -- "$tmp" "$conf" || fail 'Не удалось атомарно сохранить конфигурацию меню.'
+}
 main() {
+    local src status compose_env_name area dest file
     set +x
     [[ ${1-} != --help ]] || { usage; return 0; }
     (($#==0)) || { usage >&2; return 2; }
@@ -310,25 +380,28 @@ main() {
     trap cancel INT TERM
     enter_screen
     choose_areas
-    [[ ${selected[backend]:-0}${selected[web]:-0}${selected[keycloak]:-0} == *1* ]] || fail 'Выберите хотя бы одну новую область.'
-    filesystem_preflight
-    check_project_collisions
-    if [[ ${selected[backend]:-0} == 1 && -z ${existing[backend]+x} || ${selected[web]:-0} == 1 && -z ${existing[web]+x} ]]; then command -v make >/dev/null 2>&1 || fail 'Для выбранной сборки требуется Make.'; fi
-    ask_settings
-    while ! confirm_plan; do ask_settings; done
+    prepare_selection
+    while :; do
+        if confirm_plan; then break; fi
+        if services_selected; then
+            ask_settings
+        else
+            choose_areas
+            prepare_selection
+        fi
+    done
     restore_terminal
-    printf '[prepare] Генерация секретов и финальная проверка целевых каталогов.\n'
+    if services_selected; then printf '[prepare] Генерация секретов и финальная проверка целевых каталогов.\n'; else printf '[prepare] Проверка целевого каталога меню.\n'; fi
     FS_FINAL=1
     filesystem_preflight
     if [[ ${selected[keycloak]:-0} == 1 && -z ${existing[keycloak]+x} ]]; then read_secret POSTGRES_PASSWORD; read_secret KEYCLOAK_ADMIN_PASSWORD; fi
     if [[ ${selected[backend]:-0} == 1 && -z ${existing[backend]+x} ]]; then read_secret MYSQL_ROOT_PASSWORD; read_secret MYSQL_PASSWORD; read_secret MONGO_INITDB_ROOT_PASSWORD; read_secret ACCOUNT_SERVICE_KEY; read_secret INTERNAL_SERVICE_KEY; fi
     if [[ ${selected[keycloak]:-0} == 1 && -z ${existing[keycloak]+x} && ${selected[backend]:-0} == 1 && -z ${existing[backend]+x} && ${values[OIDC_FLOW]-} == local ]]; then read_secret OIDC_CLIENT_SECRET; fi
-    local compose_env_name
-    while IFS= read -r compose_env_name; do unset "$compose_env_name"; done < <(compgen -e COMPOSE_)
+    if services_selected; then while IFS= read -r compose_env_name; do unset "$compose_env_name"; done < <(compgen -e COMPOSE_); fi
     phase=checkout
     printf '[sources] Получение исходников в %s/.sources.\n' "$root"
     mkdir -p -- "$root" || fail "Не удалось создать $root."
-    local src=$root/.sources status
+    src=$root/.sources
     if [[ -e $src ]]; then
         [[ -d $src && ! -L $src ]] || fail 'root/.sources занят не-каталогом или symlink.'
         if [[ -n $(find "$src" -mindepth 1 -maxdepth 1 -print -quit) ]]; then
@@ -341,10 +414,19 @@ main() {
     if [[ ! -d $src ]]; then GIT_TERMINAL_PROMPT=0 git clone --branch "$ref" --single-branch -- "$repository" "$src" || fail 'Не удалось клонировать исходники.'; fi
     [[ $(git -C "$src" rev-parse --show-toplevel 2>/dev/null) == "$src" ]] || fail 'Source checkout root не совпадает с root/.sources.'
     bash -n "$src/deploy/menu.sh" || fail 'Исходный menu.sh не прошёл bash -n.'
+    if ! services_selected; then
+        phase=menu-delivery
+        printf '[menu] Доставка меню и сохранение конфигурации меню.\n'
+        deliver_menu "$src/deploy/menu.sh"
+        save_menu_bindings "$src"
+        phase=complete
+        printf 'Установлены меню и исходники. Сервисные каталоги не создавались; сборок и операций с контейнерами не было.\n'
+        printf 'Меню: bash %s/menu.sh\nИсходники: %s\n' "$root" "$src"
+        return 0
+    fi
     phase=staging
     printf '[prepare] Подготовка выбранных bundles и конфигурации.\n'
     stage=$(mktemp -d "$root/.install-stage.XXXXXX") || fail 'Не удалось создать staging.'
-    local area dest
     for area in backend web keycloak; do
         [[ ${selected[$area]:-0} == 1 ]] || continue
         dest=$root/$area
@@ -404,42 +486,9 @@ main() {
     done
     phase=menu-delivery
     printf '[menu] Безопасная доставка menu.sh и конфигурации.\n'
-    if [[ -e $root/menu.sh || -L $root/menu.sh ]]; then
-        [[ -f $root/menu.sh && ! -L $root/menu.sh ]] || fail 'menu.sh стал symlink или не-обычным файлом.'
-    else
-        local menu_temp
-        menu_temp=$(umask 077; mktemp "$root/.menu.sh.XXXXXX") || fail 'Не удалось подготовить временный menu.sh.'
-        temps+=("$menu_temp")
-        install -m 0755 "$src/deploy/menu.sh" "$menu_temp" || fail 'Не удалось установить временный menu.sh.'
-        [[ ! -e $root/menu.sh && ! -L $root/menu.sh ]] || fail 'menu.sh появился во время установки; существующий файл сохранён.'
-        mv -nT -- "$menu_temp" "$root/menu.sh" || fail 'Не удалось атомарно доставить menu.sh.'
-        [[ -f $root/menu.sh && ! -L $root/menu.sh ]] || fail 'После доставки menu.sh не является обычным файлом.'
-        IFS= read -r file < "$root/menu.sh" || fail 'Не удалось проверить menu.sh.'
-        [[ $file == '#!/usr/bin/env bash' || $file == '#!/bin/bash' ]] || fail 'Доставленный menu.sh не прошёл проверку shebang.'
-        rm -f -- "$menu_temp" || fail 'Не удалось убрать временный menu.sh.'
-    fi
+    deliver_menu "$src/deploy/menu.sh"
     phase=menu-config
-    local conf=$root/.tdn-menu.conf tmp record
-    [[ ! -e $conf && ! -L $conf || -f $conf && ! -L $conf ]] || fail 'Конфигурация меню стала symlink или не-обычным файлом.'
-    tmp=$(umask 077; mktemp "$root/.tdn-menu.XXXXXX") || fail 'Не удалось подготовить конфигурацию меню.'
-    temps+=("$tmp")
-    config_values=()
-    if [[ -f $conf ]]; then
-        while IFS= read -r record || [[ -n $record ]]; do
-            [[ $record == *$'\t'* ]] || continue
-            key=${record%%$'\t'*}; value=${record#*$'\t'}
-            [[ $value != *$'\t'* ]] || continue
-            case $key in backend|web|keycloak|source) [[ -n ${config_values[$key]+x} ]] || config_values[$key]=$value;; esac
-        done < "$conf"
-    fi
-    for area in backend web keycloak; do
-        if [[ ${selected[$area]:-0} == 1 && -n ${saved[$area]-} ]]; then config_values[$area]=${saved[$area]}; fi
-    done
-    config_values[source]=$src
-    for key in backend web keycloak source; do printf '%s\t%s\n' "$key" "${config_values[$key]-}" >> "$tmp" || fail 'Не удалось сформировать конфигурацию меню.'; done
-    chmod 600 "$tmp" || fail 'Не удалось защитить конфигурацию меню.'
-    [[ ! -e $conf && ! -L $conf || -f $conf && ! -L $conf ]] || fail 'Конфигурация меню изменилась и не может быть заменена.'
-    mv -fT -- "$tmp" "$conf" || fail 'Не удалось атомарно сохранить конфигурацию меню.'
+    save_menu_bindings "$src"
     phase=startup
     printf '[startup] Запуск только новых областей в порядке Keycloak, Backend+BFF, Web.\n'
     check_project_collisions

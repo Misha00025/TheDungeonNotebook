@@ -6,8 +6,13 @@ declare -A MENU_PLAN_SERVICES=([backend]="" [web]="" [keycloak]="")
 declare -A MENU_PLAN_DIR=([backend]="" [web]="" [keycloak]="")
 declare -A MENU_PLAN_PROJECT=([backend]="" [web]="" [keycloak]="")
 declare -A MENU_PLAN_COMPOSE=([backend]="" [web]="" [keycloak]="")
+declare -A MENU_UPDATE_LEAVES=([backend]="" [web]="" [keycloak]="")
+declare -A MENU_UPDATE_DISABLED=([backend]="" [web]="" [keycloak]="")
+declare -A MENU_UPDATE_EXPANDED=([backend]=1 [web]=1 [keycloak]=1)
+declare -A MENU_UPDATE_SELECTED=()
 declare -a MENU_COMPOSE_ARGS=() MENU_COMPOSE_FILES=() MENU_SCREEN_BODY=() MENU_SCREEN_ACTIONS=()
 declare -a MENU_OUTPUT_LINES=() MENU_SERVICES=() MENU_PROJECTS=() MENU_PROJECT_OPTIONS=()
+declare -a MENU_UPDATE_LOG_LINES=() MENU_UPDATE_ROWS=() MENU_UPDATE_ROW_TYPE=() MENU_UPDATE_ROW_AREA=() MENU_UPDATE_ROW_SERVICE=()
 declare -a MENU_TEMP_FILES=()
 MENU_SCRIPT=
 MENU_CONFIG=
@@ -44,6 +49,15 @@ MENU_EDITING=0
 MENU_EDIT_VALUE=
 MENU_EDIT_POS=0
 MENU_EDIT_AREA=
+MENU_UPDATE_PICKING=0
+MENU_RUN_BATCH=0
+MENU_UPDATE_FOCUS=0
+MENU_UPDATE_SCROLL=0
+MENU_UPDATE_HOFFSET=0
+MENU_UPDATE_HINT=
+MENU_UPDATE_BODY_AREA=0
+MENU_PROGRESS=0
+MENU_TREE_SEPARATOR='────────────────────────────────────────────────────────────────'
 MENU_SELECTED_AREAS=()
 
 menu_usage() {
@@ -58,6 +72,11 @@ menu_require() {
             return 1
         fi
     done
+}
+
+menu_paths_overlap() {
+    local left=$1 right=$2
+    [[ $left == "$right" || $left == / || $right == / || $left == "$right"/* || $right == "$left"/* ]]
 }
 
 menu_cleanup() {
@@ -173,11 +192,261 @@ menu_draw_lines() {
 
 menu_redraw() {
     menu_geometry
-    if ((MENU_EDITING)); then
+    if ((MENU_UPDATE_PICKING)); then
+        menu_draw_update_tree
+    elif ((MENU_EDITING)); then
         menu_draw_editor
+    elif ((MENU_PROGRESS)); then
+        menu_draw_progress
     else
         menu_draw_lines
     fi
+}
+
+menu_update_rebuild_rows() {
+    local area service label selected total all
+    MENU_UPDATE_ROWS=() MENU_UPDATE_ROW_TYPE=() MENU_UPDATE_ROW_AREA=() MENU_UPDATE_ROW_SERVICE=()
+    for area in backend web keycloak; do
+        case $area in backend) label='Backend + BFF' ;; web) label='Web' ;; keycloak) label='Keycloak' ;; esac
+        if [[ -n ${MENU_UPDATE_DISABLED[$area]} ]]; then
+            MENU_UPDATE_ROWS+=("[—] $label — ${MENU_UPDATE_DISABLED[$area]}")
+            MENU_UPDATE_ROW_TYPE+=(disabled) MENU_UPDATE_ROW_AREA+=("$area") MENU_UPDATE_ROW_SERVICE+=( '')
+            continue
+        fi
+        total=0 selected=0
+        for service in ${MENU_UPDATE_LEAVES[$area]}; do
+            ((total++))
+            [[ ${MENU_UPDATE_SELECTED[$area:$service]:-0} == 1 ]] && ((selected++))
+        done
+        all=' '
+        if ((total > 0 && selected == total)); then all=x; elif ((selected > 0)); then all=-; fi
+        if ((${MENU_UPDATE_EXPANDED[$area]:-1})); then label+=" ▾"; else label+=" ▸"; fi
+        MENU_UPDATE_ROWS+=("[$all] $label")
+        MENU_UPDATE_ROW_TYPE+=(root) MENU_UPDATE_ROW_AREA+=("$area") MENU_UPDATE_ROW_SERVICE+=( '')
+        if ((${MENU_UPDATE_EXPANDED[$area]:-1})); then
+            for service in ${MENU_UPDATE_LEAVES[$area]}; do
+                all=' '
+                [[ ${MENU_UPDATE_SELECTED[$area:$service]:-0} == 1 ]] && all=x
+                MENU_UPDATE_ROWS+=("  [$all] $service")
+                MENU_UPDATE_ROW_TYPE+=(leaf) MENU_UPDATE_ROW_AREA+=("$area") MENU_UPDATE_ROW_SERVICE+=("$service")
+            done
+        fi
+    done
+    ((${#MENU_UPDATE_ROWS[@]})) || return 1
+    ((MENU_UPDATE_FOCUS >= ${#MENU_UPDATE_ROWS[@]})) && MENU_UPDATE_FOCUS=$((${#MENU_UPDATE_ROWS[@]}-1))
+    ((MENU_UPDATE_FOCUS < 0)) && MENU_UPDATE_FOCUS=0
+    return 0
+}
+
+menu_update_selection_count() {
+    local area service count=0
+    for area in backend web keycloak; do
+        for service in ${MENU_UPDATE_LEAVES[$area]}; do
+            [[ ${MENU_UPDATE_SELECTED[$area:$service]:-0} == 1 ]] && ((count++))
+        done
+    done
+    MENU_UPDATE_COUNT=$count
+}
+
+menu_draw_update_tree() {
+    local i row capacity context area service width text title counter footer hint maxoffset
+    printf '\033[H\033[2J'
+    MENU_SMALL=0
+    if ((MENU_ROWS < 10 || MENU_COLS < 40)); then
+        MENU_SMALL=1
+        text='Окно мало — увеличьте его. Esc — назад.'
+        text=${text:0:MENU_COLS-1}
+        printf '\033[1;1H%s' "$text"
+        return
+    fi
+    menu_update_rebuild_rows || :
+    menu_update_selection_count
+    capacity=$((MENU_ROWS-6))
+    MENU_UPDATE_BODY_AREA=$capacity
+    ((MENU_UPDATE_FOCUS < MENU_UPDATE_SCROLL)) && MENU_UPDATE_SCROLL=$MENU_UPDATE_FOCUS
+    ((MENU_UPDATE_FOCUS >= MENU_UPDATE_SCROLL+capacity)) && MENU_UPDATE_SCROLL=$((MENU_UPDATE_FOCUS-capacity+1))
+    ((MENU_UPDATE_SCROLL < 0)) && MENU_UPDATE_SCROLL=0
+    ((MENU_UPDATE_SCROLL+capacity > ${#MENU_UPDATE_ROWS[@]})) && MENU_UPDATE_SCROLL=$((${#MENU_UPDATE_ROWS[@]}-capacity))
+    ((MENU_UPDATE_SCROLL < 0)) && MENU_UPDATE_SCROLL=0
+    width=$((MENU_COLS-1))
+    title='Выбор сервисов для обновления'
+    title=${title:0:width}
+    counter="Отмечено сервисов: $MENU_UPDATE_COUNT"
+    counter=${counter:0:width}
+    context=''
+    if ((${#MENU_UPDATE_ROWS[@]})); then
+        area=${MENU_UPDATE_ROW_AREA[MENU_UPDATE_FOCUS]}
+        case ${MENU_UPDATE_ROW_TYPE[MENU_UPDATE_FOCUS]} in
+            leaf) context="${MENU_PLAN_DIR[$area]} — ${MENU_PLAN_COMPOSE[$area]} — project ${MENU_PLAN_PROJECT[$area]:-Compose default} — ${MENU_UPDATE_ROW_SERVICE[MENU_UPDATE_FOCUS]}" ;;
+            disabled) context="${MENU_PATHS[$area]} — ${MENU_UPDATE_DISABLED[$area]}" ;;
+            *) context="${MENU_PLAN_DIR[$area]} — ${MENU_PLAN_COMPOSE[$area]} — project ${MENU_PLAN_PROJECT[$area]:-Compose default}" ;;
+        esac
+    fi
+    maxoffset=$((${#context}-width))
+    ((maxoffset < 0)) && maxoffset=0
+    ((MENU_UPDATE_HOFFSET > maxoffset)) && MENU_UPDATE_HOFFSET=$maxoffset
+    ((MENU_UPDATE_HOFFSET < 0)) && MENU_UPDATE_HOFFSET=0
+    context=${context:MENU_UPDATE_HOFFSET:width}
+    printf '\033[1;1H%s\033[2;1H%s\033[3;1H\033[K%s' "$title" "$counter" "$context"
+    printf '\033[4;1H%s' "${MENU_TREE_SEPARATOR:0:width}"
+    for ((i=0; i<capacity; i++)); do
+        row=$((MENU_UPDATE_SCROLL+i))
+        printf '\033[%d;1H\033[K' "$((5+i))"
+        if ((row < ${#MENU_UPDATE_ROWS[@]})); then
+            text=${MENU_UPDATE_ROWS[row]:0:MENU_COLS-3}
+            if ((row == MENU_UPDATE_FOCUS)); then printf '\033[7m%s\033[0m' "$text"; else printf '%s' "$text"; fi
+        fi
+    done
+    hint=${MENU_UPDATE_HINT:-'↑↓ Home/End PgUp/Dn ←→ fold Tab path'}
+    hint=${hint:0:width}
+    footer='Space: выбор  Enter: запуск  Esc: назад'
+    footer=${footer:0:width}
+    printf '\033[%d;1H\033[K%s' "$((MENU_ROWS-1))" "$hint"
+    printf '\033[%d;1H\033[K%s' "$MENU_ROWS" "$footer"
+}
+
+menu_draw_progress() {
+    local i capacity width title footer text
+    printf '\033[H\033[2J'
+    MENU_SMALL=0
+    if ((MENU_ROWS < 8 || MENU_COLS < 30)); then
+        MENU_SMALL=1
+        text='Окно мало — увеличьте его. Ctrl+C отмена.'
+        text=${text:0:MENU_COLS-1}
+        printf '\033[1;1H%s' "$text"
+        return
+    fi
+    width=$((MENU_COLS-1))
+    title='Обновление сервисов'
+    title=${title:0:width}
+    capacity=$((MENU_ROWS-3))
+    printf '\033[1;1H%s\033[2;1H%s' "$title" "${MENU_TREE_SEPARATOR:0:width}"
+    for ((i=0; i<capacity; i++)); do
+        printf '\033[%d;1H\033[K' "$((i+3))"
+        if ((i < ${#MENU_SCREEN_BODY[@]})); then
+            text=${MENU_SCREEN_BODY[i]:0:MENU_COLS-2}
+            printf '%s' "$text"
+        fi
+    done
+    footer='Обновление выполняется... Ctrl+C — отмена'
+    footer=${footer:0:width}
+    printf '\033[%d;1H\033[K%s' "$MENU_ROWS" "$footer"
+}
+
+menu_update_snapshot() {
+    local area known service
+    local -a declared=() known_services=()
+    for area in backend web keycloak; do
+        MENU_UPDATE_LEAVES[$area]=
+        MENU_UPDATE_DISABLED[$area]=
+        MENU_PLAN_SERVICES[$area]=
+        MENU_UPDATE_EXPANDED[$area]=1
+        if [[ -z ${MENU_PATHS[$area]} ]]; then
+            MENU_UPDATE_DISABLED[$area]='путь не задан'
+            continue
+        fi
+        if [[ ! -d ${MENU_PATHS[$area]} ]]; then
+            MENU_UPDATE_DISABLED[$area]='не установлено'
+            continue
+        fi
+        if ! menu_prepare_compose "$area" no; then
+            MENU_UPDATE_DISABLED[$area]=${MENU_COMPOSE_ERROR:-Compose недоступен}
+            continue
+        fi
+        if [[ $MENU_PROJECT == несколько ]]; then
+            MENU_UPDATE_DISABLED[$area]='обнаружено несколько Docker projects'
+            continue
+        fi
+        if ! menu_compose_services; then
+            MENU_UPDATE_DISABLED[$area]='не удалось прочитать список Compose services'
+            continue
+        fi
+        declared=("${MENU_SERVICES[@]}")
+        case $area in
+            backend) known_services=(users-service campaign-service account-service api-gateway bff-web) ;;
+            web) known_services=(campaign profile login hub nginx) ;;
+            keycloak) known_services=(keycloak) ;;
+        esac
+        for known in "${known_services[@]}"; do
+            for service in "${declared[@]}"; do
+                [[ $service == "$known" ]] || continue
+                MENU_UPDATE_LEAVES[$area]+=" $known"
+                MENU_UPDATE_SELECTED[$area:$known]=0
+                break
+            done
+        done
+        MENU_UPDATE_LEAVES[$area]=${MENU_UPDATE_LEAVES[$area]# }
+        if [[ -z ${MENU_UPDATE_LEAVES[$area]} ]]; then
+            MENU_UPDATE_DISABLED[$area]='нет известных application services'
+            continue
+        fi
+        MENU_PLAN_DIR[$area]=$MENU_DIRECTORY
+        MENU_PLAN_COMPOSE[$area]=$MENU_COMPOSE_FILE
+        MENU_PLAN_PROJECT[$area]=$MENU_PROJECT
+    done
+    MENU_UPDATE_FOCUS=0 MENU_UPDATE_SCROLL=0 MENU_UPDATE_HOFFSET=0 MENU_UPDATE_HINT=
+    menu_update_rebuild_rows
+}
+
+menu_update_picker() {
+    local type area service current next focus_area
+    while :; do
+        menu_update_rebuild_rows || return 1
+        menu_draw_update_tree
+        menu_read_key || return 2
+        if ((MENU_SMALL)); then [[ $MENU_KEY == ESC ]] && return 1; continue; fi
+        type=${MENU_UPDATE_ROW_TYPE[MENU_UPDATE_FOCUS]}
+        area=${MENU_UPDATE_ROW_AREA[MENU_UPDATE_FOCUS]}
+        service=${MENU_UPDATE_ROW_SERVICE[MENU_UPDATE_FOCUS]}
+        case $MENU_KEY in
+            UP) ((MENU_UPDATE_FOCUS > 0)) && ((MENU_UPDATE_FOCUS--)) ;;
+            DOWN) ((MENU_UPDATE_FOCUS+1 < ${#MENU_UPDATE_ROWS[@]})) && ((MENU_UPDATE_FOCUS++)) ;;
+            HOME) MENU_UPDATE_FOCUS=0 ;;
+            END) MENU_UPDATE_FOCUS=$((${#MENU_UPDATE_ROWS[@]}-1)) ;;
+            PGUP) ((MENU_UPDATE_FOCUS-=MENU_UPDATE_BODY_AREA)); ((MENU_UPDATE_FOCUS<0)) && MENU_UPDATE_FOCUS=0 ;;
+            PGDN) ((MENU_UPDATE_FOCUS+=MENU_UPDATE_BODY_AREA)); ((MENU_UPDATE_FOCUS>=${#MENU_UPDATE_ROWS[@]})) && MENU_UPDATE_FOCUS=$((${#MENU_UPDATE_ROWS[@]}-1)) ;;
+            LEFT)
+                if [[ $type == leaf ]]; then
+                    for ((current=MENU_UPDATE_FOCUS-1; current>=0; current--)); do
+                        if [[ ${MENU_UPDATE_ROW_TYPE[current]} == root && ${MENU_UPDATE_ROW_AREA[current]} == "$area" ]]; then MENU_UPDATE_FOCUS=$current; break; fi
+                    done
+                elif [[ $type == root ]]; then MENU_UPDATE_EXPANDED[$area]=0; fi
+                ;;
+            RIGHT) [[ $type == root ]] && MENU_UPDATE_EXPANDED[$area]=1 ;;
+            TAB) ((MENU_UPDATE_HOFFSET+=8)) ;;
+            BACKTAB) ((MENU_UPDATE_HOFFSET>0)) && ((MENU_UPDATE_HOFFSET-=8)) ;;
+            ' ')
+                if [[ $type == root ]]; then
+                    current=1
+                    for service in ${MENU_UPDATE_LEAVES[$area]}; do [[ ${MENU_UPDATE_SELECTED[$area:$service]:-0} == 1 ]] || current=0; done
+                    next=1; ((current)) && next=0
+                    for service in ${MENU_UPDATE_LEAVES[$area]}; do MENU_UPDATE_SELECTED[$area:$service]=$next; done
+                elif [[ $type == leaf ]]; then
+                    if [[ ${MENU_UPDATE_SELECTED[$area:$service]:-0} == 1 ]]; then MENU_UPDATE_SELECTED[$area:$service]=0; else MENU_UPDATE_SELECTED[$area:$service]=1; fi
+                else
+                    MENU_UPDATE_HINT=${MENU_UPDATE_DISABLED[$area]}
+                fi
+                ;;
+            ENTER)
+                menu_update_selection_count
+                if ((MENU_UPDATE_COUNT == 0)); then MENU_UPDATE_HINT='Отметьте сервисы или область'; continue; fi
+                MENU_SELECTED_AREAS=()
+                for area in backend web keycloak; do
+                    MENU_PLAN_SERVICES[$area]=
+                    for service in ${MENU_UPDATE_LEAVES[$area]}; do
+                        if [[ ${MENU_UPDATE_SELECTED[$area:$service]:-0} == 1 ]]; then
+                            MENU_PLAN_SERVICES[$area]+=" $service"
+                        fi
+                    done
+                    MENU_PLAN_SERVICES[$area]=${MENU_PLAN_SERVICES[$area]# }
+                    [[ -z ${MENU_PLAN_SERVICES[$area]} ]] || MENU_SELECTED_AREAS+=("$area")
+                done
+                return 0
+                ;;
+            ESC) return 1 ;;
+        esac
+        MENU_UPDATE_HINT=
+    done
 }
 
 screen_select() {
@@ -540,19 +809,24 @@ menu_build_dashboard() {
 menu_run() {
     local title=$1 redact=${2:-0} rc line
     shift 2
-    MENU_LOG=$(umask 077; mktemp "${TMPDIR:-/tmp}/tdn-menu.XXXXXX") || return 1
+    MENU_RC=1 MENU_CANCELLED=0
+    MENU_LOG=$(umask 077; mktemp "${TMPDIR:-/tmp}/tdn-menu.XXXXXX") || {
+        MENU_RC=1
+        if ((MENU_RUN_BATCH)); then MENU_UPDATE_LOG_LINES+=("$title: не удалось создать временный журнал."); else MENU_OUTPUT_LINES=("$title: не удалось создать временный журнал."); menu_result "$title"; fi
+        return 1
+    }
     MENU_TITLE=$title MENU_RUN_REDACT=$redact MENU_CHILD=
-    MENU_CANCELLED=0
+    MENU_SCREEN_ACTIONS=() MENU_CHOICE=0 MENU_SCROLL=0 MENU_HOFFSET=0 MENU_ACTION_SCROLL=0
     setsid --wait "$@" >"$MENU_LOG" 2>&1 &
     MENU_CHILD=$!
+    MENU_PROGRESS=$MENU_RUN_BATCH
     while kill -0 "$MENU_CHILD" 2>/dev/null; do
-        MENU_SCREEN_BODY=("$title" '' 'Выполняется…')
+        MENU_SCREEN_BODY=("Этап: $title" '' 'Выполняется…')
         if [[ $redact == 0 ]]; then
             mapfile -t MENU_OUTPUT_LINES < <(tail -n 8 "$MENU_LOG" 2>/dev/null)
             MENU_SCREEN_BODY+=("${MENU_OUTPUT_LINES[@]}")
         fi
-        MENU_SCREEN_ACTIONS=()
-        menu_draw_lines
+        if ((MENU_RUN_BATCH)); then menu_draw_progress; else menu_draw_lines; fi
         local key
         if IFS= read -rsn1 -t .1 key; then
             if [[ $key == $'\003' ]]; then
@@ -564,6 +838,9 @@ menu_run() {
                 wait "$MENU_CHILD" 2>/dev/null || :
                 MENU_CHILD=
                 MENU_CANCELLED=1
+                MENU_RC=130
+                MENU_PROGRESS=0
+                ((MENU_RUN_BATCH)) && MENU_UPDATE_LOG_LINES+=("$title: отменено пользователем.")
                 rm -f -- "$MENU_LOG"; MENU_LOG=
                 return 130
             fi
@@ -577,6 +854,8 @@ menu_run() {
                 kill -KILL "$MENU_CHILD" 2>/dev/null || :
                 wait "$MENU_CHILD" 2>/dev/null || :
                 MENU_CHILD= MENU_CANCELLED=1
+                MENU_RC=130 MENU_PROGRESS=0
+                ((MENU_RUN_BATCH)) && MENU_UPDATE_LOG_LINES+=("$title: ввод завершён; операция отменена.")
                 rm -f -- "$MENU_LOG"; MENU_LOG=
                 return 130
             fi
@@ -585,8 +864,15 @@ menu_run() {
     wait "$MENU_CHILD"; rc=$?
     MENU_CHILD=
     MENU_RC=$rc
+    MENU_PROGRESS=0
     if [[ $redact == 0 ]]; then mapfile -t MENU_OUTPUT_LINES < "$MENU_LOG"; else MENU_OUTPUT_LINES=(); fi
     rm -f -- "$MENU_LOG"; MENU_LOG=
+    if ((MENU_RUN_BATCH)); then
+        MENU_UPDATE_LOG_LINES+=("— $title —")
+        if [[ $redact == 0 ]]; then MENU_UPDATE_LOG_LINES+=("${MENU_OUTPUT_LINES[@]}"); else MENU_UPDATE_LOG_LINES+=("Вывод скрыт; код завершения: $rc"); fi
+        MENU_UPDATE_LOG_LINES+=("Код завершения: $rc")
+        return "$rc"
+    fi
     MENU_OUTPUT_LINES+=("Код завершения: $rc")
     menu_result "$title"
     return "$rc"
@@ -612,12 +898,10 @@ menu_area_selector() {
         fi
     done
     ((${#MENU_SELECTED_AREAS[@]})) || { MENU_OUTPUT_LINES=('Нет доступных установок с Compose.'); menu_result 'Сервисы'; return 1; }
-    if [[ $mode == update ]]; then actions+=('Все установленные'); fi
     actions+=('Назад')
     body=('Выберите существующую установку.')
-    case $mode in update) title='Обновление — область' ;; restart) title='Перезапуск — область' ;; stop) title='Выключение — область' ;; esac
+    case $mode in restart) title='Перезапуск — область' ;; stop) title='Выключение — область' ;; esac
     screen_select "$title" body actions || return 1
-    if [[ $mode == update && $MENU_CHOICE == ${#MENU_SELECTED_AREAS[@]} ]]; then return 0; fi
     ((${MENU_CHOICE} < ${#MENU_SELECTED_AREAS[@]})) || return 1
     MENU_SELECTED_AREAS=("${MENU_SELECTED_AREAS[MENU_CHOICE]}")
 }
@@ -625,10 +909,10 @@ menu_area_selector() {
 menu_service_action() {
     local action=$1 area verb label output service i title
     local -a body=() actions=() selected=() services=()
-    if ! menu_require docker setsid tail; then menu_result 'Зависимости' ; return; fi
     MENU_OUTPUT_LINES=()
+    if ! menu_require docker setsid tail; then menu_result 'Зависимости'; return; fi
+    if [[ $action == update ]]; then menu_update; return; fi
     menu_area_selector "$action" || return
-    if [[ $action == update ]]; then menu_update "${MENU_SELECTED_AREAS[@]}"; return; fi
     area=${MENU_SELECTED_AREAS[0]}
     if ! menu_prepare_compose "$area"; then MENU_OUTPUT_LINES=("Compose недоступен: $MENU_COMPOSE_ERROR"); menu_result 'Сервисы'; return; fi
     if ! menu_compose_services; then MENU_OUTPUT_LINES=('Состояние недоступно: Compose не смог получить список сервисов.'); menu_result 'Сервисы'; return; fi
@@ -646,87 +930,143 @@ menu_service_action() {
     menu_run "$title" 1 bash -c 'cd "$1" || exit; shift; exec env -u COMPOSE_FILE -u COMPOSE_PROJECT_NAME -u COMPOSE_PROFILES -u COMPOSE_ENV_FILES -u COMPOSE_PATH_SEPARATOR -u COMPOSE_DISABLE_ENV_FILE docker "$@"' _ "$MENU_DIRECTORY" "${MENU_COMPOSE_ARGS[@]}" "$verb" "${selected[@]}"
 }
 
-menu_make_plan() {
-    local area=$1 declared=() names name
-    MENU_PLAN_SERVICES[$area]=
-    if ! menu_prepare_compose "$area"; then return 1; fi
-    if ! menu_compose_services; then MENU_COMPOSE_ERROR='не удалось получить services из Compose'; return 1; fi
-    declared=("${MENU_SERVICES[@]}")
-    case $area in
-        backend) names='users-service campaign-service account-service api-gateway bff-web' ;;
-        web) names='campaign profile login hub nginx' ;;
-        keycloak) names=keycloak ;;
-    esac
-    for name in $names; do
-        local declared_name
-        for declared_name in "${declared[@]}"; do
-            [[ $declared_name == "$name" ]] && MENU_PLAN_SERVICES[$area]+=" $name"
+menu_update_execute() {
+    local area install_real source_real root status_output service target rc reason
+    local -a make_targets=() selected_services=() targets=()
+    local -A seen_targets=()
+    MENU_UPDATE_ERROR=
+    MENU_UPDATE_APPLIED=() MENU_UPDATE_FAILED=()
+    if ! menu_require git setsid tail docker; then
+        MENU_UPDATE_ERROR=${MENU_OUTPUT_LINES[*]}
+        MENU_UPDATE_LOG_LINES+=("Ошибка: $MENU_UPDATE_ERROR")
+        return 1
+    fi
+    for area in backend web keycloak; do
+        [[ -n ${MENU_PATHS[$area]} ]] || continue
+        install_real=$(realpath -m -- "${MENU_PATHS[$area]}") || { MENU_UPDATE_ERROR="Не удалось определить путь установки: $area"; return 1; }
+        if menu_paths_overlap "$MENU_SOURCE_DIR" "$install_real"; then
+            MENU_UPDATE_ERROR="Кэш исходников пересекается с каталогом установки: $install_real"
+            return 1
+        fi
+        read -r -a selected_services <<< "${MENU_PLAN_SERVICES[$area]}"
+        for service in "${selected_services[@]}"; do
+            target=
+            case "$area:$service" in
+                backend:users-service) target=build-users-service ;;
+                backend:campaign-service) target=build-campaign-service ;;
+                backend:account-service) target=build-account-service ;;
+                backend:api-gateway) target=build-api-gateway ;;
+                backend:bff-web) target=build-bff-web ;;
+                web:campaign) target=build-web-campaign ;;
+                web:profile) target=build-web-profile ;;
+                web:login) target=build-web-login ;;
+                web:hub) target=build-web-hub ;;
+                web:nginx) target=build-web-proxy ;;
+            esac
+            if [[ -n $target && -z ${seen_targets[$target]+x} ]]; then
+                seen_targets[$target]=1
+                make_targets+=("$target")
+            fi
         done
     done
-    MENU_PLAN_SERVICES[$area]=${MENU_PLAN_SERVICES[$area]# }
-    [[ -n ${MENU_PLAN_SERVICES[$area]} ]] || { MENU_COMPOSE_ERROR='нет известных application services'; return 1; }
-    MENU_PLAN_DIR[$area]=$MENU_DIRECTORY
-    MENU_PLAN_PROJECT[$area]=$MENU_PROJECT
-    MENU_PLAN_COMPOSE[$area]=$MENU_COMPOSE_FILE
+    if ((${#make_targets[@]})); then
+        if ! menu_require make; then
+            MENU_UPDATE_ERROR=${MENU_OUTPUT_LINES[*]}
+            MENU_UPDATE_LOG_LINES+=("Ошибка: $MENU_UPDATE_ERROR")
+            return 1
+        fi
+    fi
+    if [[ -e $MENU_SOURCE_DIR/.git ]]; then
+        source_real=$(realpath -e -- "$MENU_SOURCE_DIR") || { MENU_UPDATE_ERROR='Не удалось разрешить каталог checkout.'; return 1; }
+        root=$(git -C "$source_real" rev-parse --show-toplevel 2>/dev/null) || { MENU_UPDATE_ERROR='Кэш исходников не является Git checkout.'; return 1; }
+        root=$(realpath -e -- "$root") || { MENU_UPDATE_ERROR='Не удалось определить корень Git checkout.'; return 1; }
+        [[ $root == "$source_real" ]] || { MENU_UPDATE_ERROR='Кэш исходников не является корнем Git checkout.'; return 1; }
+        if ! status_output=$(git -C "$source_real" status --porcelain); then MENU_UPDATE_ERROR='Не удалось проверить локальные изменения checkout.'; return 1; fi
+        [[ -z $status_output ]] || { MENU_UPDATE_ERROR='Checkout содержит локальные изменения; обновление остановлено.'; return 1; }
+        if ! menu_run 'Получение исходников' 0 env GIT_TERMINAL_PROMPT=0 git -C "$source_real" pull --ff-only origin "$MENU_REF"; then
+            if ((MENU_CANCELLED)); then MENU_UPDATE_ERROR='Обновление отменено при получении исходников.'; else MENU_UPDATE_ERROR="Не удалось получить исходники (код $MENU_RC)."; fi
+            return 1
+        fi
+    else
+        if [[ -e $MENU_SOURCE_DIR ]] && { [[ ! -d $MENU_SOURCE_DIR ]] || [[ -n $(find "$MENU_SOURCE_DIR" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null) ]]; }; then
+            MENU_UPDATE_ERROR='Каталог кэша занят и не является checkout.'
+            return 1
+        fi
+        mkdir -p -- "$(dirname -- "$MENU_SOURCE_DIR")" || { MENU_UPDATE_ERROR='Не удалось создать родительский каталог кэша.'; return 1; }
+        if [[ -d $MENU_SOURCE_DIR ]] && [[ -z $(find "$MENU_SOURCE_DIR" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null) ]]; then
+            rmdir -- "$MENU_SOURCE_DIR" || { MENU_UPDATE_ERROR='Не удалось подготовить каталог кэша.'; return 1; }
+        fi
+        if ! menu_run 'Загрузка исходников' 0 env GIT_TERMINAL_PROMPT=0 git clone --branch "$MENU_REF" --single-branch -- "$MENU_REPOSITORY" "$MENU_SOURCE_DIR"; then
+            if ((MENU_CANCELLED)); then MENU_UPDATE_ERROR='Обновление отменено при загрузке исходников.'; else MENU_UPDATE_ERROR="Не удалось загрузить исходники (код $MENU_RC)."; fi
+            return 1
+        fi
+        source_real=$(realpath -e -- "$MENU_SOURCE_DIR") || { MENU_UPDATE_ERROR='Не удалось разрешить загруженный checkout.'; return 1; }
+        root=$(git -C "$source_real" rev-parse --show-toplevel 2>/dev/null) || { MENU_UPDATE_ERROR='Загруженные исходники не являются Git checkout.'; return 1; }
+        root=$(realpath -e -- "$root") || { MENU_UPDATE_ERROR='Не удалось определить корень загруженного checkout.'; return 1; }
+        [[ $root == "$source_real" ]] || { MENU_UPDATE_ERROR='Загруженный каталог не является корнем Git checkout.'; return 1; }
+    fi
+    if ((${#make_targets[@]})); then
+        if ! menu_run 'Сборка выбранных сервисов' 0 env -u COMPOSE_FILE -u COMPOSE_PROJECT_NAME -u COMPOSE_PROFILES -u COMPOSE_ENV_FILES -u COMPOSE_PATH_SEPARATOR -u COMPOSE_DISABLE_ENV_FILE -u BUILD_FLAGS -u IMAGE_TAG make -C "$source_real" "${make_targets[@]}" SERVICE= IMAGE_TAG=latest WEB_BUILD_ENV=template.env.build BUILD_FLAGS=; then
+            if ((MENU_CANCELLED)); then MENU_UPDATE_ERROR='Обновление отменено во время сборки; сервисы не пересоздавались.'; else MENU_UPDATE_ERROR="Сборка выбранных сервисов завершилась с кодом $MENU_RC; сервисы не пересоздавались."; fi
+            return 1
+        fi
+    fi
+    for area in keycloak; do
+        [[ -n ${MENU_PLAN_SERVICES[$area]} ]] || continue
+        menu_prepare_saved_plan "$area"
+        if ! menu_run 'Загрузка образа Keycloak' 1 bash -c 'cd "$1" || exit; shift; exec env -u COMPOSE_FILE -u COMPOSE_PROJECT_NAME -u COMPOSE_PROFILES -u COMPOSE_ENV_FILES -u COMPOSE_PATH_SEPARATOR -u COMPOSE_DISABLE_ENV_FILE docker "$@"' _ "$MENU_DIRECTORY" "${MENU_COMPOSE_ARGS[@]}" pull keycloak; then
+            if ((MENU_CANCELLED)); then MENU_UPDATE_ERROR='Обновление отменено при загрузке Keycloak; сервисы не пересоздавались.'; else MENU_UPDATE_ERROR="Не удалось загрузить образ Keycloak (код $MENU_RC); сервисы не пересоздавались."; fi
+            return 1
+        fi
+    done
+    for area in backend web keycloak; do
+        [[ -n ${MENU_PLAN_SERVICES[$area]} ]] || continue
+        menu_prepare_saved_plan "$area"
+        read -r -a targets <<< "${MENU_PLAN_SERVICES[$area]}"
+        if menu_run "Пересоздание сервисов — $area" 1 bash -c 'cd "$1" || exit; shift; exec env -u COMPOSE_FILE -u COMPOSE_PROJECT_NAME -u COMPOSE_PROFILES -u COMPOSE_ENV_FILES -u COMPOSE_PATH_SEPARATOR -u COMPOSE_DISABLE_ENV_FILE docker "$@"' _ "$MENU_DIRECTORY" "${MENU_COMPOSE_ARGS[@]}" up -d --no-deps --force-recreate "${targets[@]}"; then
+            MENU_UPDATE_APPLIED+=("$area")
+        elif ((MENU_CANCELLED)); then
+            MENU_UPDATE_ERROR='Обновление отменено во время пересоздания сервисов.'
+            MENU_UPDATE_FAILED+=("$area (отмена; область могла быть частично пересоздана)")
+            return 130
+        else
+            MENU_UPDATE_FAILED+=("$area (код $MENU_RC; возможны частично пересозданные сервисы)")
+        fi
+    done
     return 0
 }
 
 menu_update() {
-    local area source_real root status_output rc service line
-    local -a body=() selected=() app=() failures=() updated=() args=() build=() targets=()
-    MENU_OUTPUT_LINES=()
-    if ! menu_require git make setsid docker tail; then menu_result 'Зависимости'; return; fi
-    for area in "$@"; do
-        if ! menu_make_plan "$area"; then MENU_OUTPUT_LINES=("$area: ${MENU_COMPOSE_ERROR:-состояние недоступно}"); menu_result 'Обновление'; return; fi
-        selected+=("$area — ${MENU_PLAN_DIR[$area]} — ${MENU_PLAN_COMPOSE[$area]} — services ${MENU_PLAN_SERVICES[$area]} — project ${MENU_PLAN_PROJECT[$area]:-Compose default}")
-    done
-    body=("Исходники: $MENU_SOURCE_DIR" "${selected[@]}" 'До подтверждения сеть и сборка не выполняются.')
-    menu_confirm 'Подтвердите обновление.' body || return
-    for area in backend web keycloak; do
-        [[ -n ${MENU_PATHS[$area]} ]] || continue
-        local install_real
-        install_real=$(realpath -m -- "${MENU_PATHS[$area]}") || return
-        [[ $MENU_SOURCE_DIR != "$install_real" && $MENU_SOURCE_DIR != "$install_real"/* && $install_real != "$MENU_SOURCE_DIR"/* ]] || { MENU_OUTPUT_LINES=('Кэш исходников пересекается с настроенным каталогом установки.'); menu_result 'Обновление'; return; }
-    done
-    if [[ -e $MENU_SOURCE_DIR/.git ]]; then
-        source_real=$(realpath -e -- "$MENU_SOURCE_DIR") || { MENU_OUTPUT_LINES=('Не удалось разрешить кэш исходников.'); menu_result 'Обновление'; return; }
-        root=$(git -C "$source_real" rev-parse --show-toplevel 2>/dev/null) || { MENU_OUTPUT_LINES=('Кэш не является Git checkout.'); menu_result 'Обновление'; return; }
-        root=$(realpath -e -- "$root") || return
-        [[ $root == "$source_real" ]] || { MENU_OUTPUT_LINES=('Кэш не является корнем checkout.'); menu_result 'Обновление'; return; }
-        if ! status_output=$(git -C "$source_real" status --porcelain); then MENU_OUTPUT_LINES=('Не удалось проверить локальные изменения checkout.'); menu_result 'Обновление'; return; fi
-        [[ -z $status_output ]] || { MENU_OUTPUT_LINES=('В checkout есть локальные изменения; обновление остановлено.'); menu_result 'Обновление'; return; }
-        menu_run 'Получение исходников' 0 env GIT_TERMINAL_PROMPT=0 git -C "$source_real" pull --ff-only origin "$MENU_REF" || return
-    else
-        [[ ! -e $MENU_SOURCE_DIR ]] || [[ -d $MENU_SOURCE_DIR && -z $(find "$MENU_SOURCE_DIR" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null) ]] || { MENU_OUTPUT_LINES=('Каталог кэша занят посторонними файлами.'); menu_result 'Обновление'; return; }
-        mkdir -p -- "$(dirname -- "$MENU_SOURCE_DIR")" || { MENU_OUTPUT_LINES=('Не удалось создать родительский каталог кэша.'); menu_result 'Обновление'; return; }
-        if [[ -d $MENU_SOURCE_DIR ]] && [[ -z $(find "$MENU_SOURCE_DIR" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null) ]]; then rmdir -- "$MENU_SOURCE_DIR" || return; fi
-        menu_run 'Загрузка исходников' 0 env GIT_TERMINAL_PROMPT=0 git clone --branch "$MENU_REF" --single-branch -- "$MENU_REPOSITORY" "$MENU_SOURCE_DIR" || return
-        source_real=$(realpath -e -- "$MENU_SOURCE_DIR") || return
+    local MENU_RUN_BATCH=1 picker_rc area reason
+    MENU_OUTPUT_LINES=() MENU_UPDATE_LOG_LINES=() MENU_SELECTED_AREAS=()
+    MENU_UPDATE_ERROR= MENU_UPDATE_APPLIED=() MENU_UPDATE_FAILED=()
+    if ! menu_require docker; then
+        MENU_OUTPUT_LINES=("${MENU_OUTPUT_LINES[@]}")
+        menu_result 'Обновление сервисов'
+        return
     fi
-    for area in "$@"; do
-        case $area in
-            backend) build=(build-backend build-bff SERVICE= IMAGE_TAG=latest WEB_BUILD_ENV=template.env.build BUILD_FLAGS=) ;;
-            web) build=(build-web SERVICE= IMAGE_TAG=latest WEB_BUILD_ENV=template.env.build BUILD_FLAGS=) ;;
-            keycloak)
-                menu_prepare_saved_plan "$area" || return
-                menu_run 'Загрузка образа Keycloak' 1 bash -c 'cd "$1" || exit; shift; exec env -u COMPOSE_FILE -u COMPOSE_PROJECT_NAME -u COMPOSE_PROFILES -u COMPOSE_ENV_FILES -u COMPOSE_PATH_SEPARATOR -u COMPOSE_DISABLE_ENV_FILE docker "$@"' _ "$MENU_DIRECTORY" "${MENU_COMPOSE_ARGS[@]}" pull keycloak || return
-                continue ;;
-        esac
-        menu_run "Сборка $area" 0 env -u COMPOSE_FILE -u COMPOSE_PROJECT_NAME -u COMPOSE_PROFILES -u COMPOSE_ENV_FILES -u COMPOSE_PATH_SEPARATOR -u COMPOSE_DISABLE_ENV_FILE -u BUILD_FLAGS -u IMAGE_TAG make -C "$source_real" "${build[@]}" || return
-    done
-    for area in "$@"; do
-        menu_prepare_saved_plan "$area" || { failures+=("$area: Compose недоступен"); continue; }
-        read -r -a targets <<< "${MENU_PLAN_SERVICES[$area]}"
-        if menu_run "Пересоздание сервисов — $area" 1 bash -c 'cd "$1" || exit; shift; exec env -u COMPOSE_FILE -u COMPOSE_PROJECT_NAME -u COMPOSE_PROFILES -u COMPOSE_ENV_FILES -u COMPOSE_PATH_SEPARATOR -u COMPOSE_DISABLE_ENV_FILE docker "$@"' _ "$MENU_DIRECTORY" "${MENU_COMPOSE_ARGS[@]}" up -d --no-deps --force-recreate "${targets[@]}"; then
-            updated+=("$area")
-        elif ((MENU_CANCELLED)); then
-            return 130
-        else
-            failures+=("$area (код $MENU_RC)")
-        fi
-    done
-    MENU_OUTPUT_LINES=("Обновлены: ${updated[*]:-нет}" "Не обновлены: ${failures[*]:-нет}")
-    menu_result 'Результат обновления'
+    menu_update_snapshot || :
+    MENU_UPDATE_PICKING=1
+    menu_update_picker
+    picker_rc=$?
+    MENU_UPDATE_PICKING=0
+    ((picker_rc == 0)) || return
+    menu_update_selection_count
+    if ((MENU_UPDATE_COUNT == 0)); then return; fi
+    if ! menu_update_execute; then
+        reason=$MENU_UPDATE_ERROR
+    else
+        reason=
+    fi
+    MENU_OUTPUT_LINES=("Отмечено сервисов: $MENU_UPDATE_COUNT")
+    if ((${#MENU_UPDATE_APPLIED[@]})); then MENU_OUTPUT_LINES+=("Пересоздание выполнено: ${MENU_UPDATE_APPLIED[*]}"); fi
+    if ((${#MENU_UPDATE_FAILED[@]})); then MENU_OUTPUT_LINES+=("Пересоздание не выполнено: ${MENU_UPDATE_FAILED[*]}"); fi
+    if [[ -n $reason ]]; then
+        MENU_OUTPUT_LINES+=("Результат: $reason")
+        if ((${#MENU_UPDATE_APPLIED[@]} == 0 && ${#MENU_UPDATE_FAILED[@]} == 0)); then MENU_OUTPUT_LINES+=('Пересоздание сервисов не выполнялось.'); fi
+    fi
+    if ((${#MENU_UPDATE_LOG_LINES[@]})); then MENU_OUTPUT_LINES+=('' 'Журнал операции:' "${MENU_UPDATE_LOG_LINES[@]}"); fi
+    menu_result 'Результат обновления сервисов'
 }
 
 menu_restore_terminal() {
@@ -753,7 +1093,7 @@ menu_prepare_saved_plan() {
 }
 
 menu_dashboard() {
-    local -a actions=('Обновить' 'Перезапустить сервисы' 'Выключить сервисы' 'Обновить состояние' 'Назад')
+    local -a actions=('Обновить сервисы' 'Перезапустить сервисы' 'Выключить сервисы' 'Обновить состояние' 'Назад')
     while :; do
         menu_build_dashboard
         screen_select 'Управление сервисами' MENU_SCREEN_BODY actions || return
