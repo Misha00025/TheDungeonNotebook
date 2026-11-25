@@ -12,6 +12,7 @@ declare -a MENU_TEMP_FILES=()
 MENU_SCRIPT=
 MENU_CONFIG=
 MENU_SOURCE_DIR=
+MENU_SAVED_SOURCE_DIR=
 MENU_REPOSITORY=
 MENU_REF=
 MENU_RAW_URL=
@@ -279,7 +280,13 @@ menu_load_config() {
         key=${record%%$'\t'*}
         value=${record#*$'\t'}
         case $key in
-            backend|web|keycloak)
+            backend|web|keycloak|source)
+                if [[ $key == source ]]; then
+                    if [[ -n ${seen[$key]+x} || $value == *$'\t'* || $value == *$'\n'* ]]; then MENU_CONFIG_WARNING="Некорректная или повторная запись: $key"; MENU_SAVED_SOURCE_DIR=; continue; fi
+                    seen[$key]=1
+                    if ! menu_normalize_path "$value"; then MENU_CONFIG_WARNING='Некорректный путь: source'; MENU_SAVED_SOURCE_DIR=; else MENU_SAVED_SOURCE_DIR=$MENU_NORMALIZED_PATH; fi
+                    continue
+                fi
                 if [[ -n ${seen[$key]+x} || $value == *$'\t'* || $value == *$'\n'* ]]; then
                     MENU_CONFIG_WARNING="Некорректная или повторная запись: $key"
                     MENU_PATHS[$key]=
@@ -302,13 +309,14 @@ menu_save_config() {
     dir=$(dirname -- "$MENU_CONFIG")
     mkdir -p -- "$dir" || return 1
     tmp=$(umask 077; mktemp "$dir/.tdn-menu.XXXXXX") || return 1
-    for key in backend web keycloak; do
-        value=${MENU_DRAFT[$key]}
+    for key in backend web keycloak source; do
+        if [[ $key == source ]]; then value=$MENU_SOURCE_DIR; else value=${MENU_DRAFT[$key]}; fi
         [[ $value != *$'\t'* && $value != *$'\n'* ]] || { rm -f -- "$tmp"; return 1; }
         printf '%s\t%s\n' "$key" "$value" >> "$tmp" || { rm -f -- "$tmp"; return 1; }
     done
     chmod 600 "$tmp" && mv -fT -- "$tmp" "$MENU_CONFIG" || { rm -f -- "$tmp"; return 1; }
     for key in backend web keycloak; do MENU_PATHS[$key]=${MENU_DRAFT[$key]}; done
+    MENU_SAVED_SOURCE_DIR=$MENU_SOURCE_DIR
 }
 
 menu_normalize_path() {
@@ -334,6 +342,7 @@ menu_draw_editor() {
     viewport=$((MENU_EDIT_POS-width+1))
     ((viewport < 0)) && viewport=0
     shown=${MENU_EDIT_VALUE:viewport:width}
+    [[ -n $shown ]] || shown='не управляется на этом хосте'
     title="Путь установки — $MENU_EDIT_AREA"
     title=${title:0:MENU_COLS-1}
     help='Enter применить  Esc отмена  Ctrl+U очистить'
@@ -378,7 +387,7 @@ menu_config_form() {
     local key changed initial_choice=0 select_rc
     for key in backend web keycloak; do MENU_DRAFT[$key]=${MENU_PATHS[$key]}; done
     while :; do
-        body=("Backend + BFF: ${MENU_DRAFT[backend]}" "Web: ${MENU_DRAFT[web]}" "Keycloak: ${MENU_DRAFT[keycloak]}" '' 'Enter — редактировать поле; Tab — следующее; Shift+Tab — предыдущее')
+        body=("Backend + BFF: ${MENU_DRAFT[backend]:-не управляется на этом хосте}" "Web: ${MENU_DRAFT[web]:-не управляется на этом хосте}" "Keycloak: ${MENU_DRAFT[keycloak]:-не управляется на этом хосте}" '' 'Настраивайте только нужные области' 'Enter — редактировать поле; Tab — следующее; Shift+Tab — предыдущее')
         MENU_INITIAL_CHOICE=$initial_choice
         screen_select 'Расположение установок' body actions
         select_rc=$?
@@ -497,7 +506,7 @@ menu_build_dashboard() {
     MENU_AVAILABLE_AREAS=()
     for area in backend web keycloak; do
         case $area in backend) label='Backend + BFF' ;; web) label=Web ;; keycloak) label=Keycloak ;; esac
-        if [[ -z ${MENU_PATHS[$area]} ]]; then MENU_SCREEN_BODY+=("$label — путь не задан"); continue; fi
+        if [[ -z ${MENU_PATHS[$area]} ]]; then MENU_SCREEN_BODY+=("$label — не управляется на этом хосте"); continue; fi
         if [[ ! -d ${MENU_PATHS[$area]} ]]; then MENU_SCREEN_BODY+=("$label — не установлено: ${MENU_PATHS[$area]}"); continue; fi
         if ! menu_prepare_compose "$area" no; then
             MENU_SCREEN_BODY+=("$label — ${MENU_COMPOSE_ERROR:-не установлено}: ${MENU_PATHS[$area]}")
@@ -794,7 +803,7 @@ menu_update_script() {
 menu_configuration() {
     local -a body=() actions=('Расположение установок' 'Обновить menu.sh' 'Назад')
     while :; do
-        body=("Конфигурация: $MENU_CONFIG")
+        body=("Конфигурация: $MENU_CONFIG" "Backend + BFF: ${MENU_PATHS[backend]:-не управляется на этом хосте}" "Web: ${MENU_PATHS[web]:-не управляется на этом хосте}" "Keycloak: ${MENU_PATHS[keycloak]:-не управляется на этом хосте}" '' 'Настраивайте только нужные области')
         screen_select 'Управление конфигурацией' body actions || return
         case $MENU_CHOICE in
             0) menu_config_form ;;
@@ -822,8 +831,6 @@ menu_main() {
     MENU_REPOSITORY=${TDN_MENU_REPOSITORY:-https://github.com/Misha00025/TheDungeonNotebook.git}
     MENU_REF=${TDN_MENU_REF:-master}
     MENU_RAW_URL=${TDN_MENU_RAW_URL:-https://raw.githubusercontent.com/Misha00025/TheDungeonNotebook/master/deploy/menu.sh}
-    MENU_SOURCE_DIR=${TDN_MENU_SOURCE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/tdn-menu/sources}
-    MENU_SOURCE_DIR=$(realpath -m -- "$MENU_SOURCE_DIR") || return 1
     ((set_config)) && MENU_CONFIG=$config_arg
     MENU_CONFIG=$(realpath -m -- "$MENU_CONFIG") || return 1
     [[ $MENU_CONFIG != "$MENU_SCRIPT" && $MENU_CONFIG != "${MENU_SCRIPT}.previous" ]] || { printf '%s\n' 'Ошибка: путь конфигурации совпадает с меню или резервной копией.' >&2; return 2; }
@@ -831,6 +838,8 @@ menu_main() {
     if ! menu_require stty tput awk sed mkdir mktemp chmod mv cp rm dirname basename find sleep env; then printf '%s\n' "${MENU_OUTPUT_LINES[@]}" >&2; return 1; fi
     [[ -t 0 && -t 1 ]] || { printf '%s\n' 'Нужен интерактивный терминал.' >&2; return 1; }
     menu_load_config || return 1
+    MENU_SOURCE_DIR=${TDN_MENU_SOURCE_DIR:-${MENU_SAVED_SOURCE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/tdn-menu/sources}}
+    MENU_SOURCE_DIR=$(realpath -m -- "$MENU_SOURCE_DIR") || return 1
     trap menu_cleanup EXIT
     trap 'exit 130' INT
     trap 'exit 143' TERM
