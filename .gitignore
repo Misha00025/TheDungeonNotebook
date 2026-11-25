@@ -1,5 +1,7 @@
 **/.vscode/
 **/.env
+**/.tdn-menu.conf
+**/menu.sh.previous
 **/venv/
 **/*.log
 

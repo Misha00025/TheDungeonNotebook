@@ -6,6 +6,8 @@
 
 Каталоги `backend`, `bff` и `web` расположены в `apps/`. Makefile и инфраструктурные каталоги остаются в корне; npm workspace по-прежнему находится во внутреннем каталоге `apps/web`.
 
+Управление существующими переносимыми установками через терминальное меню: [deploy/menu README](deploy/README.md).
+
 ## Сборка Docker-образов
 
 `make build` собирает все 13 образов; `SERVICE=<name>` выбирает один образ из списка `make list-images`. Группы доступны через `make build-backend` (шесть backend-образов), `make build-web` (шесть web-образов, включая gateway proxy) и отдельную группу `make build-bff` (один BFF-образ). Образ BFF также можно собрать как `make build SERVICE=bff-web`; proxy — как `make build-web-proxy`. `make help` выводит краткую справку.
