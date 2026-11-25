@@ -30,8 +30,9 @@ page() {
     printf '%s\n' "$@"
 }
 read_value() {
-    local key=$1 label=$2 default=${3-} secret=${4:-no} answer
-    page "$label" 'Enter — оставить текущее значение; Ctrl+C — отмена.' "$FORM_ERROR"
+    local key=$1 label=$2 default=${3-} secret=${4:-no} help=${5-} answer
+    if [[ -n $help ]]; then page "$label" 'Enter — оставить текущее значение; Ctrl+C — отмена.' "$help" "$FORM_ERROR"
+    else page "$label" 'Enter — оставить текущее значение; Ctrl+C — отмена.' "$FORM_ERROR"; fi
     FORM_ERROR=
     stty "$stty_state" || fail 'Не удалось включить режим ввода.'
     printf '\033[?25h'
@@ -83,15 +84,15 @@ valid_issuer() {
     valid_http_url "$1"
 }
 required_value() {
-    local key=$1 label=$2 default=${3-} secret=${4:-no}
+    local key=$1 label=$2 default=${3-} secret=${4:-no} help=${5-}
     default=${values[$key]-$default}
-    while :; do read_value "$key" "$label" "$default" "$secret"; default=${values[$key]}; [[ -n ${values[$key]} ]] && return; FORM_ERROR='Значение обязательно.'; done
+    while :; do read_value "$key" "$label" "$default" "$secret" "$help"; default=${values[$key]}; [[ -n ${values[$key]} ]] && return; FORM_ERROR='Значение обязательно.'; done
 }
 origin_input() {
-    local key=$1 label=$2 default=${3-}
+    local key=$1 label=$2 default=${3-} help=${4-}
     default=${values[$key]-$default}
     while :; do
-        read_value "$key" "$label" "$default"
+        read_value "$key" "$label" "$default" no "$help"
         if valid_origin "${values[$key]}"; then
             while [[ ${values[$key]} == */ ]]; do values[$key]=${values[$key]%/}; done
             return
@@ -99,10 +100,17 @@ origin_input() {
         FORM_ERROR='Некорректный HTTP(S) origin.'
     done
 }
+suggested_origin() {
+    local base_url=$1 http_port=$2 scheme=${1%%://*} rest authority host
+    rest=${base_url#*://}; authority=${rest%%/*}
+    if [[ $authority == \[* ]]; then host=${authority%%\]*}; host+=']'
+    else host=${authority%:*}; [[ $authority == *:* ]] || host=$authority; fi
+    if [[ $scheme == http ]]; then printf '%s://%s:%s' "$scheme" "$host" "$http_port"; else printf '%s://%s' "$scheme" "$host"; fi
+}
 web_bff_input() {
-    local base
+    local help='Адрес должен открываться в браузере пользователя. Например: http://192.168.1.10:5080/bff или https://api.example.com/bff.'
     while :; do
-        read_value WEB_BFF_BASE 'Browser-доступный BFF_BASE (полный HTTP(S) URL)' "${values[WEB_BFF_BASE]-}"
+        read_value WEB_BFF_BASE 'Адрес BFF для Web (полный URL)' "${values[WEB_BFF_BASE]-}" no "$help"
         valid_http_url "${values[WEB_BFF_BASE]}" || { FORM_ERROR='Некорректный HTTP(S) BFF_BASE URL.'; continue; }
         while [[ ${values[WEB_BFF_BASE]} == */ ]]; do values[WEB_BFF_BASE]=${values[WEB_BFF_BASE]%/}; done
         return
@@ -189,30 +197,40 @@ append_project_name() {
 ask_settings() {
     local flow profile
     if [[ ${selected[keycloak]:-0} == 1 && -z ${existing[keycloak]+x} ]]; then
-        origin_input KEYCLOAK_URL 'Публичный URL Keycloak' 'http://localhost:8180'
+        origin_input KEYCLOAK_URL 'Публичный URL Keycloak' 'http://localhost:8180' 'Адрес должен быть доступен браузеру и backend-контейнерам; localhost внутри контейнера не указывает на хост. Например: http://192.168.1.10:8180 или https://sso.example.com.'
     fi
     if [[ ${selected[backend]:-0} == 1 && -z ${existing[backend]+x} ]]; then
-        origin_input BFF_ORIGIN 'Публичный origin BFF (без /bff)' 'http://localhost:5080'
-        origin_input WEB_ORIGIN 'Публичный origin доверенного Web'
+        local bff_default bff_help
+        bff_default=http://localhost:5080
+        [[ -z ${values[KEYCLOAK_URL]-} ]] || bff_default=$(suggested_origin "${values[KEYCLOAK_URL]}" 5080)
+        bff_help='Например: http://192.168.1.10:5080 или https://api.example.com. Если BFF размещён на другом хосте, измените предложенный адрес.'
+        origin_input BFF_ORIGIN 'Публичный адрес BFF (без /bff)' "$bff_default" "$bff_help"
+        local web_default web_help
+        web_default=$(suggested_origin "${values[BFF_ORIGIN]}" 3004)
+        web_help='Адрес, который открывается в браузере: схема, хост и порт, без /пути. Например: http://192.168.1.10:3004 или https://tdn.example.com. Измените адрес, если Web размещён на другом хосте.'
+        origin_input WEB_ORIGIN 'Публичный адрес Web-интерфейса (без пути)' "$web_default" "$web_help"
         if [[ ${selected[keycloak]:-0} == 1 && -z ${existing[keycloak]+x} ]]; then [[ ${values[OIDC_FLOW]-} != external ]] || SELECT_INITIAL=1; select_one 'OIDC-провайдер' 'Использовать устанавливаемый Keycloak' 'Внешний/существующий провайдер'; if ((SELECTED==0)); then flow=local; else flow=external; fi
         else flow=external; fi
         values[OIDC_FLOW]=$flow
-        if [[ $flow == local ]]; then values[TOKEN_PROFILE]=0; values[BFF_AUTHORITY]=${values[KEYCLOAK_URL]%/}/realms/shared-local; values[ACCOUNT_ISSUER]=${values[BFF_AUTHORITY]}; values[ACCOUNT_AUDIENCE]=tdn-api; values[OIDC_CLIENT_ID]=tdn-bff; values[CLIENT_AUTH]=PostBody; if [[ ${values[KEYCLOAK_URL]} == http://* ]]; then values[ALLOW_HTTP]=true; else values[ALLOW_HTTP]=false; fi; fi
+        if [[ $flow == local ]]; then values[TOKEN_PROFILE]=0; values[OIDC_ISSUER]=${values[KEYCLOAK_URL]%/}/realms/shared-local; values[OIDC_AUDIENCE]=tdn-api; values[OIDC_CLIENT_ID]=tdn-bff; values[CLIENT_AUTH]=PostBody; if [[ ${values[OIDC_ISSUER]} == http://* ]]; then values[ALLOW_HTTP]=true; else values[ALLOW_HTTP]=false; fi; fi
         if [[ $flow == external ]]; then
-            while :; do required_value BFF_AUTHORITY 'BFF Authority issuer'; valid_issuer "${values[BFF_AUTHORITY]}" && break; FORM_ERROR='Некорректный issuer URL.'; done
-            while :; do required_value ACCOUNT_ISSUER 'Account Issuer' "${values[BFF_AUTHORITY]}"; valid_issuer "${values[ACCOUNT_ISSUER]}" && break; FORM_ERROR='Некорректный issuer URL.'; done
-            required_value ACCOUNT_AUDIENCE 'Account audience'
-            required_value OIDC_CLIENT_ID 'OIDC ClientId'
+            local issuer_default issuer_help
+            if [[ -n ${values[KEYCLOAK_URL]-} ]]; then issuer_default=${values[KEYCLOAK_URL]%/}/realms/shared-local
+            else issuer_default=$(suggested_origin "${values[BFF_ORIGIN]}" 8180); issuer_default=${issuer_default%/}/realms/shared-local; fi
+            issuer_help='Предложен стандартный путь realm Keycloak. Для другого realm или провайдера укажите его фактический issuer; например https://sso.example.com/realms/shared-local.'
+            while :; do required_value OIDC_ISSUER 'Адрес OIDC-провайдера' "$issuer_default" no "$issuer_help"; valid_issuer "${values[OIDC_ISSUER]}" && break; FORM_ERROR='Некорректный issuer URL.'; done
+            required_value OIDC_AUDIENCE 'Audience (аудитория access token)'
+            required_value OIDC_CLIENT_ID 'Client ID'
             case ${values[CLIENT_AUTH]-PostBody} in Basic) SELECT_INITIAL=1;;None) SELECT_INITIAL=2;;esac
-            select_one 'Client authentication' PostBody Basic None
+            select_one 'Аутентификация клиента' PostBody Basic None
             case $SELECTED in 0) values[CLIENT_AUTH]=PostBody;;1) values[CLIENT_AUTH]=Basic;;2) values[CLIENT_AUTH]=None;;esac
-            if [[ ${values[CLIENT_AUTH]} == None ]]; then values[OIDC_CLIENT_SECRET]=; else required_value OIDC_CLIENT_SECRET 'OIDC ClientSecret' "${values[OIDC_CLIENT_SECRET]-}" yes; fi
+            if [[ ${values[CLIENT_AUTH]} == None ]]; then values[OIDC_CLIENT_SECRET]=; else required_value OIDC_CLIENT_SECRET 'Client secret' "${values[OIDC_CLIENT_SECRET]-}" yes; fi
             [[ ${values[TOKEN_PROFILE]-0} != 1 ]] || SELECT_INITIAL=1
             select_one 'Token profile' 'Keycloak (JWT + typ=Bearer)' 'RFC9068 (at+jwt)'
             values[TOKEN_PROFILE]=$SELECTED
-            if [[ ${values[ACCOUNT_ISSUER]} == http://* ]]; then
+            if [[ ${values[OIDC_ISSUER]} == http://* ]]; then
                 [[ ${values[ALLOW_HTTP]-false} != true ]] || SELECT_INITIAL=1
-                select_one 'Account issuer использует HTTP. Разрешить небезопасную HTTP metadata?' 'Отмена' 'Подтвердить HTTP metadata'
+                select_one 'OIDC-провайдер использует HTTP. Разрешить загрузку metadata без HTTPS?' 'Отмена' 'Подтвердить HTTP metadata'
                 ((SELECTED==1)) || cancel
                 values[ALLOW_HTTP]=true
             else values[ALLOW_HTTP]=false; fi
@@ -220,7 +238,9 @@ ask_settings() {
     fi
     if [[ ${selected[web]:-0} == 1 && -z ${existing[web]+x} ]]; then
         local def=
-        [[ ${selected[backend]:-0} != 1 || -n ${existing[backend]+x} ]] || def=${values[BFF_ORIGIN]}/bff
+        if [[ -n ${values[BFF_ORIGIN]-} ]]; then def=${values[BFF_ORIGIN]%/}/bff
+        elif [[ -n ${values[KEYCLOAK_URL]-} ]]; then def=$(suggested_origin "${values[KEYCLOAK_URL]}" 5080); def=${def%/}/bff
+        else def=http://localhost:5080/bff; fi
         [[ -n ${values[WEB_BFF_BASE]+x} ]] || values[WEB_BFF_BASE]=$def
         web_bff_input
     fi
@@ -234,9 +254,8 @@ confirm_plan() {
     local key label title; local -a lines=('Проверьте выбранные области и параметры. Секреты не отображаются.') choices=('Отмена' 'Назад к настройкам' 'Установить')
     for key in backend web keycloak; do [[ ${selected[$key]:-0} == 1 ]] || continue; case $key in backend) label='Backend + BFF';;web) label=Web;;keycloak) label=Keycloak;;esac; if [[ -n ${existing[$key]+x} ]]; then lines+=("Существующая область: $label"); else lines+=("Новая область: $label"); fi; done
     [[ ${selected[keycloak]:-0} != 1 || -n ${existing[keycloak]+x} ]] || lines+=("Keycloak URL: ${values[KEYCLOAK_URL]}")
-    [[ ${selected[backend]:-0} != 1 || -n ${existing[backend]+x} ]] || lines+=("BFF: ${values[BFF_ORIGIN]}/bff — Web: ${values[WEB_ORIGIN]}" "OIDC: ${values[BFF_AUTHORITY]} — client ${values[OIDC_CLIENT_ID]} — audience ${values[ACCOUNT_AUDIENCE]} — ${values[CLIENT_AUTH]}")
-    if [[ -z ${existing[backend]+x} && ${values[BFF_AUTHORITY]-} == http://* ]]; then lines+=('Внимание: BFF использует HTTP metadata без HTTPS.'); fi
-    if [[ -z ${existing[backend]+x} && ${values[ALLOW_HTTP]-false} == true ]]; then lines+=('Внимание: Account использует HTTP metadata без HTTPS.'); fi
+    [[ ${selected[backend]:-0} != 1 || -n ${existing[backend]+x} ]] || lines+=("BFF: ${values[BFF_ORIGIN]}/bff — Web: ${values[WEB_ORIGIN]}" "OIDC: ${values[OIDC_ISSUER]} — client ${values[OIDC_CLIENT_ID]} — audience ${values[OIDC_AUDIENCE]} — ${values[CLIENT_AUTH]}")
+    if [[ -z ${existing[backend]+x} && ${values[OIDC_ISSUER]-} == http://* ]]; then lines+=('Внимание: OIDC metadata будут загружаться по HTTP без шифрования.'); fi
     [[ ${selected[web]:-0} != 1 || -n ${existing[web]+x} ]] || lines+=("Web BFF: ${values[WEB_BFF_BASE]}")
     title=$(printf '%s\n' "${lines[@]}")
     select_one "$title" "${choices[@]}"
@@ -257,8 +276,8 @@ json_configs() {
     local area=$1 dir=$2 source=$3 secret_file
     if [[ $area == backend ]]; then
         mkdir -p "$dir/config/account" "$dir/config/bff" || fail 'Не удалось подготовить каталоги конфигурации.'
-        jq --arg iss "${values[ACCOUNT_ISSUER]}" --arg aud "${values[ACCOUNT_AUDIENCE]}" --argjson allow "${values[ALLOW_HTTP]:-false}" --arg profile "${values[TOKEN_PROFILE]:-1}" '.Accounts.FirstAccountId=1 | .Oidc.Providers[0].Issuer=$iss | .Oidc.Providers[0].Audiences=[$aud] | .Oidc.Providers[0].AllowHttpForDevelopment=$allow | if $profile=="0" then .Oidc.Providers[0].ValidHeaderTypes=["JWT"] | .Oidc.Providers[0].AccessTokenTypeClaim="typ" | .Oidc.Providers[0].AccessTokenTypeValues=["Bearer"] else . end' "$source/apps/backend/account-service/config/accounts.template.json" > "$dir/config/account/accounts.json" || fail 'Не удалось сформировать Account JSON.'
-        local authority=${values[BFF_AUTHORITY]-} require_https=true
+        jq --arg iss "${values[OIDC_ISSUER]}" --arg aud "${values[OIDC_AUDIENCE]}" --argjson allow "${values[ALLOW_HTTP]:-false}" --arg profile "${values[TOKEN_PROFILE]:-1}" '.Accounts.FirstAccountId=1 | .Oidc.Providers[0].Issuer=$iss | .Oidc.Providers[0].Audiences=[$aud] | .Oidc.Providers[0].AllowHttpForDevelopment=$allow | if $profile=="0" then .Oidc.Providers[0].ValidHeaderTypes=["JWT"] | .Oidc.Providers[0].AccessTokenTypeClaim="typ" | .Oidc.Providers[0].AccessTokenTypeValues=["Bearer"] else . end' "$source/apps/backend/account-service/config/accounts.template.json" > "$dir/config/account/accounts.json" || fail 'Не удалось сформировать Account JSON.'
+        local authority=${values[OIDC_ISSUER]-} require_https=true
         [[ $authority != http://* ]] || require_https=false
         secret_file=$(umask 077; mktemp "$dir/.bff-secret.XXXXXX") || fail 'Не удалось подготовить временный secret input.'
         temps+=("$secret_file")
