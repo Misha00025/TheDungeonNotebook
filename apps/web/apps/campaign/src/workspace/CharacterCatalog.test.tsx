@@ -76,11 +76,11 @@ function makeRequest(handler?: RequestHandler) {
     if (custom) return custom;
     const method = options?.method ?? 'GET';
     if (url === `/api/campaigns/12/characters/${characterId}/items` && method === 'GET') return response([]);
-    if (url === `/api/campaigns/12/items/attributes`) return response({ campaignId: 12, contentRevision: 1, data: { definitions: attributeDefinitions } });
-    if (url === '/api/campaigns/12/items/groups') return response({ campaignId: 12, contentRevision: 1, groups: [] });
-    if (url === '/api/campaigns/12/items' || url.startsWith('/api/campaigns/12/items?')) return response([rawDefinition(sourceDefinition)]);
-    if (url === `/api/campaigns/12/items/${sourceId}`) return response(rawDefinition(sourceDefinition));
-    if (url === `/api/campaigns/12/items/${sourceId}/content`) return response(sourceContent);
+    if (url === `/api/campaigns/12/catalog/items/attributes`) return response({ campaignId: 12, contentRevision: 1, data: { definitions: attributeDefinitions } });
+    if (url === '/api/campaigns/12/catalog/items/groups') return response({ campaignId: 12, contentRevision: 1, groups: [] });
+    if (url === '/api/campaigns/12/catalog/items' || url.startsWith('/api/campaigns/12/catalog/items?')) return response([rawDefinition(sourceDefinition)]);
+    if (url === `/api/campaigns/12/catalog/items/${sourceId}`) return response(rawDefinition(sourceDefinition));
+    if (url === `/api/campaigns/12/catalog/items/${sourceId}/content`) return response(sourceContent);
     if (url.startsWith(`/api/campaigns/12/characters/${characterId}/items/additions/`)) return response({ code: 'not_found', title: 'Not found', detail: 'Not found' }, 404);
     if (url === `/api/campaigns/12/characters/${characterId}/items/${recordId}` && method === 'GET') return response(rawEntry(makeEntry()));
     if (url === `/api/campaigns/12/characters/${characterId}/items/${recordId}` && method === 'DELETE') return new Response(null, { status: 204 });
@@ -154,7 +154,7 @@ describe('character catalog consumer', () => {
     expect(within(dialog).queryByRole('checkbox', { name: 'Отрицательное' })).not.toBeInTheDocument();
     expect(screen.getAllByText('read-only')[0]).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Сохранить изменения' })).not.toBeInTheDocument();
-    expect(calls.some(([url]) => url === `/api/campaigns/12/items/${sourceId}` || url === `/api/campaigns/12/items/${sourceId}/content`)).toBe(false);
+    expect(calls.some(([url]) => url === `/api/campaigns/12/catalog/items/${sourceId}` || url === `/api/campaigns/12/catalog/items/${sourceId}/content`)).toBe(false);
     expect(calls.some(([, options]) => ['POST', 'PUT', 'DELETE'].includes(options?.method ?? ''))).toBe(false);
   });
 
@@ -242,9 +242,9 @@ describe('character catalog consumer', () => {
     let submitted: any;
     const { request, calls } = makeRequest((url, options) => {
       if (url === `/api/campaigns/12/characters/${characterId}/skills` && options?.method === 'GET') return response([]);
-      if (url === '/api/campaigns/12/skills/attributes') return response({ campaignId: 12, contentRevision: 1, data: { definitions: attributeDefinitions } });
-      if (url === '/api/campaigns/12/skills/groups') return response({ campaignId: 12, contentRevision: 1, groups: [] });
-      if (url === '/api/campaigns/12/skills' || url.startsWith('/api/campaigns/12/skills?')) return response([]);
+      if (url === '/api/campaigns/12/catalog/skills/attributes') return response({ campaignId: 12, contentRevision: 1, data: { definitions: attributeDefinitions } });
+      if (url === '/api/campaigns/12/catalog/skills/groups') return response({ campaignId: 12, contentRevision: 1, groups: [] });
+      if (url === '/api/campaigns/12/catalog/skills' || url.startsWith('/api/campaigns/12/catalog/skills?')) return response([]);
       if (url.endsWith('/skills/create') && options?.method === 'POST') {
         submitted = parseJson(String(options.body));
         const created = makeEntry({ id: 'created-skill', quantity: null, definition: { ...sourceDefinition, id: 'created-definition', name: 'Моя проверка', kind: 'Skill', quantityUnit: null, isHidden: true } });
@@ -278,10 +278,10 @@ describe('character catalog consumer', () => {
     const editable = { id: 'personal-type', attributeId: definition.id, value: 'личный', editLevel: 'Character' as const };
     const source = { ...sourceDefinition, quantityUnit: 'Single' as const };
     const { request, calls } = makeRequest((url, options) => {
-      if (url === '/api/campaigns/12/items/attributes') return response({ campaignId: 12, contentRevision: 1, data: { definitions: [definition] } });
-      if (url === '/api/campaigns/12/items' || url.startsWith('/api/campaigns/12/items?')) return response([rawDefinition(source)]);
-      if (url === `/api/campaigns/12/items/${sourceId}`) return response(rawDefinition(source));
-      if (url === `/api/campaigns/12/items/${sourceId}/content`) return response({ ...sourceContent, data: { description: 'Два вхождения.', attributes: [fixed, editable] } });
+      if (url === '/api/campaigns/12/catalog/items/attributes') return response({ campaignId: 12, contentRevision: 1, data: { definitions: [definition] } });
+      if (url === '/api/campaigns/12/catalog/items' || url.startsWith('/api/campaigns/12/catalog/items?')) return response([rawDefinition(source)]);
+      if (url === `/api/campaigns/12/catalog/items/${sourceId}`) return response(rawDefinition(source));
+      if (url === `/api/campaigns/12/catalog/items/${sourceId}/content`) return response({ ...sourceContent, data: { description: 'Два вхождения.', attributes: [fixed, editable] } });
       if (url === `/api/campaigns/12/characters/${characterId}/items` && options?.method === 'POST') {
         const body = parseJson(String(options.body)) as any;
         return response({ requestId: body.requestId, entry: rawEntry(makeEntry({ id: 'added-record', quantity: 1, attributes: body.attributes })) });
@@ -295,7 +295,7 @@ describe('character catalog consumer', () => {
     fireEvent.click(await within(dialog).findByRole('button', { name: source.name }));
     expect(await within(dialog).findByText('Два вхождения.')).toBeInTheDocument();
     expect(calls.filter(([url, options]) => url === `/api/campaigns/12/characters/${characterId}/items` && options?.method === 'POST')).toHaveLength(0);
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Выбрать' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: `Выбрать ${source.name}` }));
     expect(await within(dialog).findByLabelText('Количество')).toHaveTextContent('1');
     fireEvent.click(await within(dialog).findByRole('button', { name: 'Изменить: Тип' }));
     const value = await within(dialog).findByRole('textbox', { name: 'Значение: Тип' });
@@ -319,9 +319,9 @@ describe('character catalog consumer', () => {
     const { request, calls } = makeRequest((url, options) => {
       if (url === `/api/campaigns/12/characters/${characterId}/items` && options?.method !== 'POST') return response([rawEntry(entry)]);
       if (url === `/api/campaigns/12/characters/${characterId}/items/${recordId}` && options?.method === 'GET') return response({ ...entry, definition });
-      if (url === `/api/campaigns/12/items/${sourceId}` && options?.method === 'GET') return response(rawDefinition(definition));
-      if (url === `/api/campaigns/12/items/${sourceId}/content`) return response(sourceContent);
-      if (url === `/api/campaigns/12/items/${sourceId}` && options?.method === 'PUT') {
+      if (url === `/api/campaigns/12/catalog/items/${sourceId}` && options?.method === 'GET') return response(rawDefinition(definition));
+      if (url === `/api/campaigns/12/catalog/items/${sourceId}/content`) return response(sourceContent);
+      if (url === `/api/campaigns/12/catalog/items/${sourceId}` && options?.method === 'PUT') {
         const body = parseJson(String(options.body)) as any;
         definition = { ...definition, name: body.name, metadataRevision: 3 };
         entry = { ...entry, definition };
@@ -352,9 +352,12 @@ describe('character catalog consumer', () => {
   it('retains an uncertain add operation across permission refresh and confirms it without reposting', async () => {
     let receiptReads = 0;
     let submittedRequestId = '';
-    const existing = makeEntry({ id: 'created-record', quantity: 1 });
-    const created = makeEntry({ id: 'created-record', quantity: 2 });
+    const source = { ...sourceDefinition, quantityUnit: 'Whole' as const };
+    const existing = makeEntry({ id: 'created-record', quantity: 1, definition: source });
+    const created = makeEntry({ id: 'created-record', quantity: 2, definition: source });
     const { request, calls } = makeRequest((url, options) => {
+      if (url === '/api/campaigns/12/catalog/items' || url.startsWith('/api/campaigns/12/catalog/items?')) return response([rawDefinition(source)]);
+      if (url === `/api/campaigns/12/catalog/items/${sourceId}`) return response(rawDefinition(source));
       if (url === `/api/campaigns/12/characters/${characterId}/items` && options?.method === 'GET') return response([existing]);
       if (url === `/api/campaigns/12/characters/${characterId}/items` && options?.method === 'POST') {
         submittedRequestId = String((parseJson(String(options.body)) as any).requestId);
@@ -382,7 +385,7 @@ describe('character catalog consumer', () => {
 
     expect(await screen.findByRole('button', { name: 'Тайный паёк' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Тайный паёк' })).toHaveLength(1);
-    expect(screen.getByRole('cell', { name: '2' })).toBeInTheDocument();
+    expect(await screen.findByRole('cell', { name: '2' })).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Добавить предмет' })).not.toBeInTheDocument();
     expect(calls.filter(([url, options]) => url === `/api/campaigns/12/characters/${characterId}/items` && options?.method === 'POST')).toHaveLength(1);
     expect(calls.filter(([url]) => url.endsWith(`/additions/${submittedRequestId}`))).toHaveLength(2);
@@ -396,7 +399,7 @@ describe('character catalog consumer', () => {
       if (url === `/api/campaigns/12/characters/${characterId}`) return response({ id: characterId, campaignId: 12, name: 'Service hero', importance: 'Key', metadataRevision: 1 });
       if (url === `/api/campaigns/12/characters/${characterId}/permissions`) return response({ canRead: true, canWrite: true, canManageAccess: false });
       if (url === `/api/campaigns/12/characters/${characterId}/${service === 'inventory' ? 'items' : 'skills'}`) return response([]);
-      if (url === '/api/campaigns/12/items/attributes') return response({ campaignId: 12, contentRevision: 1, data: { definitions: [] } });
+      if (url === '/api/campaigns/12/catalog/items/attributes') return response({ campaignId: 12, contentRevision: 1, data: { definitions: [] } });
       if (url === '/api/campaigns/12/characters') return response([]);
       if (url === `/api/campaigns/12/characters/${characterId}/computed-sheet`) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [], virtualFields: [], formulaContentRevisions: [] });
       if (url === '/api/campaigns/12/presentation') return response({ contentRevision: 1, defaults: {}, contextParams: {} });

@@ -181,8 +181,8 @@ describe('campaign typed client', () => {
     });
 
     expect(calls.map(([url]) => url)).toEqual([
-      '/api/campaigns/7/items/entry-guid/content',
-      '/api/campaigns/7/items/groups',
+      '/api/campaigns/7/catalog/items/entry-guid/content',
+      '/api/campaigns/7/catalog/items/groups',
     ]);
     const contentBody = parseJson(String(calls[0][1]?.body)) as any;
     expect(String(contentBody.expectedRevision)).toBe('9223372036854775806');
