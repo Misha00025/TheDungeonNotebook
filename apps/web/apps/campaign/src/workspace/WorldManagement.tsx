@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { ActionRow, Badge, Button, Checkbox, Field, FieldSet, FormGrid, IconButton, Input, List, ListItem, MarkdownEditor, MarkdownViewer, Notification, Panel, StatePanel, Textarea, Toolbar } from '@tdn/shared';
+import { ActionRow, Badge, Button, Checkbox, Field, FieldSet, IconButton, Input, List, MarkdownEditor, MarkdownViewer, Notification, Panel, StatePanel, Textarea, Toolbar } from '@tdn/shared';
 import { useDirtyDraft, useWorkspace } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 import { useResource } from './hooks';
@@ -45,14 +45,15 @@ const WorldTagsEditor: React.FC<{
   disabled: boolean;
   onChange: (tags: string[]) => void;
 }> = ({ idPrefix, tags, disabled, onChange }) => <FieldSet legend="Теги" className={styles.tagEditor}>
-  {tags.length > 0 && <List layout="vertical" gap="small">
+  {tags.length > 0 && <List layout="vertical" gap="small" stretch className={styles.tagList}>
     {tags.map((tag, index) => {
       const id = `${idPrefix}-tag-${index}`;
-      return <ListItem key={index} actions={<IconButton icon="delete" title={`Удалить тег ${index + 1}`} ariaLabel={`Удалить тег ${index + 1}`} size="small" variant="secondary" disabled={disabled} onClick={() => onChange(tags.filter((_, itemIndex) => itemIndex !== index))} />}>
-        <Field label={`Тег ${index + 1}`} htmlFor={id} error={tag.length === 0 ? 'Тег не может быть пустым. Введите значение или удалите поле.' : undefined}>
-          <Input variant="single-line" id={id} value={tag} disabled={disabled} aria-invalid={tag.length === 0 ? 'true' : undefined} onChange={event => onChange(tags.map((value, itemIndex) => itemIndex === index ? event.target.value : value))} />
-        </Field>
-      </ListItem>;
+      const errorId = `${id}-error`;
+      return <ActionRow key={index} className={styles.tagRow}>
+        <Input variant="single-line" id={id} aria-label={`Тег ${index + 1}`} aria-describedby={tag.length === 0 ? errorId : undefined} value={tag} disabled={disabled} aria-invalid={tag.length === 0 ? 'true' : undefined} onChange={event => onChange(tags.map((value, itemIndex) => itemIndex === index ? event.target.value : value))} />
+        <IconButton icon="delete" title={`Удалить тег ${index + 1}`} ariaLabel={`Удалить тег ${index + 1}`} size="small" variant="secondary" disabled={disabled} onClick={() => onChange(tags.filter((_, itemIndex) => itemIndex !== index))} />
+        {tag.length === 0 && <span id={errorId} className={styles.tagError} role="alert">Тег не может быть пустым. Введите значение или удалите поле.</span>}
+      </ActionRow>;
     })}
   </List>}
   <ActionRow><Button type="button" size="small" variant="secondary" disabled={disabled} onClick={() => onChange([...tags, ''])}>Добавить тег</Button></ActionRow>
@@ -83,13 +84,18 @@ export const CreateWorldMaterialPage: React.FC<{
   const [description, setDescription] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [body, setBody] = useState('');
+  const [isPublished, setIsPublished] = useState(false);
+  const [createdMaterial, setCreatedMaterial] = useState<WorldMaterial>();
+  const [createdBodyVersion, setCreatedBodyVersion] = useState('');
+  const [publicationRecovery, setPublicationRecovery] = useState<'check' | 'ready'>();
+  const [publicationFailure, setPublicationFailure] = useState<unknown>();
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [failure, setFailure] = useState<unknown>();
   const [checkFailure, setCheckFailure] = useState<unknown>();
   const [titleError, setTitleError] = useState('');
   const [forbidden, setForbidden] = useState(false);
-  const dirty = Boolean(title || description || tags.length > 0 || body || blocked);
+  const dirty = Boolean(title || description || tags.length > 0 || body || blocked || createdMaterial);
   const hasEmptyTag = tags.some(tag => tag.length === 0);
   const clearDirty = useDirtyDraft(`world-create-${scope}-${requestId}`, dirty || busy);
   const writeAllowed = canWrite && !permissionsLoading && !forbidden;
@@ -115,12 +121,103 @@ export const CreateWorldMaterialPage: React.FC<{
     try {
       const material = await api.getWorldMaterial(campaignId, kind, requestId);
       if (mountedRef.current) {
-        clearDirty();
-        onCreated(material);
+        if (isPublished && !material.isPublished) {
+          setCreatedMaterial(material);
+          setCreatedBodyVersion('');
+          setBlocked(false);
+          setFailure(undefined);
+          setPublicationFailure(undefined);
+          try {
+            const published = await api.updateWorldMaterial(campaignId, kind, material.id, {
+              title: material.title,
+              description: material.description,
+              tags: material.tags,
+              isPublished: true,
+              expectedRevision: material.metadataRevision,
+            });
+            if (mountedRef.current) {
+              clearDirty();
+              onCreated(published);
+            }
+          } catch (error) {
+            if (mountedRef.current) {
+              setPublicationFailure(error);
+              setPublicationRecovery('check');
+              if (error instanceof CampaignApiError && error.status === 403) {
+                setForbidden(true);
+                reloadPermissions();
+              }
+            }
+          }
+        } else {
+          clearDirty();
+          onCreated(material);
+        }
       }
     } catch (error) {
       if (mountedRef.current) {
         setCheckFailure(error);
+        if (error instanceof CampaignApiError && error.status === 403) {
+          setForbidden(true);
+          reloadPermissions();
+        }
+      }
+    } finally {
+      busyRef.current = false;
+      if (mountedRef.current) setBusy(false);
+    }
+  };
+
+  const checkPublication = async () => {
+    if (!createdMaterial || publicationRecovery !== 'check' || busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setCheckFailure(undefined);
+    try {
+      const latest = await api.getWorldMaterial(campaignId, kind, createdMaterial.id);
+      if (!mountedRef.current) return;
+      if (latest.isPublished) {
+        clearDirty();
+        onCreated(latest, createdBodyVersion ? { body, bodyVersion: createdBodyVersion } : undefined);
+      } else {
+        setCreatedMaterial(latest);
+        setPublicationRecovery('ready');
+      }
+    } catch (error) {
+      if (mountedRef.current) {
+        setCheckFailure(error);
+        if (error instanceof CampaignApiError && error.status === 403) {
+          setForbidden(true);
+          reloadPermissions();
+        }
+      }
+    } finally {
+      busyRef.current = false;
+      if (mountedRef.current) setBusy(false);
+    }
+  };
+
+  const publishCreated = async () => {
+    if (!createdMaterial || publicationRecovery !== 'ready' || !writeAllowed || busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setPublicationFailure(undefined);
+    try {
+      const published = await api.updateWorldMaterial(campaignId, kind, createdMaterial.id, {
+        title: createdMaterial.title,
+        description: createdMaterial.description,
+        tags: createdMaterial.tags,
+        isPublished: true,
+        expectedRevision: createdMaterial.metadataRevision,
+      });
+      if (mountedRef.current) {
+        clearDirty();
+        onCreated(published, createdBodyVersion ? { body, bodyVersion: createdBodyVersion } : undefined);
+      }
+    } catch (error) {
+      if (mountedRef.current) {
+        setPublicationFailure(error);
+        setPublicationRecovery('check');
         if (error instanceof CampaignApiError && error.status === 403) {
           setForbidden(true);
           reloadPermissions();
@@ -152,6 +249,34 @@ export const CreateWorldMaterialPage: React.FC<{
         body,
       });
       if (mountedRef.current) {
+        if (isPublished) {
+          setCreatedMaterial(result.material);
+          setCreatedBodyVersion(result.bodyVersion);
+          setBusy(true);
+          try {
+            const published = await api.updateWorldMaterial(campaignId, kind, result.material.id, {
+              title: result.material.title,
+              description: result.material.description,
+              tags: result.material.tags,
+              isPublished: true,
+              expectedRevision: result.material.metadataRevision,
+            });
+            if (mountedRef.current) {
+              clearDirty();
+              onCreated(published, { body, bodyVersion: result.bodyVersion });
+            }
+          } catch (error) {
+            if (mountedRef.current) {
+              setPublicationFailure(error);
+              setPublicationRecovery('check');
+              if (error instanceof CampaignApiError && error.status === 403) {
+                setForbidden(true);
+                reloadPermissions();
+              }
+            }
+          }
+          return;
+        }
         clearDirty();
         onCreated(result.material, { body, bodyVersion: result.bodyVersion });
       }
@@ -170,33 +295,37 @@ export const CreateWorldMaterialPage: React.FC<{
     }
   };
 
-  return <Panel title="Данные материала" headingLevel={2} description="Заполните карточку и текст нового материала." className={styles.createPage}>
+  return <Panel className={styles.createPage}>
       <>
-        <FieldSet legend="Карточка">
-          <FormGrid minColumnWidth="16rem">
+          <div className={styles.createFields}>
             <Field label="Название" htmlFor={titleId} error={titleError || undefined}>
-              <Input variant="single-line" id={titleId} value={title} disabled={busy} aria-invalid={titleError ? 'true' : undefined} onChange={event => { setTitle(event.target.value); setTitleError(''); }} />
+              <Input variant="single-line" id={titleId} value={title} disabled={busy || Boolean(createdMaterial)} aria-invalid={titleError ? 'true' : undefined} onChange={event => { setTitle(event.target.value); setTitleError(''); }} />
             </Field>
-            <Field label="Краткое описание" htmlFor={descriptionId}>
-              <Textarea variant="multiline" id={descriptionId} value={description} disabled={busy} onChange={event => setDescription(event.target.value)} />
+            <Field label="Описание" htmlFor={descriptionId}>
+              <Textarea variant="multiline" rows={6} id={descriptionId} value={description} disabled={busy || Boolean(createdMaterial)} onChange={event => setDescription(event.target.value)} />
             </Field>
-          </FormGrid>
-          <WorldTagsEditor idPrefix={tagsId} tags={tags} disabled={busy} onChange={setTags} />
-        </FieldSet>
-        <FieldSet legend="Текст материала">
-          <Field label="Markdown" htmlFor={bodyId}>
-            <MarkdownEditor id={bodyId} value={body} onChange={setBody} disabled={busy} height={400} preview="edit" />
+          <WorldTagsEditor idPrefix={tagsId} tags={tags} disabled={busy || Boolean(createdMaterial)} onChange={setTags} />
+          </div>
+          <Field label="Открыть игрокам" htmlFor={`${bodyId}-published`}>
+            <Checkbox id={`${bodyId}-published`} checked={isPublished} disabled={busy || Boolean(createdMaterial)} onChange={event => setIsPublished(event.target.checked)} />
           </Field>
-        </FieldSet>
-        <Panel title="Доступность" headingLevel={4} description="Новый материал всегда будет закрыт для игроков. Открыть его можно будет после создания." />
+          <MarkdownEditor id={bodyId} value={body} onChange={setBody} disabled={busy || Boolean(createdMaterial)} height={400} preview="edit" textareaProps={{ 'aria-label': 'Текст материала' }} />
         {!writeAllowed && <StatePanel kind="info">{permissionsLoading ? 'Проверяются права записи. Команды временно заблокированы.' : 'Право записи недоступно. Черновик сохранён.'}</StatePanel>}
         {blocked && <StatePanel kind="info" actions={<ActionRow><Button type="button" size="small" disabled={busy} onClick={() => void checkCreation()}>Проверить создание</Button></ActionRow>}>
           Результат создания не подтверждён. Черновик и идентификатор операции сохранены; повторное создание не выполняется.
         </StatePanel>}
         {failure && <WorldErrorPanel error={failure} />}
         {checkFailure && <WorldErrorPanel error={checkFailure} notFoundMessage="Создание пока не подтверждено. Повторная отправка не выполнялась." />}
+        {createdMaterial && publicationRecovery && <StatePanel kind="info" actions={<ActionRow>
+          {publicationRecovery === 'check'
+            ? <Button type="button" size="small" disabled={busy} onClick={() => void checkPublication()}>Проверить публикацию</Button>
+            : <Button type="button" size="small" disabled={!writeAllowed || busy} onClick={() => void publishCreated()}>Открыть игрокам</Button>}
+        </ActionRow>}>
+          Создание материала подтверждено, но публикация ещё не подтверждена. Материал и текст сохранены; повторное создание не выполняется.
+        </StatePanel>}
+        {publicationFailure && <WorldErrorPanel error={publicationFailure} />}
         <ActionRow justify="end">
-          {!blocked && <Button type="button" size="small" disabled={!writeAllowed || busy || hasEmptyTag} onClick={() => void submit()}>Создать</Button>}
+          {!blocked && !createdMaterial && <Button type="button" size="small" disabled={!writeAllowed || busy || hasEmptyTag} onClick={() => void submit()}>Создать</Button>}
           <Button variant="secondary" size="small" type="button" disabled={busy} onClick={cancel}>{blocked ? 'Отказаться от проверки' : 'Отмена'}</Button>
         </ActionRow>
       </>
@@ -504,9 +633,9 @@ export const WorldMaterialDetail: React.FC<{
     {editing && <Button type="button" size="small" variant="secondary" disabled={metadataSaving || bodySaving} onClick={cancelEditing}>Отменить изменения</Button>}
     {backAction}
   </ActionRow></Toolbar>;
-  return <Panel as="article" className={styles.detail} title={item.title} headingLevel={2} description={item.description} status={<Badge>{item.isPublished ? 'Открыт игрокам' : 'Закрыт'}</Badge>} actions={detailActions}>
+  return <Panel as="article" className={styles.detail} title={editing ? undefined : item.title} headingLevel={2} description={editing ? undefined : item.description} status={!editing ? <Badge>{item.isPublished ? 'Открыт игрокам' : 'Закрыт'}</Badge> : undefined} actions={detailActions}>
     <>
-      <WorldTagsDisplay tags={item.tags} />
+      {!editing && <WorldTagsDisplay tags={item.tags} />}
       {mode === 'gm' && permissionsLoading && <StatePanel kind="info">Проверяются права записи. Команды управления временно заблокированы.</StatePanel>}
       {mode === 'gm' && !permissionsLoading && !writeAllowed && <StatePanel kind="info">Право записи недоступно. Черновик сохранён; команды управления заблокированы.</StatePanel>}
       {metadata.error && <WorldErrorPanel error={metadata.error} onRetry={metadata.reload} />}
@@ -514,44 +643,38 @@ export const WorldMaterialDetail: React.FC<{
       {body.error && <WorldErrorPanel error={body.error} onRetry={body.reload} />}
       {bodyData && !editing && <MarkdownViewer value={bodyData.body} className={styles.markdown} />}
       {editing && metadataDraft && bodyDraft !== undefined && <>
-        <Panel title="Карточка материала" headingLevel={3}>
+        <Panel>
           <>
-            <FieldSet legend="Поля карточки">
-              <FormGrid minColumnWidth="16rem">
-                <Field label="Название" htmlFor={titleId} error={metadataTitleError || undefined}>
-                  <Input variant="single-line" id={titleId} value={metadataDraft.title} disabled={metadataSaving} aria-invalid={metadataTitleError ? 'true' : undefined} onChange={event => { setMetadataDraft(current => current ? { ...current, title: event.target.value } : current); setMetadataTitleError(''); }} />
-                </Field>
-                <Field label="Краткое описание" htmlFor={descriptionId}>
-                  <Textarea variant="multiline" id={descriptionId} value={metadataDraft.description} disabled={metadataSaving} onChange={event => setMetadataDraft(current => current ? { ...current, description: event.target.value } : current)} />
-                </Field>
-              </FormGrid>
+            <div className={styles.metadataFields}>
+              <Field label="Название" htmlFor={titleId} error={metadataTitleError || undefined}>
+                <Input variant="single-line" id={titleId} value={metadataDraft.title} disabled={metadataSaving} aria-invalid={metadataTitleError ? 'true' : undefined} onChange={event => { setMetadataDraft(current => current ? { ...current, title: event.target.value } : current); setMetadataTitleError(''); }} />
+              </Field>
+              <Field label="Описание" htmlFor={descriptionId}>
+                <Textarea variant="multiline" rows={6} id={descriptionId} value={metadataDraft.description} disabled={metadataSaving} onChange={event => setMetadataDraft(current => current ? { ...current, description: event.target.value } : current)} />
+              </Field>
               <WorldTagsEditor idPrefix={tagsId} tags={metadataDraft.tags} disabled={metadataSaving} onChange={tags => setMetadataDraft(current => current ? { ...current, tags } : current)} />
               <Field label="Открыть игрокам" htmlFor={publishedId}>
                 <Checkbox id={publishedId} checked={metadataDraft.isPublished} disabled={metadataSaving} onChange={event => setMetadataDraft(current => current ? { ...current, isPublished: event.target.checked } : current)} />
               </Field>
-            </FieldSet>
+            </div>
         {metadataBlocked && <StatePanel kind="info" actions={<ActionRow>
           <Button type="button" size="small" disabled={metadataChecking} onClick={() => void checkMetadata()}>Проверить данные</Button>
           {metadataVerified && <Button type="button" size="small" variant="secondary" onClick={continueMetadata}>Продолжить с моим черновиком</Button>}
         </ActionRow>}>
           <>
-            Сохранение карточки не подтверждено. Черновик сохранён; повторная запись заблокирована до проверки данных.
+            Сохранение не подтверждено. Черновик сохранён; повторная запись заблокирована до проверки данных.
             {metadataCheckFailure && <WorldErrorPanel error={metadataCheckFailure} />}
           </>
         </StatePanel>}
             {metadataFailure && <WorldErrorPanel error={metadataFailure} />}
             <ActionRow justify="end">
-              <Button type="button" size="small" disabled={!writeAllowed || !metadataDirty || metadataBlocked || metadataSaving || hasEmptyMetadataTag} onClick={() => void saveMetadata()}>Сохранить карточку</Button>
+              <Button type="button" size="small" disabled={!writeAllowed || !metadataDirty || metadataBlocked || metadataSaving || hasEmptyMetadataTag} onClick={() => void saveMetadata()}>Сохранить</Button>
             </ActionRow>
           </>
         </Panel>
-        <Panel title="Текст материала (Markdown)" headingLevel={3}>
+        <Panel>
           <>
-            <FieldSet legend="Markdown">
-              <Field label="Текст материала" htmlFor={bodyId}>
-                <MarkdownEditor id={bodyId} value={bodyDraft} onChange={setBodyDraft} disabled={bodySaving} height={500} preview="edit" />
-              </Field>
-            </FieldSet>
+            <MarkdownEditor id={bodyId} value={bodyDraft} onChange={setBodyDraft} disabled={bodySaving} height={500} preview="edit" textareaProps={{ 'aria-label': 'Текст материала' }} />
         {bodyBlocked && <StatePanel kind="info" actions={<ActionRow>
           <Button type="button" size="small" disabled={bodyChecking} onClick={() => void checkBody()}>Проверить данные</Button>
           {bodyVerified && <Button type="button" size="small" variant="secondary" onClick={continueBody}>Продолжить с моим черновиком</Button>}
@@ -563,7 +686,7 @@ export const WorldMaterialDetail: React.FC<{
         </StatePanel>}
             {bodyFailure && <WorldErrorPanel error={bodyFailure} />}
             <ActionRow justify="end">
-              <Button type="button" size="small" disabled={!writeAllowed || !bodyDirty || bodyBlocked || bodySaving} onClick={() => void saveBody()}>Сохранить текст</Button>
+              <Button type="button" size="small" disabled={!writeAllowed || !bodyDirty || bodyBlocked || bodySaving} onClick={() => void saveBody()}>Сохранить</Button>
             </ActionRow>
           </>
         </Panel>

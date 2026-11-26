@@ -2,6 +2,40 @@
   min-width: 0;
 }
 
+.tagList {
+  min-width: 0;
+}
+
+.tagRow {
+  width: 100%;
+  min-width: 0;
+}
+
+.tagRow > :global(input) {
+  flex: 1 1 0%;
+  width: 100%;
+  min-width: 0;
+}
+
+.tagError {
+  flex-basis: 100%;
+  color: var(--notification-error-color);
+}
+
+.metadataFields {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.createFields {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
 .detail {
   min-width: 0;
   overflow-wrap: anywhere;
