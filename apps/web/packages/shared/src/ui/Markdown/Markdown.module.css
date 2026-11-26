@@ -1,0 +1,82 @@
+.editorFrame {
+  width: 100%;
+  min-width: 0;
+}
+
+.editor {
+  width: 100%;
+  min-width: 0;
+}
+
+.editor :global(.w-md-editor) {
+  width: 100%;
+  min-width: 0;
+}
+
+.editor :global(.w-md-editor-preview) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.editor :global(.w-md-editor-preview pre) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.editor :global(.w-md-editor-preview pre code) {
+  overflow-wrap: normal;
+  white-space: pre;
+}
+
+.viewer {
+  min-width: 0;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.viewer :global(a) {
+  color: var(--accent-color);
+  overflow-wrap: anywhere;
+}
+
+.viewer :global(blockquote) {
+  margin-inline: 0;
+  padding-inline-start: 1rem;
+  border-inline-start: 0.2rem solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.viewer :global(ul),
+.viewer :global(ol) {
+  padding-inline-start: 1.5rem;
+}
+
+.viewer :global(code:not(pre code)) {
+  padding: 0.1em 0.3em;
+  background: var(--bg-secondary);
+  overflow-wrap: anywhere;
+}
+
+.viewer :global(pre) {
+  max-width: 100%;
+  overflow-x: auto;
+  background: var(--bg-secondary);
+}
+
+.viewer :global(pre code) {
+  overflow-wrap: normal;
+  white-space: pre;
+}
+
+.viewer :global(table) {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.viewer :global(img) {
+  max-width: 100%;
+  height: auto;
+}

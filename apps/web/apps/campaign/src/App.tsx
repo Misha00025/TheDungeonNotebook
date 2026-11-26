@@ -16,7 +16,7 @@ import Templates from './workspace/Templates';
 import Formulas from './workspace/Formulas';
 import Views from './workspace/Views';
 import Catalog from './workspace/Catalog';
-import World from './workspace/World';
+import World, { WorldCreatePage } from './workspace/World';
 import LegacyExportDiscovery from './workspace/LegacyExportDiscovery';
 import CharacterSheet from './workspace/CharacterSheet';
 import type { WorldKind, WorldMaterial, WorldMaterialBody } from './workspace/types';
@@ -28,12 +28,33 @@ const WorldRoute: React.FC = () => {
   const { sessionKey } = useWorkspace();
   const { mode } = useCampaignWorkspace();
   const location = useLocation();
-  if (!['locations', 'organizations', 'lore'].includes(kind)) return <NotFound />;
+  if (!['locations', 'organizations', 'lore'].includes(kind) || materialId === 'new') return <NotFound />;
   const state = location.state as { worldMaterial?: WorldMaterial; worldBody?: WorldMaterialBody } | null;
   const candidate = state?.worldMaterial;
   const initialMaterial = mode === 'gm' && materialId && candidate?.id === materialId && candidate.campaignId === Number(groupId) && candidate.kind === kind ? candidate : undefined;
   const initialBody = initialMaterial && state?.worldBody ? state.worldBody : undefined;
   return <World key={`${sessionKey}:${groupId}:${mode}:${kind}:${materialId ?? ''}`} kind={kind as WorldKind} materialId={materialId} initialMaterial={initialMaterial} initialBody={initialBody} />;
+};
+const WorldCreateRoute: React.FC = () => {
+  const { groupId = '', kind = '' } = useParams();
+  const { path, navigate, sessionKey } = useWorkspace();
+  const { mode, permissions, permissionsLoading = false } = useCampaignWorkspace();
+  const location = useLocation();
+  if (!['locations', 'organizations', 'lore'].includes(kind) || mode !== 'gm') return <NotFound />;
+  const campaignId = Number(groupId);
+  const returnState = location.state as { worldReturnTag?: string } | null;
+  const returnTag = typeof returnState?.worldReturnTag === 'string' ? returnState.worldReturnTag : '';
+  const listPath = path(`/${campaignId}/gm/world/${kind}`);
+  const canWrite = permissions.canWrite && !permissionsLoading;
+  return <WorldCreatePage
+    campaignId={campaignId}
+    kind={kind as WorldKind}
+    sessionKey={sessionKey}
+    canWrite={canWrite}
+    permissionsLoading={permissionsLoading}
+    onCancel={() => navigate(listPath, { replace: true, state: { worldReturnTag: returnTag } })}
+    onCreated={material => navigate(listPath, { replace: true, state: { worldReturnTag: returnTag, worldMaterial: material } })}
+  />;
 };
 const ModeEntry: React.FC = () => {
   const { groupId = '' } = useParams();
@@ -86,6 +107,7 @@ const GuardedRoutes: React.FC = () => {
       </Route>
       <Route path="gm/world">
         <Route index element={<Navigate to="locations" replace />} />
+        <Route path=":kind/new" element={<WorldCreateRoute />} />
         <Route path=":kind" element={<WorldRoute />} />
         <Route path=":kind/:materialId" element={<WorldRoute />} />
       </Route>

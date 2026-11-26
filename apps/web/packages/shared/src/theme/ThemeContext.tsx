@@ -267,3 +267,5 @@ export const useTheme = () => {
   }
   return context;
 };
+
+export const useOptionalTheme = () => useContext(ThemeContext);
