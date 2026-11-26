@@ -10,9 +10,9 @@ import { CreateWorldMaterialPage, WorldErrorPanel, WorldMaterialDetail } from '.
 import styles from './World.module.css';
 
 const tabs = [
+  { id: 'lore', label: 'Лор', path: 'lore' },
   { id: 'locations', label: 'Локации', path: 'locations' },
   { id: 'organizations', label: 'Организации', path: 'organizations' },
-  { id: 'lore', label: 'Лор', path: 'lore' },
 ];
 
 type WorldRouteState = {

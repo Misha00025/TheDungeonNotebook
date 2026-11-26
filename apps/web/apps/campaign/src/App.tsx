@@ -12,6 +12,7 @@ import CampaignOverview from './workspace/CampaignOverview';
 import Members from './workspace/Members';
 import CampaignSettings from './workspace/CampaignSettings';
 import CampaignManagement from './workspace/CampaignManagement';
+import CharacterSheetSections from './workspace/CharacterSheetSections';
 import Templates from './workspace/Templates';
 import Formulas from './workspace/Formulas';
 import Views from './workspace/Views';
@@ -90,6 +91,12 @@ const LegacyMembersEntry: React.FC = () => {
   const { path } = useWorkspace();
   return <Navigate to={path(`/${groupId}/gm/settings/members`)} replace />;
 };
+const LegacyCharacterSheetSection: React.FC<{ section: 'templates' | 'formulas' | 'views' }> = ({ section }) => {
+  const { groupId = '' } = useParams();
+  const location = useLocation();
+  const { path } = useWorkspace();
+  return <Navigate to={{ pathname: path(`/${groupId}/gm/character-sheet/${section}`), search: location.search, hash: location.hash }} replace />;
+};
 const GuardedRoutes: React.FC = () => {
   const accepted = useAcceptedLocation();
   return <Routes location={accepted}>
@@ -97,9 +104,15 @@ const GuardedRoutes: React.FC = () => {
     <Route path=":groupId" element={<Shell />}>
       <Route index element={<ModeEntry />} />
       <Route path="gm/overview" element={<CampaignOverview />} />
-      <Route path="gm/templates" element={<Templates />} />
-      <Route path="gm/formulas" element={<Formulas />} />
-      <Route path="gm/views" element={<Views />} />
+      <Route path="gm/character-sheet" element={<CharacterSheetSections />}>
+        <Route index element={<Navigate to="templates" replace />} />
+        <Route path="templates" element={<Templates />} />
+        <Route path="formulas" element={<Formulas />} />
+        <Route path="views" element={<Views />} />
+      </Route>
+      <Route path="gm/templates" element={<LegacyCharacterSheetSection section="templates" />} />
+      <Route path="gm/formulas" element={<LegacyCharacterSheetSection section="formulas" />} />
+      <Route path="gm/views" element={<LegacyCharacterSheetSection section="views" />} />
       <Route path="gm/catalog">
         <Route index element={<Navigate to="items" replace />} />
         <Route path="items" element={<Catalog key="items" kind="Item" />} />
