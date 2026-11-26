@@ -22,6 +22,7 @@ import CharacterStatsTable from './CharacterStatsTable';
 import { CharacterCatalogScope } from './CharacterCatalogContext';
 import CharacterCatalogPanel from './CharacterCatalogPanel';
 import { PresentationCatalogProvider } from './PresentationCatalog';
+import { PlayerCharacterChooser, playerSelectionKey, useConfirmedPlayerCharacterSelection } from './PlayerCharacterChooser';
 
 const importanceLabel: Record<string, string> = { Background: 'Фоновый', Secondary: 'Второстепенный', Key: 'Ключевой' };
 type MetadataDraft = { name: string; importance: CharacterMetadata['importance'] };
@@ -53,6 +54,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
   const gmCatalogPage = variant === 'sheet' && mode === 'gm' && (pageKey === 'inventory' || pageKey === 'skills');
   const gmServicePage = gmStatsPage || gmCatalogPage;
   const scope = `${sessionKey}:${campaignId}:${characterId}`;
+  const choosePlayerCharacter = useConfirmedPlayerCharacterSelection(campaignId, playerSelectionKey(sessionKey, campaignId), id => navigate(path(`/${campaignId}/player/characters/${encodeURIComponent(id)}`)));
   const metadataResource = useResource<CharacterMetadata>(`${scope}:metadata`, () => api.getCharacter(campaignId, characterId), variant === 'sheet' || !initialMetadata);
   const permissionResource = useResource<Permissions>(`${scope}:character-permissions`, () => api.characterPermissions(campaignId, characterId));
   const sheetResource = useResource<ComputedSheet>(`${scope}:computed-sheet`, () => api.getComputedSheet(campaignId, characterId));
@@ -676,6 +678,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
     <ActionRow><IconButton icon="check" title="Сохранить описание" ariaLabel="Сохранить описание" size="small" variant="secondary" disabled={descriptionDraft === sheet.description || descriptionControlsDisabled} busy={contentBusy} onClick={saveDescription} /><IconButton icon="close" title="Отменить изменения описания" ariaLabel="Отменить изменения описания" size="small" variant="secondary" disabled={contentBusy || computedReadBusy} onClick={cancelDescription} /></ActionRow>
   </List> : readAllowed && !sheetInaccessible && sheet && (sheet.description || canWrite) ? <List layout="vertical" gap="small" stretch className={characterStyles.description}><List layout="horizontal" gap="small">{sheet.description && <span className={characterStyles.descriptionText}>{sheet.description}</span>}{canWrite && <IconButton icon="edit" title="Изменить описание" ariaLabel="Изменить описание" size="small" variant="secondary" disabled={descriptionControlsDisabled} onClick={() => { setDescriptionDraft(sheet.description); setWriteStatus(''); }} />}</List></List> : undefined;
   const identityActions = <ActionRow justify="end">
+    {mode === 'player' && <PlayerCharacterChooser campaignId={campaignId} characterId={characterId} onChoose={choosePlayerCharacter} />}
     {currentPermissions && !currentPermissions.canWrite && <Badge>Только чтение</Badge>}
     {metadataDraft === undefined && metadataReadAllowed && canWrite && <IconButton icon="edit" title="Изменить сведения персонажа" ariaLabel="Изменить сведения персонажа" size="small" variant="secondary" disabled={metadataControlsDisabled} onClick={ensureMetadataDraft} />}
     {metadataDraft !== undefined && <><IconButton icon="check" title="Сохранить сведения персонажа" ariaLabel="Сохранить сведения персонажа" size="small" variant="secondary" disabled={!metadataDirty || metadataControlsDisabled} busy={metadataMutation.busy} onClick={() => void saveMetadata()} /><IconButton icon="close" title="Отменить изменения сведений персонажа" ariaLabel="Отменить изменения сведений персонажа" size="small" variant="secondary" disabled={metadataMutation.busy} onClick={cancelMetadata} /></>}

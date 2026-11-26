@@ -78,6 +78,36 @@ describe('campaign SDK pilot', () => {
     expect(screen.queryByRole('button', { name: 'Создать персонажа' })).not.toBeInTheDocument();
   });
 
+  it('persists the explicitly selected writable character for this account and campaign and restores its sheet', async () => {
+    const selected = playerCharacters[2];
+    const request = vi.fn(async (url: string) => {
+      if (url === '/api/campaigns') return response([campaign]);
+      if (url === '/api/campaigns/12') return response(campaign);
+      if (url === '/api/campaigns/12/permissions') return response({ canRead: true, canWrite: false, canManageAccess: false });
+      if (url === '/api/campaigns/12/characters') return response([playerCharacters[0], playerCharacters[1], selected]);
+      if (url.endsWith(`${playerCharacters[0].id}/permissions`)) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url.endsWith(`${playerCharacters[1].id}/permissions`)) return response({ canRead: true, canWrite: false, canManageAccess: false });
+      if (url.endsWith(`${selected.id}/permissions`)) return response({ canRead: true, canWrite: true, canManageAccess: false });
+      if (url === `/api/campaigns/12/characters/${selected.id}`) return response(selected);
+      if (url === `/api/campaigns/12/characters/${selected.id}/computed-sheet`) return response({ contentRevision: 1, templateContentRevision: 1, description: '', baseFields: [], formulaContentRevisions: [], virtualFields: [] });
+      if (url === '/api/campaigns/12/presentation') return response(presentation);
+      if (url.includes('/presentation/resolve?')) return response(resolved(new URL(url, 'http://localhost').searchParams.get('contextKey') ?? ''));
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const firstVisit = renderPilot(request, '/groups/12/player/characters');
+    const picker = await screen.findByRole('combobox', { name: 'Персонаж' });
+    fireEvent.change(picker, { target: { value: selected.id } });
+    await waitFor(() => expect(screen.getByLabelText('Current pathname')).toHaveTextContent(`/groups/12/player/characters/${selected.id}`));
+    expect(window.localStorage.getItem('tdn.player.character.4.12')).toBe(selected.id);
+    expect(await screen.findByRole('navigation', { name: 'Разделы кампании' })).toBeInTheDocument();
+    firstVisit.unmount();
+
+    renderPilot(request, '/groups/12/player/characters');
+    await waitFor(() => expect(screen.getByLabelText('Current pathname')).toHaveTextContent(`/groups/12/player/characters/${selected.id}`));
+    expect(request.mock.calls.some(([url]) => url === `/api/campaigns/12/characters/${selected.id}/computed-sheet`)).toBe(true);
+  });
+
   it('keeps permission-pending characters out of readonly cards and empty states', async () => {
     let resolvePermissions!: (value: Response) => void;
     const pendingPermissions = new Promise<Response>(resolve => { resolvePermissions = resolve; });

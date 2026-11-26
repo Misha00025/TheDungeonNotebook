@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ActionRow, Badge, Button, ClampedText, LinkButton, List, ListItem, Notification, PageHeader, Panel, SearchBar, StatePanel, Toolbar } from '@tdn/shared';
+import { ActionRow, Badge, Button, ClampedText, Field, LinkButton, List, ListItem, Notification, PageHeader, Panel, SearchBar, Select, StatePanel, Toolbar } from '@tdn/shared';
 import { useWorkspace } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 import { useResource } from './hooks';
@@ -13,6 +13,66 @@ import styles from './Characters.module.css';
 type Access = Permissions | { error: unknown };
 type CardState = { dirty: boolean; busy: boolean };
 const importanceLabel: Record<CharacterMetadata['importance'], string> = { Background: 'Фоновый', Secondary: 'Второстепенный', Key: 'Ключевой' };
+const playerSelectionKey = (sessionKey: string, campaignId: number) => `tdn.player.character.${encodeURIComponent(sessionKey)}.${campaignId}`;
+
+export const PlayerCharactersEntry: React.FC = () => {
+  const { groupId = '' } = useParams();
+  const campaignId = Number(groupId);
+  const { api, path, sessionKey, navigate } = useWorkspace();
+  const { campaign } = useCampaignWorkspace();
+  const key = `${sessionKey}:${campaign.id}:player-entry`;
+  const characters = useResource<CharacterMetadata[]>(key, () => api.listCharacters(campaignId));
+  const [accesses, setAccesses] = useState<{ key: string; values: Record<string, Access> }>({ key, values: {} });
+  const activeKey = useRef(key);
+  activeKey.current = key;
+  const accessMap = accesses.key === key ? accesses.values : {};
+  const onResult = useCallback((id: string, result: Access) => {
+    if (activeKey.current !== key) return;
+    setAccesses(current => current.key === key
+      ? { key, values: { ...current.values, [id]: result } }
+      : { key, values: { [id]: result } });
+  }, [key]);
+  const eligible = (characters.data ?? []).filter(character => {
+    const access = accessMap[character.id];
+    return access && !('error' in access) && access.canWrite;
+  });
+  const failed = (characters.data ?? []).some(character => {
+    const access = accessMap[character.id];
+    return access && 'error' in access;
+  });
+  const settled = (characters.data ?? []).every(character => Boolean(accessMap[character.id]));
+  const selectionKey = playerSelectionKey(sessionKey, campaign.id);
+  const storedSelection = window.localStorage.getItem(selectionKey);
+  const selected = eligible.find(character => character.id === storedSelection);
+  useEffect(() => {
+    if (characters.data && !characters.error && settled && !failed && eligible.length === 1) {
+      navigate(path(`/${campaignId}/player/characters/${encodeURIComponent(eligible[0].id)}`), { replace: true });
+    } else if (characters.data && !characters.error && settled && !failed && selected) {
+      navigate(path(`/${campaignId}/player/characters/${encodeURIComponent(selected.id)}`), { replace: true });
+    }
+  }, [characters.data, characters.error, settled, failed, eligible, selected, campaignId, navigate, path]);
+  if (characters.loading && !characters.data) return <StatePanel kind="loading">Загрузка персонажей…</StatePanel>;
+  if (characters.error && !characters.data) return <ApiError error={characters.error} onRetry={characters.reload} />;
+  return <section>
+    <PageHeader title="Мой персонаж" headingLevel={2} />
+    {Boolean(characters.error) && <ApiError error={characters.error} onRetry={characters.reload} />}
+    {(characters.data ?? []).map(character => <PermissionProbe key={`${key}:${character.id}`} character={character} campaignId={campaignId} resourceKey={key} onResult={onResult} />)}
+    {Object.values(accessMap).some(value => 'error' in value) && <Notification kind="error">Не удалось проверить доступ к персонажам.</Notification>}
+    {!settled && !characters.error && <StatePanel kind="loading">Проверка доступа к персонажам…</StatePanel>}
+    {settled && !characters.error && !failed && eligible.length === 0 && <StatePanel kind="empty">В этой кампании пока нет персонажей, которыми вы можете управлять. Разделы «Мир» и «Каталог» доступны в навигации.</StatePanel>}
+    {settled && !characters.error && !failed && eligible.length > 1 && <Field label="Персонаж" htmlFor="player-character-selection">
+      <Select variant="single-line" id="player-character-selection" value="" onChange={event => {
+        const characterId = event.target.value;
+        if (!eligible.some(character => character.id === characterId)) return;
+        window.localStorage.setItem(selectionKey, characterId);
+        navigate(path(`/${campaignId}/player/characters/${encodeURIComponent(characterId)}`));
+      }}>
+        <option value="">Выберите персонажа</option>
+        {eligible.map(character => <option key={character.id} value={character.id}>{character.name}</option>)}
+      </Select>
+    </Field>}
+  </section>;
+};
 
 const CharacterCard: React.FC<{ character: CharacterMetadata; href: string; mode: 'gm' | 'player' }> = ({ character, href, mode }) => (
   <Panel

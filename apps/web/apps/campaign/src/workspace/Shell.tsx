@@ -89,7 +89,7 @@ const CampaignShell: React.FC = () => {
     catch (error) { if (mounted.current && sequence.current === current && route.current === pathname) setSwitchError(error); }
     finally { if (mounted.current && sequence.current === current) { busy.current = false; setSwitchBusy(false); } }
   };
-  const nav: [string, string][] = mode === 'gm' ? [['Обзор', 'gm/overview'], ['Мир', 'gm/world'], ['Каталог', 'gm/catalog'], ['Лист персонажа', 'gm/character-sheet'], ['Управление', 'gm/settings']] : [['Мои персонажи', 'player/characters'], ['Мир', 'player/world'], ['Каталог', 'player/catalog']];
+  const nav: [string, string][] = mode === 'gm' ? [['Обзор', 'gm/overview'], ['Мир', 'gm/world'], ['Каталог', 'gm/catalog'], ['Лист персонажа', 'gm/character-sheet'], ['Управление', 'gm/settings']] : [['Мой персонаж', 'player/characters'], ['Мир', 'player/world'], ['Каталог', 'player/catalog']];
   const inCharacterSheetSections = location.pathname.startsWith(`/${id}/gm/character-sheet`);
   const title = inCharacterSheetSections ? 'Лист персонажа' : mode === 'gm' && location.pathname.includes(`/${id}/gm/settings`) ? 'Управление' : location.pathname.includes(`/${id}/${mode}/world`) ? 'Мир' : nav.find(([, suffix]) => location.pathname.endsWith(`/${suffix}`))?.[0] ?? campaign.data.name;
   const sectionIcons: Record<string, NavigationIconName> = {

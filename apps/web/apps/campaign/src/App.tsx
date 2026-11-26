@@ -7,7 +7,7 @@ import { useResource } from './workspace/hooks';
 import { ApiError } from './workspace/Feedback';
 import Campaigns from './workspace/Campaigns';
 import Shell, { useCampaignWorkspace } from './workspace/Shell';
-import Characters from './workspace/Characters';
+import { PlayerCharactersEntry } from './workspace/Characters';
 import CampaignOverview from './workspace/CampaignOverview';
 import Members from './workspace/Members';
 import CampaignSettings from './workspace/CampaignSettings';
@@ -154,7 +154,7 @@ const GuardedRoutes: React.FC = () => {
       </Route>
       <Route path="users" element={<LegacySectionEntry target="members" />} />
       <Route path="settings" element={<LegacySectionEntry target="settings" />} />
-      <Route path="player/characters" element={<Characters />} />
+      <Route path="player/characters" element={<PlayerCharactersEntry />} />
       <Route path="player/characters/:characterId" element={<CharacterSheetRoute />} />
       <Route path="player/characters/:characterId/:pageKey" element={<CharacterSheetRoute />} />
       <Route path="character/:characterId" element={<LegacyCharacterRoute />} />
