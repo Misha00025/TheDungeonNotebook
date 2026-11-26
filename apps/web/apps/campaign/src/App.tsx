@@ -19,7 +19,7 @@ import Catalog from './workspace/Catalog';
 import World from './workspace/World';
 import LegacyExportDiscovery from './workspace/LegacyExportDiscovery';
 import CharacterSheet from './workspace/CharacterSheet';
-import type { WorldKind } from './workspace/types';
+import type { WorldKind, WorldMaterial, WorldMaterialBody } from './workspace/types';
 import '@tdn/shared/styles/globals.css';
 
 const NotFound: React.FC = () => { const { path } = useWorkspace(); return <section><h2>Страница не найдена</h2><Link to={path('/')}>К кампаниям</Link></section>; };
@@ -27,8 +27,13 @@ const WorldRoute: React.FC = () => {
   const { groupId = '', kind = '', materialId } = useParams();
   const { sessionKey } = useWorkspace();
   const { mode } = useCampaignWorkspace();
+  const location = useLocation();
   if (!['locations', 'organizations', 'lore'].includes(kind)) return <NotFound />;
-  return <World key={`${sessionKey}:${groupId}:${mode}:${kind}:${materialId ?? ''}`} kind={kind as WorldKind} materialId={materialId} />;
+  const state = location.state as { worldMaterial?: WorldMaterial; worldBody?: WorldMaterialBody } | null;
+  const candidate = state?.worldMaterial;
+  const initialMaterial = mode === 'gm' && materialId && candidate?.id === materialId && candidate.campaignId === Number(groupId) && candidate.kind === kind ? candidate : undefined;
+  const initialBody = initialMaterial && state?.worldBody ? state.worldBody : undefined;
+  return <World key={`${sessionKey}:${groupId}:${mode}:${kind}:${materialId ?? ''}`} kind={kind as WorldKind} materialId={materialId} initialMaterial={initialMaterial} initialBody={initialBody} />;
 };
 const ModeEntry: React.FC = () => {
   const { groupId = '' } = useParams();

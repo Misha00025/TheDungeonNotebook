@@ -46,4 +46,77 @@ describe('world materials API', () => {
     expect(detail).toEqual(material);
     expect(body.body).toBe('## Причал\n\nЗдесь начинается путь.\n\n- Северный мол\n- Рыбный рынок');
   });
+
+  it('creates and reads back a closed location without changing its tag or Markdown body', async () => {
+    const requestId = '2e015e8d-6fe2-4a24-8330-b59c6ef01f3a';
+    const tag = 'двор, старый рынок';
+    const body = '# Старый рынок\n\n## Арка\n\nТекст **без изменений**.\n';
+    const materials = new Map<string, WorldMaterial>();
+    const bodies = new Map<string, WorldMaterialBody>();
+    const request = vi.fn(async (url: string, options?: RequestInit) => {
+      const method = options?.method ?? 'GET';
+      const createPath = '/api/campaigns/42/world/locations';
+      if (url === createPath && method === 'POST') {
+        const input = JSON.parse(String(options?.body)) as {
+          requestId: string;
+          title: string;
+          description: string;
+          tags: string[];
+          body: string;
+        };
+        const material: WorldMaterial = {
+          id: input.requestId,
+          campaignId: 42,
+          kind: 'locations',
+          title: input.title,
+          description: input.description,
+          tags: input.tags,
+          isPublished: false,
+          metadataRevision: 1,
+        };
+        const content: WorldMaterialBody = { body: input.body, bodyVersion: 'body-version-1' };
+        materials.set(material.id, material);
+        bodies.set(material.id, content);
+        return new Response(JSON.stringify({ material, bodyVersion: content.bodyVersion }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      const materialPath = `${createPath}/${requestId}`;
+      if (url === materialPath && method === 'GET') {
+        const material = materials.get(requestId);
+        if (material) return json(material);
+      }
+      if (url === `${materialPath}/body` && method === 'GET') {
+        const content = bodies.get(requestId);
+        if (content) return json(content);
+      }
+      throw new Error('Unexpected world-material request');
+    }) as unknown as AuthenticatedRequest;
+    const api = createCampaignApi(request);
+
+    const created = await api.createWorldMaterial(42, 'locations', {
+      requestId,
+      title: 'Старый рынок',
+      description: 'Закрытое место у городской стены.',
+      tags: [tag],
+      body,
+    });
+    const material = await api.getWorldMaterial(42, 'locations', created.material.id);
+    const content = await api.getWorldBody(42, 'locations', created.material.id);
+
+    expect(material).toEqual({
+      id: requestId,
+      campaignId: 42,
+      kind: 'locations',
+      title: 'Старый рынок',
+      description: 'Закрытое место у городской стены.',
+      tags: [tag],
+      isPublished: false,
+      metadataRevision: 1,
+    });
+    expect(material.tags).toEqual(['двор, старый рынок']);
+    expect(material.isPublished).toBe(false);
+    expect(content).toEqual({ body, bodyVersion: 'body-version-1' });
+  });
 });

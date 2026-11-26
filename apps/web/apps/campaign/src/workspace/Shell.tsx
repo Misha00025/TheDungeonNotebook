@@ -54,7 +54,8 @@ const CampaignShell: React.FC = () => {
   if (permission.loading && !permission.data) return <StatePanel kind="loading">Загрузка прав кампании…</StatePanel>;
   if (permission.error && !permission.data) return <ApiError error={permission.error} onRetry={permission.reload} />;
   if (!permission.data) return <Notification kind="error" eventKey={permission.error}>Права кампании недоступны.</Notification>;
-  if (mode === 'gm' && !permission.loading && !permission.error && !permission.data.canWrite) return <Navigate to={path(`/${id}/player/characters`)} replace />;
+  const keepWorldReaderOpen = location.pathname.includes(`/${id}/gm/world`);
+  if (mode === 'gm' && !keepWorldReaderOpen && !permission.loading && !permission.error && !permission.data.canWrite) return <Navigate to={path(`/${id}/player/characters`)} replace />;
   const effective = permission.data;
   const canEnterGm = effective.canWrite;
   const targetMode = (next: 'gm' | 'player') => path(`/${id}/${next === 'gm' ? 'gm/overview' : 'player/characters'}`);

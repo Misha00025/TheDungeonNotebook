@@ -6,6 +6,10 @@ export type Revision = JsonNumber;
 export type WorldKind = 'locations' | 'organizations' | 'lore';
 export interface WorldMaterial { id: string; campaignId: number; kind: WorldKind; title: string; description: string; tags: string[]; isPublished: boolean; metadataRevision: Revision }
 export interface WorldMaterialBody { body: string; bodyVersion: string }
+export interface WorldMaterialCreateRequest { requestId: string; title: string; description: string; tags: string[]; body: string }
+export interface WorldMaterialCreateResult { material: WorldMaterial; bodyVersion: string }
+export interface WorldMaterialUpdateRequest { title: string; description: string; tags: string[]; isPublished: boolean; expectedRevision: Revision }
+export interface WorldMaterialBodyUpdateRequest { body: string; expectedVersion: string }
 export type ValueType = 'Integer' | 'Number' | 'String' | 'Boolean' | 'SingleChoice' | 'MultiChoice';
 export type Importance = 'Background' | 'Secondary' | 'Key';
 export type NumericResultType = 'Integer' | 'Number';
