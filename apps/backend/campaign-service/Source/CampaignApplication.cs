@@ -12,6 +12,7 @@ using Tdn.Campaigns.Sheets;
 using Tdn.Campaigns.Computation;
 using Tdn.Campaigns.Views;
 using Tdn.Campaigns.Catalog;
+using Tdn.Campaigns.WorldContent;
 using MongoDB.Driver;
 
 namespace Tdn.Campaigns;
@@ -95,6 +96,9 @@ public static class CampaignApplication
         builder.Services.AddScoped(typeof(ICharacterCatalogStore<>), typeof(EfCharacterCatalogStore<>));
         builder.Services.AddScoped<IContentStore, MongoContentStore>();
         builder.Services.AddScoped(typeof(CatalogService<>));
+        builder.Services.Configure<WorldContentOptions>(builder.Configuration.GetSection("WorldContent"));
+        builder.Services.AddScoped<IWorldMaterialStore, EfWorldMaterialStore>();
+        builder.Services.AddScoped<WorldMaterialService>();
         builder.Services.AddScoped(typeof(CharacterCatalogService<>));
         builder.Services.AddScoped(typeof(CatalogGroupService<>));
         builder.Services.AddScoped<SheetService>();

@@ -7,6 +7,7 @@ using Tdn.Campaigns.Campaigns;
 using Tdn.Campaigns.Catalog;
 using Tdn.Campaigns.Persistence;
 using Tdn.Campaigns.Sheets;
+using Tdn.Campaigns.WorldContent;
 
 namespace Tdn.Campaigns.Persistence.Migrations;
 
@@ -133,6 +134,20 @@ public sealed class CampaignDbContextModelSnapshot : ModelSnapshot
 
         ConfigureCatalog<ItemCatalog>(modelBuilder, "ItemDefinitions", "CharacterItems", "ItemAdditionReceipts");
         ConfigureCatalog<SkillCatalog>(modelBuilder, "SkillDefinitions", "CharacterSkills", "SkillAdditionReceipts");
+        var material = modelBuilder.Entity<WorldMaterial>();
+        material.ToTable("WorldMaterials", table => table.HasCheckConstraint("CK_WorldMaterials_MetadataRevision", "MetadataRevision >= 1"));
+        material.HasKey(x => x.Id);
+        material.HasAlternateKey(x => new { x.CampaignId, x.Id });
+        material.Property(x => x.Id).ValueGeneratedNever().HasColumnType("char(36)");
+        material.Property(x => x.CampaignId).HasColumnType("int");
+        material.Property(x => x.Kind).IsRequired().HasColumnType("varchar(32)");
+        material.Property(x => x.Title).IsRequired().HasColumnType("longtext");
+        material.Property(x => x.Description).IsRequired().HasColumnType("longtext");
+        material.Property(x => x.Tags).IsRequired().HasColumnType("longtext");
+        material.Property(x => x.IsPublished).IsRequired().ValueGeneratedOnAdd().HasColumnType("tinyint(1)").HasDefaultValue(false);
+        material.Property(x => x.MetadataRevision).IsConcurrencyToken().HasColumnType("bigint");
+        material.HasIndex(x => new { x.CampaignId, x.Kind });
+        modelBuilder.Entity<WorldMaterial>().HasOne(x => x.Campaign).WithMany().HasForeignKey(x => x.CampaignId).OnDelete(DeleteBehavior.Restrict).IsRequired();
 
     }
 

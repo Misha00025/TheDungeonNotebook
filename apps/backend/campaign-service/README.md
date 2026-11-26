@@ -8,6 +8,8 @@ The separate item and skill catalog APIs, schemas, and content contracts are doc
 
 Character-attached catalog records, quantities, local values, and add receipts are documented in [`docs/character-catalog.md`](docs/character-catalog.md).
 
+Campaign-scoped locations, organizations, and lore materials with file-backed Markdown bodies are documented in [`docs/world-content.md`](docs/world-content.md). Configure `WorldContent:RootPath` to select their storage root; the default is the relative path `world-content`.
+
 Independent item and skill group navigation and conditional membership are documented in [`docs/catalog-groups.md`](docs/catalog-groups.md).
 
 ## Structure
@@ -53,7 +55,7 @@ Views store a typed Layout/Widget tree and opaque native JSON parameters. The ba
 
 ## Data storage and publication boundaries
 
-SQL stores campaign and member records, one shared-primary-key `CampaignTemplates` metadata row per campaign, separate item and skill definitions/character records/add receipts (six tables total), other resource metadata, and character assignments. MongoDB stores content in `campaignTemplates` (one document per campaign, created by the first content update), `characterSheets`, `formulaContents`, `viewContents`, `campaignPresentationConfigs`, and eight catalog collections: `itemAttributeDefinitions`, `itemContents`, `characterItemContents`, `itemGroups`, `skillAttributeDefinitions`, `skillContents`, `characterSkillContents`, and `skillGroups`. Item and skill application logic is generic/shared, but their persisted data and group/schema revisions are independent. Current point reads use MongoDB's standard unique `_id` index, whose value combines campaign ID and the internal resource key; singleton documents use `Guid.Empty` as their resource ID. The template has no public resource selector. The service does not rely on user-created indexes or full collection scans to establish publication. Mongo `contentRevision` and SQL `metadataRevision` are independent. View `params` and context parameters remain native JSON values. This service slice has no filesystem-backed content bodies.
+SQL stores campaign and member records, one shared-primary-key `CampaignTemplates` metadata row per campaign, separate item and skill definitions/character records/add receipts (six tables total), world-material metadata, other resource metadata, and character assignments. MongoDB stores content in `campaignTemplates` (one document per campaign, created by the first content update), `characterSheets`, `formulaContents`, `viewContents`, `campaignPresentationConfigs`, and eight catalog collections: `itemAttributeDefinitions`, `itemContents`, `characterItemContents`, `itemGroups`, `skillAttributeDefinitions`, `skillContents`, `characterSkillContents`, and `skillGroups`. Item and skill application logic is generic/shared, but their persisted data and group/schema revisions are independent. Current point reads use MongoDB's standard unique `_id` index, whose value combines campaign ID and the internal resource key; singleton documents use `Guid.Empty` as their resource ID. The template has no public resource selector. The service does not rely on user-created indexes or full collection scans to establish publication. Mongo `contentRevision` and SQL `metadataRevision` are independent. View `params` and context parameters remain native JSON values. World-material bodies are UTF-8 Markdown files below `WorldContent:RootPath`, partitioned by campaign ID and material GUID; SQL metadata and files do not share a transaction.
 
 ### Destructive legacy catalog startup cleanup
 
@@ -76,6 +78,7 @@ SQL and MongoDB do not share a transaction. Character, formula, View, and catalo
 | `MONGO_DATABASE` | Required MongoDB database name | No default; configure for service startup |
 | `Characters:DefaultImportance` | Default importance when creating a character | `background` |
 | `Access:MembersCanReadDefinitions` | Allow campaign members to read template definitions | `true` |
+| `WorldContent:RootPath` | Root directory for world-material Markdown bodies | `world-content` (relative to the service process working directory) |
 | `urls` / `ASPNETCORE_URLS` | Listening URL configuration | Not set by the service; Kestrel uses standard defaults |
 | `ASPNETCORE_ENVIRONMENT` | ASP.NET Core environment | `Production` when not set |
 | `Logging:LogLevel` | Logging thresholds | Root `appsettings.json`: `Default=Warning`, `Tdn.Api=Information`, `Microsoft.AspNetCore.Hosting.Diagnostics=Information` |

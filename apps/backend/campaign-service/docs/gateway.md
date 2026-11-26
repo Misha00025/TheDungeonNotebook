@@ -6,6 +6,8 @@ Template routes are singleton paths: `GET`/`PUT /api/campaigns/{campaignId}/temp
 
 Item routes are explicitly proxied one-to-one under `/api/campaigns/{campaignId}/catalog/items`, including `/attributes`, `/attributes/{attributeId}`, and `/groups` with its `configuration` and `{groupId}/entries` reads. Skill routes have the same shape under `/api/campaigns/{campaignId}/catalog/skills`. Character item and skill routes are respectively under `/api/campaigns/{campaignId}/characters/{characterId}/items` and `/skills`; each has its own `create`, `additions/{requestId}`, and record routes. Only item records have a `quantity` route. These routes forward the verified subject and response without parameter injection; detailed contracts are in [catalog.md](catalog.md), [character-catalog.md](character-catalog.md), and [catalog-groups.md](catalog-groups.md).
 
+World-material routes are explicitly proxied under `/api/campaigns/{campaignId}/world/{kind}` for list/create, individual metadata read/update/delete, and individual `/body` read/update. They use the existing campaign upstream and response hooks and forward the verified subject, query, and body unchanged. The service recognizes only `locations`, `organizations`, and `lore`; see [world-content.md](world-content.md).
+
 Full group configuration is administrator-only in campaign-service; Gateway applies no group-specific access hook or parameter injection. The two scopes have separate group configuration and revisions.
 
 Virtual-field inputs use ordinary `bindings` only; the separate parent-field properties are not part of the service contract. Existing template/custom virtual-field and override proxy routes pass their request bodies through without rewrites.

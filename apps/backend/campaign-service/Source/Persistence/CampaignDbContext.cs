@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Tdn.Campaigns.Campaigns;
 using Tdn.Campaigns.Sheets;
 using Tdn.Campaigns.Catalog;
+using Tdn.Campaigns.WorldContent;
 
 namespace Tdn.Campaigns.Persistence;
 
@@ -20,6 +21,7 @@ public sealed class CampaignDbContext(DbContextOptions<CampaignDbContext> option
     public DbSet<CharacterCatalogEntry<SkillCatalog>> CharacterSkills => Set<CharacterCatalogEntry<SkillCatalog>>();
     public DbSet<CatalogAdditionReceipt<ItemCatalog>> ItemAdditionReceipts => Set<CatalogAdditionReceipt<ItemCatalog>>();
     public DbSet<CatalogAdditionReceipt<SkillCatalog>> SkillAdditionReceipts => Set<CatalogAdditionReceipt<SkillCatalog>>();
+    public DbSet<WorldMaterial> WorldMaterials => Set<WorldMaterial>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -83,6 +85,19 @@ public sealed class CampaignDbContext(DbContextOptions<CampaignDbContext> option
 
         ConfigureCatalog<ItemCatalog>(modelBuilder);
         ConfigureCatalog<SkillCatalog>(modelBuilder);
+        var material = modelBuilder.Entity<WorldMaterial>();
+        material.ToTable("WorldMaterials", table => table.HasCheckConstraint("CK_WorldMaterials_MetadataRevision", "MetadataRevision >= 1"));
+        material.HasKey(x => x.Id);
+        material.HasAlternateKey(x => new { x.CampaignId, x.Id });
+        material.Property(x => x.Id).ValueGeneratedNever();
+        material.Property(x => x.Kind).IsRequired().HasColumnType("varchar(32)");
+        material.Property(x => x.Title).IsRequired().HasColumnType("longtext");
+        material.Property(x => x.Description).IsRequired().HasColumnType("longtext");
+        material.Property(x => x.Tags).IsRequired().HasColumnType("longtext");
+        material.Property(x => x.IsPublished).IsRequired().HasDefaultValue(false);
+        material.Property(x => x.MetadataRevision).IsRequired().IsConcurrencyToken();
+        material.HasIndex(x => new { x.CampaignId, x.Kind });
+        material.HasOne(x => x.Campaign).WithMany().HasForeignKey(x => x.CampaignId).OnDelete(DeleteBehavior.Restrict);
     }
 
     private static void ConfigureCatalog<TCatalog>(ModelBuilder modelBuilder) where TCatalog : ICatalogType

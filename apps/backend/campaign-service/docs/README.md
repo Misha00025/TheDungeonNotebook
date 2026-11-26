@@ -11,6 +11,7 @@ Current API contracts:
 - [Separate item and skill catalogs, schemas, and content](catalog.md)
 - [Character items and skills, quantities, local state, and add receipts](character-catalog.md)
 - [Independent item and skill groups and conditional selection](catalog-groups.md)
+- [World materials and file-backed bodies](world-content.md)
 - [API Gateway routing](gateway.md)
 - [Singleton-template Web handoff](singleton-template-web.md)
 

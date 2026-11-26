@@ -22,6 +22,8 @@ Separate item and skill routes use `/api/campaigns/{campaignId}/catalog/items` a
 
 Character items and skills use separate explicit routes under `/api/campaigns/{campaignId}/characters/{characterId}/items` and `/skills`; see the campaign-service [character catalog contract](../campaign-service/docs/character-catalog.md). These routes forward the verified `X-Subject` one-to-one and do not add policy hooks or parameter injection.
 
+World materials are proxied one-to-one under `/api/campaigns/{campaignId}/world/{kind}`, including metadata and `/body` routes. They use the existing campaign upstream/response hooks and verified `X-Subject`; query parameters and bodies are not rewritten. The supported kinds and service behavior are documented in the campaign-service [world content contract](../campaign-service/docs/world-content.md).
+
 Item and skill groups use separate route families under `/api/campaigns/{campaignId}/catalog/items/groups` and `/catalog/skills/groups`. See the campaign-service [catalog groups contract](../campaign-service/docs/catalog-groups.md). They use the existing verified-subject hooks without group-specific access rules or parameter injection.
 
 Virtual-field requests use ordinary `bindings` only; separate parent-field properties are not part of the service contract. Existing template/custom virtual-field and override routes pass bodies through without rewrites.
