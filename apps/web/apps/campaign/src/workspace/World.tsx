@@ -3,6 +3,7 @@ import { useLocation, useParams } from 'react-router-dom';
 import { ActionRow, Button, Field, IconButton, Input, List, NavigationListItem, PageHeader, StatePanel, TabBar, Toolbar } from '@tdn/shared';
 import { useCampaignWorkspace } from './Shell';
 import { useWorkspace } from './Workspace';
+import Characters from './Characters';
 import { useResource } from './hooks';
 import { CampaignApiError } from './api';
 import type { WorldKind, WorldMaterial, WorldMaterialBody } from './types';
@@ -14,6 +15,8 @@ const tabs = [
   { id: 'locations', label: 'Локации', path: 'locations' },
   { id: 'organizations', label: 'Организации', path: 'organizations' },
 ];
+const getWorldTabs = (_mode: 'gm' | 'player') =>
+  [...tabs, { id: 'characters', label: 'Персонажи', path: 'characters' }];
 
 type WorldRouteState = {
   worldMaterial?: WorldMaterial;
@@ -57,7 +60,7 @@ const World: React.FC<{ kind: WorldKind; materialId?: string; initialMaterial?: 
 
   return <>
     <PageHeader title="Мир" />
-    <TabBar aria-label="Разделы мира" basePath={basePath} tabs={tabs} />
+    <TabBar aria-label="Разделы мира" basePath={basePath} tabs={getWorldTabs(mode)} />
     {materialId === undefined
       ? <WorldList key={`${scope}:list`} campaignId={campaignId} kind={kind} mode={mode} scope={scope} canWrite={canWrite} permissionsLoading={permissionsLoading} initialTag={routeState?.worldReturnTag ?? ''} createdMaterial={routeState?.worldMaterial} />
       : <WorldMaterialDetail
@@ -76,6 +79,17 @@ const World: React.FC<{ kind: WorldKind; materialId?: string; initialMaterial?: 
   </>;
 };
 
+export const WorldCharactersPage: React.FC = () => {
+  const { groupId = '' } = useParams();
+  const { path } = useWorkspace();
+  const { mode } = useCampaignWorkspace();
+  return <>
+    <PageHeader title="Мир" />
+    <TabBar aria-label="Разделы мира" basePath={path(`/${groupId}/${mode}/world`)} tabs={getWorldTabs(mode)} />
+    <Characters worldTab />
+  </>;
+};
+
 export const WorldCreatePage: React.FC<{
   campaignId: number;
   kind: WorldKind;
@@ -90,7 +104,7 @@ export const WorldCreatePage: React.FC<{
   const scope = `${sessionKey}:${campaignId}:${mode}:${kind}`;
   return <>
     <PageHeader title="Мир" subtitle="Создание материала" />
-    <TabBar aria-label="Разделы мира" basePath={path(`/${campaignId}/${mode}/world`)} tabs={tabs} />
+    <TabBar aria-label="Разделы мира" basePath={path(`/${campaignId}/${mode}/world`)} tabs={getWorldTabs(mode)} />
     <CreateWorldMaterialPage
       key={`${scope}:create`}
       campaignId={campaignId}

@@ -57,7 +57,7 @@ const GMCharacterEntry: React.FC<{ character: CharacterMetadata; href: string; c
   </div>;
 };
 
-const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
+const Characters: React.FC<{ compact?: boolean; worldTab?: boolean }> = ({ compact = false, worldTab = false }) => {
   const { groupId = '' } = useParams();
   const campaignId = Number(groupId);
   const { api, path, sessionKey } = useWorkspace();
@@ -95,10 +95,10 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const hasCardAssignment = Boolean(presentationConfig?.defaults.character_card);
   const cardSetupError = presentationResource.error ?? (hasCardAssignment ? cardPresentationResource.error : undefined);
   const cardModeActive = !compact && hasCardAssignment;
-  const allowed = filtered.filter(item => { const access = accessMap[item.id]; return access && !('error' in access) && (access.canRead || access.canWrite); });
-  const failed = filtered.filter(item => { const access = accessMap[item.id]; return access && 'error' in access; });
-  const settled = filtered.every(item => Boolean(accessMap[item.id]));
-  const groups = mode === 'player' ? [
+  const allowed = worldTab ? filtered : filtered.filter(item => { const access = accessMap[item.id]; return access && !('error' in access) && (access.canRead || access.canWrite); });
+  const failed = worldTab ? [] : filtered.filter(item => { const access = accessMap[item.id]; return access && 'error' in access; });
+  const settled = worldTab || filtered.every(item => Boolean(accessMap[item.id]));
+  const groups = mode === 'player' && !worldTab ? [
     ['Могу вести', allowed.filter(item => { const access = accessMap[item.id]; return access && !('error' in access) && access.canWrite; })],
     ['Могу просматривать', allowed.filter(item => { const access = accessMap[item.id]; return access && !('error' in access) && !access.canWrite; })]
   ] as const : [['Персонажи', allowed]] as const;
@@ -121,7 +121,7 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   return <section aria-busy={resource.loading || !settled || (!compact && (presentationResource.loading || Boolean(hasCardAssignment && cardPresentationResource.loading))) || undefined}><List layout="vertical" stretch>
     {!compact && <>
       <PageHeader
-        title={mode === 'gm' ? 'Персонажи кампании' : 'Мои персонажи'}
+        title={mode === 'gm' || worldTab ? 'Персонажи кампании' : 'Мои персонажи'}
         headingLevel={2}
         actions={mode === 'gm'
           ? <Button type="button" disabled={!permissions.canWrite || permissionsLoading || createOpen} onClick={() => setCreateOpen(true)}>Создать персонажа</Button>
@@ -136,13 +136,13 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
     {retainedDraftCards.length > 0 && <p className={styles.retainedDraftNote}>Карточки с несохранённым вводом или выполняющимся сохранением остаются видимыми, даже если не совпадают с поиском.</p>}
     {!resource.data?.length && !resource.loading && !resource.error && <StatePanel kind="empty">{emptyText}</StatePanel>}
     {Boolean(resource.data?.length) && filtered.length === 0 && <StatePanel kind="empty">Совпадений нет.</StatePanel>}
-    {filtered.map(character => <PermissionProbe key={`${key}:${character.id}`} character={character} campaignId={campaignId} resourceKey={key} onResult={onResult} />)}
+    {!worldTab && filtered.map(character => <PermissionProbe key={`${key}:${character.id}`} character={character} campaignId={campaignId} resourceKey={key} onResult={onResult} />)}
     {mode === 'gm' && compact && <List layout="vertical" stretch>
       {groups[0][1].map(item => compact
          ? <CharacterRow key={item.id} character={item} href={characterHref(item.id)} mode="gm" />
         : <CharacterCard key={item.id} character={item} href={characterHref(item.id)} mode="gm" />)}
     </List>}
-    {mode === 'gm' && !compact && <>
+    {(mode === 'gm' || worldTab) && !compact && <>
       {(['Key', 'Secondary', 'Background'] as const).map((importance, index) => {
         const titles = ['Ключевые', 'Второстепенные', 'Фоновые'];
         const items = allowed.filter(item => item.importance === importance);
@@ -164,7 +164,7 @@ const Characters: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
         </section>;
       })}
     </>}
-    {mode === 'player' && <List layout="grid" columns={2} minItemWidth="18rem">
+    {mode === 'player' && !worldTab && <List layout="grid" columns={2} minItemWidth="18rem">
       {groups.map(([title, items], index) => {
         const id = `${headingId}-${index}`;
         const emptyLabel = index === 0 ? 'Нет персонажей для ведения.' : 'Нет персонажей только для просмотра.';

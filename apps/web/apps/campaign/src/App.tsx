@@ -17,7 +17,7 @@ import Templates from './workspace/Templates';
 import Formulas from './workspace/Formulas';
 import Views from './workspace/Views';
 import Catalog from './workspace/Catalog';
-import World, { WorldCreatePage } from './workspace/World';
+import World, { WorldCharactersPage, WorldCreatePage } from './workspace/World';
 import LegacyExportDiscovery from './workspace/LegacyExportDiscovery';
 import CharacterSheet from './workspace/CharacterSheet';
 import type { WorldKind, WorldMaterial, WorldMaterialBody } from './workspace/types';
@@ -77,6 +77,12 @@ const LegacyCharactersEntry: React.FC = () => {
   if (resource.error) return <ApiError error={resource.error} onRetry={resource.reload} />;
   return <Navigate to={path(`/${id}/${resource.data?.canWrite ? 'gm' : 'player'}/characters`)} replace />;
 };
+const LegacyGmCharactersEntry: React.FC = () => {
+  const { groupId = '' } = useParams();
+  const location = useLocation();
+  const { path } = useWorkspace();
+  return <Navigate to={{ pathname: path(`/${groupId}/gm/world/characters`), search: location.search, hash: location.hash }} replace />;
+};
 const LegacySectionEntry: React.FC<{ target: 'members' | 'settings' | 'templates' }> = ({ target }) => {
   const { groupId = '' } = useParams();
   const { api, path, sessionKey } = useWorkspace();
@@ -120,6 +126,7 @@ const GuardedRoutes: React.FC = () => {
       </Route>
       <Route path="gm/world">
         <Route index element={<Navigate to="locations" replace />} />
+        <Route path="characters" element={<WorldCharactersPage />} />
         <Route path=":kind/new" element={<WorldCreateRoute />} />
         <Route path=":kind" element={<WorldRoute />} />
         <Route path=":kind/:materialId" element={<WorldRoute />} />
@@ -131,11 +138,12 @@ const GuardedRoutes: React.FC = () => {
       </Route>
       <Route path="player/world">
         <Route index element={<Navigate to="locations" replace />} />
+        <Route path="characters" element={<WorldCharactersPage />} />
         <Route path=":kind" element={<WorldRoute />} />
         <Route path=":kind/:materialId" element={<WorldRoute />} />
       </Route>
       <Route path="templates" element={<LegacySectionEntry target="templates" />} />
-      <Route path="gm/characters" element={<Characters />} />
+      <Route path="gm/characters" element={<LegacyGmCharactersEntry />} />
       <Route path="gm/characters/:characterId" element={<CharacterSheetRoute />} />
       <Route path="gm/characters/:characterId/:pageKey" element={<CharacterSheetRoute />} />
       <Route path="gm/members" element={<LegacyMembersEntry />} />
