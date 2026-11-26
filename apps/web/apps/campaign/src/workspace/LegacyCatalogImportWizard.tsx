@@ -4,7 +4,7 @@ import { CampaignApiError } from './api';
 import { ApiError } from './Feedback';
 import type { LegacyObject } from './legacyDiscovery';
 import type { CatalogAttributeSchemaEnvelope, CatalogAttributeType, CatalogKind } from './catalogTypes';
-import { catalogImportOccurrences, discoverCatalogAttributes, metadataForLegacy, schemaInputs } from './legacyCatalogImport';
+import { catalogImportOccurrences, discoverCatalogAttributes, discoverCatalogChoiceOptions, metadataForLegacy, schemaInputs } from './legacyCatalogImport';
 import { useWorkspace, useDirtyDraft } from './Workspace';
 import { useCampaignWorkspace } from './Shell';
 
@@ -35,6 +35,7 @@ const LegacyCatalogImportWizard: React.FC<Props> = ({ items, skills, skillAttrib
   const busyRef = useRef(false);
   const picked = (kind: Kind) => [...selected[kind]].sort((a, b) => a - b).map(index => sources[kind][index]).filter((source): source is LegacyObject => Boolean(source));
   const proposalMap = useMemo(() => ({ Item: discoverCatalogAttributes('Item', picked('Item'), []), Skill: discoverCatalogAttributes('Skill', picked('Skill'), skillAttributes) }), [items, skills, skillAttributes, selected]);
+  const optionMap = useMemo(() => ({ Item: discoverCatalogChoiceOptions(items, choices.Item), Skill: discoverCatalogChoiceOptions(skills, choices.Skill) }), [items, skills, choices]);
   const dirty = Object.values(selected).some(value => value.size > 0) && outcomes.length === 0;
   const clearDirty = useDirtyDraft(`legacy-catalog-import-${sessionKey}-${campaignId}`, dirty);
 
@@ -94,7 +95,7 @@ const LegacyCatalogImportWizard: React.FC<Props> = ({ items, skills, skillAttrib
         if (!schema) { report.push({ kind, name: 'Схема', status: 'не загружена; определения не обработаны' }); continue; }
         const chosen = proposalMap[kind].filter(item => choices[kind][item.key]?.included);
         const existingCount = schema.data.definitions.length;
-        const definitionInputs = schemaInputs(schema.data.definitions, proposalMap[kind], choices[kind]);
+        const definitionInputs = schemaInputs(schema.data.definitions, proposalMap[kind], choices[kind], optionMap[kind]);
         const newChosen = chosen.length > 0;
         const ids = new Map<string, string>();
         if (newChosen) {
@@ -118,7 +119,7 @@ const LegacyCatalogImportWizard: React.FC<Props> = ({ items, skills, skillAttrib
         for (const source of [...selected[kind]].sort((a, b) => a - b).map(index => sources[kind][index])) {
           if (!source) continue;
           const sourceChoices = choices[kind];
-            const occurrenceResult = catalogImportOccurrences(kind, source, sourceChoices, ids);
+          const occurrenceResult = catalogImportOccurrences(kind, source, sourceChoices, ids, optionMap[kind]);
           const requestId = crypto.randomUUID();
           const metadata = metadataForLegacy(kind, source);
           const request = { requestId, ...metadata, description: typeof source.data.description === 'string' ? source.data.description : '', attributes: occurrenceResult.attributes };
@@ -194,7 +195,7 @@ const LegacyCatalogImportWizard: React.FC<Props> = ({ items, skills, skillAttrib
           <tbody>{proposalMap[kind].map(attribute => <tr key={attribute.key}>
             <DataTableCell><Checkbox aria-label={`Импортировать атрибут ${attribute.title}`} checked={choices[kind][attribute.key]?.included ?? false} disabled={busy || !canWrite} onChange={event => updateChoice(kind, attribute.key, { included: event.target.checked })} /></DataTableCell>
             <DataTableCell as="th" scope="row">{attribute.title} <small>({attribute.key})</small></DataTableCell>
-            <DataTableCell>{attribute.price ? 'integer' : <Select aria-label={`Тип атрибута ${attribute.title}`} value={choices[kind][attribute.key]?.typeKey ?? 'string'} disabled={busy || !canWrite} onChange={event => updateChoice(kind, attribute.key, { typeKey: event.target.value as CatalogAttributeType })}><option value="string">string</option><option value="integer">integer</option><option value="number">number</option><option value="boolean">boolean</option></Select>}</DataTableCell>
+            <DataTableCell>{attribute.price ? 'integer' : <><Select aria-label={`Тип атрибута ${attribute.title}`} value={choices[kind][attribute.key]?.typeKey ?? 'string'} disabled={busy || !canWrite} onChange={event => updateChoice(kind, attribute.key, { typeKey: event.target.value as CatalogAttributeType })}><option value="string">string</option><option value="integer">integer</option><option value="number">number</option><option value="boolean">boolean</option><option value="singleChoice">Выбор</option><option value="multiChoice">Множественный выбор</option></Select>{(['singleChoice', 'multiChoice'] as CatalogAttributeType[]).includes(choices[kind][attribute.key]?.typeKey ?? 'string') && <ul>{(optionMap[kind][attribute.key] ?? []).map(option => <li key={option.optionKey}>{option.title}</li>)}</ul>}</>}</DataTableCell>
           </tr>)}</tbody>
         </DataTable>}
         <p>Цена импортируется как целое число только при включённом атрибуте «Цена»; неподходящие значения будут пропущены.</p>
