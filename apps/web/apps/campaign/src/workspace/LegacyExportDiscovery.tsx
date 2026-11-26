@@ -10,6 +10,7 @@ import { useCampaignWorkspace } from './Shell';
 import styles from './Workspace.module.css';
 import HeroImportWizard, { HeroImportSummary } from './HeroImportWizard';
 import type { HeroImportPlan, HeroImportRun } from './heroImport';
+import LegacyTemplateFieldImportWizard from './LegacyTemplateFieldImportWizard';
 
 const readValue = (data: Record<string, JsonValue>, key: string) => Object.prototype.hasOwnProperty.call(data, key) ? formatValue(data[key]) : 'Не задано';
 const formatValue = (value: JsonValue) => value === '' ? 'Пустая строка' : value === null ? 'null' : displayValue(value);
@@ -61,6 +62,8 @@ const ScopedLegacyExportDiscovery: React.FC<{ canAnalyze: boolean; campaignId: n
   const [fileName, setFileName] = useState('');
   const [busy, setBusy] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [templateImportOpen, setTemplateImportOpen] = useState(false);
+  const importBusy = importOpen || templateImportOpen;
   const [lastImport, setLastImport] = useState<{ plan: HeroImportPlan; run: HeroImportRun }>();
   const input = useRef<HTMLInputElement>(null);
   const sequence = useRef(0);
@@ -79,11 +82,12 @@ const ScopedLegacyExportDiscovery: React.FC<{ canAnalyze: boolean; campaignId: n
     setFileName('');
     setBusy(false);
     setImportOpen(false);
+    setTemplateImportOpen(false);
     if (input.current) input.current.value = '';
   }, [canAnalyze]);
 
   const clear = () => {
-    if (importOpen) return;
+    if (importBusy) return;
     sequence.current += 1;
     setReport(undefined);
     setError(undefined);
@@ -93,7 +97,7 @@ const ScopedLegacyExportDiscovery: React.FC<{ canAnalyze: boolean; campaignId: n
   };
 
   const selectFile = async (file?: File) => {
-    if (!canAnalyze || importOpen) return;
+    if (!canAnalyze || importBusy) return;
     const current = ++sequence.current;
     setReport(undefined);
     setError(undefined);
@@ -119,18 +123,20 @@ const ScopedLegacyExportDiscovery: React.FC<{ canAnalyze: boolean; campaignId: n
   return <section className={styles.page}>
     <p>Файл разбирается в браузере. Данные кампании изменяются только после подтверждения выбранного импорта.</p>
     <Field label="JSON старого экспорта" htmlFor="legacy-export-file">
-      <FileInput ref={input} id="legacy-export-file" accept=".json,application/json" disabled={!canAnalyze || importOpen} onChange={event => { void selectFile(event.currentTarget.files?.[0]); }} />
+      <FileInput ref={input} id="legacy-export-file" accept=".json,application/json" disabled={!canAnalyze || importBusy} onChange={event => { void selectFile(event.currentTarget.files?.[0]); }} />
     </Field>
     <ActionRow>
-      <Button type="button" variant="secondary" disabled={!canAnalyze || importOpen} onClick={clear}>Очистить</Button>
+      <Button type="button" variant="secondary" disabled={!canAnalyze || importBusy} onClick={clear}>Очистить</Button>
     </ActionRow>
     {fileName && <p>Файл: {fileName}</p>}
     {busy && <p role="status">Анализ файла…</p>}
     {error && <p role="alert">{error}</p>}
     {report && <Report report={report} attempted={Boolean(lastImport && (lastImport.run.attempted || Object.values(lastImport.run.statuses).includes('unknown')))} />}
-    {report && (report.sections.find(section => section.key === 'characters')?.objects.length ?? 0) > 0 && <Button type="button" disabled={!canAnalyze || importOpen} onClick={() => setImportOpen(true)}>Импортировать персонажа</Button>}
+    {report && (report.sections.find(section => section.key === 'characters')?.objects.length ?? 0) > 0 && <Button type="button" disabled={!canAnalyze || importBusy} onClick={() => { setTemplateImportOpen(false); setImportOpen(true); }}>Импортировать персонажа</Button>}
+    {report && (report.sections.find(section => section.key === 'charlists')?.objects.length ?? 0) > 0 && <Button type="button" disabled={!canAnalyze || importBusy} onClick={() => { setImportOpen(false); setTemplateImportOpen(true); }}>Импортировать базовые поля шаблона</Button>}
     {lastImport && !importOpen && <Panel title="Последний импорт"><HeroImportSummary plan={lastImport.plan} run={lastImport.run} campaignId={campaignId} /></Panel>}
     {importOpen && report && canAnalyze && <HeroImportWizard sources={report.sections.find(section => section.key === 'characters')?.objects ?? []} campaignId={campaignId} onClose={() => setImportOpen(false)} onResult={(plan, run) => setLastImport({ plan, run })} />}
+    {templateImportOpen && report && canAnalyze && <LegacyTemplateFieldImportWizard sources={report.sections.find(section => section.key === 'charlists')?.objects ?? []} campaignId={campaignId} onClose={() => setTemplateImportOpen(false)} />}
   </section>;
 };
 
