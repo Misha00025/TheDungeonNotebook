@@ -319,10 +319,10 @@ routes:
     auth: required
     methods: [GET, POST]
 
-  - path: /api/campaigns/{campaignId}/items
+  - path: /api/campaigns/{campaignId}/catalog/items
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/items
+      path: /api/campaigns/{campaignId}/catalog/items
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream
@@ -330,10 +330,10 @@ routes:
     auth: required
     methods: [GET, POST]
 
-  - path: /api/campaigns/{campaignId}/items/{entryId}
+  - path: /api/campaigns/{campaignId}/catalog/items/{entryId}
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/items/{entryId}
+      path: /api/campaigns/{campaignId}/catalog/items/{entryId}
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream
@@ -341,10 +341,10 @@ routes:
     auth: required
     methods: [GET, PUT]
 
-  - path: /api/campaigns/{campaignId}/items/{entryId}/content
+  - path: /api/campaigns/{campaignId}/catalog/items/{entryId}/content
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/items/{entryId}/content
+      path: /api/campaigns/{campaignId}/catalog/items/{entryId}/content
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream
@@ -352,10 +352,10 @@ routes:
     auth: required
     methods: [GET, PUT]
 
-  - path: /api/campaigns/{campaignId}/items/attributes
+  - path: /api/campaigns/{campaignId}/catalog/items/attributes
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/items/attributes
+      path: /api/campaigns/{campaignId}/catalog/items/attributes
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream
@@ -363,10 +363,10 @@ routes:
     auth: required
     methods: [GET, PUT]
 
-  - path: /api/campaigns/{campaignId}/items/attributes/{attributeId}
+  - path: /api/campaigns/{campaignId}/catalog/items/attributes/{attributeId}
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/items/attributes/{attributeId}
+      path: /api/campaigns/{campaignId}/catalog/items/attributes/{attributeId}
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream
@@ -374,10 +374,10 @@ routes:
     auth: required
     methods: [DELETE]
 
-  - path: /api/campaigns/{campaignId}/items/groups
+  - path: /api/campaigns/{campaignId}/catalog/items/groups
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/items/groups
+      path: /api/campaigns/{campaignId}/catalog/items/groups
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream
@@ -385,10 +385,10 @@ routes:
     auth: required
     methods: [GET, PUT]
 
-  - path: /api/campaigns/{campaignId}/items/groups/configuration
+  - path: /api/campaigns/{campaignId}/catalog/items/groups/configuration
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/items/groups/configuration
+      path: /api/campaigns/{campaignId}/catalog/items/groups/configuration
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream
@@ -396,10 +396,10 @@ routes:
     auth: required
     methods: [GET]
 
-  - path: /api/campaigns/{campaignId}/items/groups/{groupId}/entries
+  - path: /api/campaigns/{campaignId}/catalog/items/groups/{groupId}/entries
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/items/groups/{groupId}/entries
+      path: /api/campaigns/{campaignId}/catalog/items/groups/{groupId}/entries
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream
@@ -407,10 +407,10 @@ routes:
     auth: required
     methods: [GET]
 
-  - path: /api/campaigns/{campaignId}/skills
+  - path: /api/campaigns/{campaignId}/catalog/skills
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/skills
+      path: /api/campaigns/{campaignId}/catalog/skills
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream
@@ -418,10 +418,10 @@ routes:
     auth: required
     methods: [GET, POST]
 
-  - path: /api/campaigns/{campaignId}/skills/{entryId}
+  - path: /api/campaigns/{campaignId}/catalog/skills/{entryId}
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/skills/{entryId}
+      path: /api/campaigns/{campaignId}/catalog/skills/{entryId}
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream
@@ -429,10 +429,10 @@ routes:
     auth: required
     methods: [GET, PUT]
 
-  - path: /api/campaigns/{campaignId}/skills/{entryId}/content
+  - path: /api/campaigns/{campaignId}/catalog/skills/{entryId}/content
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/skills/{entryId}/content
+      path: /api/campaigns/{campaignId}/catalog/skills/{entryId}/content
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream
@@ -440,10 +440,10 @@ routes:
     auth: required
     methods: [GET, PUT]
 
-  - path: /api/campaigns/{campaignId}/skills/attributes
+  - path: /api/campaigns/{campaignId}/catalog/skills/attributes
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/skills/attributes
+      path: /api/campaigns/{campaignId}/catalog/skills/attributes
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream
@@ -451,10 +451,10 @@ routes:
     auth: required
     methods: [GET, PUT]
 
-  - path: /api/campaigns/{campaignId}/skills/attributes/{attributeId}
+  - path: /api/campaigns/{campaignId}/catalog/skills/attributes/{attributeId}
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/skills/attributes/{attributeId}
+      path: /api/campaigns/{campaignId}/catalog/skills/attributes/{attributeId}
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream
@@ -462,10 +462,10 @@ routes:
     auth: required
     methods: [DELETE]
 
-  - path: /api/campaigns/{campaignId}/skills/groups
+  - path: /api/campaigns/{campaignId}/catalog/skills/groups
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/skills/groups
+      path: /api/campaigns/{campaignId}/catalog/skills/groups
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream
@@ -473,10 +473,10 @@ routes:
     auth: required
     methods: [GET, PUT]
 
-  - path: /api/campaigns/{campaignId}/skills/groups/configuration
+  - path: /api/campaigns/{campaignId}/catalog/skills/groups/configuration
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/skills/groups/configuration
+      path: /api/campaigns/{campaignId}/catalog/skills/groups/configuration
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream
@@ -484,10 +484,10 @@ routes:
     auth: required
     methods: [GET]
 
-  - path: /api/campaigns/{campaignId}/skills/groups/{groupId}/entries
+  - path: /api/campaigns/{campaignId}/catalog/skills/groups/{groupId}/entries
     proxy:
       service: campaign
-      path: /api/campaigns/{campaignId}/skills/groups/{groupId}/entries
+      path: /api/campaigns/{campaignId}/catalog/skills/groups/{groupId}/entries
       headers:
         X-Subject: "{state.x_subject}"
     pre_request_handler: campaign_upstream

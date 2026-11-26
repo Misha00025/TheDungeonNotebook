@@ -10,16 +10,16 @@ The item catalog routes are:
 
 | Method | Path |
 | --- | --- |
-| `GET`, `POST` | `/api/campaigns/{campaignId}/items` |
-| `GET`, `PUT` | `/api/campaigns/{campaignId}/items/{entryId}` |
-| `GET`, `PUT` | `/api/campaigns/{campaignId}/items/{entryId}/content` |
-| `GET`, `PUT` | `/api/campaigns/{campaignId}/items/attributes` |
-| `DELETE` | `/api/campaigns/{campaignId}/items/attributes/{attributeId}?expectedRevision=...` |
-| `GET`, `PUT` | `/api/campaigns/{campaignId}/items/groups` |
-| `GET` | `/api/campaigns/{campaignId}/items/groups/configuration` |
-| `GET` | `/api/campaigns/{campaignId}/items/groups/{groupId}/entries` |
+| `GET`, `POST` | `/api/campaigns/{campaignId}/catalog/items` |
+| `GET`, `PUT` | `/api/campaigns/{campaignId}/catalog/items/{entryId}` |
+| `GET`, `PUT` | `/api/campaigns/{campaignId}/catalog/items/{entryId}/content` |
+| `GET`, `PUT` | `/api/campaigns/{campaignId}/catalog/items/attributes` |
+| `DELETE` | `/api/campaigns/{campaignId}/catalog/items/attributes/{attributeId}?expectedRevision=...` |
+| `GET`, `PUT` | `/api/campaigns/{campaignId}/catalog/items/groups` |
+| `GET` | `/api/campaigns/{campaignId}/catalog/items/groups/configuration` |
+| `GET` | `/api/campaigns/{campaignId}/catalog/items/groups/{groupId}/entries` |
 
-The skill catalog has the same methods and route shapes under `/api/campaigns/{campaignId}/skills`. Item and skill schemas, contents, and groups are independent.
+The skill catalog has the same methods and route shapes under `/api/campaigns/{campaignId}/catalog/skills`. Item and skill schemas, contents, and groups are independent.
 
 `campaignId` is an integer; resource IDs are GUIDs. JSON properties are camel case. Enums are emitted as names (for example, `Whole`, `Single`, `Definition`, `Character`); defined numeric enum values are also accepted. JSON values remain native JSON, not strings coerced from numbers or booleans.
 
@@ -46,7 +46,7 @@ Occurrence `id` is unique within the values array; several occurrences may refer
 
 ## Definitions and publication
 
-Creating a shared definition is administrator-only. `POST /items` and `POST /skills` require `requestId`, `name`, `isHidden`, `allowNegative`, `description`, and `attributes`; items also require a defined `quantityUnit` (`Whole`, `Fractional`, or `Single`). Skills require `quantityUnit: null` and `allowNegative: false`. Unknown request fields are rejected. `creatorUserId` is derived from a User subject, not supplied by the client.
+Creating a shared definition is administrator-only. `POST /catalog/items` and `POST /catalog/skills` require `requestId`, `name`, `isHidden`, `allowNegative`, `description`, and `attributes`; items also require a defined `quantityUnit` (`Whole`, `Fractional`, or `Single`). Skills require `quantityUnit: null` and `allowNegative: false`. Unknown request fields are rejected. `creatorUserId` is derived from a User subject, not supplied by the client.
 
 The definition content is prepared in its scope's Mongo collection before SQL metadata is published. `409 already_published` means the SQL definition exists; `409 content_already_prepared` means content for that resource ID already exists without a confirmed publication. SQL publication uncertainty returns `503 publication_outcome_unknown`; use the same ID to query the definition before deciding what to do. Mongo and SQL do not share a transaction.
 

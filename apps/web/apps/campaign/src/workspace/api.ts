@@ -59,7 +59,7 @@ export function createCampaignApi(request: AuthenticatedRequest) {
   const characters = (id: number) => `${c(id)}/characters`;
   const formulas = (id: number) => `${c(id)}/formulas`;
   const views = (id: number) => `${c(id)}/views`;
-  const catalog = (id: number, kind: CatalogKind) => `${c(id)}/${kind === 'Item' ? 'items' : 'skills'}`;
+  const catalog = (id: number, kind: CatalogKind) => `${c(id)}/catalog/${kind === 'Item' ? 'items' : 'skills'}`;
   const characterEntries = (id: number, characterId: Id, kind: CatalogKind) => `${characters(id)}/${enc(characterId)}/${kind === 'Item' ? 'items' : 'skills'}`;
   const enrichMetadata = (metadata: CatalogMetadataDto, kind: CatalogKind): CatalogMetadata => ({ ...metadata, kind });
   const enrichCharacterEntry = (entry: CharacterCatalogEntryDto, kind: CatalogKind): CharacterCatalogEntryEnvelope => ({ ...entry, definition: enrichMetadata(entry.definition, kind) });

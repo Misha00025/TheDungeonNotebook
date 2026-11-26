@@ -5,7 +5,7 @@ using Tdn.Campaigns.Catalog;
 namespace Tdn.Campaigns.Http;
 
 [ApiController]
-[Route("api/campaigns/{campaignId:int}/skills/attributes")]
+[Route("api/campaigns/{campaignId:int}/catalog/skills/attributes")]
 public sealed class SkillCatalogAttributesController(CatalogService<SkillCatalog> catalog) : ControllerBase
 {
     [HttpGet]

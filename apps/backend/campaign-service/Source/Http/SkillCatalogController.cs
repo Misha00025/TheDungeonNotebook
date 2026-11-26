@@ -5,7 +5,7 @@ using Tdn.Campaigns.Catalog;
 namespace Tdn.Campaigns.Http;
 
 [ApiController]
-[Route("api/campaigns/{campaignId:int}/skills")]
+[Route("api/campaigns/{campaignId:int}/catalog/skills")]
 public sealed class SkillCatalogController(CatalogService<SkillCatalog> catalog) : ControllerBase
 {
     [HttpGet]
@@ -14,7 +14,7 @@ public sealed class SkillCatalogController(CatalogService<SkillCatalog> catalog)
     public async Task<IActionResult> Create(int campaignId, [FromBody] CatalogCreateRequest request, CancellationToken ct)
     {
         var result = await catalog.CreateAsync(ReadSubject(), campaignId, request, ct);
-        return Created($"/api/campaigns/{campaignId}/skills/{result.Entry.Id}", result);
+        return Created($"/api/campaigns/{campaignId}/catalog/skills/{result.Entry.Id}", result);
     }
     [HttpGet("{entryId:guid}")]
     public async Task<ActionResult<CatalogEntryDto>> Get(int campaignId, Guid entryId, CancellationToken ct) => Ok(await catalog.GetAsync(ReadSubject(), campaignId, entryId, ct));

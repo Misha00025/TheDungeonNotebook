@@ -4,13 +4,13 @@ Groups are per-kind campaign navigation and selection configuration. Item groups
 
 ## Endpoints and access
 
-Each scope has these routes, with `items` or `skills` in place of `{scope}`:
+Each scope has these routes under `/api/campaigns/{campaignId}/catalog/{scope}`, with `items` or `skills` in place of `{scope}`:
 
 | Method | Path |
 | --- | --- |
-| `GET`, `PUT` | `/api/campaigns/{campaignId}/{scope}/groups` |
-| `GET` | `/api/campaigns/{campaignId}/{scope}/groups/configuration` |
-| `GET` | `/api/campaigns/{campaignId}/{scope}/groups/{groupId}/entries` |
+| `GET`, `PUT` | `/api/campaigns/{campaignId}/catalog/{scope}/groups` |
+| `GET` | `/api/campaigns/{campaignId}/catalog/{scope}/groups/configuration` |
+| `GET` | `/api/campaigns/{campaignId}/catalog/{scope}/groups/{groupId}/entries` |
 
 Campaign members may read group summaries and entries. Only campaign administrators may read or replace the full configuration. The group singleton uses `Guid.Empty` as its resource ID; a missing document reads as revision zero with an empty group list. PUT is a full replacement using `expectedRevision` as a Mongo content compare-and-set token; it is not an attribute version or global snapshot.
 
