@@ -120,15 +120,16 @@ const Characters: React.FC<{ compact?: boolean; worldTab?: boolean }> = ({ compa
   if (resource.error && !resource.data) return <ApiError error={resource.error} onRetry={resource.reload} />;
   return <section aria-busy={resource.loading || !settled || (!compact && (presentationResource.loading || Boolean(hasCardAssignment && cardPresentationResource.loading))) || undefined}><List layout="vertical" stretch>
     {!compact && <>
-      <PageHeader
-        title={mode === 'gm' || worldTab ? 'Персонажи кампании' : 'Мои персонажи'}
+      {!worldTab && <PageHeader
+        title={mode === 'gm' ? 'Персонажи кампании' : 'Мои персонажи'}
         headingLevel={2}
         actions={mode === 'gm'
           ? <Button type="button" disabled={!permissions.canWrite || permissionsLoading || createOpen} onClick={() => setCreateOpen(true)}>Создать персонажа</Button>
           : undefined}
-      />
+      />}
       <Toolbar>
-        <SearchBar searchTerm={search} onSearchChange={setSearch} aria-label="Поиск персонажей" compact />
+        <SearchBar searchTerm={search} onSearchChange={setSearch} placeholder="Поиск…" aria-label="Поиск персонажей" compact />
+        {worldTab && mode === 'gm' && <ActionRow><Button type="button" size="small" disabled={!permissions.canWrite || permissionsLoading || createOpen} onClick={() => setCreateOpen(true)}>Создать персонажа</Button></ActionRow>}
       </Toolbar>
     </>}
     {Boolean(resource.error) && <ApiError error={resource.error} onRetry={resource.reload} />}

@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import { ActionRow, Button, Field, IconButton, Input, List, NavigationListItem, PageHeader, StatePanel, TabBar, Toolbar } from '@tdn/shared';
+import { ActionRow, Button, IconButton, Input, List, NavigationListItem, PageHeader, StatePanel, TabBar, Toolbar } from '@tdn/shared';
 import { useCampaignWorkspace } from './Shell';
 import { useWorkspace } from './Workspace';
 import Characters from './Characters';
@@ -152,9 +152,7 @@ const WorldList: React.FC<{
     {mode === 'gm' && permissionsLoading && <StatePanel kind="info">Проверяются права записи. Команды управления временно заблокированы.</StatePanel>}
     {mode === 'gm' && !permissionsLoading && !canWrite && <StatePanel kind="info">Право записи недоступно. Команды управления заблокированы.</StatePanel>}
     <Toolbar>
-      <Field label="Точный тег" htmlFor={tagInputId}>
-        <Input variant="single-line" id={tagInputId} value={tagDraft} onChange={event => setTagDraft(event.target.value)} />
-      </Field>
+      <Input variant="single-line" id={tagInputId} value={tagDraft} onChange={event => setTagDraft(event.target.value)} aria-label="Поиск материалов" placeholder="Поиск…" />
       <ActionRow>
           <Button type="button" size="small" onClick={() => { setTag(tagDraft); setCreatedFilterMismatch(''); }}>Применить</Button>
           <Button type="button" size="small" variant="secondary" onClick={clearTagFilter}>Сбросить</Button>
