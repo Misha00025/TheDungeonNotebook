@@ -26,7 +26,7 @@ describe('LegacyExportDiscovery', () => {
     expect(screen.getAllByText('Template').length).toBeGreaterThan(0);
     expect(screen.getByText('Item')).toBeInTheDocument();
     expect(screen.getByText('Показано только содержимое файла. Ничего не импортировано.')).toBeInTheDocument();
-    expect(screen.getByText('Обнаружено, но запись этих данных текущим API не поддерживается.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Импортировать определения предметов и навыков' })).toBeInTheDocument();
     expect(Object.values(shared.api).every(method => method.mock.calls.length === 0)).toBe(true);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
