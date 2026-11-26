@@ -88,8 +88,8 @@ const CampaignShell: React.FC = () => {
     catch (error) { if (mounted.current && sequence.current === current && route.current === pathname) setSwitchError(error); }
     finally { if (mounted.current && sequence.current === current) { busy.current = false; setSwitchBusy(false); } }
   };
-  const nav: [string, string][] = mode === 'gm' ? [['Обзор', 'gm/overview'], ['Персонажи', 'gm/characters'], ['Шаблон', 'gm/templates'], ['Формулы', 'gm/formulas'], ['Представления', 'gm/views'], ['Каталог', 'gm/catalog'], ['Управление', 'gm/settings']] : [['Мои персонажи', 'player/characters'], ['Каталог', 'player/catalog']];
-  const title = mode === 'gm' && location.pathname.includes(`/${id}/gm/settings`) ? 'Управление' : nav.find(([, suffix]) => location.pathname.endsWith(`/${suffix}`))?.[0] ?? campaign.data.name;
+  const nav: [string, string][] = mode === 'gm' ? [['Обзор', 'gm/overview'], ['Персонажи', 'gm/characters'], ['Шаблон', 'gm/templates'], ['Формулы', 'gm/formulas'], ['Представления', 'gm/views'], ['Каталог', 'gm/catalog'], ['Мир', 'gm/world'], ['Управление', 'gm/settings']] : [['Мои персонажи', 'player/characters'], ['Каталог', 'player/catalog'], ['Мир', 'player/world']];
+  const title = mode === 'gm' && location.pathname.includes(`/${id}/gm/settings`) ? 'Управление' : location.pathname.includes(`/${id}/${mode}/world`) ? 'Мир' : nav.find(([, suffix]) => location.pathname.endsWith(`/${suffix}`))?.[0] ?? campaign.data.name;
   const sectionIcons: Record<string, NavigationIconName> = {
     'gm/overview': 'home',
     'gm/characters': 'people',
@@ -97,9 +97,11 @@ const CampaignShell: React.FC = () => {
     'gm/formulas': 'function',
     'gm/views': 'layout',
     'gm/catalog': 'document',
+    'gm/world': 'document',
     'gm/settings': 'settings',
     'player/characters': 'people',
     'player/catalog': 'document',
+    'player/world': 'document',
   };
   const campaignNavigation: BottomNavigationItem[] = nav.map(([label, route]) => {
     const to = path(`/${id}/${route}`);

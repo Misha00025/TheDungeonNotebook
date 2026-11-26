@@ -16,11 +16,20 @@ import Templates from './workspace/Templates';
 import Formulas from './workspace/Formulas';
 import Views from './workspace/Views';
 import Catalog from './workspace/Catalog';
+import World from './workspace/World';
 import LegacyExportDiscovery from './workspace/LegacyExportDiscovery';
 import CharacterSheet from './workspace/CharacterSheet';
+import type { WorldKind } from './workspace/types';
 import '@tdn/shared/styles/globals.css';
 
 const NotFound: React.FC = () => { const { path } = useWorkspace(); return <section><h2>Страница не найдена</h2><Link to={path('/')}>К кампаниям</Link></section>; };
+const WorldRoute: React.FC = () => {
+  const { groupId = '', kind = '', materialId } = useParams();
+  const { sessionKey } = useWorkspace();
+  const { mode } = useCampaignWorkspace();
+  if (!['locations', 'organizations', 'lore'].includes(kind)) return <NotFound />;
+  return <World key={`${sessionKey}:${groupId}:${mode}:${kind}:${materialId ?? ''}`} kind={kind as WorldKind} materialId={materialId} />;
+};
 const ModeEntry: React.FC = () => {
   const { groupId = '' } = useParams();
   const { api, path, sessionKey } = useWorkspace();
@@ -70,10 +79,20 @@ const GuardedRoutes: React.FC = () => {
         <Route path="items" element={<Catalog key="items" kind="Item" />} />
         <Route path="skills" element={<Catalog key="skills" kind="Skill" />} />
       </Route>
+      <Route path="gm/world">
+        <Route index element={<Navigate to="locations" replace />} />
+        <Route path=":kind" element={<WorldRoute />} />
+        <Route path=":kind/:materialId" element={<WorldRoute />} />
+      </Route>
       <Route path="player/catalog">
         <Route index element={<Navigate to="items" replace />} />
         <Route path="items" element={<Catalog key="items" kind="Item" />} />
         <Route path="skills" element={<Catalog key="skills" kind="Skill" />} />
+      </Route>
+      <Route path="player/world">
+        <Route index element={<Navigate to="locations" replace />} />
+        <Route path=":kind" element={<WorldRoute />} />
+        <Route path=":kind/:materialId" element={<WorldRoute />} />
       </Route>
       <Route path="templates" element={<LegacySectionEntry target="templates" />} />
       <Route path="gm/characters" element={<Characters />} />

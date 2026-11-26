@@ -1,7 +1,7 @@
 import { makeAuthenticatedRequest } from '@tdn/shared';
 import type { AuthenticatedRequest } from '@tdn/shared';
 import { parseJson, stringifyJson } from './json';
-import type { Assignment, BaseFieldInput, Campaign, CharacterMetadata, CharacterSheetEnvelope, ComputedSheet, ContentRevisionDto, DefinitionCreate, DefinitionMetadata, FormulaContent, FormulaContentEnvelope, FormulaMetadata, Importance, JsonValue, Member, OverridesEnvelope, Permissions, PresentationEnvelope, ResolvedPresentation, TemplateContentEnvelope, TemplateMetadata, User, ViewContentEnvelope, ViewMetadata, ViewNode, ViewSourcesResponse, VirtualFieldInput, VirtualFieldsEnvelope } from './types';
+import type { Assignment, BaseFieldInput, Campaign, CharacterMetadata, CharacterSheetEnvelope, ComputedSheet, ContentRevisionDto, DefinitionCreate, DefinitionMetadata, FormulaContent, FormulaContentEnvelope, FormulaMetadata, Importance, JsonValue, Member, OverridesEnvelope, Permissions, PresentationEnvelope, ResolvedPresentation, TemplateContentEnvelope, TemplateMetadata, User, ViewContentEnvelope, ViewMetadata, ViewNode, ViewSourcesResponse, VirtualFieldInput, VirtualFieldsEnvelope, WorldKind, WorldMaterial, WorldMaterialBody } from './types';
 import type { CatalogAttributeSchemaEnvelope, CatalogContentEnvelope, CatalogCreateRequest, CatalogCreateResult, CatalogCreateResultDto, CatalogGroupConfigurationEnvelope, CatalogGroupEntriesDto, CatalogGroupInput, CatalogGroupsEnvelope, CatalogKind, CatalogMetadata, CatalogMetadataDto, CharacterCatalogAddRequest, CharacterCatalogAddResponse, CharacterCatalogAdditionDto, CharacterCatalogAttributesUpdateRequest, CharacterCatalogCreateRequest, CharacterCatalogEntryDto, CharacterCatalogEntryEnvelope, CharacterCatalogQuantityUpdateRequest } from './catalogTypes';
 
 export interface Problem { code: string; title: string; detail: string; errors?: Record<string, string[]>; resourceId?: string; requestId?: string }
@@ -156,6 +156,9 @@ export function createCampaignApi(request: AuthenticatedRequest) {
       const result = await send<CatalogGroupEntriesDto>(`${catalog(id, kind)}/groups/${enc(groupId)}/entries`);
       return { ...result, entries: result.entries.map(entry => enrichMetadata(entry, kind)) };
     },
+    listWorldMaterials: (id: number, kind: WorldKind, tag?: string) => send<WorldMaterial[]>(`${c(id)}/world/${kind}`, 'GET', undefined, tag === undefined ? undefined : { tag }),
+    getWorldMaterial: (id: number, kind: WorldKind, materialId: Id) => send<WorldMaterial>(`${c(id)}/world/${kind}/${enc(materialId)}`),
+    getWorldBody: (id: number, kind: WorldKind, materialId: Id) => send<WorldMaterialBody>(`${c(id)}/world/${kind}/${enc(materialId)}/body`),
     listCharacterEntries: async (id: number, kind: CatalogKind, characterId: Id) => (await send<CharacterCatalogEntryDto[]>(characterEntries(id, characterId, kind))).map(entry => enrichCharacterEntry(entry, kind)),
     getCharacterEntry: async (id: number, kind: CatalogKind, characterId: Id, entryId: Id) => enrichCharacterEntry(await send<CharacterCatalogEntryDto>(`${characterEntries(id, characterId, kind)}/${enc(entryId)}`), kind),
     addCharacterEntry: async (id: number, kind: CatalogKind, characterId: Id, body: CharacterCatalogAddRequest) => enrichCharacterResponse(await create<{ requestId: string; entry: CharacterCatalogEntryDto }>(characterEntries(id, characterId, kind), {

@@ -3,6 +3,9 @@ import type { LosslessNumber } from 'lossless-json';
 export type JsonNumber = number | LosslessNumber;
 export type JsonValue = null | boolean | string | JsonNumber | JsonValue[] | { [key: string]: JsonValue };
 export type Revision = JsonNumber;
+export type WorldKind = 'locations' | 'organizations' | 'lore';
+export interface WorldMaterial { id: string; campaignId: number; kind: WorldKind; title: string; description: string; tags: string[]; isPublished: boolean; metadataRevision: Revision }
+export interface WorldMaterialBody { body: string; bodyVersion: string }
 export type ValueType = 'Integer' | 'Number' | 'String' | 'Boolean' | 'SingleChoice' | 'MultiChoice';
 export type Importance = 'Background' | 'Secondary' | 'Key';
 export type NumericResultType = 'Integer' | 'Number';
