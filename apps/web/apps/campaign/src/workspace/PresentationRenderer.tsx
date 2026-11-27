@@ -128,7 +128,7 @@ const NodeContent: React.FC<{ node: PresentationNode; sheet?: ComputedSheet; con
       {params.showBar && hasValidMaximum && <div className={styles.progressTrack} role="img" aria-label={sample ? 'Образец соотношения текущего значения и максимума' : 'Соотношение текущего значения и максимума'}><span style={{ width: `${barWidth}%` }} /></div>}
     </div>;
    } else if (params?.type === 'catalog') {
-     content = <PresentationCatalog kind={params.kind} condition={params.condition} sample={sample} />;
+       content = <PresentationCatalog kind={params.kind} condition={params.condition} sample={sample} attributeIds={params.attributeIds} />;
    } else if (params?.type === 'stat-list') {
     const mainRows: React.ReactNode[] = [];
     const hiddenRows: React.ReactNode[] = [];

@@ -15,7 +15,7 @@ export type PresentationParams =
   | { version: 1; type: 'composite'; parts: FieldPart[]; primary: JsonFieldReference | null; size: PresentationSize; [key: string]: JsonValue }
   | { version: 1; type: 'resource'; current: JsonFieldReference | null; maximum: JsonFieldReference | null; showBar: boolean; size: PresentationSize; [key: string]: JsonValue }
   | { version: 1; type: 'stat-list'; entries: { source: JsonFieldReference; label: string; [key: string]: JsonValue }[]; columns: number; format: string; expressions: (string | null)[]; condition: string; [key: string]: JsonValue }
-  | { version: 1; type: 'catalog'; kind: CatalogKind; condition: CatalogGroupCondition | null; [key: string]: JsonValue };
+   | { version: 1; type: 'catalog'; kind: CatalogKind; condition: CatalogGroupCondition | null; attributeIds: string[]; [key: string]: JsonValue };
 export type ParamsRead = { [T in PresentationType]: { status: 'supported'; type: T; params: Extract<PresentationParams, { type: T }> } }[PresentationType] | { status: 'unsupported' | 'invalid'; message: string; params: JsonValue };
 
 const isRecord = (value: unknown): value is Record<string, JsonValue> => typeof value === 'object' && value !== null && !Array.isArray(value) && !isLosslessNumber(value);
@@ -51,8 +51,18 @@ export function readParams(params: JsonValue): ParamsRead {
          ? (params.current === null || validRef(params.current)) && (params.maximum === null || validRef(params.maximum)) && typeof params.showBar === 'boolean' && (params.size === undefined || validSize(params.size))
          : type === 'stat-list'
            ? Array.isArray(params.entries) && params.entries.every(entry => isRecord(entry) && validRef(entry.source) && typeof entry.label === 'string') && positiveInteger(params.columns) && (params.format === undefined || typeof params.format === 'string') && (params.condition === undefined || typeof params.condition === 'string') && (params.expressions === undefined || Array.isArray(params.expressions) && params.expressions.every(expression => expression === null || typeof expression === 'string'))
-           : (params.kind === 'Item' || params.kind === 'Skill') && (params.condition === null || isCatalogCondition(params.condition));
-  return valid ? { status: 'supported', type, params: { ...params, version: 1, type, ...((type === 'composite' || type === 'resource') ? { size: validSize(params.size) ? params.size : 'large' } : {}), ...(type === 'stat-list' ? { format: typeof params.format === 'string' ? params.format : '$0', expressions: Array.isArray(params.expressions) ? params.expressions as (string | null)[] : [], condition: typeof params.condition === 'string' ? params.condition : '' } : {}) } as PresentationParams } as ParamsRead : { status: 'invalid', message: 'Настройки отображения заполнены некорректно.', params };
+             : (params.kind === 'Item' || params.kind === 'Skill') && (params.condition === null || isCatalogCondition(params.condition)) && (params.attributeIds === undefined || params.attributeIds === null || Array.isArray(params.attributeIds) && params.attributeIds.every(id => typeof id === 'string'));
+      if (!valid) return { status: 'invalid', message: 'Настройки отображения заполнены некорректно.', params };
+      const normalized: Record<string, JsonValue> = {
+        ...params,
+        version: 1,
+        type,
+        ...((type === 'composite' || type === 'resource') ? { size: validSize(params.size) ? params.size : 'large' } : {}),
+        ...(type === 'stat-list' ? { format: typeof params.format === 'string' ? params.format : '$0', expressions: Array.isArray(params.expressions) ? params.expressions as (string | null)[] : [], condition: typeof params.condition === 'string' ? params.condition : '' } : {}),
+        ...(type === 'catalog' ? { attributeIds: Array.isArray(params.attributeIds) ? params.attributeIds as string[] : [] } : {}),
+      };
+      if (type === 'catalog') delete normalized.tableMode;
+      return { status: 'supported', type, params: normalized as PresentationParams } as ParamsRead;
 }
 
 const stringParam = (value: JsonValue | undefined, fallback: string): string => typeof value === 'string' ? value : fallback;
@@ -63,7 +73,7 @@ export const makeNode = (type: PresentationType, title = ''): PresentationNode =
      : type === 'composite' ? { version: 1, type, parts: [], primary: null, size: 'large' }
        : type === 'resource' ? { version: 1, type, current: null, maximum: null, showBar: true, size: 'large' }
            : type === 'stat-list' ? { version: 1, type, entries: [], columns: 1, format: '$0', expressions: [], condition: '' }
-             : { version: 1, type, kind: 'Item', condition: null },
+               : { version: 1, type, kind: 'Item', condition: null, attributeIds: [] },
 });
 
 function parseWidgetFormat(format: string, sources: WidgetNode['sources']): FieldPart[] | null {

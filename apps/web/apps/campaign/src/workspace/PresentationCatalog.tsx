@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useId } from 'react';
-import { Field, List, ListItem, Select, StatePanel } from '@tdn/shared';
+import { Checkbox, DataTable, DataTableCell, Field, Select, StatePanel } from '@tdn/shared';
 import type { CatalogGroupCondition, CatalogKind } from './catalogTypes';
 import { CharacterCatalogProvider, CharacterCatalogScope } from './CharacterCatalogContext';
 import type { CharacterCatalogProviderProps } from './CharacterCatalogContext';
@@ -11,6 +11,7 @@ import { useWorkspace } from './Workspace';
 import { ApiError } from './Feedback';
 
 type CatalogViewOptions = {
+  campaignId: number;
   audience: 'gm' | 'player';
   characterName?: string;
   canPublishDefinition: boolean;
@@ -44,7 +45,7 @@ export const PresentationCatalogProvider: React.FC<PresentationCatalogProviderPr
   onDefinitionForbidden,
   preview = false,
   children,
-}) => <CatalogViewContext.Provider value={{ audience, characterName, canPublishDefinition, definitionPermissionsPending, onDefinitionForbidden, preview }}>
+}) => <CatalogViewContext.Provider value={{ campaignId, audience, characterName, canPublishDefinition, definitionPermissionsPending, onDefinitionForbidden, preview }}>
   <CharacterCatalogProvider campaignId={campaignId} characterId={characterId} kind="Item" canRead={canRead} canWrite={preview ? false : canWrite} permissionsPending={permissionsPending} onForbidden={onForbidden}>
     <CharacterCatalogProvider campaignId={campaignId} characterId={characterId} kind="Skill" canRead={canRead} canWrite={preview ? false : canWrite} permissionsPending={permissionsPending} onForbidden={onForbidden}>
       {children}
@@ -52,14 +53,31 @@ export const PresentationCatalogProvider: React.FC<PresentationCatalogProviderPr
   </CharacterCatalogProvider>
 </CatalogViewContext.Provider>;
 
-export const PresentationCatalog: React.FC<{ kind: CatalogKind; condition: CatalogGroupCondition | null; sample: boolean }> = ({ kind, condition, sample }) => {
+export const PresentationCatalog: React.FC<{ kind: CatalogKind; condition: CatalogGroupCondition | null; sample: boolean; attributeIds?: string[] | null }> = ({ kind, condition, sample, attributeIds }) => {
   const options = useContext(CatalogViewContext);
-  if (sample) return <section>
-    <p>Образец · Не игровые данные</p>
-    <List layout="vertical" stretch gap="small">
-      {(kind === 'Item' ? [{ name: 'Походный набор', quantity: '2' }, { name: 'Факел', quantity: '1' }] : [{ name: 'Выживание' }, { name: 'Наблюдательность' }]).map(entry => <ListItem key={entry.name} density="compact" meta={'quantity' in entry ? entry.quantity : undefined}><span>{entry.name}</span></ListItem>)}
-    </List>
-  </section>;
+  const { api, sessionKey } = useWorkspace();
+  const schema = useResource(
+    `${sessionKey}:${options?.campaignId ?? 'none'}:${kind}:layout-preview-schema`,
+    () => options ? api.getCatalogAttributes(options.campaignId, kind) : Promise.reject(new Error('Campaign context unavailable')),
+    sample && Boolean(options),
+  );
+  if (sample) {
+    const entries = kind === 'Item' ? [{ name: 'Походный набор', quantity: '2' }, { name: 'Факел', quantity: '1' }] : [{ name: 'Выживание' }, { name: 'Наблюдательность' }];
+    const definitions = schema.data?.data.definitions ?? [];
+    const selectedDefinitions = (attributeIds ?? []).flatMap(id => {
+      const definition = definitions.find(item => item.id === id);
+      return definition ? [definition] : [];
+    });
+    const sampleValue = (index: number) => index === 0 ? 'Образец' : 'Пример';
+    return <section>
+      <p>Образец · Не игровые данные</p>
+      {schema.loading && !schema.data && <StatePanel kind="loading">Загрузка схемы атрибутов для предпросмотра…</StatePanel>}
+       <DataTable aria-label={kind === 'Item' ? 'Образец инвентаря' : 'Образец навыков'}>
+         <thead><tr><DataTableCell as="th" scope="col" sizing="content">Имя</DataTableCell>{selectedDefinitions.map(definition => <DataTableCell key={definition.id} as="th" scope="col">{definition.title}</DataTableCell>)}{kind === 'Item' && <DataTableCell as="th" scope="col" sizing="control">Количество</DataTableCell>}</tr></thead>
+         <tbody>{entries.map((entry, rowIndex) => <tr key={entry.name}><DataTableCell as="th" scope="row" sizing="content">{entry.name}</DataTableCell>{selectedDefinitions.map((definition, index) => <DataTableCell key={definition.id}>{sampleValue((rowIndex + index) % 2)}</DataTableCell>)}{'quantity' in entry && <DataTableCell sizing="control">{entry.quantity}</DataTableCell>}</tr>)}</tbody>
+        </DataTable>
+    </section>;
+  }
   if (!options) return <StatePanel kind="empty">Контекст персонажа недоступен.</StatePanel>;
   return <>
     {options.preview && <p role="status">Только просмотр</p>}
@@ -68,6 +86,7 @@ export const PresentationCatalog: React.FC<{ kind: CatalogKind; condition: Catal
     kind={kind}
     layout
     condition={condition}
+    attributeIds={attributeIds}
     readOnly={options.preview}
     preview={options.preview}
     audience={options.audience}
@@ -83,10 +102,11 @@ export const PresentationCatalogSettings: React.FC<{
   campaignId: number;
   kind: CatalogKind;
   condition: CatalogGroupCondition | null;
-  onChange: (patch: { kind?: CatalogKind; condition?: CatalogGroupCondition | null }) => void;
+  attributeIds: string[] | null;
+  onChange: (patch: { kind?: CatalogKind; condition?: CatalogGroupCondition | null; attributeIds?: string[] | null }) => void;
   disabled: boolean;
   onValidityChange: (invalid: boolean) => void;
-}> = ({ campaignId, kind, condition, onChange, disabled, onValidityChange }) => {
+}> = ({ campaignId, kind, condition, attributeIds, onChange, disabled, onValidityChange }) => {
   const { api, sessionKey } = useWorkspace();
   const kindFieldId = useId();
   const schema = useResource(`${sessionKey}:${campaignId}:${kind}:layout-catalog-schema`, () => api.getCatalogAttributes(campaignId, kind));
@@ -94,7 +114,7 @@ export const PresentationCatalogSettings: React.FC<{
   const changeKind = (next: CatalogKind) => {
     if (next === kind) return;
     if (condition && !window.confirm('При смене раздела условие другого каталога будет сброшено. Продолжить?')) return;
-    onChange({ kind: next, condition: null });
+    onChange({ kind: next, condition: null, attributeIds: [] });
   };
 
   return <div>
@@ -107,6 +127,18 @@ export const PresentationCatalogSettings: React.FC<{
     {schema.loading && !schema.data && <StatePanel kind="loading">Загрузка схемы характеристик…</StatePanel>}
     {Boolean(schema.error) && <ApiError error={schema.error} onRetry={schema.reload} />}
     {schema.data && !schema.error && <>
+      <fieldset>
+        <legend>Атрибуты</legend>
+        {schema.data.data.definitions.map(definition => {
+          const selected = (attributeIds ?? []).includes(definition.id);
+          return <label key={definition.id}><Checkbox disabled={disabled} checked={selected} onChange={event => {
+            const current = attributeIds ?? [];
+            onChange({ attributeIds: event.target.checked
+              ? [...new Set([...current, definition.id])]
+              : current.filter(id => id !== definition.id) });
+          }} />{definition.title}</label>;
+        })}
+      </fieldset>
       {compiled?.error && <p role="status">{compiled.error}</p>}
       <CatalogConditionEditor key={kind} definitions={schema.data.data.definitions} condition={condition} onChange={next => onChange({ condition: next })} disabled={disabled} onValidityChange={onValidityChange} />
     </>}

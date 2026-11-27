@@ -186,7 +186,7 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
      const defaultsValue = makeNode(type).params;
      const defaults = isJsonObject(defaultsValue) ? defaultsValue : {};
      const source = isJsonObject(current.params) ? current.params : { legacyParams: current.params };
-      const reserved = new Set(['version', 'type', 'direction', 'columns', 'gap', 'appearance', 'parts', 'primary', 'current', 'maximum', 'showBar', 'size', 'entries', 'format', 'expressions', 'condition', 'kind', 'legacyFormatError']);
+       const reserved = new Set(['version', 'type', 'direction', 'columns', 'gap', 'appearance', 'parts', 'primary', 'current', 'maximum', 'showBar', 'size', 'entries', 'format', 'expressions', 'condition', 'kind', 'tableMode', 'attributeIds', 'legacyFormatError']);
       const unknown = Object.fromEntries(Object.entries(source).filter(([key]) => !reserved.has(key)));
      const size = source.size === 'compact' || source.size === 'medium' || source.size === 'large' ? source.size : undefined;
      updateSettingsDraft(node => ({ ...node, params: { ...unknown, ...defaults, ...((type === 'resource' || type === 'composite') && size ? { size } : {}) } }));
@@ -280,8 +280,9 @@ const PresentationEditor: React.FC<PresentationEditorProps> = React.memo(({ root
             </> : settingsRead.type === 'catalog' ? <>
               {campaignId !== undefined ? <PresentationCatalogSettings
                 campaignId={campaignId}
-                kind={settingsRead.params.kind}
-                condition={settingsRead.params.condition}
+                 kind={settingsRead.params.kind}
+                 condition={settingsRead.params.condition}
+                 attributeIds={settingsRead.params.attributeIds}
                 disabled={disabled}
                 onValidityChange={setCatalogSettingsInvalid}
                 onChange={changes => { if (changes.kind !== undefined) setCatalogSettingsInvalid(false); patch(changes as Record<string, JsonValue>); }}
