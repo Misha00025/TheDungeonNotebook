@@ -113,15 +113,8 @@ const CampaignShell: React.FC = () => {
       active: location.pathname === to || location.pathname.startsWith(`${to}/`),
     };
   });
-   const sheetRoute = location.pathname.match(/\/(?:gm|player)\/characters\/([^/]+)(?:\/(page_[1-9]\d*|overview|stats|all-stats|inventory|skills))?$/);
-  const sheetCharacterId = sheetRoute?.[1];
-  const validSheetCharacter = Boolean(sheetCharacterId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sheetCharacterId));
-  const mobileItems: BottomNavigationItem[] = validSheetCharacter && sheetRoute && sheetCharacterId
-    ? [{ id: `back-${id}-${mode}-${sheetCharacterId}`, label: 'Назад', icon: <NavigationIcon name="arrow-left" />, to: path(`/${id}/${mode}/characters`) }]
-    : campaignNavigation;
-  const mobileNavigationKey = validSheetCharacter && sheetRoute && sheetCharacterId
-    ? `${id}:${mode}:${sheetCharacterId}:${sheetRoute[2] ?? 'entry'}`
-    : `${id}:${mode}:campaign`;
+   const mobileItems = campaignNavigation;
+   const mobileNavigationKey = `${id}:${mode}:campaign`;
   const campaignItems = campaigns.data ?? [];
   const campaignOptions = campaignItems.some(item => item.id === id)
     ? campaignItems
@@ -144,7 +137,7 @@ const CampaignShell: React.FC = () => {
         const to = path(`/${id}/${route}`);
         return { label, to, active: location.pathname === to || location.pathname.startsWith(`${to}/`) };
       })} />
-    </>} mobileNavigation={<BottomNavigation key={mobileNavigationKey} aria-label={validSheetCharacter ? 'Лист персонажа на телефоне' : 'Навигация кампании на телефоне'} items={mobileItems} />}>
+     </>} mobileNavigation={<BottomNavigation key={mobileNavigationKey} aria-label="Навигация кампании на телефоне" items={mobileItems} />}>
       <Breadcrumbs items={[{ label: 'Кампании', path: path('/') }, { label: campaign.data.name, path: targetMode(mode) }, { label: title }]} />
        {Boolean(permission.error) && <ApiError error={permission.error} onRetry={permission.reload} />}{Boolean(switchError) && <ApiError error={switchError} />}<Outlet />
     </WorkspaceLayout>
