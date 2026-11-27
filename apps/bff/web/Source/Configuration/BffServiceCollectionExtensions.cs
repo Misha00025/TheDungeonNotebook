@@ -12,6 +12,7 @@ using StackExchange.Redis;
 using Tdn.Bff.Errors;
 using Tdn.Bff.Oidc;
 using Tdn.Bff.PlayerScreens;
+using Tdn.Bff.GmCharacters;
 using Tdn.Bff.Security;
 using Tdn.Bff.Sessions;
 using Tdn.Bff.Upstream;
@@ -70,6 +71,8 @@ public static class BffServiceCollectionExtensions
         services.AddSingleton<ISessionTokenService, SessionTokenService>();
         services.AddHttpClient("player-screens");
         services.AddScoped<PlayerScreenService>();
+        services.AddHttpClient("gm-character-collection");
+        services.AddScoped<GmCharacterCollectionService>();
         services.AddSingleton(TimeProvider.System);
 
         services.AddAuthentication(options =>

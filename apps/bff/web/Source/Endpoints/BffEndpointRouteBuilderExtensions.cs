@@ -12,6 +12,7 @@ using Tdn.Bff.Security;
 using Tdn.Bff.Sessions;
 using Tdn.Bff.Oidc;
 using Tdn.Bff.PlayerScreens;
+using Tdn.Bff.GmCharacters;
 
 namespace Tdn.Bff.Endpoints;
 
@@ -33,6 +34,8 @@ public static class BffEndpointRouteBuilderExtensions
 
         endpoints.MapGet("/bff/api/player/campaigns/{campaignId:int}/characters", (HttpContext context, int campaignId, PlayerScreenService screens) =>
             screens.ListCharactersAsync(context, campaignId)).RequireAuthorization();
+        endpoints.MapGet("/bff/api/gm/campaigns/{campaignId:int}/characters", (HttpContext context, int campaignId, GmCharacterCollectionService characters) =>
+            characters.ListAsync(context, campaignId)).RequireAuthorization();
         endpoints.MapGet("/bff/api/player/campaigns/{campaignId:int}/characters/{characterId}", (HttpContext context, int campaignId, string characterId, PlayerScreenService screens) =>
             screens.GetCharacterScreenAsync(context, campaignId, characterId)).RequireAuthorization();
 
