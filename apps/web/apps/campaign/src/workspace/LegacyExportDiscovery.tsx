@@ -15,7 +15,7 @@ import LegacyCatalogImportWizard from './LegacyCatalogImportWizard';
 
 const readValue = (data: Record<string, JsonValue>, key: string) => Object.prototype.hasOwnProperty.call(data, key) ? formatValue(data[key]) : 'Не задано';
 const formatValue = (value: JsonValue) => value === '' ? 'Пустая строка' : value === null ? 'null' : displayValue(value);
-const unsupportedSections = new Set(['characterItems', 'characterSkills', 'skillAttributes']);
+const unsupportedSections = new Set(['skillAttributes']);
 
 const FieldTable: React.FC<{ fields: LegacyField[] }> = ({ fields }) => <DataTable aria-label="Исходные поля">
   <thead><tr><DataTableCell as="th" sizing="content">Название</DataTableCell><DataTableCell as="th" sizing="content">Ключ</DataTableCell><DataTableCell as="th">Значение</DataTableCell><DataTableCell as="th">Формула</DataTableCell><DataTableCell as="th">Формула модификатора</DataTableCell><DataTableCell as="th">Максимум</DataTableCell><DataTableCell as="th">Описание</DataTableCell></tr></thead>
@@ -40,7 +40,7 @@ const ObjectDetails: React.FC<{ object: LegacyObject; sectionKey: string }> = ({
 const SectionDetails: React.FC<{ section: LegacySection; sectionIndex: number }> = ({ section, sectionIndex }) => <details>
   <summary>{section.label}{section.objects.length !== section.total ? ` — обнаружено ${section.objects.length} из ${section.total}` : ` — ${section.objects.length}`}</summary>
   {!section.present ? <p>Раздел отсутствует в файле.</p> : section.total === 0 ? <p>Записей нет.</p> : null}
-  {section.present && section.objects.length > 0 && unsupportedSections.has(section.key) && <p>{section.key === 'skillAttributes' ? 'Метаданные используются для названий атрибутов навыков; отдельно не импортируются.' : 'Назначения персонажам обнаружены, но не импортируются.'}</p>}
+  {section.present && section.objects.length > 0 && unsupportedSections.has(section.key) && <p>Метаданные используются для названий атрибутов навыков; отдельно не импортируются.</p>}
   {section.objects.map((object, objectIndex) => <ObjectDetails key={`${sectionIndex}:${objectIndex}`} object={object} sectionKey={section.key} />)}
 </details>;
 
@@ -139,7 +139,15 @@ const ScopedLegacyExportDiscovery: React.FC<{ canAnalyze: boolean; campaignId: n
     {report && (report.sections.find(section => section.key === 'charlists')?.objects.length ?? 0) > 0 && <Button type="button" disabled={!canAnalyze || importBusy} onClick={() => { setImportOpen(false); setTemplateImportOpen(true); }}>Импортировать базовые поля шаблона</Button>}
     {report && ((report.sections.find(section => section.key === 'items')?.objects.length ?? 0) > 0 || (report.sections.find(section => section.key === 'skills')?.objects.length ?? 0) > 0) && <Button type="button" disabled={!canAnalyze || importBusy} onClick={() => { setImportOpen(false); setTemplateImportOpen(false); setCatalogImportOpen(true); }}>Импортировать определения предметов и навыков</Button>}
     {lastImport && !importOpen && <Panel title="Последний импорт"><HeroImportSummary plan={lastImport.plan} run={lastImport.run} campaignId={campaignId} /></Panel>}
-    {importOpen && report && canAnalyze && <HeroImportWizard sources={report.sections.find(section => section.key === 'characters')?.objects ?? []} campaignId={campaignId} onClose={() => setImportOpen(false)} onResult={(plan, run) => setLastImport({ plan, run })} />}
+    {importOpen && report && canAnalyze && <HeroImportWizard
+      sources={report.sections.find(section => section.key === 'characters')?.objects ?? []}
+      characters={report.sections.find(section => section.key === 'characters')?.objects ?? []}
+      items={report.sections.find(section => section.key === 'items')?.objects ?? []}
+      skills={report.sections.find(section => section.key === 'skills')?.objects ?? []}
+      characterItems={report.sections.find(section => section.key === 'characterItems')?.objects ?? []}
+      characterSkills={report.sections.find(section => section.key === 'characterSkills')?.objects ?? []}
+      campaignId={campaignId} onClose={() => setImportOpen(false)} onResult={(plan, run) => setLastImport({ plan, run })}
+    />}
     {templateImportOpen && report && canAnalyze && <LegacyTemplateFieldImportWizard sources={report.sections.find(section => section.key === 'charlists')?.objects ?? []} campaignId={campaignId} onClose={() => setTemplateImportOpen(false)} />}
     {catalogImportOpen && report && canAnalyze && <LegacyCatalogImportWizard items={report.sections.find(section => section.key === 'items')?.objects ?? []} skills={report.sections.find(section => section.key === 'skills')?.objects ?? []} skillAttributes={report.sections.find(section => section.key === 'skillAttributes')?.objects ?? []} campaignId={campaignId} onClose={() => setCatalogImportOpen(false)} />}
   </section>;

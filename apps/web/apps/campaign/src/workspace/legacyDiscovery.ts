@@ -174,32 +174,14 @@ export function discoverLegacyExport(text: string): LegacyDiscovery {
     const character = resolve('characters', entry.characterOldId, 'Назначение предмета');
     const item = resolve('items', entry.itemOldId, 'Назначение предмета');
     for (const property of Object.keys(entry)) if (!new Set(['characterOldId', 'itemOldId', 'amount']).has(property)) diagnostics.push(`Назначение предмета содержит неизвестное свойство «${property}».`);
-    const objects = sectionFor('characterItems').objects;
-    const characterId = idString(entry.characterOldId);
-    const itemId = idString(entry.itemOldId);
-    const duplicate = characterId !== undefined && itemId !== undefined && objects.some(object => {
-      const previousCharacterId = idString(object.data.characterOldId);
-      const previousItemId = idString(object.data.itemOldId);
-      return previousCharacterId !== undefined && itemId !== undefined && previousItemId !== undefined && previousCharacterId === characterId && previousItemId === itemId;
-    });
-    if (duplicate) diagnostics.push('Повторяется назначение предмета персонажу.');
-    objects.push({ name: `${character} — ${item}`, data: entry, fields: [], properties: Object.prototype.hasOwnProperty.call(entry, 'amount') ? [{ name: 'Количество', value: entry.amount }] : [] });
+    sectionFor('characterItems').objects.push({ name: `${character} — ${item}`, data: entry, fields: [], properties: Object.prototype.hasOwnProperty.call(entry, 'amount') ? [{ name: 'Количество', value: entry.amount }] : [] });
   }
   for (const entry of arrays.get('characterSkills') ?? []) {
     if (!isRecord(entry)) { diagnostics.push('Назначение навыка имеет некорректный формат.'); continue; }
     const character = resolve('characters', entry.characterOldId, 'Назначение навыка');
     const skill = resolve('skills', entry.skillOldId, 'Назначение навыка');
     for (const property of Object.keys(entry)) if (!new Set(['characterOldId', 'skillOldId']).has(property)) diagnostics.push(`Назначение навыка содержит неизвестное свойство «${property}».`);
-    const objects = sectionFor('characterSkills').objects;
-    const characterId = idString(entry.characterOldId);
-    const skillId = idString(entry.skillOldId);
-    const duplicate = characterId !== undefined && skillId !== undefined && objects.some(object => {
-      const previousCharacterId = idString(object.data.characterOldId);
-      const previousSkillId = idString(object.data.skillOldId);
-      return previousCharacterId !== undefined && skillId !== undefined && previousSkillId !== undefined && previousCharacterId === characterId && previousSkillId === skillId;
-    });
-    if (duplicate) diagnostics.push('Повторяется назначение навыка персонажу.');
-    objects.push({ name: `${character} — ${skill}`, data: entry, fields: [], properties: [] });
+    sectionFor('characterSkills').objects.push({ name: `${character} — ${skill}`, data: entry, fields: [], properties: [] });
   }
   return { version: 1, ...(typeof parsed.exportedAt === 'string' ? { exportedAt: parsed.exportedAt } : {}), sections, diagnostics, unknownSections };
 }

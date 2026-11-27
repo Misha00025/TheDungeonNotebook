@@ -9,6 +9,7 @@ import { displayValue } from './json';
 import type { JsonValue } from './types';
 import type { LegacyField, LegacyObject } from './legacyDiscovery';
 import {
+  collectHeroCatalogSources,
   compatibleHeroFields,
   createHeroDraft,
   executeHeroImport,
@@ -16,9 +17,9 @@ import {
   readHeroTarget,
   recheckHeroImport
 } from './heroImport';
-import type { HeroDraft, HeroImportPlan, HeroImportRun, HeroPartAction, HeroTargetSnapshot } from './heroImport';
+import type { HeroCatalogSource, HeroDraft, HeroImportPlan, HeroImportRun, HeroPartAction, HeroTargetSnapshot } from './heroImport';
 
-type WizardProps = { sources: LegacyObject[]; campaignId: number; onClose: () => void; onResult?: (plan: HeroImportPlan, run: HeroImportRun) => void };
+type WizardProps = { sources: LegacyObject[]; characters?: LegacyObject[]; items?: LegacyObject[]; skills?: LegacyObject[]; characterItems?: LegacyObject[]; characterSkills?: LegacyObject[]; campaignId: number; onClose: () => void; onResult?: (plan: HeroImportPlan, run: HeroImportRun) => void };
 type SummaryProps = { plan: HeroImportPlan; run: HeroImportRun; campaignId: number };
 
 const importanceOptions = [
@@ -43,7 +44,7 @@ export const HeroImportSummary: React.FC<SummaryProps> = ({ plan, run, campaignI
     if (prior) resources.set(key, { ...prior, metadata });
   });
   const statuses = { ...Object.fromEntries(plan.steps.map(step => [step.key, 'pending'])), ...run.statuses };
-  const statusText = (status: string) => status === 'applied' ? 'Сохранено' : status === 'verified' ? 'Создание подтверждено' : status === 'unknown' ? 'Результат неизвестен' : status === 'failed' ? 'Не сохранено' : 'Ожидает подтверждения';
+  const statusText = (status: string) => status === 'applied' ? 'Сохранено' : status === 'verified' ? 'Изменение подтверждено перечитыванием' : status === 'unknown' ? 'Результат неизвестен' : status === 'failed' ? 'Не сохранено' : 'Ожидает подтверждения';
   const targets = new Map<string, { name: string; id: string }>();
   resources.forEach((snapshot, key) => targets.set(key, { name: snapshot.metadata.name, id: snapshot.metadata.id }));
   Object.entries(run.createdMetadata ?? {}).forEach(([key, metadata]) => targets.set(key, { name: metadata.name, id: metadata.id }));
@@ -60,14 +61,15 @@ export const HeroImportSummary: React.FC<SummaryProps> = ({ plan, run, campaignI
   </section>;
 };
 
-const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose, onResult }) => {
+const HeroImportWizard: React.FC<WizardProps> = ({ sources, characters = sources, items = [], skills = [], characterItems = [], characterSkills = [], campaignId, onClose, onResult }) => {
   const { api, sessionKey } = useWorkspace();
   const { mode, permissions, permissionsLoading, reloadPermissions } = useCampaignWorkspace();
   const canWrite = mode === 'gm' && permissions.canWrite && !permissionsLoading;
   const canWriteRef = useRef(canWrite);
   canWriteRef.current = canWrite;
   const [requestIds] = useState<Record<number, string>>(() => Object.fromEntries(sources.map((_, index) => [index, crypto.randomUUID()])));
-  const [drafts, setDrafts] = useState<HeroDraft[]>(() => sources.map((source, index) => createHeroDraft(source, index)));
+  const catalogSources = useMemo(() => Object.fromEntries(sources.map((source, index) => [index, collectHeroCatalogSources(source, characters, items, skills, characterItems, characterSkills)])) as Record<number, HeroCatalogSource[]>, [sources, characters, items, skills, characterItems, characterSkills]);
+  const [drafts, setDrafts] = useState<HeroDraft[]>(() => sources.map((source, index) => createHeroDraft(source, index, catalogSources[index])));
   const [step, setStep] = useState(1);
   const [run, setRun] = useState<HeroImportRun>();
   const [plan, setPlan] = useState<HeroImportPlan>();
@@ -80,14 +82,20 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
   const activeRef = useRef(true);
   const busyRef = useRef(false);
   const stopRef = useRef(false);
+  const catalogMappingsSeeded = useRef(false);
   const selected = drafts.filter(draft => draft.selected);
   const selectedDraft = selected[0];
   const selectedSourceValue = selectedDraft ? String(selectedDraft.sourceIndex) : '';
   const selectedExistingIds = Array.from(new Set(selected.filter(draft => draft.targetMode === 'existing' && draft.targetId).map(draft => draft.targetId))).sort();
   const resourcesEnabled = canWrite;
   const definitions = useResource(`${sessionKey}:${campaignId}:hero-import-base`, async () => {
-    const [template, characters] = await Promise.all([api.getTemplateContent(campaignId), api.listCharacters(campaignId)]);
-    return { template, characters };
+    const [template, targetCharacters, itemDefinitions, skillDefinitions] = await Promise.all([
+      api.getTemplateContent(campaignId),
+      api.listCharacters(campaignId),
+      api.listCatalog(campaignId, 'Item'),
+      api.listCatalog(campaignId, 'Skill')
+    ]);
+    return { template, characters: targetCharacters, itemDefinitions, skillDefinitions };
   }, resourcesEnabled);
   const targetResources = useResource(`${sessionKey}:${campaignId}:hero-import-targets:${selectedExistingIds.join('|')}`, () => Promise.all(selectedExistingIds.map(async id => [id, await readHeroTarget(api, campaignId, id)] as const)), canWrite && selectedExistingIds.length > 0);
   const locked = Boolean(run?.attempted);
@@ -98,7 +106,7 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
   const targetMap = useMemo(() => Object.fromEntries(targetResources.data ?? []), [targetResources.data]);
   const snapshots: Record<string, HeroTargetSnapshot> = { ...targetMap, ...(run?.targets ?? {}) };
   const currentTemplate = run?.template ?? definitions.data?.template;
-  const context = currentTemplate ? { template: currentTemplate, targets: snapshots } : undefined;
+  const context = currentTemplate && definitions.data ? { template: currentTemplate, targets: snapshots, itemDefinitions: definitions.data.itemDefinitions, skillDefinitions: definitions.data.skillDefinitions } : undefined;
   const resourceError = definitions.error ?? targetResources.error;
   const controlsDisabled = busy || !canWrite || resourceBusy || Boolean(resourceError) || !definitions.data;
 
@@ -136,6 +144,19 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
     });
   }, [definitions.data, resourceError, resourceBusy, resourcesEnabled, requestIds, snapshots, sources]);
 
+  useEffect(() => {
+    if (!definitions.data || catalogMappingsSeeded.current) return;
+    catalogMappingsSeeded.current = true;
+    setDrafts(current => current.map(draft => ({
+      ...draft,
+      catalogMappings: Object.fromEntries((catalogSources[draft.sourceIndex] ?? []).map(item => {
+        const candidates = (item.kind === 'Item' ? definitions.data!.itemDefinitions : definitions.data!.skillDefinitions)
+          .filter(definition => Boolean(item.name.trim()) && definition.name.trim().toLocaleLowerCase() === item.name.trim().toLocaleLowerCase());
+        return [item.key, !item.quantityIssue && candidates.length === 1 ? candidates[0].id : draft.catalogMappings[item.key] ?? ''];
+      }))
+    })));
+  }, [definitions.data, catalogSources]);
+
   const invalidatePlan = () => { setPlan(undefined); setPlanErrors([]); setNotice(''); };
   const updateDraft = (sourceIndex: number, update: (draft: HeroDraft) => HeroDraft) => {
     invalidatePlan();
@@ -144,12 +165,12 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
   const updateField = (sourceIndex: number, key: string, update: (choice: HeroDraft['fields'][string]) => HeroDraft['fields'][string]) => updateDraft(sourceIndex, draft => ({ ...draft, fields: { ...draft.fields, [key]: update(draft.fields[key]) } }));
   const prepare = () => {
     if (!context || controlsDisabled || !canWrite || run?.needsCheck) return;
-    const result = prepareHeroImport(sources, drafts, context, requestIds, run);
+    const result = prepareHeroImport(sources, drafts, context, requestIds, run, catalogSources);
     setPlanErrors(result.errors);
     setPlan(result.plan);
     if (result.plan) {
       setReportPlan(result.plan);
-      setStep(4);
+      setStep(5);
     }
     setNotice('');
   };
@@ -192,8 +213,8 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
       setRun(next);
       setPlan(undefined);
       setPlanErrors([]);
-      if (!next.needsCheck) setStep(3);
-      setNotice(next.needsCheck ? '' : 'Текущее состояние перечитано. Проверьте действия и повторно откройте итог перед подтверждением.');
+      if (!next.needsCheck) setStep(4);
+      setNotice(next.needsCheck ? '' : 'Текущее состояние перечитано. Проверьте сопоставления предметов и навыков, затем сформируйте итог заново.');
       try { onResult?.(checkPlan, next); } catch { }
       if (next.error instanceof CampaignApiError && next.error.status === 403) reloadPermissions();
     } catch (error) {
@@ -253,11 +274,11 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
     return templateField ? importValueDisplay(templateField.value) : 'Не задано';
   };
 
-  const stepDescription = step === 1 ? 'выберите персонажа и цель' : step === 2 ? 'выберите данные' : step === 3 ? 'задайте сопоставление полей' : 'итог';
+  const stepDescription = step === 1 ? 'выберите персонажа и цель' : step === 2 ? 'выберите данные для существующего персонажа' : step === 3 ? 'сопоставьте поля персонажа' : step === 4 ? 'сопоставьте предметы и навыки' : 'проверьте итог и подтвердите импорт';
   const allComplete = !busy && completeRun(run, plan);
   const existingTargets = definitions.data?.characters ?? [];
   const runIncomplete = Boolean(run?.attempted && !allComplete);
-  const frozenPlan = step === 4 ? plan ?? reportPlan : undefined;
+  const frozenPlan = step === 5 ? plan ?? reportPlan : undefined;
   const confirmDisabled = !plan || !canWrite || busy || resourceBusy || Boolean(resourceError) || !definitions.data || Boolean(genericError) || Boolean(run?.error) || Boolean(run?.needsCheck) || allComplete;
   const targetNextDisabled = !selectedDraft || !selectedDraft.targetMode || !definitions.data || resourceBusy || Boolean(resourceError) || (selectedDraft.targetMode === 'new' ? !selectedDraft.newName.trim() : !selectedDraft.targetId || !snapshots[selectedDraft.targetId]);
   const statusLabel = (key: string) => run?.statuses[key] === 'applied' ? 'Уже сохранено' : run?.statuses[key] === 'verified' ? 'Создание подтверждено' : run?.statuses[key] === 'unknown' ? 'Результат неизвестен' : run?.statuses[key] === 'failed' ? 'Не сохранено' : 'Будет выполнено после подтверждения';
@@ -280,7 +301,18 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
     return `В существующего: ${frozenPlan?.targets[targetKey]?.metadata.name ?? 'Персонаж'}`;
   };
   const sourceLabel = (sourceIndex: number) => sources[sourceIndex]?.name ?? `Персонаж ${sourceIndex + 1}`;
-  const proceed = () => setStep(value => Math.min(3, value + 1));
+  const catalogCounts = (sourceIndex: number) => {
+    const sourceCatalog = catalogSources[sourceIndex] ?? [];
+    return { items: sourceCatalog.filter(item => item.kind === 'Item').length, skills: sourceCatalog.filter(item => item.kind === 'Skill').length };
+  };
+  const catalogSelectionControls = (draft: HeroDraft, disabled: boolean) => {
+    const counts = catalogCounts(draft.sourceIndex);
+    return <>
+      <label><Checkbox aria-label={`Предметы (${counts.items})`} checked={draft.selectItems} disabled={disabled || counts.items === 0} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, selectItems: event.target.checked }))} /> Предметы ({counts.items})</label>
+      <label><Checkbox aria-label={`Навыки (${counts.skills})`} checked={draft.selectSkills} disabled={disabled || counts.skills === 0} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, selectSkills: event.target.checked }))} /> Навыки ({counts.skills})</label>
+    </>;
+  };
+  const proceed = () => setStep(value => Math.min(5, value + 1));
   const proceedFromTarget = () => {
     const draft = selected[0];
     if (!draft || !definitions.data || controlsDisabled || resourceBusy || resourceError || !draft.targetMode) return;
@@ -293,9 +325,19 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
     setStep(2);
   };
   const goBack = () => {
+    if (step === 5) {
+      setPlan(undefined);
+      setPlanErrors([]);
+      setNotice('');
+      setGenericError(undefined);
+      setStep(4);
+      return;
+    }
     if (step === 4) {
       setPlan(undefined);
       setPlanErrors([]);
+      setNotice('');
+      setGenericError(undefined);
       setStep(3);
       return;
     }
@@ -307,7 +349,7 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
   };
 
   return <ModalPortal isOpen onClose={requestClose} title="Импорт персонажа" size="wide" dismissDisabled={busy}>
-    <p>{`Шаг ${step} из 4: ${stepDescription}`}</p>
+    <p>{`Шаг ${step} из 5: ${stepDescription}`}</p>
     {mode !== 'gm' && <p role="alert">Импорт доступен только в пространстве ведущего.</p>}
     {permissionsLoading && <p role="status">Проверка прав…</p>}
     {!permissionsLoading && mode === 'gm' && !permissions.canWrite && <p role="alert">Нет прав на запись в кампанию.</p>}
@@ -341,11 +383,12 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
                 {importanceOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
               </Select>
             </Field>
+            {catalogSelectionControls(draft, identityDisabled)}
           </>}
         </Panel>;
       })}
       {sources.length === 0 && <p>В файле нет персонажей для импорта.</p>}
-      {resourceBusy && <p role="status">Загрузка шаблона и персонажей…</p>}
+      {resourceBusy && <p role="status">Загрузка шаблона, персонажей и каталогов…</p>}
       {Boolean(resourceError) && <ApiError error={resourceError} onRetry={() => { if (definitions.error) definitions.reload(); else targetResources.reload(); }} />}
     </section>}
 
@@ -362,14 +405,15 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
           {!descriptionValid && <p>Описание в исходных данных отсутствует или некорректно.</p>}
           <label><Checkbox aria-label={`Поля ${source.name}`} checked={source.fields.length > 0 && source.fields.every(field => draft.fields[field.key]?.selected)} disabled={locked || busy || !canWrite || source.fields.length === 0} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, fields: Object.fromEntries(Object.entries(value.fields).map(([key, choice]) => [key, { ...choice, selected: event.target.checked }])) }))} /> Поля ({source.fields.length})</label>
           {source.fields.length === 0 && <p>В файле нет полей.</p>}
+          {catalogSelectionControls(draft, locked || busy || !canWrite)}
           <p>Формулы, формулы модификаторов и максимальные значения не импортируются.</p>
         </Panel>;
       })}
       {selected.length === 0 && <p>Вернитесь назад и выберите хотя бы одного персонажа.</p>}
     </section>}
 
-    {(step === 3 || step === 4) && <section aria-label={step === 3 ? 'Действия импорта' : 'Итог импорта'}>
-      {resourceBusy && <p role="status">Загрузка шаблона и персонажей…</p>}
+    {(step === 3 || step === 4 || step === 5) && <section aria-label={step === 3 ? 'Сопоставление полей' : step === 4 ? 'Предметы и навыки' : 'Итог импорта'}>
+      {resourceBusy && <p role="status">Загрузка шаблона, персонажей и каталогов…</p>}
       {Boolean(resourceError) && <ApiError error={resourceError} onRetry={() => { if (definitions.error) definitions.reload(); else targetResources.reload(); }} />}
       {!canWrite && <p>Действия недоступны без актуального права записи.</p>}
       {step === 3 && <>
@@ -399,16 +443,55 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
               </DataTableCell><DataTableCell preserveWhitespace>{targetField ? currentValue(targetKey, targetField.id) : '—'}</DataTableCell></tr>;
             })}
           </tbody></DataTable> : <p>Поля не выбраны.</p>}
+          </Panel>;
+      })}
+      </>}
+
+      {step === 4 && selected.map(draft => {
+        const source = sources[draft.sourceIndex];
+        if (!source) return null;
+        const targetKey = draft.targetMode === 'new' ? requestIds[draft.sourceIndex] : draft.targetMode === 'existing' ? draft.targetId : '';
+        const targetEntries = draft.targetMode === 'existing' ? snapshots[targetKey]?.itemEntries ?? [] : [];
+        const mapDisabled = controlsDisabled || !targetKey || (draft.targetMode === 'existing' && !snapshots[targetKey]) || Boolean(run?.needsCheck);
+        const allSourceCatalog = catalogSources[draft.sourceIndex] ?? [];
+        const selectedKinds = [draft.selectItems ? 'Item' : undefined, draft.selectSkills ? 'Skill' : undefined].filter((kind): kind is 'Item' | 'Skill' => Boolean(kind));
+        const sourceCatalog = allSourceCatalog.filter(item => selectedKinds.includes(item.kind));
+        const counts = catalogCounts(draft.sourceIndex);
+        return <Panel key={draft.sourceIndex} title={source.name}>
+          {selectedKinds.length === 0 ? <p>Выберите предметы и/или навыки на предыдущем шаге, чтобы настроить их импорт.</p> : sourceCatalog.length === 0 ? <p>Для выбранных типов в исходных данных нет назначений.</p> : <DataTable aria-label={`Сопоставление предметов и навыков ${source.name}`}>
+            <thead><tr><DataTableCell as="th">Исходное определение</DataTableCell><DataTableCell as="th" sizing="content">Количество</DataTableCell><DataTableCell as="th" sizing="editor">Определение кампании</DataTableCell></tr></thead>
+            <tbody>{sourceCatalog.map(item => {
+              const candidates = item.kind === 'Item' ? definitions.data?.itemDefinitions ?? [] : definitions.data?.skillDefinitions ?? [];
+              const match = candidates.find(definition => definition.id === draft.catalogMappings[item.key]);
+              const numericCandidates = candidates.filter(definition => definition.name.trim().toLocaleLowerCase() === item.name.trim().toLocaleLowerCase());
+              const existingCount = item.kind === 'Item' && match ? targetEntries.filter(entry => entry.record.catalogEntryId === match.id).length : 0;
+              const desiredTotal = Number(String(item.quantity));
+              const additionalCount = Number.isFinite(desiredTotal) ? Math.max(0, desiredTotal - existingCount) : 0;
+              return <tr key={item.key}>
+                <DataTableCell as="th" scope="row">{item.kind === 'Item' ? 'Предмет' : 'Навык'}: {item.name}{item.quantityIssue && <p>{item.quantityIssue}</p>}</DataTableCell>
+                <DataTableCell>{String(item.quantity)}</DataTableCell>
+                <DataTableCell>
+                  <Field label={`Сопоставление ${item.name}`} htmlFor={`hero-catalog-${draft.sourceIndex}-${item.kind}-${encodeURIComponent(item.sourceId)}`}>
+                    <Select variant="embedded" id={`hero-catalog-${draft.sourceIndex}-${item.kind}-${encodeURIComponent(item.sourceId)}`} value={draft.catalogMappings[item.key] ?? ''} disabled={mapDisabled || Boolean(item.quantityIssue)} onChange={event => updateDraft(draft.sourceIndex, value => ({ ...value, catalogMappings: { ...value.catalogMappings, [item.key]: event.target.value } }))}>
+                      <option value="">Не импортировать</option>{candidates.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}{candidate.isHidden ? ' (скрытое)' : ''}</option>)}
+                    </Select>
+                  </Field>
+                  {match && <p>{item.kind === 'Item' && match.quantityUnit === 'Single' ? `Целевое количество: ${String(item.quantity)}; уже назначено: ${existingCount}; будет добавлено: ${additionalCount}. Существующие записи не удаляются.` : item.kind === 'Item' ? `Количество будет заменено на ${String(item.quantity)}.` : 'Навык будет добавлен, если ещё не назначен.'}</p>}
+                  {!match && numericCandidates.length !== 1 && !item.quantityIssue && <p>{candidates.length === 0 ? 'В каталоге нет доступных определений.' : 'Выберите существующее определение или пропустите запись.'}</p>}
+                </DataTableCell>
+              </tr>;
+            })}</tbody>
+          </DataTable>}
+          {draft.selectItems && counts.items === 0 && <p>Для выбранных предметов в исходных данных нет назначений.</p>}
+          {draft.selectSkills && counts.skills === 0 && <p>Для выбранных навыков в исходных данных нет назначений.</p>}
         </Panel>;
       })}
 
       {planErrors.length > 0 && <ul role="alert">{planErrors.map((error, index) => <li key={index}>{error}</li>)}</ul>}
       {notice && <p role="status">{notice}</p>}
       {Boolean(genericError) && <ApiError error={genericError} />}
-      {Boolean(run?.error) && <ApiError error={run?.error} />}
-      {run?.needsCheck && <Button type="button" variant="secondary" disabled={busy || !canWrite} busy={busy} onClick={() => void recheck()}>Перечитать данные</Button>}
-      </>}
-      {step === 4 && frozenPlan && <>
+      {step === 5 && Boolean(run?.error) && <ApiError error={run?.error} />}
+      {step === 5 && frozenPlan && <>
         <p>Проверьте итог и подтвердите импорт выбранных данных.</p>
         <ul>{Array.from(new Set(frozenPlan.steps.map(item => item.sourceIndex))).map(sourceIndex => {
           const sourceSteps = frozenPlan.steps.filter(item => item.sourceIndex === sourceIndex);
@@ -417,6 +500,7 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
           const nameStep = sourceSteps.find(item => item.kind === 'name');
           const descriptionStep = sourceSteps.find(item => item.kind === 'description');
           const values = sourceSteps.filter((item): item is Extract<HeroImportPlan['steps'][number], { kind: 'value' }> => item.kind === 'value');
+           const catalogSteps = sourceSteps.filter((item): item is Extract<HeroImportPlan['steps'][number], { kind: 'catalog' }> => item.kind === 'catalog');
           const currentName = frozenPlan.targets[targetKey]?.metadata.name ?? '';
           const currentDescription = frozenPlan.targets[targetKey]?.sheet.description ?? '';
           return <li key={sourceIndex}>
@@ -429,6 +513,11 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
                 const sourceField = sources[sourceIndex]?.fields.find(field => field.key === item.sourceKey);
                 return <li key={item.key}>{sourceField?.name ?? item.sourceKey} → {item.title}: {beforeFieldValue(item.targetKey, item.fieldId)} → {importValueDisplay(item.value)} — {statusLabel(item.key)}</li>;
               })}</ul></li>}
+              {catalogSteps.length > 0 && <li>Предметы и навыки<ul>{catalogSteps.map(item => {
+                const additionalCount = item.operation === 'single' ? Math.max(0, Number(String(item.amount)) - item.records.length) : 0;
+                const verb = item.operation === 'skill' ? (item.records.length ? 'уже назначен' : 'добавить') : item.operation === 'single' ? `целевое количество: ${String(item.amount)}; уже назначено: ${item.records.length}; будет добавлено: ${additionalCount}. Существующие записи не удаляются` : item.records.length ? `заменить количество на ${String(item.amount)}` : `добавить с количеством ${String(item.amount)}`;
+                return <li key={item.key}>{item.catalogKind === 'Item' ? 'Предмет' : 'Навык'}: {item.label} — {verb} — {statusLabel(item.key)}</li>;
+              })}</ul></li>}
             </ul>
           </li>;
         })}</ul>
@@ -439,8 +528,8 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
         {allComplete && <p role="status">Импорт выбранных данных завершён.</p>}
         {runIncomplete && <p>Закрытие мастера не отменяет уже сохранённые изменения.</p>}
       </>}
-      {step === 4 && !frozenPlan && <p>Итог недоступен. Вернитесь к действиям и сформируйте его заново.</p>}
-      {step === 4 && <ActionRow>
+      {step === 5 && !frozenPlan && <p>Итог недоступен. Вернитесь к сопоставлению предметов и навыков и сформируйте его заново.</p>}
+      {step === 5 && <ActionRow>
         <Button type="button" disabled={confirmDisabled} busy={busy} onClick={() => void execute()}>Подтвердить импорт</Button>
         {busy && <Button type="button" variant="secondary" onClick={stop}>Остановить</Button>}
         {run?.needsCheck && <Button type="button" variant="secondary" disabled={busy || !canWrite} busy={busy} onClick={() => void recheck()}>Перечитать данные</Button>}
@@ -449,10 +538,11 @@ const HeroImportWizard: React.FC<WizardProps> = ({ sources, campaignId, onClose,
     </section>}
 
     <ActionRow>
-      <Button type="button" variant="secondary" disabled={busy || step === 1 || (locked && step !== 4)} onClick={goBack}>Назад</Button>
+      <Button type="button" variant="secondary" disabled={busy || step === 1 || (locked && step !== 5)} onClick={goBack}>Назад</Button>
       {step === 1 && <Button type="button" disabled={busy || !canWrite || targetNextDisabled || locked} onClick={proceedFromTarget}>Далее</Button>}
       {step === 2 && <Button type="button" disabled={busy || !canWrite || locked} onClick={proceed}>Далее</Button>}
-      {step === 3 && <Button type="button" disabled={controlsDisabled || Boolean(run?.needsCheck) || Boolean(genericError) || Boolean(run?.error) || allComplete} onClick={prepare}>Далее</Button>}
+      {step === 3 && <Button type="button" disabled={busy || !canWrite || locked || Boolean(run?.needsCheck) || Boolean(genericError) || Boolean(run?.error) || allComplete} onClick={proceed}>Далее</Button>}
+      {step === 4 && <Button type="button" disabled={controlsDisabled || Boolean(run?.needsCheck) || Boolean(genericError) || Boolean(run?.error)} onClick={prepare}>Далее</Button>}
     </ActionRow>
   </ModalPortal>;
 };

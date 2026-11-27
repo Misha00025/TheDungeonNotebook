@@ -4,6 +4,8 @@ import type { HeroImportApi, HeroDraft, HeroImportContext, HeroImportRun, HeroIm
 import { createHeroDraft, executeHeroImport, prepareHeroImport, recheckHeroImport } from './heroImport';
 import type { BaseField, CharacterMetadata, CharacterSheetEnvelope, TemplateContentEnvelope } from './types';
 import type { LegacyObject } from './legacyDiscovery';
+import type { CatalogMetadata, CharacterCatalogEntryEnvelope } from './catalogTypes';
+import { collectHeroCatalogSources } from './heroImport';
 
 const baseField = (id: string, key: string, valueType: BaseField['valueType'], value: BaseField['value']): BaseField => ({ id, key, title: key, description: '', valueType, typeRevision: 1, value, options: [] });
 const template: TemplateContentEnvelope = { campaignId: 4, contentRevision: 7, data: { description: 'unchanged', baseFields: [baseField('field-a', 'a', 'Integer', 0), baseField('field-a2', 'a2', 'Integer', 0), baseField('field-a3', 'a3', 'Integer', 0), baseField('field-b', 'b', 'Boolean', false), baseField('field-c', 'c', 'String', 'default')], virtualFields: [] } };
@@ -193,5 +195,83 @@ describe('hero import planning and execution', () => {
     const conflictRun = await execute(conflicted, plan);
     expect(conflictRun.needsCheck).toBe(true);
     expect(conflicted.putBaseValue).not.toHaveBeenCalled();
+  });
+
+  it('imports combined legacy amounts as additional single-item records without changing existing records', async () => {
+    const picked = hero('Picked');
+    const other = hero('Other');
+    picked.sourceId = '1';
+    other.sourceId = '2';
+    const itemDefinition: CatalogMetadata = { id: 'catalog-item', campaignId: 4, kind: 'Item', name: 'Potion', creatorUserId: null, isHidden: false, quantityUnit: 'Single', allowNegative: false, metadataRevision: 1 };
+    const skillDefinition: CatalogMetadata = { id: 'catalog-skill', campaignId: 4, kind: 'Skill', name: 'Stealth', creatorUserId: null, isHidden: false, quantityUnit: 'Single', allowNegative: false, metadataRevision: 1 };
+    const row = (characterOldId: number, amount: number): LegacyObject => ({
+      name: 'Potion assignment',
+      sourceId: undefined,
+      data: { characterOldId, itemOldId: 42, amount } as LegacyObject['data'],
+      fields: [],
+      properties: []
+    });
+    const item = hero('Potion');
+    item.sourceId = '42';
+    const skill = hero('Stealth');
+    skill.sourceId = '43';
+    const skillRow: LegacyObject = { name: 'Stealth assignment', sourceId: undefined, data: { characterOldId: 1, skillOldId: 43 }, fields: [], properties: [] };
+    const catalogSources = collectHeroCatalogSources(picked, [picked, other], [item], [skill], [row(1, 1), row(1, 3), row(2, 7)], [skillRow]);
+    const source = catalogSources[0];
+    const draft = createHeroDraft(picked, 0, catalogSources);
+    draft.selected = true;
+    draft.targetMode = 'existing';
+    draft.targetId = 'existing';
+    draft.selectItems = true;
+    expect(draft.selectSkills).toBe(false);
+    draft.catalogMappings[source.key] = itemDefinition.id;
+    draft.catalogRequestNamespaces[source.key] = '123e4567-e89b-42d3-a456-426614174000';
+    const skillSource = catalogSources.find(catalogSource => catalogSource.kind === 'Skill')!;
+    draft.catalogMappings[skillSource.key] = skillDefinition.id;
+    const existingEntry = (id: string): CharacterCatalogEntryEnvelope => ({
+      record: { id, campaignId: 4, characterId: 'existing', catalogEntryId: itemDefinition.id, quantity: null, metadataRevision: 1 },
+      definition: itemDefinition,
+      definitionDescription: '',
+      effectiveAttributes: [],
+      explicitAttributes: [],
+      definitionContentRevision: 1,
+      localContentRevision: 1
+    });
+    const existingRecords = [existingEntry('record-a'), existingEntry('record-b')];
+    const result = prepareHeroImport([picked, other], [draft], {
+      ...context({ existing: { metadata: metadata(), sheet: sheet(), itemEntries: existingRecords, skillEntries: [] } }),
+      itemDefinitions: [itemDefinition],
+      skillDefinitions: [skillDefinition]
+    }, {}, undefined, { 0: catalogSources });
+    expect(result.errors).toEqual([]);
+    const plan = result.plan!;
+    expect(plan.steps.map(step => step.kind === 'catalog' ? step.catalogKind : step.kind)).toEqual(['Item']);
+    expect(plan.steps[0]).toMatchObject({ kind: 'catalog', quantityUnit: 'Single', desiredAdds: 2 });
+    expect(plan.steps[0].kind === 'catalog' ? String(plan.steps[0].amount) : '').toBe('4');
+    const api = apiFactory() as ReturnType<typeof apiFactory> & {
+      listCharacterEntries: ReturnType<typeof vi.fn>;
+      addCharacterEntry: ReturnType<typeof vi.fn>;
+    };
+    api.listCharacterEntries = vi.fn(async (_campaignId: number, kind: string) => kind === 'Item' ? existingRecords : []);
+    api.addCharacterEntry = vi.fn(async (_campaignId: number, _kind: string, _characterId: string, body: { requestId: string; catalogEntryId: string; attributes: [] }) => ({ requestId: body.requestId, entry: existingRecords[0] }));
+
+    const run = await execute(api, plan);
+
+    expect(run.statuses['0:catalog:Item:catalog-item']).toBe('applied');
+    expect(api.addCharacterEntry).toHaveBeenCalledTimes(2);
+    const calls = api.addCharacterEntry.mock.calls;
+    expect(calls.map(call => call[1])).toEqual(['Item', 'Item']);
+    expect(calls.map(call => call[3])).toEqual(plan.steps[0].kind === 'catalog'
+      ? plan.steps[0].requestIds.map(requestId => ({ requestId, catalogEntryId: itemDefinition.id, attributes: [] }))
+      : []);
+    expect(calls.every(call => !Object.prototype.hasOwnProperty.call(call[3], 'quantity'))).toBe(true);
+    const requestIds = calls.map(call => call[3].requestId);
+    expect(new Set(requestIds).size).toBe(2);
+    expect(requestIds.every(id => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))).toBe(true);
+    expect(api.addCharacterEntry.mock.calls.map(call => call[3].catalogEntryId)).toEqual([itemDefinition.id, itemDefinition.id]);
+    expect(existingRecords.map(entry => entry.record)).toEqual([
+      expect.objectContaining({ id: 'record-a', quantity: null }),
+      expect.objectContaining({ id: 'record-b', quantity: null })
+    ]);
   });
 });
