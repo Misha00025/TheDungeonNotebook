@@ -1,7 +1,7 @@
 import { makeAuthenticatedRequest } from '@tdn/shared';
 import type { AuthenticatedRequest } from '@tdn/shared';
 import { parseJson, stringifyJson } from './json';
-import type { Assignment, BaseFieldInput, Campaign, CharacterMetadata, CharacterSheetEnvelope, ComputedSheet, ContentRevisionDto, DefinitionCreate, DefinitionMetadata, FormulaContent, FormulaContentEnvelope, FormulaMetadata, Importance, JsonValue, Member, OverridesEnvelope, Permissions, PresentationEnvelope, ResolvedPresentation, TemplateContentEnvelope, TemplateMetadata, User, ViewContentEnvelope, ViewMetadata, ViewNode, ViewSourcesResponse, VirtualFieldInput, VirtualFieldsEnvelope, WorldKind, WorldMaterial, WorldMaterialBody, WorldMaterialBodyUpdateRequest, WorldMaterialCreateRequest, WorldMaterialCreateResult, WorldMaterialUpdateRequest } from './types';
+import type { Assignment, BaseFieldInput, Campaign, CharacterMetadata, CharacterSheetEnvelope, ComputedSheet, ContentRevisionDto, DefinitionCreate, DefinitionMetadata, FormulaContent, FormulaContentEnvelope, FormulaMetadata, Importance, JsonValue, Member, OverridesEnvelope, Permissions, PlayerCharacterScreen, PlayerCharactersResponse, PresentationEnvelope, ResolvedPresentation, TemplateContentEnvelope, TemplateMetadata, User, ViewContentEnvelope, ViewMetadata, ViewNode, ViewSourcesResponse, VirtualFieldInput, VirtualFieldsEnvelope, WorldKind, WorldMaterial, WorldMaterialBody, WorldMaterialBodyUpdateRequest, WorldMaterialCreateRequest, WorldMaterialCreateResult, WorldMaterialUpdateRequest } from './types';
 import type { CatalogAttributeSchemaEnvelope, CatalogContentEnvelope, CatalogCreateRequest, CatalogCreateResult, CatalogCreateResultDto, CatalogGroupConfigurationEnvelope, CatalogGroupEntriesDto, CatalogGroupInput, CatalogGroupsEnvelope, CatalogKind, CatalogMetadata, CatalogMetadataDto, CharacterCatalogAddRequest, CharacterCatalogAddResponse, CharacterCatalogAdditionDto, CharacterCatalogAttributesUpdateRequest, CharacterCatalogCreateRequest, CharacterCatalogEntryDto, CharacterCatalogEntryEnvelope, CharacterCatalogQuantityUpdateRequest } from './catalogTypes';
 
 export interface Problem { code: string; title: string; detail: string; errors?: Record<string, string[]>; resourceId?: string; requestId?: string }
@@ -54,6 +54,30 @@ export function createCampaignApi(request: AuthenticatedRequest) {
     if (parsed === undefined) throw new CampaignApiError(response.status, { code: 'invalid_response', title: 'Invalid response', detail: 'Expected a JSON response body.' }, method !== 'GET');
     return parsed as T;
   }
+  async function sendPlayerScreen<T>(path: string): Promise<T> {
+    let response: Response;
+    try {
+      response = await request(path, { method: 'GET', cache: 'no-store' });
+    } catch (error) {
+      throw error;
+    }
+    let text: string;
+    try { text = await response.text(); } catch {
+      throw new CampaignApiError(response.status, { code: 'invalid_response', title: 'Invalid response', detail: 'Response body could not be read.' });
+    }
+    let parsed: unknown;
+    try { parsed = text ? parseJson(text) : undefined; } catch { parsed = undefined; }
+    if (!response.ok) {
+      const value = parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : {};
+      const problem: Problem = { code: String(value.code ?? 'http_error'), title: String(value.title ?? response.statusText), detail: String(value.detail ?? response.statusText) };
+      if (value.errors && typeof value.errors === 'object') problem.errors = value.errors as Record<string, string[]>;
+      if (value.resourceId !== undefined) problem.resourceId = String(value.resourceId);
+      if (value.requestId !== undefined) problem.requestId = String(value.requestId);
+      throw new CampaignApiError(response.status, problem);
+    }
+    if (parsed === undefined) throw new CampaignApiError(response.status, { code: 'invalid_response', title: 'Invalid response', detail: 'Expected a JSON response body.' });
+    return parsed as T;
+  }
   const c = (id: number) => `/${enc(id)}`;
   const template = (id: number) => `${c(id)}/template`;
   const characters = (id: number) => `${c(id)}/characters`;
@@ -91,6 +115,8 @@ export function createCampaignApi(request: AuthenticatedRequest) {
     getTemplateVirtualFields: (id: number) => send<VirtualFieldsEnvelope>(`${template(id)}/virtual-fields`),
     putTemplateVirtualFields: (id: number, body: { expectedRevision: RevisionPayload['expectedRevision']; virtualFields: VirtualFieldInput[] }) => put<VirtualFieldsEnvelope>(`${template(id)}/virtual-fields`, body),
     listCharacters: (id: number) => send<CharacterMetadata[]>(characters(id)),
+    listPlayerScreenCharacters: (id: number) => sendPlayerScreen<PlayerCharactersResponse>(`/player/campaigns/${enc(id)}/characters`),
+    getPlayerCharacterScreen: (id: number, charId: Id) => sendPlayerScreen<PlayerCharacterScreen>(`/player/campaigns/${enc(id)}/characters/${enc(charId)}`),
     getCharacter: (id: number, charId: Id) => send<CharacterMetadata>(`${characters(id)}/${enc(charId)}`),
     createCharacter: (id: number, body: { requestId: Id; name: string; importance?: Importance }) => create<CharacterMetadata>(characters(id), body),
     putCharacter: (id: number, charId: Id, body: { name: string; importance: Importance; expectedRevision: RevisionPayload['expectedRevision'] }) => put<CharacterMetadata>(`${characters(id)}/${enc(charId)}`, body),

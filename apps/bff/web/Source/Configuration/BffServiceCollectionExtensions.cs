@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using Tdn.Bff.Errors;
 using Tdn.Bff.Oidc;
+using Tdn.Bff.PlayerScreens;
 using Tdn.Bff.Security;
 using Tdn.Bff.Sessions;
 using Tdn.Bff.Upstream;
@@ -67,6 +68,8 @@ public static class BffServiceCollectionExtensions
         services.AddSingleton<ISessionLock, RedisSessionLock>();
         services.AddSingleton<IOidcTokenClient, OidcTokenClient>();
         services.AddSingleton<ISessionTokenService, SessionTokenService>();
+        services.AddHttpClient("player-screens");
+        services.AddScoped<PlayerScreenService>();
         services.AddSingleton(TimeProvider.System);
 
         services.AddAuthentication(options =>

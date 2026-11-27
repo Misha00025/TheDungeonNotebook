@@ -50,6 +50,16 @@ export interface ViewMetadata extends DefinitionMetadata {}
 export interface Presentation { contentRevision: Revision; defaults: Record<string, string>; contextParams: Record<string, JsonValue> }
 export interface PresentationEnvelope extends Presentation {}
 export interface ResolvedPresentation { contextKey: string; viewMetadata: ViewMetadata; viewContent: ContentEnvelope<ViewContent>; contextParams: JsonValue | null; contentRevision: Revision }
+export interface PlayerCharacterOption extends CharacterMetadata { canWrite: true }
+export interface PlayerCharactersResponse { characters: PlayerCharacterOption[] }
+export interface PlayerCharacterScreen {
+  character: CharacterMetadata;
+  permissions: Pick<Permissions, 'canRead' | 'canWrite'>;
+  computedSheet: ComputedSheet;
+  presentation: PresentationEnvelope;
+  resolvedPresentations: Record<string, ResolvedPresentation>;
+  availableCharacters: PlayerCharacterOption[];
+}
 export interface ViewSourcesResponse { viewContentRevision: Revision; contentRevision: Revision; templateContentRevision: Revision; formulaContentRevisions: FormulaRevision[]; widgets: { nodeKey: string; sources: { sourceIndex: number; source: WidgetSource; value: JsonValue | null; diagnostic: { code: string } | null }[] }[] }
 export interface FormulaContentEnvelope extends ContentEnvelope<FormulaContent> {}
 export interface ViewContentEnvelope extends ContentEnvelope<ViewContent> {}

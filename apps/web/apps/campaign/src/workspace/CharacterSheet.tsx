@@ -7,7 +7,7 @@ import { useOptionalCampaignWorkspace } from './Shell';
 import { useVisitHistory } from './VisitHistory';
 import { useMutation, useResource } from './hooks';
 import { CampaignApiError } from './api';
-import type { CharacterMetadata, ChoiceOption, ComputedSheet, FieldReference, JsonValue, Permissions, PresentationEnvelope, ResolvedPresentation, Revision, ValueType } from './types';
+import type { CharacterMetadata, ChoiceOption, ComputedSheet, FieldReference, JsonValue, Permissions, PlayerCharacterScreen, PresentationEnvelope, ResolvedPresentation, Revision, ValueType } from './types';
 import { ValueInput, validateFieldValue } from './ValueInput';
 import { stringifyJson } from './json';
 import { ApiError } from './Feedback';
@@ -54,11 +54,13 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
   const gmCatalogPage = variant === 'sheet' && mode === 'gm' && (pageKey === 'inventory' || pageKey === 'skills');
   const gmServicePage = gmStatsPage || gmCatalogPage;
   const scope = `${sessionKey}:${campaignId}:${characterId}`;
+  const playerScreenMode = variant === 'sheet' && mode === 'player';
   const choosePlayerCharacter = useConfirmedPlayerCharacterSelection(campaignId, playerSelectionKey(sessionKey, campaignId), id => navigate(path(`/${campaignId}/player/characters/${encodeURIComponent(id)}`)));
-  const metadataResource = useResource<CharacterMetadata>(`${scope}:metadata`, () => api.getCharacter(campaignId, characterId), variant === 'sheet' || !initialMetadata);
-  const permissionResource = useResource<Permissions>(`${scope}:character-permissions`, () => api.characterPermissions(campaignId, characterId));
-  const sheetResource = useResource<ComputedSheet>(`${scope}:computed-sheet`, () => api.getComputedSheet(campaignId, characterId));
-  const presentationResource = useResource<PresentationEnvelope>(`${scope}:presentation`, () => api.getPresentation(campaignId), variant === 'sheet');
+  const playerScreenResource = useResource<PlayerCharacterScreen>(`${scope}:player-screen`, () => api.getPlayerCharacterScreen(campaignId, characterId), playerScreenMode);
+  const metadataResource = useResource<CharacterMetadata>(`${scope}:metadata`, () => api.getCharacter(campaignId, characterId), variant === 'sheet' && mode === 'gm' || variant === 'card' && !initialMetadata);
+  const permissionResource = useResource<Permissions>(`${scope}:character-permissions`, () => api.characterPermissions(campaignId, characterId), !playerScreenMode);
+  const sheetResource = useResource<ComputedSheet>(`${scope}:computed-sheet`, () => api.getComputedSheet(campaignId, characterId), !playerScreenMode);
+  const presentationResource = useResource<PresentationEnvelope>(`${scope}:presentation`, () => api.getPresentation(campaignId), variant === 'sheet' && mode === 'gm');
   const [metadata, setMetadata] = useState<CharacterMetadata | undefined>(initialMetadata);
   const [metadataDraft, setMetadataDraft] = useState<MetadataDraft>();
   const [sheet, setSheet] = useState<ComputedSheet>();
@@ -73,11 +75,12 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
   const [pageRefreshConflict, setPageRefreshConflict] = useState(false);
   const [pageVisibleFieldIds, setPageVisibleFieldIds] = useState<string[]>([]);
   const [headerVisibleFieldIds, setHeaderVisibleFieldIds] = useState<string[]>([]);
-  const [permissionSnapshot, setPermissionSnapshot] = useState<Permissions>();
+  const [permissionSnapshot, setPermissionSnapshot] = useState<Pick<Permissions, 'canRead' | 'canWrite'>>();
   const [permissionCheckError, setPermissionCheckError] = useState<unknown>();
   const [permissionDirectVerified, setPermissionDirectVerified] = useState(false);
   const [serverMetadataSnapshot, setServerMetadataSnapshot] = useState<CharacterMetadata>();
   const [presentation, setPresentation] = useState<PresentationEnvelope>();
+  const [playerScreen, setPlayerScreen] = useState<PlayerCharacterScreen>();
   const [presentationError, setPresentationError] = useState<unknown>();
   const [resetCounters, setResetCounters] = useState<Record<string, number>>({});
   const descriptionDraftRef = useRef(descriptionDraft);
@@ -116,8 +119,9 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
   const snapshotBusyRef = useRef(false);
   const computedReadBusyRef = useRef(false);
   const computedReadGenerationRef = useRef(0);
-  const lastPermissionRef = useRef<Permissions | undefined>(undefined);
+  const lastPermissionRef = useRef<Pick<Permissions, 'canRead' | 'canWrite'> | undefined>(undefined);
   const initializedRef = useRef(false);
+  const hydratedPlayerScreenRef = useRef<PlayerCharacterScreen | undefined>(undefined);
   const recordedCharacter = useRef<string | null>(null);
   const activeRef = useRef(true);
   const refreshBusyRef = useRef(false);
@@ -138,6 +142,24 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
     activeRef.current = true;
     return () => { activeRef.current = false; };
   }, []);
+  useEffect(() => {
+    const screen = playerScreenResource.data;
+    if (!screen || screen === hydratedPlayerScreenRef.current) return;
+    hydratedPlayerScreenRef.current = screen;
+    setPlayerScreen(screen);
+    setMetadata(screen.character);
+    setServerMetadataSnapshot(undefined);
+    setPermissionSnapshot(screen.permissions);
+    lastPermissionRef.current = screen.permissions;
+    setPermissionCheckError(undefined);
+    setPermissionDirectVerified(true);
+    setPresentation(screen.presentation);
+    setPresentationError(undefined);
+    updateSheet(() => screen.computedSheet);
+    contentRevisionRef.current = screen.computedSheet.contentRevision;
+    initializedRef.current = true;
+    setSheetReadBlocked(false);
+  }, [playerScreenResource.data]);
   useEffect(() => {
     if (variant === 'card' && initialMetadata) { setMetadata(initialMetadata); return; }
     if (metadataResource.data && !metadataResource.loading && !metadataResource.error) setMetadata(metadataResource.data);
@@ -173,10 +195,11 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
   useEffect(() => {
     const identity = `${sessionKey}:${campaignId}:${characterId.toLowerCase()}`;
     const permission = permissionSnapshot ?? permissionResource.data;
-    if (variant === 'card' || !metadataResource.data || metadataResource.loading || metadataResource.error || !permission || permissionResource.loading || permissionCheckError || (!permission.canRead && !permission.canWrite) || recordedCharacter.current === identity) return;
+    const confirmedMetadata = playerScreenMode ? metadata : metadataResource.data;
+    if (variant === 'card' || !confirmedMetadata || (!playerScreenMode && (metadataResource.loading || metadataResource.error)) || !permission || permissionResource.loading || permissionCheckError || (!permission.canRead && !permission.canWrite) || recordedCharacter.current === identity) return;
     recordedCharacter.current = identity;
     visitCharacter(campaignId, characterId);
-  }, [variant, sessionKey, campaignId, characterId, metadataResource.data, metadataResource.loading, metadataResource.error, permissionSnapshot, permissionResource.data, permissionResource.loading, permissionCheckError, visitCharacter]);
+  }, [variant, playerScreenMode, metadata, sessionKey, campaignId, characterId, metadataResource.data, metadataResource.loading, metadataResource.error, permissionSnapshot, permissionResource.data, permissionResource.loading, permissionCheckError, visitCharacter]);
 
   const fieldDirty = Object.keys(fieldDrafts).length > 0 || Object.keys(rawDrafts).length > 0;
   const contentDirty = Boolean(
@@ -259,6 +282,11 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
     if (!hasUnconfirmedDrafts()) { blockedRef.current = false; setSheetBlocked(false); }
     else if (!changed) { blockedRef.current = false; setSheetBlocked(false); }
   };
+  const refreshPermissions = () => {
+    campaignWorkspace?.reloadPermissions();
+    if (playerScreenMode) refreshAllRef.current?.();
+    else permissionResource.reload();
+  };
   const refreshComputedSheet = useCallback(async (duringContentWrite = false) => {
     if (!activeRef.current || computedReadBusyRef.current || (!duringContentWrite && contentBusyRef.current) || snapshotBusyRef.current) return;
     computedReadBusyRef.current = true;
@@ -277,8 +305,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
       setComputedReadError(error);
       if (error instanceof CampaignApiError && error.status === 403) {
         setPermissionCheckError(undefined);
-        campaignWorkspace?.reloadPermissions();
-        permissionResource.reload();
+        refreshPermissions();
       }
     } finally {
       if (generation === computedReadGenerationRef.current) {
@@ -286,7 +313,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
         if (activeRef.current) setComputedReadBusy(false);
       }
     }
-  }, [api, campaignId, characterId, campaignWorkspace, permissionResource.reload, sheetResource.setData]);
+  }, [api, campaignId, characterId, campaignWorkspace, permissionResource.reload, sheetResource.setData, playerScreenMode]);
   const refreshAll = useCallback(async () => {
     if (!initializedRef.current || !activeRef.current) return;
     if (refreshBusyRef.current || contentBusyRef.current || processorBusyRef.current || metadataBusyRef.current) { refreshQueuedRef.current = true; return; }
@@ -295,6 +322,53 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
     computedReadBusyRef.current = false;
     setComputedReadBusy(false);
     const generation = ++snapshotGenerationRef.current;
+    if (playerScreenMode) {
+      try {
+        const screen = await api.getPlayerCharacterScreen(campaignId, characterId);
+        if (activeRef.current && generation === snapshotGenerationRef.current) {
+          hydratedPlayerScreenRef.current = screen;
+          setPlayerScreen(screen);
+          const current = metadataRef.current;
+          const draft = metadataDraftRef.current;
+          const dirtyMetadata = Boolean(current && draft && (current.name !== draft.name || current.importance !== draft.importance));
+          if (dirtyMetadata && current && stringifyJson(current.metadataRevision) !== stringifyJson(screen.character.metadataRevision)) {
+            setServerMetadataSnapshot(screen.character);
+            setMetadataBlocked(true);
+          } else if (dirtyMetadata) {
+            setServerMetadataSnapshot(undefined);
+            setMetadataBlocked(false);
+            setMetadataError(undefined);
+          } else {
+            setMetadata(screen.character);
+            setServerMetadataSnapshot(undefined);
+            setMetadataBlocked(false);
+            setMetadataError(undefined);
+          }
+          setPermissionSnapshot(screen.permissions);
+          setPermissionCheckError(undefined);
+          setPermissionDirectVerified(true);
+          lastPermissionRef.current = screen.permissions;
+          setPresentation(screen.presentation);
+          setPresentationError(undefined);
+          setPresentationRefreshKey(value => value + 1);
+          setSnapshotError(undefined);
+          setComputedReadError(undefined);
+          setSheetReadBlocked(false);
+          acceptFreshSheet(screen.computedSheet);
+        }
+      } catch (error) {
+        if (activeRef.current && generation === snapshotGenerationRef.current) {
+          setSnapshotError(error);
+          setPermissionCheckError(error);
+          setPermissionDirectVerified(false);
+        }
+      }
+      refreshBusyRef.current = false;
+      snapshotBusyRef.current = false;
+      if (activeRef.current) setSnapshotBusy(false);
+      if (refreshQueuedRef.current) { refreshQueuedRef.current = false; refreshAllRef.current?.(); }
+      return;
+    }
     const results = await Promise.allSettled([
       variant === 'sheet' ? api.getPresentation(campaignId) : Promise.resolve(undefined),
       api.getComputedSheet(campaignId, characterId),
@@ -325,7 +399,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
     refreshBusyRef.current = false; snapshotBusyRef.current = false;
     if (activeRef.current) setSnapshotBusy(false);
     if (refreshQueuedRef.current) { refreshQueuedRef.current = false; refreshAllRef.current?.(); }
-  }, [api, campaignId, characterId, variant, sheetResource.setData]);
+  }, [api, campaignId, characterId, variant, playerScreenMode, sheetResource.setData]);
   refreshAllRef.current = () => { void refreshAll(); };
 
   const metadataMutation = useMutation(async (draft: MetadataDraft) => {
@@ -348,7 +422,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
         setMetadataError(error);
         setWriteStatus('');
         setSnapshotError(undefined); setMetadataBlocked(true);
-        if (error instanceof CampaignApiError && error.status === 403) { setPermissionCheckError(undefined); campaignWorkspace?.reloadPermissions(); permissionResource.reload(); }
+        if (error instanceof CampaignApiError && error.status === 403) { setPermissionCheckError(undefined); refreshPermissions(); }
       }
       return undefined;
     } finally { metadataBusyRef.current = false; if (refreshQueuedRef.current && activeRef.current) { refreshQueuedRef.current = false; void refreshAll(); } }
@@ -375,7 +449,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
       stopPendingFields();
       setWriteError(error);
       setWriteStatus('');
-      if (error instanceof CampaignApiError && error.status === 403) { setPermissionCheckError(undefined); campaignWorkspace?.reloadPermissions(); permissionResource.reload(); }
+      if (error instanceof CampaignApiError && error.status === 403) { setPermissionCheckError(undefined); refreshPermissions(); }
       setSnapshotError(undefined); blockedRef.current = true; setSheetBlocked(true);
     } finally {
       contentBusyRef.current = false;
@@ -599,7 +673,10 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
       {(!field || !editorAllowed) && <Button variant="secondary" type="button" disabled={contentBusy} onClick={() => cancelField(fieldId)}>Отменить черновик</Button>}
     </article>;
   });
-  const retryInitialLoad = () => { metadataResource.reload(); permissionResource.reload(); sheetResource.reload(); presentationResource.reload(); };
+  const retryInitialLoad = () => {
+    if (playerScreenMode) { playerScreenResource.reload(); return; }
+    metadataResource.reload(); permissionResource.reload(); sheetResource.reload(); presentationResource.reload();
+  };
   const retryCardData = () => {
     if (initializedRef.current) { void refreshAll(); return; }
     if (!initialMetadata) metadataResource.reload();
@@ -612,7 +689,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
     canRead={gmCatalogPage ? catalogCanRead : readAllowed}
     canWrite={gmCatalogPage ? catalogCanWrite : canWrite && !permissionPending}
     permissionsPending={gmCatalogPage ? catalogAccessPending : permissionPending}
-    onForbidden={() => { permissionResource.reload(); campaignWorkspace?.reloadPermissions(); }}
+    onForbidden={refreshPermissions}
     characterName={metadata?.name}
     audience={mode}
     canPublishDefinition={Boolean(campaignWorkspace?.permissions.canWrite && !campaignWorkspace.permissionsLoading)}
@@ -649,7 +726,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
 
   if (!metadata || (!sheet && !gmCatalogPage)) {
     return <section className={characterStyles.sheetSection} aria-busy={!metadataResource.error && !sheetResource.error}>
-      {(metadataResource.error || sheetResource.error) ? <ApiError error={metadataResource.error ?? sheetResource.error} onRetry={retryInitialLoad} /> : <StatePanel kind="loading">Загрузка листа персонажа…</StatePanel>}
+      {(playerScreenResource.error || metadataResource.error || sheetResource.error) ? <ApiError error={playerScreenResource.error ?? metadataResource.error ?? sheetResource.error} onRetry={retryInitialLoad} /> : <StatePanel kind="loading">Загрузка листа персонажа…</StatePanel>}
     </section>;
   }
   const ensureMetadataDraft = () => setMetadataDraft(current => current ?? { name: metadata.name, importance: metadata.importance });
@@ -678,14 +755,14 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
     <ActionRow><IconButton icon="check" title="Сохранить описание" ariaLabel="Сохранить описание" size="small" variant="secondary" disabled={descriptionDraft === sheet.description || descriptionControlsDisabled} busy={contentBusy} onClick={saveDescription} /><IconButton icon="close" title="Отменить изменения описания" ariaLabel="Отменить изменения описания" size="small" variant="secondary" disabled={contentBusy || computedReadBusy} onClick={cancelDescription} /></ActionRow>
   </List> : readAllowed && !sheetInaccessible && sheet && (sheet.description || canWrite) ? <List layout="vertical" gap="small" stretch className={characterStyles.description}><List layout="horizontal" gap="small">{sheet.description && <span className={characterStyles.descriptionText}>{sheet.description}</span>}{canWrite && <IconButton icon="edit" title="Изменить описание" ariaLabel="Изменить описание" size="small" variant="secondary" disabled={descriptionControlsDisabled} onClick={() => { setDescriptionDraft(sheet.description); setWriteStatus(''); }} />}</List></List> : undefined;
   const identityActions = <ActionRow justify="end">
-    {mode === 'player' && <PlayerCharacterChooser campaignId={campaignId} characterId={characterId} onChoose={choosePlayerCharacter} />}
+    {mode === 'player' && <PlayerCharacterChooser campaignId={campaignId} characterId={characterId} onChoose={choosePlayerCharacter} availableCharacters={playerScreen?.availableCharacters ?? []} />}
     {currentPermissions && !currentPermissions.canWrite && <Badge>Только чтение</Badge>}
     {metadataDraft === undefined && metadataReadAllowed && canWrite && <IconButton icon="edit" title="Изменить сведения персонажа" ariaLabel="Изменить сведения персонажа" size="small" variant="secondary" disabled={metadataControlsDisabled} onClick={ensureMetadataDraft} />}
     {metadataDraft !== undefined && <><IconButton icon="check" title="Сохранить сведения персонажа" ariaLabel="Сохранить сведения персонажа" size="small" variant="secondary" disabled={!metadataDirty || metadataControlsDisabled} busy={metadataMutation.busy} onClick={() => void saveMetadata()} /><IconButton icon="close" title="Отменить изменения сведений персонажа" ariaLabel="Отменить изменения сведений персонажа" size="small" variant="secondary" disabled={metadataMutation.busy} onClick={cancelMetadata} /></>}
   </ActionRow>;
   const characterIdentity = headerViewKey
     ? <PresentationSurfaceFrame surface="header" title={identityTitle} titleAside={identityAside} description={identityDescription} actions={identityActions} headingLevel={2}>
-        {readAllowed && presentationSheet && !sheetInaccessible && <CharacterPresentation campaignId={campaignId} characterId={characterId} pageKey={surfaceContextKeys.header} surface="header" sheet={presentationSheet} conditionSheet={sheet} refreshKey={presentationRefreshKey} renderValue={editorAllowed ? renderValue : undefined} onVisibleFieldsChange={onHeaderVisibleFieldsChange} />}
+        {readAllowed && presentationSheet && !sheetInaccessible && <CharacterPresentation campaignId={campaignId} characterId={characterId} pageKey={surfaceContextKeys.header} surface="header" sheet={presentationSheet} conditionSheet={sheet} refreshKey={presentationRefreshKey} resolvedPresentation={playerScreen?.resolvedPresentations[surfaceContextKeys.header]} onRetryResolved={playerScreenMode ? () => void refreshAll() : undefined} renderValue={editorAllowed ? renderValue : undefined} onVisibleFieldsChange={onHeaderVisibleFieldsChange} />}
       </PresentationSurfaceFrame>
     : <PageHeader title={identityTitle} headingLevel={2} titleAside={identityAside} subtitle={identityDescription} actions={identityActions} />;
   const openCurrentPage = () => { if (pages[0]) goToPage(pages[0].key); };
@@ -699,7 +776,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
       {Boolean(writeError) && <ApiError error={writeError} onRetry={() => void refreshAll()} />}{Boolean(metadataError) && <ApiError error={metadataError} onRetry={() => void refreshAll()} />}
      </div> : <List layout="vertical" stretch>
        {characterIdentity}
-        {presentationUnavailable && <ApiError error={presentationError ?? presentationResource.error} onRetry={() => { presentationResource.reload(); setPresentationError(undefined); }} />}
+        {presentationUnavailable && <ApiError error={presentationError ?? presentationResource.error} onRetry={() => { if (playerScreenMode) void refreshAll(); else presentationResource.reload(); setPresentationError(undefined); }} />}
        <div className={characterStyles.tabNavigation}>
         <TabBar basePath={pageBase} aria-label="Страницы персонажа" tabs={pages.map(page => ({ id: page.key, label: page.title, path: page.key }))} />
          {mode === 'gm' && <div className={characterStyles.toolTabs}><TabBar basePath={pageBase} aria-label="Инструменты мастера" tabs={[{ id: 'all-stats', label: 'Все характеристики', path: 'all-stats' }, { id: 'inventory', label: 'Инвентарь', path: 'inventory' }, { id: 'skills', label: 'Навыки', path: 'skills' }]} /></div>}
@@ -716,7 +793,7 @@ const CharacterSheet: React.FC<CharacterSheetProps> = ({ campaignId, characterId
       {Boolean(snapshotError) && <ApiError error={snapshotError} onRetry={retrySnapshot} />}
       {Boolean(computedReadError) && <><ApiError error={computedReadError} /><Button variant="secondary" type="button" disabled={computedReadBusy || contentBusy || snapshotBusy} onClick={() => void refreshComputedSheet()}>Повторить обновление расчётов</Button></>}
         {gmStatsPage && readAllowed && presentationSheet && <CharacterStatsTable sheet={presentationSheet} renderValue={editorAllowed ? renderValue : undefined} onVisibleFieldsChange={onPageVisibleFieldsChange} />}
-       {pageNavigable && visiblePage && !pageRefreshConflict && presentationSheet && <CharacterPresentation campaignId={campaignId} characterId={characterId} pageKey={displayedPageKey!} surface="page" sheet={presentationSheet} conditionSheet={sheet} refreshKey={presentationRefreshKey} renderValue={editorAllowed ? renderValue : undefined} onVisibleFieldsChange={onPageVisibleFieldsChange} />}
+        {pageNavigable && visiblePage && !pageRefreshConflict && presentationSheet && <CharacterPresentation campaignId={campaignId} characterId={characterId} pageKey={displayedPageKey!} surface="page" sheet={presentationSheet} conditionSheet={sheet} refreshKey={presentationRefreshKey} resolvedPresentation={playerScreen?.resolvedPresentations[displayedPageKey!]} onRetryResolved={playerScreenMode ? () => void refreshAll() : undefined} renderValue={editorAllowed ? renderValue : undefined} onVisibleFieldsChange={onPageVisibleFieldsChange} />}
       {Boolean(writeError) && <ApiError error={writeError} onRetry={() => void refreshAll()} />}{Boolean(metadataError) && <ApiError error={metadataError} onRetry={() => void refreshAll()} />}
       {writeStatus && <Notification kind={writeStatusKind} eventKey={writeStatusEvent}>{writeStatus}</Notification>}
     </List>}

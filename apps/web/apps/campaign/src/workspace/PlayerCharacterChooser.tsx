@@ -1,10 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Field, Select, StatePanel } from '@tdn/shared';
+import { Field, Select } from '@tdn/shared';
 import { useAcceptedLocation, useWorkspace } from './Workspace';
-import { useResource } from './hooks';
-import type { CharacterMetadata, Permissions } from './types';
-import { ApiError } from './Feedback';
+import type { PlayerCharacterOption } from './types';
 
 export const playerSelectionKey = (sessionKey: string, campaignId: number) => `tdn.player.character.${encodeURIComponent(sessionKey)}.${campaignId}`;
 
@@ -13,34 +11,26 @@ type Props = {
   characterId?: string;
   onChoose: (characterId: string) => void;
   entry?: boolean;
+  availableCharacters: PlayerCharacterOption[];
 };
 
-export const PlayerCharacterChooser: React.FC<Props> = ({ campaignId, characterId = '', onChoose, entry = false }) => {
-  const { api, sessionKey, navigate, path } = useWorkspace();
-  const key = `${sessionKey}:${campaignId}:player-chooser`;
-  const characters = useResource<CharacterMetadata[]>(key, () => api.listCharacters(campaignId));
-  const permissions = useResource<Record<string, Permissions>>(`${key}:permissions`, async () => {
-    const list = await api.listCharacters(campaignId);
-    const results = await Promise.all(list.map(async character => [character.id, await api.characterPermissions(campaignId, character.id)] as const));
-    return Object.fromEntries(results);
-  });
-  const eligible = (characters.data ?? []).filter(character => permissions.data?.[character.id]?.canWrite === true);
+export const PlayerCharacterChooser: React.FC<Props> = ({ campaignId, characterId = '', onChoose, entry = false, availableCharacters }) => {
+  const { sessionKey, navigate, path } = useWorkspace();
+  const eligible = availableCharacters;
   const selectionKey = playerSelectionKey(sessionKey, campaignId);
   const saved = window.localStorage.getItem(selectionKey);
   const initial = eligible.find(character => character.id === saved);
   useEffect(() => {
-    if (entry && !characters.loading && !permissions.loading && !characters.error && !permissions.error && eligible.length === 1) {
+    if (entry && eligible.length === 1) {
       navigate(path(`/${campaignId}/player/characters/${encodeURIComponent(eligible[0].id)}`), { replace: true });
-    } else if (entry && !characters.loading && !permissions.loading && !characters.error && !permissions.error && eligible.length > 1 && initial) {
+    } else if (entry && eligible.length > 1 && initial) {
       navigate(path(`/${campaignId}/player/characters/${encodeURIComponent(initial.id)}`), { replace: true });
     }
-  }, [entry, characters.loading, permissions.loading, characters.error, permissions.error, eligible, initial, navigate, path, campaignId]);
+  }, [entry, eligible, initial, navigate, path, campaignId]);
   const choose = (id: string) => {
     if (!eligible.some(character => character.id === id)) return;
     onChoose(id);
   };
-  if ((characters.loading && !characters.data) || (permissions.loading && !permissions.data)) return <StatePanel kind="loading">Загрузка доступных персонажей…</StatePanel>;
-  if (characters.error || permissions.error) return <ApiError error={characters.error ?? permissions.error} onRetry={() => { characters.reload(); permissions.reload(); }} />;
   if (eligible.length < 2) return null;
   const selectedId = eligible.some(character => character.id === characterId) ? characterId : '';
   return <Field label="Персонаж" htmlFor="player-character-chooser"><Select variant="single-line" id="player-character-chooser" value={selectedId} onChange={event => choose(event.target.value)}>

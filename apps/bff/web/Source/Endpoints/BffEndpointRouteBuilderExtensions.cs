@@ -11,6 +11,7 @@ using Tdn.Bff.Errors;
 using Tdn.Bff.Security;
 using Tdn.Bff.Sessions;
 using Tdn.Bff.Oidc;
+using Tdn.Bff.PlayerScreens;
 
 namespace Tdn.Bff.Endpoints;
 
@@ -29,6 +30,11 @@ public static class BffEndpointRouteBuilderExtensions
 
         endpoints.MapGet(options.Endpoints.Session, async (HttpContext context, IAntiforgery antiforgery, IOptions<AntiforgeryOptions> antiforgeryOptions, ISessionTokenService sessionTokenService) =>
             await HandleSessionAsync(context, antiforgery, antiforgeryOptions.Value.HeaderName ?? "X-CSRF-TOKEN", sessionTokenService).ConfigureAwait(false));
+
+        endpoints.MapGet("/bff/api/player/campaigns/{campaignId:int}/characters", (HttpContext context, int campaignId, PlayerScreenService screens) =>
+            screens.ListCharactersAsync(context, campaignId)).RequireAuthorization();
+        endpoints.MapGet("/bff/api/player/campaigns/{campaignId:int}/characters/{characterId}", (HttpContext context, int campaignId, string characterId, PlayerScreenService screens) =>
+            screens.GetCharacterScreenAsync(context, campaignId, characterId)).RequireAuthorization();
 
         endpoints.MapPost(options.Endpoints.Logout, async (HttpContext context, IAntiforgeryRequestValidator antiforgeryValidator, IOptionsMonitor<OpenIdConnectOptions> oidcOptions) =>
             await HandleLogoutAsync(context, antiforgeryValidator, oidcOptions.Get(BffAuthenticationDefaults.Oidc).SignedOutRedirectUri, options.Web.PublicOrigin).ConfigureAwait(false))

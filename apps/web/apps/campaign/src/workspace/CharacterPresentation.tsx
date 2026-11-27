@@ -12,6 +12,8 @@ type Props = {
   campaignId: number;
   characterId: string;
   pageKey: string;
+  resolvedPresentation?: ResolvedPresentation;
+  onRetryResolved?: () => void;
   surface?: PresentationSurface;
   sheet: ComputedSheet;
   conditionSheet?: ComputedSheet;
@@ -39,10 +41,10 @@ export function editableBaseFields(roots: PresentationNode[], sheet: ComputedShe
   return [...ids];
 }
 
-const CharacterPresentation: React.FC<Props> = ({ campaignId, characterId, pageKey, surface = 'page', sheet, conditionSheet, refreshKey = 0, renderValue, onVisibleFieldsChange }) => {
+const CharacterPresentation: React.FC<Props> = ({ campaignId, characterId, pageKey, surface = 'page', sheet, conditionSheet, refreshKey = 0, resolvedPresentation, onRetryResolved, renderValue, onVisibleFieldsChange }) => {
   const { api, sessionKey } = useWorkspace();
   const scope = `${sessionKey}:${campaignId}:${characterId}:${pageKey}`;
-  const resolved = useResource<ResolvedPresentation>(scope, () => api.resolvePresentation(campaignId, pageKey));
+  const resolved = useResource<ResolvedPresentation>(scope, () => api.resolvePresentation(campaignId, pageKey), !resolvedPresentation);
   const previousRefreshKey = useRef(refreshKey);
   useEffect(() => {
     if (previousRefreshKey.current === refreshKey) return;
@@ -51,18 +53,21 @@ const CharacterPresentation: React.FC<Props> = ({ campaignId, characterId, pageK
   }, [refreshKey, resolved.reload]);
   const status = resolved.error && typeof resolved.error === 'object' && 'status' in resolved.error ? Number(resolved.error.status) : undefined;
   const inaccessible = status === 403 || status === 404;
-  const rendererAvailable = Boolean(resolved.data && !inaccessible);
-  const roots = useMemo(() => rendererAvailable && resolved.data ? normalizeRoots(resolved.data.viewContent.data.roots) : [], [rendererAvailable, resolved.data]);
+  const resolvedData = resolvedPresentation ?? resolved.data;
+  const resolvedError = resolvedPresentation ? undefined : resolved.error;
+  const resolvedLoading = resolvedPresentation ? false : resolved.loading;
+  const rendererAvailable = Boolean(resolvedData && !inaccessible);
+  const roots = useMemo(() => rendererAvailable && resolvedData ? normalizeRoots(resolvedData.viewContent.data.roots) : [], [rendererAvailable, resolvedData]);
   const visibleFields = useMemo(() => rendererAvailable ? editableBaseFields(roots, sheet) : [], [rendererAvailable, roots, sheet]);
   useEffect(() => { onVisibleFieldsChange?.(visibleFields); }, [onVisibleFieldsChange, visibleFields]);
   useEffect(() => () => { onVisibleFieldsChange?.([]); }, [onVisibleFieldsChange]);
 
   const surfaceLabel = surface === 'header' ? 'Шапка персонажа' : surface === 'card' ? 'Карточка персонажа' : 'Страница персонажа';
-  return <section className={styles.section} aria-label={surfaceLabel} aria-busy={resolved.loading}>
-    {resolved.loading && !resolved.data && <StatePanel kind="loading">Загрузка: {surfaceLabel.toLocaleLowerCase()}…</StatePanel>}
-    {Boolean(resolved.error) && <div className={styles.recovery}><ApiError error={resolved.error} /><Button variant="secondary" type="button" onClick={() => resolved.reload()}>Повторить загрузку</Button></div>}
-    {rendererAvailable && resolved.data ? <>
-      {resolved.data.viewContent.data.roots.length === 0 ? <div className={styles.emptyCanvas} aria-label={`Пустое отображение: ${surfaceLabel}`} /> : <PresentationRenderer roots={roots} sheet={sheet} conditionSheet={conditionSheet} surface={surface} renderValue={renderValue} />}
+  return <section className={styles.section} aria-label={surfaceLabel} aria-busy={resolvedLoading}>
+    {resolvedLoading && !resolvedData && <StatePanel kind="loading">Загрузка: {surfaceLabel.toLocaleLowerCase()}…</StatePanel>}
+    {Boolean(resolvedError) && <div className={styles.recovery}><ApiError error={resolvedError} /><Button variant="secondary" type="button" onClick={() => onRetryResolved ? onRetryResolved() : resolved.reload()}>Повторить загрузку</Button></div>}
+    {rendererAvailable && resolvedData ? <>
+      {resolvedData.viewContent.data.roots.length === 0 ? <div className={styles.emptyCanvas} aria-label={`Пустое отображение: ${surfaceLabel}`} /> : <PresentationRenderer roots={roots} sheet={sheet} conditionSheet={conditionSheet} surface={surface} renderValue={renderValue} />}
     </> : null}
   </section>;
 };
