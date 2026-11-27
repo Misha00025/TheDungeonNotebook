@@ -665,7 +665,7 @@
 }
 
 .groupChildren {
-  grid-template-columns: repeat(var(--presentation-columns, 1), minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(18rem, calc((100% - (var(--presentation-columns, 1) - 1) * var(--group-column-gap, 1rem)) / var(--presentation-columns, 1)))), 1fr));
 }
 
 .rowChildren {
