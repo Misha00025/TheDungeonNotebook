@@ -455,7 +455,7 @@ export async function executeHeroImport(api: HeroImportApi, campaignId: number, 
             if (!api.addCharacterEntry) throw new Error('API не поддерживает назначение определения.');
             for (const requestId of step.requestIds) {
               if (!canContinue()) throw new Error('Импорт остановлен до назначения следующей записи.');
-              await api.addCharacterEntry(campaignId, 'Item', target.metadata.id, { requestId, catalogEntryId: step.catalogEntryId, attributes: [] });
+              await api.addCharacterEntry(campaignId, step.catalogKind, target.metadata.id, { requestId, catalogEntryId: step.catalogEntryId, attributes: [] });
             }
           }
         }

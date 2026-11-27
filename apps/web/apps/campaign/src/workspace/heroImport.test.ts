@@ -274,4 +274,56 @@ describe('hero import planning and execution', () => {
       expect.objectContaining({ id: 'record-b', quantity: null })
     ]);
   });
+
+  it('imports a selected legacy skill onto an existing character', async () => {
+    const picked = hero('Picked');
+    picked.sourceId = '1';
+    const skill = hero('Stealth');
+    skill.sourceId = '43';
+    const skillRow: LegacyObject = { name: 'Stealth assignment', sourceId: undefined, data: { characterOldId: 1, skillOldId: 43 }, fields: [], properties: [] };
+    const catalogSources = collectHeroCatalogSources(picked, [picked], [], [skill], [], [skillRow]);
+    const skillSource = catalogSources.find(catalogSource => catalogSource.kind === 'Skill')!;
+    const skillDefinition: CatalogMetadata = { id: 'catalog-skill', campaignId: 4, kind: 'Skill', name: 'Stealth', creatorUserId: null, isHidden: false, quantityUnit: 'Single', allowNegative: false, metadataRevision: 1 };
+    const draft = createHeroDraft(picked, 0, catalogSources);
+    draft.selected = true;
+    draft.targetMode = 'existing';
+    draft.targetId = 'existing';
+    draft.selectSkills = true;
+    draft.catalogMappings[skillSource.key] = skillDefinition.id;
+    const result = prepareHeroImport([picked], [draft], {
+      ...context({ existing: { metadata: metadata(), sheet: sheet(), itemEntries: [], skillEntries: [] } }),
+      itemDefinitions: [],
+      skillDefinitions: [skillDefinition]
+    }, {}, undefined, { 0: catalogSources });
+    expect(result.errors).toEqual([]);
+    const plan = result.plan!;
+    const store: CharacterCatalogEntryEnvelope[] = [];
+    const api = apiFactory() as ReturnType<typeof apiFactory> & {
+      listCharacterEntries: ReturnType<typeof vi.fn>;
+      addCharacterEntry: ReturnType<typeof vi.fn>;
+    };
+    api.listCharacterEntries = vi.fn(async () => store);
+    api.addCharacterEntry = vi.fn(async (_campaignId: number, _kind: string, characterId: string, body: { requestId: string; catalogEntryId: string; attributes: [] }) => {
+      const entry: CharacterCatalogEntryEnvelope = {
+        record: { id: 'skill-record', campaignId: 4, characterId, catalogEntryId: body.catalogEntryId, quantity: null, metadataRevision: 1 },
+        definition: skillDefinition,
+        definitionDescription: '',
+        effectiveAttributes: [],
+        explicitAttributes: [],
+        definitionContentRevision: 1,
+        localContentRevision: 1
+      };
+      store.push(entry);
+      return { requestId: body.requestId, entry };
+    });
+
+    const run = await execute(api, plan);
+
+    expect(store).toHaveLength(1);
+    expect(store[0].record).toMatchObject({ characterId: 'existing', catalogEntryId: skillDefinition.id });
+    expect(run.statuses['0:catalog:Skill:catalog-skill']).toBe('applied');
+    expect(api.addCharacterEntry.mock.calls[0][1]).toBe('Skill');
+    expect(api.addCharacterEntry.mock.calls[0][3]).toMatchObject({ catalogEntryId: skillDefinition.id });
+    expect(api.addCharacterEntry.mock.calls[0][3]).not.toHaveProperty('quantity');
+  });
 });
